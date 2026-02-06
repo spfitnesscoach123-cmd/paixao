@@ -80,6 +80,20 @@ export default function DataScreen() {
         <Text style={styles.headerSubtitle}>Visão geral dos seus atletas</Text>
       </View>
 
+      <TouchableOpacity
+        style={styles.uploadCatapultButton}
+        onPress={() => router.push('/upload-catapult')}
+      >
+        <Ionicons name="cloud-upload" size={24} color="#2563eb" />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.uploadButtonTitle}>Importar CSV Catapult</Text>
+          <Text style={styles.uploadButtonSubtitle}>
+            Importar dados GPS para múltiplos atletas
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={24} color="#2563eb" />
+      </TouchableOpacity>
+
       <View style={styles.statsGrid}>
         <View style={styles.statCardWrapper}>
           <StatCard
