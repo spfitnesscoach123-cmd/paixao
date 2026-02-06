@@ -112,12 +112,15 @@ class GPSDataCreate(BaseModel):
     athlete_id: str
     date: str
     total_distance: float  # meters
-    high_intensity_distance: float  # meters
-    sprint_distance: float  # meters
+    high_intensity_distance: float  # HID 14.4-19.8 km/h in meters
+    high_speed_running: Optional[float] = None  # HSR 19.8-25.2 km/h in meters  
+    sprint_distance: float  # 25.3+ km/h in meters
     number_of_sprints: int
     number_of_accelerations: int
     number_of_decelerations: int
     max_speed: Optional[float] = None  # km/h
+    max_acceleration: Optional[float] = None
+    max_deceleration: Optional[float] = None
     notes: Optional[str] = None
 
 class GPSData(BaseModel):
