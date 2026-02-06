@@ -1,38 +1,43 @@
-// Spectral Dark Theme
+// Spectral Dark Theme - Violeta/Azul
 export const colors = {
-  // Backgrounds
+  // Backgrounds - Azul escuro para preto
   dark: {
     primary: '#0a0e1a',
-    secondary: '#1a1f2e',
-    tertiary: '#1e293b',
-    card: 'rgba(30, 41, 59, 0.8)',
-    cardSolid: '#1e293b',
+    secondary: '#0f1629',
+    tertiary: '#151c32',
+    card: 'rgba(21, 28, 50, 0.9)',
+    cardSolid: '#151c32',
   },
   
-  // Spectral Colors
-  spectral: {
-    cyan: '#00d4ff',
-    blue: '#0ea5e9',
-    teal: '#22d3ee',
-    green: '#00ff88',
-    emerald: '#10b981',
-    purple: '#a78bfa',
-    pink: '#f472b6',
+  // Cores principais - Violeta para Azul
+  accent: {
+    primary: '#8b5cf6',    // Violeta principal
+    secondary: '#7c3aed',  // Violeta mais escuro
+    tertiary: '#6366f1',   // Indigo
+    blue: '#3b82f6',       // Azul
+    light: '#a78bfa',      // Violeta claro
   },
   
-  // Gradients
+  // Gradientes - Violeta para Azul
   gradients: {
-    cyan: ['#00d4ff', '#0ea5e9'],
-    green: ['#00ff88', '#10b981'],
-    purple: ['#a78bfa', '#8b5cf6'],
-    blue: ['#3b82f6', '#1e40af'],
-    teal: ['#22d3ee', '#06b6d4'],
-    pink: ['#f472b6', '#ec4899'],
+    primary: ['#8b5cf6', '#3b82f6'],      // Violeta -> Azul (principal)
+    secondary: ['#7c3aed', '#2563eb'],    // Violeta escuro -> Azul escuro
+    accent: ['#a78bfa', '#6366f1'],       // Violeta claro -> Indigo
+    button: ['#8b5cf6', '#6366f1'],       // Botões
+    card: ['rgba(139, 92, 246, 0.15)', 'rgba(59, 130, 246, 0.05)'], // Cards
+    dark: ['#0f1629', '#0a0e1a'],         // Background
+  },
+  
+  // Cores de destaque
+  highlight: {
+    cyan: '#22d3ee',
+    green: '#10b981',
+    emerald: '#34d399',
   },
   
   // Text
   text: {
-    primary: '#e2e8f0',
+    primary: '#f1f5f9',
     secondary: '#94a3b8',
     tertiary: '#64748b',
     disabled: '#475569',
@@ -40,23 +45,23 @@ export const colors = {
   
   // Status
   status: {
-    success: '#00ff88',
-    warning: '#fbbf24',
+    success: '#10b981',
+    warning: '#f59e0b',
     error: '#ef4444',
-    info: '#00d4ff',
+    info: '#8b5cf6',
   },
   
   // Borders
   border: {
-    default: 'rgba(148, 163, 184, 0.1)',
-    active: '#00d4ff',
-    glow: 'rgba(0, 212, 255, 0.3)',
+    default: 'rgba(139, 92, 246, 0.2)',
+    active: '#8b5cf6',
+    glow: 'rgba(139, 92, 246, 0.4)',
   },
 };
 
 export const shadows = {
   card: {
-    shadowColor: '#00d4ff',
+    shadowColor: '#8b5cf6',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -70,10 +75,17 @@ export const shadows = {
     elevation: 4,
   },
   glow: {
-    shadowColor: '#00ff88',
+    shadowColor: '#8b5cf6',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.6,
     shadowRadius: 20,
     elevation: 12,
+  },
+  button: {
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
   },
 };
