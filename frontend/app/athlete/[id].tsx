@@ -41,6 +41,12 @@ interface GroupedSession {
 
 type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
 
+// Track selected period within each session
+interface SelectedPeriod {
+  sessionId: string;
+  periodIndex: number;
+}
+
 export default function AthleteDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -49,6 +55,7 @@ export default function AthleteDetails() {
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [refreshing, setRefreshing] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod | null>(null);
 
   const { data: athlete, isLoading: athleteLoading } = useQuery({
     queryKey: ['athlete', id],
