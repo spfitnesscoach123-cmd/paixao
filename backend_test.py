@@ -171,11 +171,13 @@ class BackendTester:
         # Test 2: Create athlete with auth
         status_code, response = self.make_request("POST", "/athletes", athlete_data, use_auth=True)
         if status_code == 201 or status_code == 200:
-            if "id" in response:
-                self.test_athlete_id = response["id"]
+            # Handle both "id" and "_id" field names
+            athlete_id = response.get("id") or response.get("_id")
+            if athlete_id:
+                self.test_athlete_id = athlete_id
                 self.log_result("athletes", "Create Athlete", True, f"Created athlete with ID: {self.test_athlete_id}", status_code)
             else:
-                self.log_result("athletes", "Create Athlete", False, "No athlete ID in response", status_code)
+                self.log_result("athletes", "Create Athlete", False, f"No athlete ID in response: {response}", status_code)
         else:
             self.log_result("athletes", "Create Athlete", False, f"Failed to create athlete: {response}", status_code)
             return
