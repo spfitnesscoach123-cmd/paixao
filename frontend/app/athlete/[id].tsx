@@ -14,10 +14,10 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
-import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment } from '../../types';
+import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format } from 'date-fns';
 
-type TabType = 'info' | 'gps' | 'wellness' | 'assessments';
+type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
 
 export default function AthleteDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
