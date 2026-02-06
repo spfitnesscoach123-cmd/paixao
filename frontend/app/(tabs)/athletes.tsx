@@ -16,10 +16,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { Athlete } from '../../types';
 import { colors } from '../../constants/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function AthletesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: athletes, isLoading } = useQuery({
