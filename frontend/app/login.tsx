@@ -14,6 +14,8 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors } from '../constants/theme';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -44,64 +46,102 @@ export default function Login() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+      <LinearGradient
+        colors={[colors.dark.primary, colors.dark.secondary]}
+        style={styles.background}
       >
-        <View style={styles.header}>
-          <Ionicons name="football" size={64} color="#2563eb" />
-          <Text style={styles.title}>Football Training</Text>
-          <Text style={styles.subtitle}>Sistema de Prescrição de Treinamentos</Text>
-        </View>
-
-        <View style={styles.form}>
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#6b7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoComplete="email"
-            />
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <View style={styles.iconGlow}>
+              <LinearGradient
+                colors={colors.gradients.cyan}
+                style={styles.iconGradient}
+              >
+                <Ionicons name="football" size={48} color="#ffffff" />
+              </LinearGradient>
+            </View>
+            <Text style={styles.title}>Football Training</Text>
+            <Text style={styles.subtitle}>Sistema Avançado de Prescrição</Text>
+            <View style={styles.spectralLine} />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#6b7280" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-            />
+          <View style={styles.form}>
+            <View style={[styles.inputContainer, styles.glowEffect]}>
+              <Ionicons name="mail-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={colors.text.tertiary}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+            </View>
+
+            <View style={[styles.inputContainer, styles.glowEffect]}>
+              <Ionicons name="lock-closed-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Senha"
+                placeholderTextColor={colors.text.tertiary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.button}
+              onPress={handleLogin}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={colors.gradients.cyan}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.buttonGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.buttonText}>Entrar</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.registerLink}
+              onPress={() => router.push('/register')}
+            >
+              <Text style={styles.registerText}>
+                Não tem uma conta? <Text style={styles.registerTextBold}>Registre-se</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.buttonText}>Entrar</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.registerLink}
-            onPress={() => router.push('/register')}
-          >
-            <Text style={styles.registerText}>
-              Não tem uma conta? <Text style={styles.registerTextBold}>Registre-se</Text>
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+          <View style={styles.features}>
+            <View style={styles.featureItem}>
+              <Ionicons name="analytics" size={24} color={colors.spectral.green} />
+              <Text style={styles.featureText}>Análise com IA</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="stats-chart" size={24} color={colors.spectral.teal} />
+              <Text style={styles.featureText}>ACWR & Fadiga</Text>
+            </View>
+            <View style={styles.featureItem}>
+              <Ionicons name="people" size={24} color={colors.spectral.purple} />
+              <Text style={styles.featureText}>Comparações</Text>
+            </View>
+          </View>
+        </ScrollView>
+      </LinearGradient>
     </KeyboardAvoidingView>
   );
 }
@@ -109,7 +149,9 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+  },
+  background: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
@@ -120,17 +162,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
+  iconGlow: {
+    marginBottom: 20,
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+    elevation: 10,
+  },
+  iconGradient: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#111827',
-    marginTop: 16,
+    color: colors.text.primary,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
+    color: colors.spectral.cyan,
     textAlign: 'center',
+    fontWeight: '600',
+    letterSpacing: 1,
+  },
+  spectralLine: {
+    width: 60,
+    height: 3,
+    backgroundColor: colors.spectral.green,
+    marginTop: 12,
+    borderRadius: 2,
+    shadowColor: colors.spectral.green,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 10,
   },
   form: {
     width: '100%',
@@ -138,12 +207,18 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(0, 212, 255, 0.2)',
     marginBottom: 16,
     paddingHorizontal: 16,
+  },
+  glowEffect: {
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
   },
   inputIcon: {
     marginRight: 12,
@@ -152,23 +227,28 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 56,
     fontSize: 16,
-    color: '#111827',
+    color: colors.text.primary,
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  buttonGradient: {
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: '#93c5fd',
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
+    letterSpacing: 1,
   },
   registerLink: {
     marginTop: 24,
@@ -176,10 +256,24 @@ const styles = StyleSheet.create({
   },
   registerText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.text.secondary,
   },
   registerTextBold: {
-    color: '#2563eb',
+    color: colors.spectral.green,
+    fontWeight: '700',
+  },
+  features: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 48,
+  },
+  featureItem: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  featureText: {
+    fontSize: 11,
+    color: colors.text.secondary,
     fontWeight: '600',
   },
 });
