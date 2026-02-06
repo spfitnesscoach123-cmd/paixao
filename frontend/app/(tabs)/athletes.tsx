@@ -54,7 +54,8 @@ export default function AthletesScreen() {
       activeOpacity={0.8}
     >
       <LinearGradient
-        colors={['rgba(0, 212, 255, 0.1)', 'rgba(0, 255, 136, 0.05)']}        start={{ x: 0, y: 0 }}
+        colors={colors.gradients.card}
+        start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.cardGradient}
       >
@@ -69,18 +70,18 @@ export default function AthletesScreen() {
             </View>
           ) : (
             <View style={styles.athletePhotoPlaceholder}>
-              <Ionicons name="person" size={28} color={colors.spectral.cyan} />
+              <Ionicons name="person" size={28} color={colors.accent.primary} />
             </View>
           )}
           <View style={styles.athleteInfo}>
             <Text style={styles.athleteName}>{item.name}</Text>
             <View style={styles.athleteDetails}>
               <View style={styles.detailBadge}>
-                <Ionicons name="calendar-outline" size={12} color={colors.spectral.green} />
+                <Ionicons name="calendar-outline" size={12} color={colors.accent.light} />
                 <Text style={styles.detailText}>{calculateAge(item.birth_date)} anos</Text>
               </View>
               <View style={styles.detailBadge}>
-                <Ionicons name="football-outline" size={12} color={colors.spectral.teal} />
+                <Ionicons name="football-outline" size={12} color={colors.accent.tertiary} />
                 <Text style={styles.detailText}>{item.position}</Text>
               </View>
             </View>
@@ -99,7 +100,7 @@ export default function AthletesScreen() {
               </View>
             )}
           </View>
-          <Ionicons name="chevron-forward" size={24} color={colors.spectral.cyan} />
+          <Ionicons name="chevron-forward" size={24} color={colors.accent.primary} />
         </View>
       </LinearGradient>
     </TouchableOpacity>
@@ -108,7 +109,7 @@ export default function AthletesScreen() {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.spectral.cyan} />
+        <ActivityIndicator size="large" color={colors.accent.primary} />
       </View>
     );
   }
@@ -124,13 +125,13 @@ export default function AthletesScreen() {
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh}
-            tintColor={colors.spectral.cyan}
+            tintColor={colors.accent.primary}
           />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconGlow}>
-              <Ionicons name="people-outline" size={64} color={colors.spectral.cyan} />
+              <Ionicons name="people-outline" size={64} color={colors.accent.primary} />
             </View>
             <Text style={styles.emptyText}>Nenhum atleta cadastrado</Text>
             <Text style={styles.emptySubtext}>
@@ -145,7 +146,7 @@ export default function AthletesScreen() {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={colors.gradients.green}
+          colors={colors.gradients.primary}
           style={styles.fabGradient}
         >
           <Ionicons name="add" size={32} color="#ffffff" />
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 255, 0.2)',
+    borderColor: colors.border.default,
   },
   cardGradient: {
     backgroundColor: colors.dark.card,
@@ -193,14 +194,14 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     borderWidth: 2,
-    borderColor: colors.spectral.cyan,
+    borderColor: colors.accent.primary,
   },
   photoGlow: {
     position: 'absolute',
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.spectral.cyan,
+    backgroundColor: colors.accent.primary,
     opacity: 0.2,
     top: 0,
     left: 0,
@@ -209,9 +210,9 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     borderWidth: 2,
-    borderColor: 'rgba(0, 212, 255, 0.3)',
+    borderColor: colors.border.default,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -235,7 +236,7 @@ const styles = StyleSheet.create({
   detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -256,7 +257,7 @@ const styles = StyleSheet.create({
     paddingVertical: 64,
   },
   emptyIconGlow: {
-    shadowColor: colors.spectral.cyan,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     overflow: 'hidden',
-    shadowColor: colors.spectral.green,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.6,
     shadowRadius: 20,
