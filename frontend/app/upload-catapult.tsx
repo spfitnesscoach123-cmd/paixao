@@ -316,17 +316,23 @@ export default function UploadCatapultCSV() {
             {unmatchedPlayers.length > 0 && (
               <View style={styles.unmatchSection}>
                 <Text style={styles.unmatchTitle}>
-                  ⚠️ Não Encontrados ({unmatchedPlayers.length})
+                  ➕ Novos Atletas ({unmatchedPlayers.length})
+                </Text>
+                <Text style={styles.unmatchSubtitle}>
+                  Esses atletas não estão cadastrados e serão criados automaticamente:
                 </Text>
                 {unmatchedPlayers.map(playerName => (
                   <View key={playerName} style={styles.unmatchItem}>
-                    <Ionicons name="alert-circle" size={16} color="#f59e0b" />
+                    <Ionicons name="person-add" size={16} color="#2563eb" />
                     <Text style={styles.unmatchText}>{playerName}</Text>
                   </View>
                 ))}
-                <Text style={styles.unmatchHint}>
-                  Cadastre esses atletas no sistema antes de importar os dados.
-                </Text>
+                <View style={styles.unmatchInfo}>
+                  <Ionicons name="information-circle" size={16} color="#6b7280" />
+                  <Text style={styles.unmatchInfoText}>
+                    Posição: "Não especificado" (edite depois)
+                  </Text>
+                </View>
               </View>
             )}
 
