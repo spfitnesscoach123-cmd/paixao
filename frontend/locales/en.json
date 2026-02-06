@@ -44,7 +44,16 @@
     "acceptTerms": "I have read and accept the",
     "termsOfUse": "Terms of Use",
     "and": "and the",
-    "privacyPolicy": "Privacy Policy"
+    "privacyPolicy": "Privacy Policy",
+    "fillAllFields": "Please fill in all fields",
+    "invalidCredentials": "Invalid credentials. Please login again.",
+    "enableBiometrics": "Enable Biometrics?",
+    "biometricsPrompt": "Would you like to enable FaceID/fingerprint login for next time?",
+    "loginWithFaceID": "Login with FaceID",
+    "loginWithBiometrics": "Login with Biometrics",
+    "passwordsDoNotMatch": "Passwords do not match",
+    "passwordMinLength": "Password must be at least 6 characters",
+    "mustAcceptTerms": "You must accept the Terms of Use and Privacy Policy"
   },
   "tabs": {
     "athletes": "Athletes",
