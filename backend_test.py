@@ -28,7 +28,8 @@ class BackendTester:
             "athletes": [],
             "gps_data": [],
             "wellness": [],
-            "assessments": []
+            "assessments": [],
+            "cleanup": []
         }
         
     def log_result(self, category: str, test_name: str, success: bool, details: str = "", response_code: int = None):
