@@ -34,7 +34,21 @@
     "loginTitle": "足球训练",
     "loginSubtitle": "高级处方系统",
     "registerTitle": "创建账户",
-    "registerSubtitle": "加入平台"
+    "registerSubtitle": "加入平台",
+    "fillAllFields": "请填写所有字段",
+    "invalidCredentials": "凭证无效，请重新登录",
+    "enableBiometrics": "启用生物识别？",
+    "biometricsPrompt": "是否启用面容ID/指纹登录？",
+    "loginWithFaceID": "面容ID登录",
+    "loginWithBiometrics": "生物识别登录",
+    "passwordsDoNotMatch": "密码不匹配",
+    "passwordMinLength": "密码至少需要6个字符",
+    "mustAcceptTerms": "您必须接受使用条款和隐私政策",
+    "logoutConfirm": "确定要退出登录吗？",
+    "acceptTerms": "我已阅读并接受",
+    "termsOfUse": "使用条款",
+    "and": "和",
+    "privacyPolicy": "隐私政策"
   },
   "tabs": {
     "athletes": "运动员",
@@ -73,11 +87,24 @@
     "muscleSoreness": "肌肉酸痛",
     "stress": "压力",
     "mood": "情绪",
-    "readiness": "准备状态"
+    "readiness": "准备状态",
+    "generateLink": "生成健康链接"
   },
   "settings": {
     "title": "设置",
     "language": "语言",
-    "selectLanguage": "选择语言"
+    "selectLanguage": "选择语言",
+    "account": "账户",
+    "subscriptionTools": "订阅与工具",
+    "manageSubscription": "管理订阅",
+    "legal": "法律信息",
+    "about": "关于",
+    "version": "版本",
+    "logout": "退出登录"
+  },
+  "features": {
+    "aiAnalysis": "AI分析",
+    "acwrFatigue": "ACWR与疲劳",
+    "comparisons": "比较"
   }
 }
