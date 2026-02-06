@@ -209,13 +209,18 @@ export default function AthleteDetails() {
             </View>
 
             {gpsLoading ? (
-              <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 32 }} />
+              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
             ) : gpsData && gpsData.length > 0 ? (
-              gpsData.map((item) => (
-                <View key={item.id} style={styles.dataCard}>
+              gpsData.map((item, index) => (
+                <View key={item.id || `gps-${index}`} style={styles.dataCard}>
                   <View style={styles.dataHeader}>
-                    <Ionicons name="location" size={20} color="#2563eb" />
+                    <Ionicons name="location" size={20} color={colors.accent.primary} />
                     <Text style={styles.dataDate}>{item.date}</Text>
+                    {item.notes && (
+                      <View style={styles.periodBadge}>
+                        <Text style={styles.periodText}>{item.notes.replace('Período: ', '')}</Text>
+                      </View>
+                    )}
                   </View>
                   <View style={styles.dataGrid}>
                     <View style={styles.dataItem}>
@@ -235,14 +240,11 @@ export default function AthleteDetails() {
                       <Text style={styles.dataValue}>{item.max_speed?.toFixed(1) || '-'} km/h</Text>
                     </View>
                   </View>
-                  {item.notes && (
-                    <Text style={styles.dataNotes}>{item.notes}</Text>
-                  )}
                 </View>
               ))
             ) : (
               <View style={styles.emptyState}>
-                <Ionicons name="location-outline" size={48} color="#d1d5db" />
+                <Ionicons name="location-outline" size={48} color={colors.text.tertiary} />
                 <Text style={styles.emptyText}>Nenhum dado GPS registrado</Text>
               </View>
             )}
