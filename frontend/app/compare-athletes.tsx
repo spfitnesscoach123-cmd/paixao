@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { Athlete, GPSData } from '../types';
 import { colors } from '../constants/theme';
+import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const ATHLETE_COLORS = [
   '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
@@ -45,11 +47,22 @@ interface QuadrantData {
 
 export default function CompareAthletes() {
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  const { t } = useLanguage();
   const [compareMode, setCompareMode] = useState<CompareMode>('athletes');
   const [selectedAthletes, setSelectedAthletes] = useState<string[]>([]);
   const [selectedAthlete, setSelectedAthlete] = useState<string | null>(null);
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('all');
+  const [gpsDataMap, setGpsDataMap] = useState<{ [athleteId: string]: GPSData[] }>({});
+  const [loadingGpsFor, setLoadingGpsFor] = useState<string[]>([]);
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.replace('/login');
+    }
+  }, [authLoading, user]);
 
   const { data: athletes, isLoading: loadingAthletes } = useQuery({
     queryKey: ['athletes'],
@@ -57,28 +70,41 @@ export default function CompareAthletes() {
       const response = await api.get<Athlete[]>('/athletes');
       return response.data;
     },
+    enabled: !!user,
   });
 
-  const { data: allGpsData, isLoading: loadingGps } = useQuery({
-    queryKey: ['all-gps-data', athletes?.length],
-    queryFn: async () => {
-      if (!athletes || athletes.length === 0) return {};
-      const gpsMap: { [athleteId: string]: GPSData[] } = {};
-      
-      for (const athlete of athletes) {
-        const id = athlete.id || athlete._id;
-        if (!id) continue;
-        try {
-          const response = await api.get<GPSData[]>(`/gps-data/athlete/${id}`);
-          gpsMap[id] = response.data || [];
-        } catch (error) {
-          gpsMap[id] = [];
-        }
-      }
-      return gpsMap;
-    },
-    enabled: !!athletes && athletes.length > 0,
-  });
+  // Load GPS data on demand for selected athletes
+  const loadGpsDataForAthlete = async (athleteId: string) => {
+    if (gpsDataMap[athleteId] || loadingGpsFor.includes(athleteId)) return;
+    
+    setLoadingGpsFor(prev => [...prev, athleteId]);
+    try {
+      const response = await api.get<GPSData[]>(`/gps-data/athlete/${athleteId}`);
+      setGpsDataMap(prev => ({ ...prev, [athleteId]: response.data || [] }));
+    } catch (error) {
+      console.log('Error loading GPS data for', athleteId);
+      setGpsDataMap(prev => ({ ...prev, [athleteId]: [] }));
+    } finally {
+      setLoadingGpsFor(prev => prev.filter(id => id !== athleteId));
+    }
+  };
+
+  // Load GPS data when athletes are selected
+  useEffect(() => {
+    if (compareMode === 'athletes') {
+      selectedAthletes.forEach(id => loadGpsDataForAthlete(id));
+    } else if (compareMode === 'sessions' && selectedAthlete) {
+      loadGpsDataForAthlete(selectedAthlete);
+    } else if (compareMode === 'position-group' && athletes) {
+      selectedPositions.forEach(position => {
+        const positionAthletes = athletes.filter(a => a.position === position);
+        positionAthletes.forEach(a => {
+          const id = a.id || a._id;
+          if (id) loadGpsDataForAthlete(id);
+        });
+      });
+    }
+  }, [selectedAthletes, selectedAthlete, selectedPositions, compareMode, athletes]);
 
   const positions = useMemo(() => {
     if (!athletes) return [];
@@ -95,14 +121,14 @@ export default function CompareAthletes() {
   };
 
   const quadrantData: QuadrantData[] = useMemo(() => {
-    if (!athletes || !allGpsData) return [];
+    if (!athletes) return [];
 
     const data: QuadrantData[] = [];
 
     if (compareMode === 'athletes') {
       selectedAthletes.forEach((athleteId, index) => {
         const athlete = athletes.find(a => (a.id || a._id) === athleteId);
-        const gpsData = filterByDate(allGpsData[athleteId] || []);
+        const gpsData = filterByDate(gpsDataMap[athleteId] || []);
         
         if (athlete && gpsData.length > 0) {
           const avgTotalDistance = gpsData.reduce((sum, d) => sum + (d.total_distance || 0), 0) / gpsData.length;
@@ -122,10 +148,10 @@ export default function CompareAthletes() {
       });
     } else if (compareMode === 'sessions' && selectedAthlete) {
       const athlete = athletes.find(a => (a.id || a._id) === selectedAthlete);
-      const gpsData = filterByDate(allGpsData[selectedAthlete] || []);
+      const gpsData = filterByDate(gpsDataMap[selectedAthlete] || []);
       
       gpsData.forEach((session, index) => {
-        const periodName = session.notes?.replace('Período: ', '') || `Sessão ${index + 1}`;
+        const periodName = session.notes?.replace('Período: ', '') || `${t('gps.session')} ${index + 1}`;
         if (!isNaN(session.total_distance) && !isNaN(session.high_intensity_distance)) {
           data.push({
             id: `${session.id || index}`,
@@ -148,7 +174,7 @@ export default function CompareAthletes() {
         positionAthletes.forEach(athlete => {
           const athleteId = athlete.id || athlete._id;
           if (!athleteId) return;
-          const gpsData = filterByDate(allGpsData[athleteId] || []);
+          const gpsData = filterByDate(gpsDataMap[athleteId] || []);
           
           gpsData.forEach(d => {
             totalDistance += d.total_distance || 0;
@@ -171,7 +197,7 @@ export default function CompareAthletes() {
     }
 
     return data;
-  }, [athletes, allGpsData, compareMode, selectedAthletes, selectedAthlete, selectedPositions, dateRange]);
+  }, [athletes, gpsDataMap, compareMode, selectedAthletes, selectedAthlete, selectedPositions, dateRange, t]);
 
   const toggleAthlete = (athleteId: string) => {
     if (selectedAthletes.includes(athleteId)) {
@@ -188,9 +214,6 @@ export default function CompareAthletes() {
       setSelectedPositions([...selectedPositions, position]);
     }
   };
-
-  const chartWidth = Dimensions.get('window').width - 48;
-  const chartHeight = 280;
 
   // Calculate chart bounds with safety checks
   const chartBounds = useMemo(() => {
@@ -220,46 +243,59 @@ export default function CompareAthletes() {
     return { minX, maxX, minY, maxY, medianX: medX, medianY: medY };
   }, [quadrantData]);
 
-  const isLoading = loadingAthletes;
-  const isLoadingGps = loadingGps;
+  const isLoading = loadingAthletes || authLoading;
+  const isLoadingGps = loadingGpsFor.length > 0;
 
   const renderQuadrantChart = () => {
-    if (quadrantData.length === 0) {
+    if (isLoadingGps && quadrantData.length === 0) {
       return (
         <View style={styles.emptyChart}>
-          <Ionicons name="analytics-outline" size={48} color={colors.text.tertiary} />
-          <Text style={styles.emptyChartText}>Selecione atletas ou posições para comparar</Text>
+          <ActivityIndicator size="large" color={colors.accent.primary} />
+          <Text style={styles.emptyChartText}>{t('common.loading')}</Text>
         </View>
       );
     }
 
-    const { minX, maxX, minY, maxY, medianX, medianY } = chartBounds;
+    if (quadrantData.length === 0) {
+      return (
+        <View style={styles.emptyChart}>
+          <Ionicons name="analytics-outline" size={48} color={colors.text.tertiary} />
+          <Text style={styles.emptyChartText}>
+            {compareMode === 'athletes' ? t('comparison.selectAthletes') : 
+             compareMode === 'sessions' ? t('comparison.selectAthlete') : 
+             t('comparison.selectPositions')}
+          </Text>
+        </View>
+      );
+    }
+
+    const { minX, maxX, minY, maxY } = chartBounds;
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
 
     return (
       <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Análise de Quadrantes</Text>
-        <Text style={styles.chartSubtitle}>X: Distância Total (m) | Y: Alta Intensidade (m)</Text>
+        <Text style={styles.chartTitle}>{t('comparison.quadrantAnalysis')}</Text>
+        <Text style={styles.chartSubtitle}>X: {t('gps.totalDistance')} (m) | Y: {t('gps.highIntensity')} (m)</Text>
         
         <View style={styles.chartArea}>
           {/* Quadrant backgrounds */}
           <View style={styles.quadrantGrid}>
             <View style={[styles.quadrant, styles.quadrantTopLeft]}>
-              <Text style={styles.quadrantLabel}>Baixo Vol.</Text>
-              <Text style={styles.quadrantLabel}>Alta Int.</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.lowVolume')}</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.highIntensity')}</Text>
             </View>
             <View style={[styles.quadrant, styles.quadrantTopRight]}>
-              <Text style={styles.quadrantLabel}>Alto Vol.</Text>
-              <Text style={styles.quadrantLabel}>Alta Int.</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.highVolume')}</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.highIntensity')}</Text>
             </View>
             <View style={[styles.quadrant, styles.quadrantBottomLeft]}>
-              <Text style={styles.quadrantLabel}>Baixo Vol.</Text>
-              <Text style={styles.quadrantLabel}>Baixa Int.</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.lowVolume')}</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.lowIntensity')}</Text>
             </View>
             <View style={[styles.quadrant, styles.quadrantBottomRight]}>
-              <Text style={styles.quadrantLabel}>Alto Vol.</Text>
-              <Text style={styles.quadrantLabel}>Baixa Int.</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.highVolume')}</Text>
+              <Text style={styles.quadrantLabel}>{t('comparison.lowIntensity')}</Text>
             </View>
           </View>
 
@@ -288,7 +324,7 @@ export default function CompareAthletes() {
 
         {/* Axes labels */}
         <View style={styles.axisLabels}>
-          <Text style={styles.axisLabel}>← Dist. Total (m) →</Text>
+          <Text style={styles.axisLabel}>← {t('gps.totalDistance')} (m) →</Text>
         </View>
 
         {/* Legend */}
@@ -311,6 +347,20 @@ export default function CompareAthletes() {
     );
   };
 
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.accent.primary} />
+      </View>
+    );
+  }
+
+  // Don't render if not authenticated
+  if (!user) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -321,14 +371,14 @@ export default function CompareAthletes() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Comparações Dinâmicas</Text>
+          <Text style={styles.headerTitle}>{t('comparison.title')}</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
           {/* Compare Mode Selector */}
           <View style={styles.modeSelector}>
-            <Text style={styles.sectionTitle}>Modo de Comparação</Text>
+            <Text style={styles.sectionTitle}>{t('comparison.compareMode')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <TouchableOpacity
                 style={[styles.modeButton, compareMode === 'athletes' && styles.modeButtonActive]}
@@ -336,7 +386,7 @@ export default function CompareAthletes() {
               >
                 <Ionicons name="people" size={18} color={compareMode === 'athletes' ? '#ffffff' : colors.accent.primary} />
                 <Text style={[styles.modeButtonText, compareMode === 'athletes' && styles.modeButtonTextActive]}>
-                  Entre Atletas
+                  {t('comparison.betweenAthletes')}
                 </Text>
               </TouchableOpacity>
               
@@ -346,7 +396,7 @@ export default function CompareAthletes() {
               >
                 <Ionicons name="calendar" size={18} color={compareMode === 'sessions' ? '#ffffff' : colors.accent.primary} />
                 <Text style={[styles.modeButtonText, compareMode === 'sessions' && styles.modeButtonTextActive]}>
-                  Sessões
+                  {t('comparison.sessions')}
                 </Text>
               </TouchableOpacity>
               
@@ -356,7 +406,7 @@ export default function CompareAthletes() {
               >
                 <Ionicons name="layers" size={18} color={compareMode === 'position-group' ? '#ffffff' : colors.accent.primary} />
                 <Text style={[styles.modeButtonText, compareMode === 'position-group' && styles.modeButtonTextActive]}>
-                  Grupos por Posição
+                  {t('comparison.positionGroups')}
                 </Text>
               </TouchableOpacity>
             </ScrollView>
@@ -364,7 +414,7 @@ export default function CompareAthletes() {
 
           {/* Date Range Filter */}
           <View style={styles.dateFilter}>
-            <Text style={styles.filterLabel}>Período:</Text>
+            <Text style={styles.filterLabel}>{t('comparison.period')}:</Text>
             <View style={styles.dateButtons}>
               {(['7d', '30d', 'all'] as const).map(range => (
                 <TouchableOpacity
@@ -373,7 +423,7 @@ export default function CompareAthletes() {
                   onPress={() => setDateRange(range)}
                 >
                   <Text style={[styles.dateButtonText, dateRange === range && styles.dateButtonTextActive]}>
-                    {range === '7d' ? '7 dias' : range === '30d' ? '30 dias' : 'Tudo'}
+                    {range === '7d' ? t('comparison.days7') : range === '30d' ? t('comparison.days30') : t('common.all')}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -388,12 +438,13 @@ export default function CompareAthletes() {
               {compareMode === 'athletes' && athletes && athletes.length > 0 && (
                 <View style={styles.selectionArea}>
                   <Text style={styles.selectionTitle}>
-                    Selecione Atletas ({selectedAthletes.length}/10)
+                    {t('comparison.selectAthletes')} ({selectedAthletes.length}/10)
                   </Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {athletes.map((athlete, index) => {
                       const athleteId = athlete.id || athlete._id || `athlete-${index}`;
                       const isSelected = selectedAthletes.includes(athleteId);
+                      const isLoadingThis = loadingGpsFor.includes(athleteId);
                       return (
                         <TouchableOpacity
                           key={athleteId}
@@ -403,7 +454,10 @@ export default function CompareAthletes() {
                           <Text style={[styles.athleteChipText, isSelected && styles.athleteChipTextSelected]}>
                             {athlete.name}
                           </Text>
-                          {isSelected && (
+                          {isSelected && isLoadingThis && (
+                            <ActivityIndicator size="small" color={colors.accent.primary} style={{ marginLeft: 8 }} />
+                          )}
+                          {isSelected && !isLoadingThis && (
                             <View style={[styles.chipNumber, { backgroundColor: ATHLETE_COLORS[selectedAthletes.indexOf(athleteId) % ATHLETE_COLORS.length] }]}>
                               <Text style={styles.chipNumberText}>
                                 {selectedAthletes.indexOf(athleteId) + 1}
@@ -419,11 +473,12 @@ export default function CompareAthletes() {
 
               {compareMode === 'sessions' && athletes && athletes.length > 0 && (
                 <View style={styles.selectionArea}>
-                  <Text style={styles.selectionTitle}>Selecione um Atleta</Text>
+                  <Text style={styles.selectionTitle}>{t('comparison.selectAthlete')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {athletes.map((athlete, index) => {
                       const athleteId = athlete.id || athlete._id || `athlete-${index}`;
                       const isSelected = selectedAthlete === athleteId;
+                      const isLoadingThis = loadingGpsFor.includes(athleteId);
                       return (
                         <TouchableOpacity
                           key={athleteId}
@@ -433,6 +488,9 @@ export default function CompareAthletes() {
                           <Text style={[styles.athleteChipText, isSelected && styles.athleteChipTextSelected]}>
                             {athlete.name}
                           </Text>
+                          {isSelected && isLoadingThis && (
+                            <ActivityIndicator size="small" color={colors.accent.primary} style={{ marginLeft: 8 }} />
+                          )}
                         </TouchableOpacity>
                       );
                     })}
@@ -442,7 +500,7 @@ export default function CompareAthletes() {
 
               {compareMode === 'position-group' && positions.length > 0 && (
                 <View style={styles.selectionArea}>
-                  <Text style={styles.selectionTitle}>Selecione Posições</Text>
+                  <Text style={styles.selectionTitle}>{t('comparison.selectPositions')}</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {positions.map(position => {
                       const isSelected = selectedPositions.includes(position);
@@ -470,41 +528,50 @@ export default function CompareAthletes() {
                 </View>
               )}
 
+              {/* Empty state when no athletes */}
+              {athletes && athletes.length === 0 && (
+                <View style={styles.emptyChart}>
+                  <Ionicons name="people-outline" size={48} color={colors.text.tertiary} />
+                  <Text style={styles.emptyChartText}>{t('athletes.noAthletes')}</Text>
+                  <Text style={styles.emptyChartSubtext}>{t('athletes.addFirst')}</Text>
+                </View>
+              )}
+
               {/* Quadrant Chart */}
-              {renderQuadrantChart()}
+              {athletes && athletes.length > 0 && renderQuadrantChart()}
 
               {/* Stats Summary */}
               {quadrantData.length > 0 && (
                 <View style={styles.statsContainer}>
-                  <Text style={styles.sectionTitle}>Resumo Estatístico</Text>
+                  <Text style={styles.sectionTitle}>{t('comparison.statsSummary')}</Text>
                   <View style={styles.statsGrid}>
                     <View style={styles.statCard}>
                       <Ionicons name="speedometer" size={24} color={colors.accent.primary} />
                       <Text style={styles.statValue}>
                         {(quadrantData.reduce((sum, d) => sum + d.x, 0) / quadrantData.length).toFixed(0)}m
                       </Text>
-                      <Text style={styles.statLabel}>Dist. Total Média</Text>
+                      <Text style={styles.statLabel}>{t('comparison.avgTotalDist')}</Text>
                     </View>
                     <View style={styles.statCard}>
                       <Ionicons name="flash" size={24} color={colors.status.warning} />
                       <Text style={styles.statValue}>
                         {(quadrantData.reduce((sum, d) => sum + d.y, 0) / quadrantData.length).toFixed(0)}m
                       </Text>
-                      <Text style={styles.statLabel}>Alta Int. Média</Text>
+                      <Text style={styles.statLabel}>{t('comparison.avgHighInt')}</Text>
                     </View>
                     <View style={styles.statCard}>
                       <Ionicons name="trending-up" size={24} color={colors.status.success} />
                       <Text style={styles.statValue}>
                         {Math.max(...quadrantData.map(d => d.x)).toFixed(0)}m
                       </Text>
-                      <Text style={styles.statLabel}>Maior Distância</Text>
+                      <Text style={styles.statLabel}>{t('comparison.highestDist')}</Text>
                     </View>
                     <View style={styles.statCard}>
                       <Ionicons name="trophy" size={24} color={colors.status.error} />
                       <Text style={styles.statValue}>
                         {Math.max(...quadrantData.map(d => d.y)).toFixed(0)}m
                       </Text>
-                      <Text style={styles.statLabel}>Maior Alta Int.</Text>
+                      <Text style={styles.statLabel}>{t('comparison.highestInt')}</Text>
                     </View>
                   </View>
                 </View>
@@ -520,6 +587,12 @@ export default function CompareAthletes() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.dark.primary,
   },
   gradient: {
     flex: 1,
@@ -784,6 +857,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     marginTop: 12,
+    textAlign: 'center',
+  },
+  emptyChartSubtext: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginTop: 4,
     textAlign: 'center',
   },
   legend: {
