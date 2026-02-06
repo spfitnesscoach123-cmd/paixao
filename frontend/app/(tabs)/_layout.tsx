@@ -1,31 +1,34 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../../constants/theme';
 
 export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#2563eb',
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: colors.spectral.cyan,
+        tabBarInactiveTintColor: colors.text.tertiary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.dark.secondary,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
+          borderTopColor: 'rgba(0, 212, 255, 0.2)',
+          height: 65,
+          paddingBottom: 10,
+          paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+          fontSize: 11,
+          fontWeight: '700',
+          letterSpacing: 0.5,
         },
         headerStyle: {
-          backgroundColor: '#2563eb',
+          backgroundColor: colors.dark.secondary,
         },
-        headerTintColor: '#ffffff',
+        headerTintColor: colors.text.primary,
         headerTitleStyle: {
           fontWeight: 'bold',
+          fontSize: 18,
         },
       }}
     >
@@ -34,16 +37,16 @@ export default function TabsLayout() {
         options={{
           title: 'Atletas',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size} color={color} />
+            <Ionicons name="people" size={size + 2} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="data"
         options={{
-          title: 'Dados',
+          title: 'Dashboard',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
+            <Ionicons name="stats-chart" size={size + 2} color={color} />
           ),
         }}
       />
@@ -52,7 +55,7 @@ export default function TabsLayout() {
         options={{
           title: 'Perfil',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person" size={size + 2} color={color} />
           ),
         }}
       />

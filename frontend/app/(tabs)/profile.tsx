@@ -9,7 +9,9 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
+import { colors } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -34,81 +36,109 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Ionicons name="person" size={48} color="#ffffff" />
+    <View style={styles.container}>
+      <LinearGradient
+        colors={colors.gradients.cyan}
+        style={styles.header}
+      >
+        <View style={styles.avatarGlow}>
+          <View style={styles.avatarContainer}>
+            <Ionicons name="person" size={48} color="#ffffff" />
+          </View>
         </View>
         <Text style={styles.name}>{user?.name}</Text>
         <Text style={styles.email}>{user?.email}</Text>
-      </View>
+      </LinearGradient>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Conta</Text>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <View style={styles.menuItemContent}>
-            <Ionicons name="person-outline" size={24} color="#6b7280" />
-            <Text style={styles.menuItemText}>Editar Perfil</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
+      <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Conta</Text>
+          
+          <TouchableOpacity style={styles.menuItem}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
+                <Ionicons name="person-outline" size={22} color={colors.spectral.cyan} />
+              </View>
+              <Text style={styles.menuItemText}>Editar Perfil</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 255, 136, 0.2)' }]}>
+                <Ionicons name="lock-closed-outline" size={22} color={colors.spectral.green} />
+              </View>
+              <Text style={styles.menuItemText}>Alterar Senha</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Sobre</Text>
+          
+          <TouchableOpacity style={styles.menuItem}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
+                <Ionicons name="information-circle-outline" size={22} color={colors.spectral.purple} />
+              </View>
+              <Text style={styles.menuItemText}>Sobre o App</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 211, 238, 0.2)' }]}>
+                <Ionicons name="help-circle-outline" size={22} color={colors.spectral.teal} />
+              </View>
+              <Text style={styles.menuItemText}>Ajuda</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <LinearGradient
+            colors={['#ef4444', '#dc2626']}
+            style={styles.logoutGradient}
+          >
+            <Ionicons name="log-out-outline" size={24} color="#ffffff" />
+            <Text style={styles.logoutText}>Sair</Text>
+          </LinearGradient>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <View style={styles.menuItemContent}>
-            <Ionicons name="lock-closed-outline" size={24} color="#6b7280" />
-            <Text style={styles.menuItemText}>Alterar Senha</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Sobre</Text>
-        
-        <TouchableOpacity style={styles.menuItem}>
-          <View style={styles.menuItemContent}>
-            <Ionicons name="information-circle-outline" size={24} color="#6b7280" />
-            <Text style={styles.menuItemText}>Sobre o App</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem}>
-          <View style={styles.menuItemContent}>
-            <Ionicons name="help-circle-outline" size={24} color="#6b7280" />
-            <Text style={styles.menuItemText}>Ajuda</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <Ionicons name="log-out-outline" size={24} color="#dc2626" />
-        <Text style={styles.logoutText}>Sair</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.dark.primary,
   },
   header: {
-    backgroundColor: '#2563eb',
     padding: 32,
+    paddingTop: 60,
     alignItems: 'center',
   },
+  avatarGlow: {
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+  },
   avatarContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 3,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   name: {
     fontSize: 24,
@@ -120,49 +150,71 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
   },
+  content: {
+    flex: 1,
+  },
   section: {
     marginTop: 24,
     paddingHorizontal: 16,
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: colors.spectral.cyan,
+    marginBottom: 12,
     marginLeft: 4,
+    letterSpacing: 1,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.dark.card,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   menuItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
+  },
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   menuItemText: {
-    fontSize: 16,
-    color: '#111827',
-    marginLeft: 12,
+    fontSize: 15,
+    color: colors.text.primary,
+    fontWeight: '600',
   },
   logoutButton: {
+    margin: 16,
+    marginTop: 32,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  logoutGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    padding: 16,
-    borderRadius: 12,
-    margin: 16,
-    marginTop: 32,
+    padding: 18,
+    gap: 12,
   },
   logoutText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginLeft: 8,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    letterSpacing: 0.5,
   },
 });
