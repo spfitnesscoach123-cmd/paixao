@@ -92,7 +92,16 @@
     "noData": "Nenhum dado GPS registrado",
     "importCSV": "Importar CSV Catapult",
     "session": "Sessão",
-    "period": "Período"
+    "sessions": "sessões",
+    "period": "Período",
+    "periods": "períodos",
+    "sessionTotals": "Totais da Sessão",
+    "periodDetails": "Detalhes por Período",
+    "manualEntry": "Entrada Manual",
+    "uploadCSV": "Upload CSV",
+    "dist": "Dist",
+    "hid": "HID",
+    "spr": "Spr"
   },
   "wellness": {
     "title": "Bem-Estar",
