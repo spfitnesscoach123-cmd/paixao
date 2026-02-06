@@ -135,7 +135,7 @@ export default function DataScreen() {
               onPress={() => router.push('/compare-athletes')}
             >
               <LinearGradient
-                colors={colors.gradients.green}
+                colors={colors.gradients.primary}
                 style={styles.compareGradient}
               >
                 <Ionicons name="git-compare" size={24} color="#ffffff" />
