@@ -546,6 +546,453 @@ async def get_athlete_assessments(
         record["_id"] = str(record["_id"])
     return [PhysicalAssessment(**record) for record in assessments]
 
+# ============= AI ANALYSIS ROUTES =============
+
+from emergentintegrations.llm.chat import LlmChat, UserMessage
+import statistics
+
+class ACWRAnalysis(BaseModel):
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str  # "low", "optimal", "moderate", "high"
+    recommendation: str
+
+class FatigueAnalysis(BaseModel):
+    fatigue_level: str  # "low", "moderate", "high", "critical"
+    fatigue_score: float
+    contributing_factors: List[str]
+    recommendation: str
+
+class AIInsights(BaseModel):
+    summary: str
+    strengths: List[str]
+    concerns: List[str]
+    recommendations: List[str]
+    training_zones: Dict[str, Any]
+
+class ComprehensiveAnalysis(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    acwr: Optional[ACWRAnalysis] = None
+    fatigue: Optional[FatigueAnalysis] = None
+    ai_insights: Optional[AIInsights] = None
+
+def calculate_training_load(gps_data: GPSData) -> float:
+    """Calculate training load from GPS data using a weighted formula"""
+    # Weighted formula considering multiple factors
+    load = (
+        gps_data.total_distance * 0.001 +  # Distance component
+        gps_data.high_intensity_distance * 0.003 +  # High intensity weight
+        gps_data.sprint_distance * 0.005 +  # Sprint weight
+        gps_data.number_of_sprints * 2 +  # Sprint count
+        gps_data.number_of_accelerations * 1 +  # Accelerations
+        gps_data.number_of_decelerations * 1  # Decelerations
+    )
+    return round(load, 2)
+
+@api_router.get("/analysis/acwr/{athlete_id}")
+async def get_acwr_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data from last 28 days
+    today = datetime.utcnow()
+    date_28_days_ago = (today - timedelta(days=28)).strftime("%Y-%m-%d")
+    date_7_days_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_28_days_ago}
+    }).to_list(1000)
+    
+    if len(gps_records) < 7:
+        raise HTTPException(
+            status_code=400, 
+            detail="Insufficient data. Need at least 7 days of GPS data for ACWR calculation."
+        )
+    
+    # Convert to GPSData objects and calculate loads
+    gps_data_list = [GPSData(**{**record, "_id": str(record["_id"])}) for record in gps_records]
+    
+    # Separate acute (last 7 days) and chronic (last 28 days) loads
+    acute_loads = []
+    chronic_loads = []
+    
+    for gps in gps_data_list:
+        load = calculate_training_load(gps)
+        chronic_loads.append(load)
+        if gps.date >= date_7_days_ago:
+            acute_loads.append(load)
+    
+    if not acute_loads or not chronic_loads:
+        raise HTTPException(status_code=400, detail="Unable to calculate ACWR")
+    
+    acute_load = sum(acute_loads)
+    chronic_load = sum(chronic_loads) / 4  # Average per week over 4 weeks
+    
+    # Calculate ACWR ratio
+    acwr_ratio = round(acute_load / chronic_load if chronic_load > 0 else 0, 2)
+    
+    # Determine risk level and recommendation
+    if acwr_ratio < 0.8:
+        risk_level = "low"
+        recommendation = "Carga de treino abaixo do ideal. Considere aumentar gradualmente a intensidade para manter a forma física."
+    elif 0.8 <= acwr_ratio <= 1.3:
+        risk_level = "optimal"
+        recommendation = "Carga de treino ótima! Continue mantendo este equilíbrio entre treino e recuperação."
+    elif 1.3 < acwr_ratio <= 1.5:
+        risk_level = "moderate"
+        recommendation = "Carga de treino moderadamente elevada. Monitore sinais de fadiga e considere reduzir volume nos próximos dias."
+    else:
+        risk_level = "high"
+        recommendation = "⚠️ ATENÇÃO: Carga de treino muito elevada! Alto risco de lesão. Recomenda-se redução imediata da carga e priorizar recuperação."
+    
+    return ACWRAnalysis(
+        acute_load=round(acute_load, 2),
+        chronic_load=round(chronic_load, 2),
+        acwr_ratio=acwr_ratio,
+        risk_level=risk_level,
+        recommendation=recommendation
+    )
+
+@api_router.get("/analysis/fatigue/{athlete_id}")
+async def get_fatigue_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get recent wellness data (last 7 days)
+    today = datetime.utcnow()
+    date_7_days_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_7_days_ago}
+    }).sort("date", -1).to_list(7)
+    
+    if not wellness_records:
+        raise HTTPException(
+            status_code=400,
+            detail="No wellness data available. Need recent wellness questionnaires for fatigue analysis."
+        )
+    
+    # Get recent GPS data for workload context
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_7_days_ago}
+    }).to_list(7)
+    
+    # Calculate average wellness metrics
+    avg_fatigue = statistics.mean([w["fatigue"] for w in wellness_records])
+    avg_sleep_quality = statistics.mean([w["sleep_quality"] for w in wellness_records])
+    avg_sleep_hours = statistics.mean([w["sleep_hours"] for w in wellness_records])
+    avg_muscle_soreness = statistics.mean([w["muscle_soreness"] for w in wellness_records])
+    avg_stress = statistics.mean([w["stress"] for w in wellness_records])
+    avg_readiness = statistics.mean([w["readiness_score"] for w in wellness_records])
+    
+    # Calculate fatigue score (0-100, higher is more fatigued)
+    fatigue_score = (
+        avg_fatigue * 8 +  # Fatigue is primary indicator
+        (10 - avg_sleep_quality) * 5 +  # Poor sleep increases fatigue
+        avg_muscle_soreness * 6 +  # Soreness indicates fatigue
+        avg_stress * 4 +  # Stress contributes to fatigue
+        (10 - min(avg_sleep_hours / 8 * 10, 10)) * 3  # Insufficient sleep
+    ) / 2.6  # Normalize to 0-100
+    
+    fatigue_score = round(fatigue_score, 1)
+    
+    # Determine fatigue level
+    if fatigue_score < 30:
+        fatigue_level = "low"
+        recommendation = "Baixo nível de fadiga. Atleta está bem recuperado e pronto para treinos intensos."
+    elif fatigue_score < 50:
+        fatigue_level = "moderate"
+        recommendation = "Fadiga moderada. Atleta pode treinar normalmente, mas monitore sinais de sobrecarga."
+    elif fatigue_score < 70:
+        fatigue_level = "high"
+        recommendation = "Alta fadiga detectada. Reduza volume/intensidade e priorize recuperação ativa."
+    else:
+        fatigue_level = "critical"
+        recommendation = "⚠️ FADIGA CRÍTICA! Recomenda-se descanso completo ou treino regenerativo leve. Risco de overtraining."
+    
+    # Identify contributing factors
+    contributing_factors = []
+    if avg_fatigue >= 7:
+        contributing_factors.append("Fadiga autorreportada elevada")
+    if avg_sleep_quality <= 5:
+        contributing_factors.append("Qualidade do sono comprometida")
+    if avg_sleep_hours < 7:
+        contributing_factors.append(f"Sono insuficiente ({avg_sleep_hours:.1f}h/noite)")
+    if avg_muscle_soreness >= 7:
+        contributing_factors.append("Dor muscular significativa")
+    if avg_stress >= 7:
+        contributing_factors.append("Níveis de estresse elevados")
+    if len(gps_records) >= 5:
+        contributing_factors.append("Alta frequência de treinos recentes")
+    if avg_readiness < 6:
+        contributing_factors.append(f"Baixo score de prontidão ({avg_readiness:.1f}/10)")
+    
+    if not contributing_factors:
+        contributing_factors.append("Nenhum fator crítico identificado")
+    
+    return FatigueAnalysis(
+        fatigue_level=fatigue_level,
+        fatigue_score=fatigue_score,
+        contributing_factors=contributing_factors,
+        recommendation=recommendation
+    )
+
+@api_router.get("/analysis/ai-insights/{athlete_id}")
+async def get_ai_insights(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get all data for comprehensive analysis
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(30).to_list(30)
+    
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(30).to_list(30)
+    
+    assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(5).to_list(5)
+    
+    if not gps_records and not wellness_records:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient data for AI analysis. Please add GPS and wellness data first."
+        )
+    
+    # Prepare data summary for AI
+    data_summary = f"""
+Análise do Atleta: {athlete['name']}
+Posição: {athlete['position']}
+
+DADOS GPS (últimos 30 registros):
+- Total de sessões: {len(gps_records)}
+- Distância média: {statistics.mean([g['total_distance'] for g in gps_records]):.0f}m
+- Distância alta intensidade média: {statistics.mean([g['high_intensity_distance'] for g in gps_records]):.0f}m
+- Sprints médios por sessão: {statistics.mean([g['number_of_sprints'] for g in gps_records]):.1f}
+- Velocidade máxima média: {statistics.mean([g.get('max_speed', 0) for g in gps_records if g.get('max_speed')]):.1f} km/h
+
+WELLNESS (últimos 30 registros):
+- Total de questionários: {len(wellness_records)}
+- Wellness score médio: {statistics.mean([w['wellness_score'] for w in wellness_records]):.1f}/10
+- Readiness score médio: {statistics.mean([w['readiness_score'] for w in wellness_records]):.1f}/10
+- Fadiga média: {statistics.mean([w['fatigue'] for w in wellness_records]):.1f}/10
+- Qualidade sono média: {statistics.mean([w['sleep_quality'] for w in wellness_records]):.1f}/10
+- Horas de sono média: {statistics.mean([w['sleep_hours'] for w in wellness_records]):.1f}h
+
+AVALIAÇÕES FÍSICAS:
+- Total de avaliações: {len(assessments)}
+"""
+    
+    if assessments:
+        for assessment in assessments[:2]:  # Last 2 assessments
+            data_summary += f"- {assessment['assessment_type']}: {assessment['date']}\n"
+    
+    # Use Emergent LLM for insights
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY')
+        chat = LlmChat(
+            api_key=emergent_key,
+            session_id=f"analysis_{athlete_id}_{datetime.utcnow().timestamp()}",
+            system_message="""Você é um especialista em ciência do esporte e treinamento de futebol.
+Analise os dados fornecidos e forneça insights profissionais, práticos e acionáveis.
+Responda em português brasileiro de forma clara e objetiva."""
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(
+            text=f"""{data_summary}
+
+Com base nesses dados, forneça uma análise profissional completa incluindo:
+
+1. RESUMO EXECUTIVO (2-3 linhas sobre o estado atual do atleta)
+
+2. PONTOS FORTES (2-3 aspectos positivos identificados nos dados)
+
+3. PONTOS DE ATENÇÃO (2-3 áreas que requerem monitoramento ou ajuste)
+
+4. RECOMENDAÇÕES ESPECÍFICAS (3-4 ações concretas para otimizar o treinamento)
+
+5. ZONAS DE TREINAMENTO RECOMENDADAS:
+   - Zona de Recuperação: distância e características
+   - Zona Aeróbica: distância e características  
+   - Zona Anaeróbica: distância e características
+   - Zona Máxima: distância e características
+
+Formate sua resposta de forma estruturada e profissional."""
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Parse AI response (basic parsing, can be improved)
+        lines = response.split('\n')
+        
+        summary = ""
+        strengths = []
+        concerns = []
+        recommendations = []
+        training_zones = {}
+        
+        current_section = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+                
+            if "RESUMO" in line.upper() or "EXECUTIVO" in line.upper():
+                current_section = "summary"
+            elif "FORTE" in line.upper() or "POSITIVO" in line.upper():
+                current_section = "strengths"
+            elif "ATENÇÃO" in line.upper() or "PREOCUP" in line.upper():
+                current_section = "concerns"
+            elif "RECOMENDA" in line.upper():
+                current_section = "recommendations"
+            elif "ZONA" in line.upper() and "TREINAMENTO" in line.upper():
+                current_section = "zones"
+            elif line.startswith('-') or line.startswith('•') or line[0].isdigit():
+                content = line.lstrip('-•0123456789. ')
+                if current_section == "strengths":
+                    strengths.append(content)
+                elif current_section == "concerns":
+                    concerns.append(content)
+                elif current_section == "recommendations":
+                    recommendations.append(content)
+            elif current_section == "summary" and len(line) > 20:
+                summary += line + " "
+        
+        # Default zones if not properly parsed
+        training_zones = {
+            "recovery": "Até 5km, ritmo leve, FC < 70% máxima",
+            "aerobic": "5-8km, ritmo moderado, FC 70-85% máxima",
+            "anaerobic": "Alta intensidade, sprints curtos, FC 85-95% máxima",
+            "maximum": "Esforço máximo, sprints, FC > 95% máxima"
+        }
+        
+        return AIInsights(
+            summary=summary.strip() if summary else "Análise dos dados do atleta concluída com sucesso.",
+            strengths=strengths if strengths else ["Dados consistentes de treinamento"],
+            concerns=concerns if concerns else ["Continue monitorando regularmente"],
+            recommendations=recommendations if recommendations else ["Manter rotina atual de monitoramento"],
+            training_zones=training_zones
+        )
+        
+    except Exception as e:
+        logger.error(f"AI Analysis error: {str(e)}")
+        # Fallback to rule-based insights
+        avg_wellness = statistics.mean([w['wellness_score'] for w in wellness_records]) if wellness_records else 0
+        avg_readiness = statistics.mean([w['readiness_score'] for w in wellness_records]) if wellness_records else 0
+        
+        summary = f"Atleta apresenta wellness médio de {avg_wellness:.1f}/10 e prontidão de {avg_readiness:.1f}/10."
+        
+        strengths = []
+        if avg_wellness >= 7:
+            strengths.append("Bom estado geral de bem-estar")
+        if len(gps_records) >= 10:
+            strengths.append("Frequência de treino consistente")
+        if avg_readiness >= 7:
+            strengths.append("Alto nível de prontidão para treino")
+            
+        concerns = []
+        if avg_wellness < 6:
+            concerns.append("Wellness score abaixo do ideal")
+        if avg_readiness < 6:
+            concerns.append("Baixa prontidão para treinos intensos")
+            
+        recommendations = [
+            "Manter monitoramento regular de wellness",
+            "Ajustar carga de treino baseado em feedback diário",
+            "Priorizar qualidade do sono e recuperação"
+        ]
+        
+        return AIInsights(
+            summary=summary,
+            strengths=strengths if strengths else ["Coleta de dados regular"],
+            concerns=concerns if concerns else ["Continue monitorando"],
+            recommendations=recommendations,
+            training_zones={
+                "recovery": "Até 5km, ritmo leve",
+                "aerobic": "5-8km, ritmo moderado",
+                "anaerobic": "Alta intensidade, sprints curtos",
+                "maximum": "Esforço máximo"
+            }
+        )
+
+@api_router.get("/analysis/comprehensive/{athlete_id}")
+async def get_comprehensive_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all analyses in one endpoint"""
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    result = ComprehensiveAnalysis(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d")
+    )
+    
+    # Try to get each analysis (non-blocking)
+    try:
+        acwr = await get_acwr_analysis(athlete_id, current_user)
+        result.acwr = acwr
+    except:
+        pass
+    
+    try:
+        fatigue = await get_fatigue_analysis(athlete_id, current_user)
+        result.fatigue = fatigue
+    except:
+        pass
+    
+    try:
+        insights = await get_ai_insights(athlete_id, current_user)
+        result.ai_insights = insights
+    except:
+        pass
+    
+    return result
+
 # Include the router in the main app
 app.include_router(api_router)
 
