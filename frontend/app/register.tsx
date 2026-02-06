@@ -329,4 +329,29 @@ const styles = StyleSheet.create({
     color: colors.accent.light,
     fontWeight: '700',
   },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginVertical: 16,
+    paddingHorizontal: 4,
+  },
+  checkbox: {
+    padding: 4,
+    marginRight: 12,
+  },
+  termsTextContainer: {
+    flex: 1,
+  },
+  termsText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: colors.accent.primary,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    shadowOpacity: 0,
+  },
 });
