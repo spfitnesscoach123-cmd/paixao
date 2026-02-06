@@ -1096,17 +1096,39 @@ const styles = StyleSheet.create({
   sessionTotals: {
     padding: 16,
   },
+  sessionTotalsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sessionTotalsTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: colors.accent.primary,
-    marginBottom: 12,
     letterSpacing: 0.5,
+  },
+  clearSelectionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  clearSelectionText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.accent.primary,
   },
   dataValueLarge: {
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text.primary,
+  },
+  dataValueHighlight: {
+    color: colors.accent.primary,
   },
   periodsContainer: {
     borderTopWidth: 1,
@@ -1118,15 +1140,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.text.secondary,
-    marginBottom: 12,
+    marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 1,
+  },
+  periodsTip: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   periodItem: {
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  periodItemSelected: {
+    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(139, 92, 246, 0.25)',
   },
   periodHeader: {
     marginBottom: 8,
@@ -1137,6 +1171,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
     alignSelf: 'flex-start',
+  },
+  periodBadgeSelected: {
+    backgroundColor: colors.status.success,
+  },
+  periodBadgeTextSelected: {
+    color: '#ffffff',
   },
   periodBadgeText: {
     fontSize: 11,
