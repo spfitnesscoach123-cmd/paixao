@@ -131,6 +131,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoints de criar, listar, obter, atualizar e deletar atletas implementados e testados. Suporte para foto em base64, dados antropométricos."
+      - working: true
+        agent: "testing"
+        comment: "Complete CRUD operations verified successfully. Authentication required correctly enforced. Create, read, update, delete all working. Proper error handling for invalid IDs. Photo upload (base64) and anthropometric data validated."
   
   - task: "Dados GPS"
     implemented: true
@@ -143,6 +146,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoint de criar e listar dados GPS por atleta implementado e testado. Inclui distâncias, sprints, acelerações/desacelerações."
+      - working: true
+        agent: "testing"
+        comment: "GPS data endpoints fully functional. Create and list GPS data working correctly. All metrics tracked: distances, sprints, accelerations/decelerations, max speed. Proper athlete ownership validation implemented."
   
   - task: "Wellness Questionnaires"
     implemented: true
@@ -155,6 +161,9 @@ backend:
       - working: true
         agent: "main"
         comment: "Endpoint de criar e listar questionários de wellness implementado e testado. Calcula automaticamente wellness_score e readiness_score."
+      - working: true
+        agent: "testing"
+        comment: "Wellness questionnaire system fully operational. Automatic score calculations verified (wellness_score: 7.5, readiness_score: 8.2 for test data). All metrics properly weighted and calculated. Data persistence confirmed."
   
   - task: "Physical Assessments"
     implemented: true
