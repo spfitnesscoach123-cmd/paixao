@@ -468,7 +468,7 @@ export default function AthleteDetails() {
                                   {t('gps.spr')}: {period.number_of_sprints}
                                 </Text>
                               </View>
-                            </View>
+                            </TouchableOpacity>
                           );
                         })}
                       </View>
