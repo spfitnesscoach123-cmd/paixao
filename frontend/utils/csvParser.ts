@@ -105,6 +105,7 @@ export const parseCatapultCSV = (csvContent: string): { data: CatapultGPSData[],
 
       // Only process "Session" periods or aggregate if no period specified
       const periodName = columnMap.periodName !== -1 ? values[columnMap.periodName]?.trim() : '';
+      const playerName = columnMap.playerName !== -1 ? values[columnMap.playerName]?.trim() : '';
       
       // Skip warm-up periods, only include Session, 1ST HALF, 2ND HALF
       if (periodName && periodName.toUpperCase() === 'W-UP') {
@@ -112,6 +113,7 @@ export const parseCatapultCSV = (csvContent: string): { data: CatapultGPSData[],
       }
 
       const record: CatapultGPSData = {
+        player_name: playerName || undefined,
         date: metadata.date || new Date().toISOString().split('T')[0],
         period_name: periodName || undefined,
         total_distance: parseFloat(values[columnMap.totalDistance] || '0') || 0,
