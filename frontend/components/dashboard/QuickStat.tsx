@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '../../constants/theme';
 
 interface QuickStatProps {
   label: string;
@@ -13,8 +14,8 @@ interface QuickStatProps {
 export const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color, trend }) => {
   return (
     <View style={styles.container}>
-      <View style={[styles.iconCircle, { backgroundColor: color + '20' }]}>
-        <Ionicons name={icon} size={20} color={color} />
+      <View style={[styles.iconCircle, { backgroundColor: color + '20', borderColor: color + '40' }]}>
+        <Ionicons name={icon} size={22} color={color} />
       </View>
       
       <View style={styles.content}>
@@ -22,11 +23,13 @@ export const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color,
         <View style={styles.valueRow}>
           <Text style={styles.value}>{value}</Text>
           {trend && (
-            <Ionicons 
-              name={trend === 'up' ? 'arrow-up' : 'arrow-down'} 
-              size={16} 
-              color={trend === 'up' ? '#10b981' : '#ef4444'} 
-            />
+            <View style={[styles.trendBadge, { backgroundColor: trend === 'up' ? colors.spectral.green : colors.status.error }]}>
+              <Ionicons 
+                name={trend === 'up' ? 'arrow-up' : 'arrow-down'} 
+                size={12} 
+                color="#ffffff"
+              />
+            </View>
           )}
         </View>
       </View>
@@ -38,39 +41,45 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 14,
     gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
   },
   content: {
     flex: 1,
   },
   label: {
     fontSize: 12,
-    color: '#6b7280',
-    marginBottom: 2,
+    color: colors.text.secondary,
+    marginBottom: 4,
+    fontWeight: '600',
   },
   valueRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   value: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text.primary,
+  },
+  trendBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
