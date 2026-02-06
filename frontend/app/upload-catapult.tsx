@@ -114,6 +114,7 @@ export default function UploadCatapultCSV() {
     },
     onSuccess: ({ successCount, skippedCount, errors }) => {
       queryClient.invalidateQueries({ queryKey: ['gps'] });
+      queryClient.invalidateQueries({ queryKey: ['athletes'] }); // Refresh athletes list
       
       let message = `${successCount} registros importados com sucesso!`;
       if (skippedCount > 0) {
