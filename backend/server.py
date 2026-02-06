@@ -1723,31 +1723,43 @@ Formate sua resposta de forma estruturada e profissional.""",
     if not gps_records and not wellness_records:
         raise HTTPException(
             status_code=400,
-            detail="Insufficient data for AI analysis. Please add GPS and wellness data first."
+            detail=t("ai_no_data")
         )
     
-    # Prepare data summary for AI
+    # Prepare data summary for AI using translated labels
+    avg_gps_distance = statistics.mean([g['total_distance'] for g in gps_records]) if gps_records else 0
+    avg_hi_distance = statistics.mean([g['high_intensity_distance'] for g in gps_records]) if gps_records else 0
+    avg_sprints = statistics.mean([g['number_of_sprints'] for g in gps_records]) if gps_records else 0
+    max_speeds = [g.get('max_speed', 0) for g in gps_records if g.get('max_speed')]
+    avg_max_speed = statistics.mean(max_speeds) if max_speeds else 0
+    
+    avg_wellness = statistics.mean([w['wellness_score'] for w in wellness_records]) if wellness_records else 0
+    avg_readiness = statistics.mean([w['readiness_score'] for w in wellness_records]) if wellness_records else 0
+    avg_fatigue = statistics.mean([w['fatigue'] for w in wellness_records]) if wellness_records else 0
+    avg_sleep_quality = statistics.mean([w['sleep_quality'] for w in wellness_records]) if wellness_records else 0
+    avg_sleep_hours = statistics.mean([w['sleep_hours'] for w in wellness_records]) if wellness_records else 0
+    
     data_summary = f"""
-Análise do Atleta: {athlete['name']}
-Posição: {athlete['position']}
+{labels['analysis']}: {athlete['name']}
+{labels['position']}: {athlete['position']}
 
-DADOS GPS (últimos 30 registros):
-- Total de sessões: {len(gps_records)}
-- Distância média: {statistics.mean([g['total_distance'] for g in gps_records]):.0f}m
-- Distância alta intensidade média: {statistics.mean([g['high_intensity_distance'] for g in gps_records]):.0f}m
-- Sprints médios por sessão: {statistics.mean([g['number_of_sprints'] for g in gps_records]):.1f}
-- Velocidade máxima média: {statistics.mean([g.get('max_speed', 0) for g in gps_records if g.get('max_speed')]):.1f} km/h
+{labels['gps_data']}:
+- {labels['total_sessions']}: {len(gps_records)}
+- {labels['avg_distance']}: {avg_gps_distance:.0f}m
+- {labels['avg_hi_distance']}: {avg_hi_distance:.0f}m
+- {labels['avg_sprints']}: {avg_sprints:.1f}
+- {labels['avg_max_speed']}: {avg_max_speed:.1f} km/h
 
-WELLNESS (últimos 30 registros):
-- Total de questionários: {len(wellness_records)}
-- Wellness score médio: {statistics.mean([w['wellness_score'] for w in wellness_records]):.1f}/10
-- Readiness score médio: {statistics.mean([w['readiness_score'] for w in wellness_records]):.1f}/10
-- Fadiga média: {statistics.mean([w['fatigue'] for w in wellness_records]):.1f}/10
-- Qualidade sono média: {statistics.mean([w['sleep_quality'] for w in wellness_records]):.1f}/10
-- Horas de sono média: {statistics.mean([w['sleep_hours'] for w in wellness_records]):.1f}h
+{labels['wellness']}:
+- {labels['total_questionnaires']}: {len(wellness_records)}
+- {labels['avg_wellness']}: {avg_wellness:.1f}/10
+- {labels['avg_readiness']}: {avg_readiness:.1f}/10
+- {labels['avg_fatigue']}: {avg_fatigue:.1f}/10
+- {labels['avg_sleep_quality']}: {avg_sleep_quality:.1f}/10
+- {labels['avg_sleep_hours']}: {avg_sleep_hours:.1f}h
 
-AVALIAÇÕES FÍSICAS:
-- Total de avaliações: {len(assessments)}
+{labels['assessments']}:
+- {labels['total_assessments']}: {len(assessments)}
 """
     
     if assessments:
