@@ -48,7 +48,7 @@ export default function AthletesScreen() {
   const renderAthleteCard = ({ item }: { item: Athlete }) => (
     <TouchableOpacity
       style={styles.athleteCard}
-      onPress={() => router.push(`/athlete/${item.id}`)}
+      onPress={() => router.push(`/athlete/${item.id || item._id}`)}
     >
       <View style={styles.athleteCardContent}>
         {item.photo_base64 ? (
