@@ -134,7 +134,9 @@
     "uploadCSV": "Upload CSV",
     "dist": "Dist",
     "hid": "HID",
-    "spr": "Spr"
+    "spr": "Spr",
+    "showTotals": "Show Totals",
+    "tapPeriodTip": "Tap a period to see its values above"
   },
   "wellness": {
     "title": "Wellness",
