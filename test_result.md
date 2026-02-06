@@ -155,15 +155,18 @@ backend:
   
   - task: "Physical Assessments"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Endpoints implementados mas não testados ainda. Estrutura flexível para diferentes tipos de avaliação."
+      - working: true
+        agent: "testing"
+        comment: "Comprehensive testing completed successfully. All assessment types (strength, aerobic, body_composition) working correctly. Flexible metrics structure validated. Full CRUD operations verified with proper authentication."
 
 frontend:
   - task: "Autenticação JWT (Login/Register)"
