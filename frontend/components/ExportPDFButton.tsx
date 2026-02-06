@@ -2,13 +2,9 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
-import * as WebBrowser from 'expo-web-browser';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
-import Constants from 'expo-constants';
 
 interface ExportPDFButtonProps {
   athleteId: string;
@@ -23,63 +19,58 @@ export const ExportPDFButton: React.FC<ExportPDFButtonProps> = ({ athleteId, ath
     setIsExporting(true);
     
     try {
-      // Get the backend URL
-      const backendUrl = Constants.expoConfig?.extra?.backendUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+      // Request PDF from backend
+      const response = await api.get(`/reports/athlete/${athleteId}/pdf?lang=${locale}`, {
+        responseType: 'blob'
+      });
       
-      // For web, we can directly open the PDF URL
       if (Platform.OS === 'web') {
-        // Get the auth token from api interceptor
-        const token = api.defaults.headers.common['Authorization'];
+        // For web, create download link
+        const blob = new Blob([response.data], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `report_${athleteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
         
-        if (token) {
-          // Create a temporary form to submit with auth
-          const pdfUrl = `${backendUrl}/api/reports/athlete/${athleteId}/pdf?lang=${locale}`;
-          
-          // Open in new tab with token
-          const response = await api.get(`/reports/athlete/${athleteId}/pdf?lang=${locale}`, {
-            responseType: 'blob'
-          });
-          
-          // Create blob URL and download
-          const blob = new Blob([response.data], { type: 'application/pdf' });
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `report_${athleteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
-          
-          Alert.alert(t('common.success'), t('reports.downloadStarted'));
-        }
+        Alert.alert(t('common.success'), t('reports.downloadStarted'));
       } else {
-        // For native, download and share
-        const response = await api.get(`/reports/athlete/${athleteId}/pdf?lang=${locale}`, {
-          responseType: 'arraybuffer'
-        });
-        
-        // Convert to base64
-        const base64 = Buffer.from(response.data, 'binary').toString('base64');
-        
-        // Save to file
-        const filename = `report_${athleteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
-        const fileUri = `${FileSystem.documentDirectory}${filename}`;
-        
-        await FileSystem.writeAsStringAsync(fileUri, base64, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        
-        // Check if sharing is available
-        const isAvailable = await Sharing.isAvailableAsync();
-        
-        if (isAvailable) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/pdf',
-            dialogTitle: t('reports.shareReport'),
-          });
-        } else {
-          Alert.alert(t('common.success'), t('reports.savedTo') + `: ${fileUri}`);
+        // For native platforms, use dynamic imports
+        try {
+          const FileSystem = await import('expo-file-system');
+          const Sharing = await import('expo-sharing');
+          
+          // Convert blob to base64
+          const reader = new FileReader();
+          reader.readAsDataURL(response.data);
+          reader.onloadend = async () => {
+            const base64data = reader.result as string;
+            const base64 = base64data.split(',')[1];
+            
+            const filename = `report_${athleteName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+            const fileUri = `${FileSystem.documentDirectory}${filename}`;
+            
+            await FileSystem.writeAsStringAsync(fileUri, base64, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            
+            const isAvailable = await Sharing.isAvailableAsync();
+            
+            if (isAvailable) {
+              await Sharing.shareAsync(fileUri, {
+                mimeType: 'application/pdf',
+                dialogTitle: t('reports.shareReport'),
+              });
+            } else {
+              Alert.alert(t('common.success'), `${t('reports.savedTo')}: ${fileUri}`);
+            }
+          };
+        } catch (nativeError) {
+          console.log('Native sharing not available:', nativeError);
+          Alert.alert(t('common.error'), t('reports.exportError'));
         }
       }
     } catch (error: any) {
