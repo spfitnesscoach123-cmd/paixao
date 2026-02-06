@@ -86,7 +86,7 @@ export default function UploadGPS() {
 
         // Preview record count
         try {
-          const records = parseCatapultCSV(content);
+          const { data: records } = parseCatapultCSV(content);
           setRecordCount(records.length);
         } catch (error) {
           Alert.alert('Aviso', 'Não foi possível analisar o arquivo. Verifique o formato.');
