@@ -1487,6 +1487,8 @@ async def get_fatigue_analysis(
     lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
+    t = lambda key: get_analysis_text(lang, key)
+    
     # Verify athlete belongs to current user
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
@@ -1508,7 +1510,7 @@ async def get_fatigue_analysis(
     if not wellness_records:
         raise HTTPException(
             status_code=400,
-            detail="No wellness data available. Need recent wellness questionnaires for fatigue analysis."
+            detail=t("ai_no_data")
         )
     
     # Get recent GPS data for workload context
@@ -1540,36 +1542,34 @@ async def get_fatigue_analysis(
     # Determine fatigue level
     if fatigue_score < 30:
         fatigue_level = "low"
-        recommendation = "Baixo nível de fadiga. Atleta está bem recuperado e pronto para treinos intensos."
+        recommendation = t("fatigue_low")
     elif fatigue_score < 50:
         fatigue_level = "moderate"
-        recommendation = "Fadiga moderada. Atleta pode treinar normalmente, mas monitore sinais de sobrecarga."
+        recommendation = t("fatigue_moderate")
     elif fatigue_score < 70:
         fatigue_level = "high"
-        recommendation = "Alta fadiga detectada. Reduza volume/intensidade e priorize recuperação ativa."
+        recommendation = t("fatigue_high")
     else:
         fatigue_level = "critical"
-        recommendation = "⚠️ FADIGA CRÍTICA! Recomenda-se descanso completo ou treino regenerativo leve. Risco de overtraining."
+        recommendation = t("fatigue_critical")
     
-    # Identify contributing factors
+    # Identify contributing factors (using translations)
     contributing_factors = []
     if avg_fatigue >= 7:
-        contributing_factors.append("Fadiga autorreportada elevada")
+        contributing_factors.append(t("high_fatigue_perception"))
     if avg_sleep_quality <= 5:
-        contributing_factors.append("Qualidade do sono comprometida")
+        contributing_factors.append(t("poor_sleep"))
     if avg_sleep_hours < 7:
-        contributing_factors.append(f"Sono insuficiente ({avg_sleep_hours:.1f}h/noite)")
+        contributing_factors.append(t("insufficient_sleep"))
     if avg_muscle_soreness >= 7:
-        contributing_factors.append("Dor muscular significativa")
+        contributing_factors.append(t("high_muscle_soreness"))
     if avg_stress >= 7:
-        contributing_factors.append("Níveis de estresse elevados")
-    if len(gps_records) >= 5:
-        contributing_factors.append("Alta frequência de treinos recentes")
+        contributing_factors.append(t("elevated_stress"))
     if avg_readiness < 6:
-        contributing_factors.append(f"Baixo score de prontidão ({avg_readiness:.1f}/10)")
+        contributing_factors.append(t("compromised_readiness"))
     
     if not contributing_factors:
-        contributing_factors.append("Nenhum fator crítico identificado")
+        contributing_factors.append(t("all_good"))
     
     return FatigueAnalysis(
         fatigue_level=fatigue_level,
