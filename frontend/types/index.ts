@@ -30,12 +30,15 @@ export interface GPSData {
   coach_id?: string;
   date: string;
   total_distance: number;
-  high_intensity_distance: number;
-  sprint_distance: number;
+  high_intensity_distance: number; // HID 14.4-19.8 km/h
+  high_speed_running?: number; // HSR 19.8-25.2 km/h
+  sprint_distance: number; // 25.3+ km/h
   number_of_sprints: number;
   number_of_accelerations: number;
   number_of_decelerations: number;
   max_speed?: number;
+  max_acceleration?: number;
+  max_deceleration?: number;
   notes?: string;
   created_at?: string;
 }
