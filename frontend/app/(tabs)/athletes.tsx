@@ -135,9 +135,9 @@ export default function AthletesScreen() {
             <View style={styles.emptyIconGlow}>
               <Ionicons name="people-outline" size={64} color={colors.accent.primary} />
             </View>
-            <Text style={styles.emptyText}>Nenhum atleta cadastrado</Text>
+            <Text style={styles.emptyText}>{t('athletes.noAthletes')}</Text>
             <Text style={styles.emptySubtext}>
-              Adicione seu primeiro atleta ou importe CSV
+              {t('athletes.addFirst')}
             </Text>
           </View>
         }
