@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   },
   headerGreeting: {
     fontSize: 14,
-    color: colors.spectral.cyan,
+    color: colors.accent.primary,
     fontWeight: '600',
     marginBottom: 4,
     letterSpacing: 1,
