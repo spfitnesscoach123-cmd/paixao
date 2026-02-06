@@ -1581,8 +1581,121 @@ async def get_fatigue_analysis(
 @api_router.get("/analysis/ai-insights/{athlete_id}")
 async def get_ai_insights(
     athlete_id: str,
+    lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
+    t = lambda key: get_analysis_text(lang, key)
+    
+    # Language-specific prompts
+    lang_prompts = {
+        "en": {
+            "system": "You are a sports science and football training expert. Analyze the provided data and provide professional, practical and actionable insights. Respond in clear and objective English.",
+            "analysis_prompt": """Based on this data, provide a complete professional analysis including:
+
+1. EXECUTIVE SUMMARY (2-3 lines about the athlete's current state)
+
+2. STRENGTHS (2-3 positive aspects identified in the data)
+
+3. AREAS OF CONCERN (2-3 areas that require monitoring or adjustment)
+
+4. SPECIFIC RECOMMENDATIONS (3-4 concrete actions to optimize training)
+
+5. RECOMMENDED TRAINING ZONES:
+   - Recovery Zone: distance and characteristics
+   - Aerobic Zone: distance and characteristics
+   - Anaerobic Zone: distance and characteristics
+   - Maximum Zone: distance and characteristics
+
+Format your response in a structured and professional manner.""",
+            "data_labels": {
+                "analysis": "Athlete Analysis",
+                "position": "Position",
+                "gps_data": "GPS DATA (last 30 records)",
+                "total_sessions": "Total sessions",
+                "avg_distance": "Average distance",
+                "avg_hi_distance": "Average high intensity distance",
+                "avg_sprints": "Average sprints per session",
+                "avg_max_speed": "Average max speed",
+                "wellness": "WELLNESS (last 30 records)",
+                "total_questionnaires": "Total questionnaires",
+                "avg_wellness": "Average wellness score",
+                "avg_readiness": "Average readiness score",
+                "avg_fatigue": "Average fatigue",
+                "avg_sleep_quality": "Average sleep quality",
+                "avg_sleep_hours": "Average sleep hours",
+                "assessments": "PHYSICAL ASSESSMENTS",
+                "total_assessments": "Total assessments"
+            },
+            "defaults": {
+                "summary": "Athlete data analysis completed successfully.",
+                "strength": "Consistent training data",
+                "concern": "Continue monitoring regularly",
+                "recommendation": "Maintain current monitoring routine"
+            },
+            "zones": {
+                "recovery": "Up to 5km, light pace, HR < 70% max",
+                "aerobic": "5-8km, moderate pace, HR 70-85% max",
+                "anaerobic": "High intensity, short sprints, HR 85-95% max",
+                "maximum": "Maximum effort, sprints, HR > 95% max"
+            }
+        },
+        "pt": {
+            "system": "Você é um especialista em ciência do esporte e treinamento de futebol. Analise os dados fornecidos e forneça insights profissionais, práticos e acionáveis. Responda em português brasileiro de forma clara e objetiva.",
+            "analysis_prompt": """Com base nesses dados, forneça uma análise profissional completa incluindo:
+
+1. RESUMO EXECUTIVO (2-3 linhas sobre o estado atual do atleta)
+
+2. PONTOS FORTES (2-3 aspectos positivos identificados nos dados)
+
+3. PONTOS DE ATENÇÃO (2-3 áreas que requerem monitoramento ou ajuste)
+
+4. RECOMENDAÇÕES ESPECÍFICAS (3-4 ações concretas para otimizar o treinamento)
+
+5. ZONAS DE TREINAMENTO RECOMENDADAS:
+   - Zona de Recuperação: distância e características
+   - Zona Aeróbica: distância e características
+   - Zona Anaeróbica: distância e características
+   - Zona Máxima: distância e características
+
+Formate sua resposta de forma estruturada e profissional.""",
+            "data_labels": {
+                "analysis": "Análise do Atleta",
+                "position": "Posição",
+                "gps_data": "DADOS GPS (últimos 30 registros)",
+                "total_sessions": "Total de sessões",
+                "avg_distance": "Distância média",
+                "avg_hi_distance": "Distância alta intensidade média",
+                "avg_sprints": "Sprints médios por sessão",
+                "avg_max_speed": "Velocidade máxima média",
+                "wellness": "WELLNESS (últimos 30 registros)",
+                "total_questionnaires": "Total de questionários",
+                "avg_wellness": "Wellness score médio",
+                "avg_readiness": "Readiness score médio",
+                "avg_fatigue": "Fadiga média",
+                "avg_sleep_quality": "Qualidade sono média",
+                "avg_sleep_hours": "Horas de sono média",
+                "assessments": "AVALIAÇÕES FÍSICAS",
+                "total_assessments": "Total de avaliações"
+            },
+            "defaults": {
+                "summary": "Análise dos dados do atleta concluída com sucesso.",
+                "strength": "Dados consistentes de treinamento",
+                "concern": "Continue monitorando regularmente",
+                "recommendation": "Manter rotina atual de monitoramento"
+            },
+            "zones": {
+                "recovery": "Até 5km, ritmo leve, FC < 70% máxima",
+                "aerobic": "5-8km, ritmo moderado, FC 70-85% máxima",
+                "anaerobic": "Alta intensidade, sprints curtos, FC 85-95% máxima",
+                "maximum": "Esforço máximo, sprints, FC > 95% máxima"
+            }
+        }
+    }
+    
+    # Default to English if language not supported
+    lp = lang_prompts.get(lang, lang_prompts["en"])
+    labels = lp["data_labels"]
+    
     # Verify athlete belongs to current user
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
