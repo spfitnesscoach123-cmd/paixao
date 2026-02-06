@@ -22,6 +22,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
   const router = useRouter();
@@ -39,6 +40,11 @@ export default function Register() {
 
     if (password.length < 6) {
       Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    if (!acceptedTerms) {
+      Alert.alert('Erro', 'Você precisa aceitar os Termos de Uso e a Política de Privacidade');
       return;
     }
 
