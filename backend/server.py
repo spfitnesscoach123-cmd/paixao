@@ -1484,6 +1484,7 @@ async def get_acwr_history(
 @api_router.get("/analysis/fatigue/{athlete_id}")
 async def get_fatigue_analysis(
     athlete_id: str,
+    lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
     # Verify athlete belongs to current user
