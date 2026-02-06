@@ -12,8 +12,10 @@ import {
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { Athlete } from '../../types';
+import { colors } from '../../constants/theme';
 
 export default function AthletesScreen() {
   const router = useRouter();
@@ -49,56 +51,64 @@ export default function AthletesScreen() {
     <TouchableOpacity
       style={styles.athleteCard}
       onPress={() => router.push(`/athlete/${item.id || item._id}`)}
+      activeOpacity={0.8}
     >
-      <View style={styles.athleteCardContent}>
-        {item.photo_base64 ? (
-          <Image
-            source={{ uri: item.photo_base64 }}
-            style={styles.athletePhoto}
-          />
-        ) : (
-          <View style={styles.athletePhotoPlaceholder}>
-            <Ionicons name="person" size={32} color="#9ca3af" />
-          </View>
-        )}
-        <View style={styles.athleteInfo}>
-          <Text style={styles.athleteName}>{item.name}</Text>
-          <View style={styles.athleteDetails}>
-            <View style={styles.detailItem}>
-              <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-              <Text style={styles.detailText}>{calculateAge(item.birth_date)} anos</Text>
+      <LinearGradient
+        colors={['rgba(0, 212, 255, 0.1)', 'rgba(0, 255, 136, 0.05)']}        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.cardGradient}
+      >
+        <View style={styles.athleteCardContent}>
+          {item.photo_base64 ? (
+            <View style={styles.photoContainer}>
+              <Image
+                source={{ uri: item.photo_base64 }}
+                style={styles.athletePhoto}
+              />
+              <View style={styles.photoGlow} />
             </View>
-            <View style={styles.detailItem}>
-              <Ionicons name="football-outline" size={14} color="#6b7280" />
-              <Text style={styles.detailText}>{item.position}</Text>
-            </View>
-          </View>
-          {(item.height || item.weight) && (
-            <View style={styles.athleteDetails}>
-              {item.height && (
-                <View style={styles.detailItem}>
-                  <Ionicons name="resize-outline" size={14} color="#6b7280" />
-                  <Text style={styles.detailText}>{item.height} cm</Text>
-                </View>
-              )}
-              {item.weight && (
-                <View style={styles.detailItem}>
-                  <Ionicons name="barbell-outline" size={14} color="#6b7280" />
-                  <Text style={styles.detailText}>{item.weight} kg</Text>
-                </View>
-              )}
+          ) : (
+            <View style={styles.athletePhotoPlaceholder}>
+              <Ionicons name="person" size={28} color={colors.spectral.cyan} />
             </View>
           )}
+          <View style={styles.athleteInfo}>
+            <Text style={styles.athleteName}>{item.name}</Text>
+            <View style={styles.athleteDetails}>
+              <View style={styles.detailBadge}>
+                <Ionicons name="calendar-outline" size={12} color={colors.spectral.green} />
+                <Text style={styles.detailText}>{calculateAge(item.birth_date)} anos</Text>
+              </View>
+              <View style={styles.detailBadge}>
+                <Ionicons name="football-outline" size={12} color={colors.spectral.teal} />
+                <Text style={styles.detailText}>{item.position}</Text>
+              </View>
+            </View>
+            {(item.height || item.weight) && (
+              <View style={styles.athleteDetails}>
+                {item.height && (
+                  <View style={styles.detailBadge}>
+                    <Text style={styles.detailTextSmall}>{item.height} cm</Text>
+                  </View>
+                )}
+                {item.weight && (
+                  <View style={styles.detailBadge}>
+                    <Text style={styles.detailTextSmall}>{item.weight} kg</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={24} color={colors.spectral.cyan} />
         </View>
-        <Ionicons name="chevron-forward" size={24} color="#9ca3af" />
-      </View>
+      </LinearGradient>
     </TouchableOpacity>
   );
 
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={colors.spectral.cyan} />
       </View>
     );
   }
@@ -107,18 +117,24 @@ export default function AthletesScreen() {
     <View style={styles.container}>
       <FlatList
         data={athletes}
-        keyExtractor={(item) => item.id!}
+        keyExtractor={(item) => item.id || item._id || ''}
         renderItem={renderAthleteCard}
         contentContainerStyle={styles.listContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh}
+            tintColor={colors.spectral.cyan}
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color="#d1d5db" />
+            <View style={styles.emptyIconGlow}>
+              <Ionicons name="people-outline" size={64} color={colors.spectral.cyan} />
+            </View>
             <Text style={styles.emptyText}>Nenhum atleta cadastrado</Text>
             <Text style={styles.emptySubtext}>
-              Adicione seu primeiro atleta para começar
+              Adicione seu primeiro atleta ou importe CSV
             </Text>
           </View>
         }
@@ -126,8 +142,14 @@ export default function AthletesScreen() {
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push('/add-athlete')}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={32} color="#ffffff" />
+        <LinearGradient
+          colors={colors.gradients.green}
+          style={styles.fabGradient}
+        >
+          <Ionicons name="add" size={32} color="#ffffff" />
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -136,42 +158,60 @@ export default function AthletesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.dark.primary,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.dark.primary,
   },
   listContent: {
     padding: 16,
   },
   athleteCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.2)',
+  },
+  cardGradient: {
+    backgroundColor: colors.dark.card,
   },
   athleteCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
   },
-  athletePhoto: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  photoContainer: {
+    position: 'relative',
     marginRight: 16,
   },
+  athletePhoto: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 2,
+    borderColor: colors.spectral.cyan,
+  },
+  photoGlow: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.spectral.cyan,
+    opacity: 0.2,
+    top: 0,
+    left: 0,
+  },
   athletePhotoPlaceholder: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#f3f4f6',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    borderWidth: 2,
+    borderColor: 'rgba(0, 212, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -181,39 +221,55 @@ const styles = StyleSheet.create({
   },
   athleteName: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginBottom: 6,
   },
   athleteDetails: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
     marginTop: 4,
   },
-  detailItem: {
+  detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
   },
   detailText: {
-    fontSize: 13,
-    color: '#6b7280',
-    marginLeft: 4,
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: '600',
+  },
+  detailTextSmall: {
+    fontSize: 11,
+    color: colors.text.secondary,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 64,
   },
+  emptyIconGlow: {
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 30,
+  },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 16,
+    color: colors.text.primary,
+    marginTop: 20,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.text.secondary,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -224,13 +280,17 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#2563eb',
+    overflow: 'hidden',
+    shadowColor: colors.spectral.green,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  fabGradient: {
+    width: 64,
+    height: 64,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
 });
