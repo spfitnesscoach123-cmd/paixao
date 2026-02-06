@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format } from 'date-fns';
+import { AnalysisTab } from '../../components/AnalysisTab';
 
 type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
 
