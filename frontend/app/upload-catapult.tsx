@@ -476,14 +476,22 @@ const styles = StyleSheet.create({
   unmatchSection: {
     marginBottom: 16,
     padding: 12,
-    backgroundColor: '#fffbeb',
+    backgroundColor: '#eff6ff',
     borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    borderStyle: 'dashed',
   },
   unmatchTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#b45309',
-    marginBottom: 8,
+    color: '#1e40af',
+    marginBottom: 4,
+  },
+  unmatchSubtitle: {
+    fontSize: 13,
+    color: '#1e40af',
+    marginBottom: 12,
   },
   unmatchItem: {
     flexDirection: 'row',
@@ -493,12 +501,21 @@ const styles = StyleSheet.create({
   },
   unmatchText: {
     fontSize: 13,
-    color: '#92400e',
+    color: '#1e3a8a',
+    fontWeight: '500',
   },
-  unmatchHint: {
+  unmatchInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#bfdbfe',
+    gap: 6,
+  },
+  unmatchInfoText: {
     fontSize: 12,
-    color: '#92400e',
-    marginTop: 8,
+    color: '#6b7280',
     fontStyle: 'italic',
   },
   uploadButton: {
