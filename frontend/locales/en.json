@@ -92,7 +92,16 @@
     "noData": "No GPS data recorded",
     "importCSV": "Import Catapult CSV",
     "session": "Session",
-    "period": "Period"
+    "sessions": "sessions",
+    "period": "Period",
+    "periods": "periods",
+    "sessionTotals": "Session Totals",
+    "periodDetails": "Period Details",
+    "manualEntry": "Manual Entry",
+    "uploadCSV": "Upload CSV",
+    "dist": "Dist",
+    "hid": "HID",
+    "spr": "Spr"
   },
   "wellness": {
     "title": "Wellness",
