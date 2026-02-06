@@ -1,5 +1,6 @@
 // Parser for Catapult CSV format - Updated for real Catapult structure
 export interface CatapultGPSData {
+  player_name?: string; // Nome do jogador do CSV
   date: string;
   period_name?: string; // Session, 1ST HALF, 2ND HALF, W-UP
   total_distance: number;
