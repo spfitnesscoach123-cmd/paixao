@@ -81,6 +81,62 @@ export default function AthleteDetails() {
     },
   });
 
+  // Group GPS data by session_id
+  const groupedSessions = useMemo((): GroupedSession[] => {
+    if (!gpsData || gpsData.length === 0) return [];
+
+    const sessionMap = new Map<string, GroupedSession>();
+
+    gpsData.forEach((record) => {
+      // Use session_id if available, otherwise create one from date
+      const sessionKey = record.session_id || `legacy_${record.date}`;
+      const sessionName = record.session_name || t('gps.session');
+
+      if (!sessionMap.has(sessionKey)) {
+        sessionMap.set(sessionKey, {
+          session_id: sessionKey,
+          session_name: sessionName,
+          date: record.date,
+          periods: [],
+          totals: {
+            total_distance: 0,
+            high_intensity_distance: 0,
+            sprint_distance: 0,
+            number_of_sprints: 0,
+            number_of_accelerations: 0,
+            number_of_decelerations: 0,
+            max_speed: 0,
+          },
+        });
+      }
+
+      const session = sessionMap.get(sessionKey)!;
+      session.periods.push(record);
+      
+      // Accumulate totals
+      session.totals.total_distance += record.total_distance || 0;
+      session.totals.high_intensity_distance += record.high_intensity_distance || 0;
+      session.totals.sprint_distance += record.sprint_distance || 0;
+      session.totals.number_of_sprints += record.number_of_sprints || 0;
+      session.totals.number_of_accelerations += record.number_of_accelerations || 0;
+      session.totals.number_of_decelerations += record.number_of_decelerations || 0;
+      session.totals.max_speed = Math.max(session.totals.max_speed, record.max_speed || 0);
+    });
+
+    // Sort sessions by date (most recent first)
+    return Array.from(sessionMap.values()).sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }, [gpsData, t]);
+
+  const toggleSessionExpand = (sessionId: string) => {
+    setExpandedSessions(prev => 
+      prev.includes(sessionId) 
+        ? prev.filter(id => id !== sessionId)
+        : [...prev, sessionId]
+    );
+  };
+
   const deleteMutation = useMutation({
     mutationFn: async () => {
       await api.delete(`/athletes/${id}`);
