@@ -220,7 +220,8 @@ export default function CompareAthletes() {
     return { minX, maxX, minY, maxY, medianX: medX, medianY: medY };
   }, [quadrantData]);
 
-  const isLoading = loadingAthletes || loadingGps;
+  const isLoading = loadingAthletes;
+  const isLoadingGps = loadingGps;
 
   const renderQuadrantChart = () => {
     if (quadrantData.length === 0) {
