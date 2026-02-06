@@ -103,7 +103,7 @@ export default function AddAthlete() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Novo Atleta</Text>
+          <Text style={styles.headerTitle}>{t('athletes.addAthlete')}</Text>
           <View style={{ width: 40 }} />
         </View>
 
@@ -122,7 +122,7 @@ export default function AddAthlete() {
               ) : (
                 <View style={styles.photoPlaceholder}>
                   <Ionicons name="camera" size={32} color={colors.accent.primary} />
-                  <Text style={styles.photoText}>Adicionar Foto</Text>
+                  <Text style={styles.photoText}>{t('athletes.addPhoto')}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -130,13 +130,13 @@ export default function AddAthlete() {
             <View style={styles.form}>
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>
-                  Nome completo <Text style={styles.required}>*</Text>
+                  {t('athletes.name')} <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
                   <Ionicons name="person-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Ex: João Silva"
+                    placeholder={t('athletes.namePlaceholder')}
                     placeholderTextColor={colors.text.tertiary}
                     value={name}
                     onChangeText={setName}
@@ -147,13 +147,13 @@ export default function AddAthlete() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>
-                  Data de nascimento <Text style={styles.required}>*</Text>
+                  {t('athletes.birthDate')} <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
                   <Ionicons name="calendar-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="AAAA-MM-DD (Ex: 2000-01-15)"
+                    placeholder={t('athletes.birthDatePlaceholder')}
                     placeholderTextColor={colors.text.tertiary}
                     value={birthDate}
                     onChangeText={setBirthDate}
@@ -164,13 +164,13 @@ export default function AddAthlete() {
 
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>
-                  Posição <Text style={styles.required}>*</Text>
+                  {t('athletes.position')} <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
                   <Ionicons name="football-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Ex: Atacante, Meio-campo, Zagueiro"
+                    placeholder={t('athletes.positionPlaceholder')}
                     placeholderTextColor={colors.text.tertiary}
                     value={position}
                     onChangeText={setPosition}
