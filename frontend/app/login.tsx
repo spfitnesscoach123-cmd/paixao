@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,14 +16,72 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as LocalAuthentication from 'expo-local-authentication';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors } from '../constants/theme';
+
+const BIOMETRIC_EMAIL_KEY = 'biometric_email';
+const BIOMETRIC_PASSWORD_KEY = 'biometric_password';
+const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isBiometricSupported, setIsBiometricSupported] = useState(false);
+  const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    checkBiometricSupport();
+  }, []);
+
+  const checkBiometricSupport = async () => {
+    try {
+      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const enrolled = await LocalAuthentication.isEnrolledAsync();
+      setIsBiometricSupported(compatible && enrolled);
+
+      // Check if there are saved credentials
+      const biometricEnabled = await AsyncStorage.getItem(BIOMETRIC_ENABLED_KEY);
+      const savedEmail = await AsyncStorage.getItem(BIOMETRIC_EMAIL_KEY);
+      setHasSavedCredentials(biometricEnabled === 'true' && !!savedEmail);
+    } catch (error) {
+      console.log('Biometric check error:', error);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Login com biometria',
+        fallbackLabel: 'Usar senha',
+        disableDeviceFallback: false,
+      });
+
+      if (result.success) {
+        setIsLoading(true);
+        const savedEmail = await AsyncStorage.getItem(BIOMETRIC_EMAIL_KEY);
+        const savedPassword = await AsyncStorage.getItem(BIOMETRIC_PASSWORD_KEY);
+
+        if (savedEmail && savedPassword) {
+          try {
+            await login(savedEmail, savedPassword);
+            router.replace('/(tabs)/athletes');
+          } catch (error: any) {
+            Alert.alert('Erro', 'Credenciais salvas inválidas. Faça login novamente.');
+            // Clear invalid credentials
+            await AsyncStorage.multiRemove([BIOMETRIC_EMAIL_KEY, BIOMETRIC_PASSWORD_KEY, BIOMETRIC_ENABLED_KEY]);
+            setHasSavedCredentials(false);
+          }
+        }
+        setIsLoading(false);
+      }
+    } catch (error) {
+      console.log('Biometric login error:', error);
+    }
+  };
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -34,6 +92,26 @@ export default function Login() {
     setIsLoading(true);
     try {
       await login(email, password);
+      
+      // Ask to save credentials for biometric login
+      if (isBiometricSupported) {
+        Alert.alert(
+          'Habilitar Biometria?',
+          'Deseja habilitar login com FaceID/impressão digital para próximas vezes?',
+          [
+            { text: 'Não', style: 'cancel' },
+            {
+              text: 'Sim',
+              onPress: async () => {
+                await AsyncStorage.setItem(BIOMETRIC_EMAIL_KEY, email);
+                await AsyncStorage.setItem(BIOMETRIC_PASSWORD_KEY, password);
+                await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+              },
+            },
+          ]
+        );
+      }
+      
       router.replace('/(tabs)/athletes');
     } catch (error: any) {
       Alert.alert('Erro', error.message);
@@ -94,6 +172,13 @@ export default function Login() {
             </View>
 
             <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={() => router.push('/forgot-password')}
+            >
+              <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={styles.button}
               onPress={handleLogin}
               disabled={isLoading}
@@ -112,6 +197,25 @@ export default function Login() {
                 )}
               </LinearGradient>
             </TouchableOpacity>
+
+            {/* Biometric Login Button */}
+            {isBiometricSupported && hasSavedCredentials && (
+              <TouchableOpacity
+                style={styles.biometricButton}
+                onPress={handleBiometricLogin}
+                disabled={isLoading}
+                activeOpacity={0.8}
+              >
+                <Ionicons 
+                  name={Platform.OS === 'ios' ? 'scan' : 'finger-print'} 
+                  size={28} 
+                  color={colors.accent.primary} 
+                />
+                <Text style={styles.biometricButtonText}>
+                  {Platform.OS === 'ios' ? 'Entrar com FaceID' : 'Entrar com Biometria'}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.registerLink}
@@ -198,6 +302,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text.primary,
   },
+  forgotPassword: {
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: colors.accent.light,
+    fontWeight: '600',
+  },
   button: {
     borderRadius: 16,
     overflow: 'hidden',
@@ -218,6 +332,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     letterSpacing: 1,
+  },
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.accent.primary,
+    height: 56,
+    marginTop: 16,
+    gap: 12,
+  },
+  biometricButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.accent.primary,
   },
   registerLink: {
     marginTop: 24,
