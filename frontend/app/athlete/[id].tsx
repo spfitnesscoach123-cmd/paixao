@@ -343,6 +343,9 @@ export default function AthleteDetails() {
           </View>
         );
 
+      case 'analysis':
+        return <AnalysisTab athleteId={id} />;
+
       default:
         return null;
     }
