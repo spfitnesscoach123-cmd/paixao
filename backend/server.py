@@ -310,6 +310,40 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
+# ============= PASSWORD RECOVERY =============
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
+@api_router.post("/auth/verify-email")
+async def verify_email(request: VerifyEmailRequest):
+    """Check if email exists in the system"""
+    user = await db.users.find_one({"email": request.email})
+    return {"exists": user is not None}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset user password"""
+    user = await db.users.find_one({"email": request.email})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found"
+        )
+    
+    # Update password
+    new_hashed_password = hash_password(request.new_password)
+    await db.users.update_one(
+        {"email": request.email},
+        {"$set": {"hashed_password": new_hashed_password}}
+    )
+    
+    return {"message": "Password reset successfully"}
+
 # ============= ATHLETE ROUTES =============
 
 @api_router.post("/athletes", response_model=Athlete)
