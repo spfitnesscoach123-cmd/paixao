@@ -32,6 +32,7 @@ export default function Login() {
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const { login } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   useEffect(() => {
