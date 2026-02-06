@@ -220,13 +220,13 @@ export default function AthleteCharts() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.dark.primary,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.dark.secondary,
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text.primary,
     flex: 1,
     textAlign: 'center',
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text.primary,
     marginTop: 8,
     marginBottom: 16,
   },
@@ -272,13 +272,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6b7280',
+    color: colors.text.secondary,
     marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.text.tertiary,
     marginTop: 8,
     textAlign: 'center',
   },
