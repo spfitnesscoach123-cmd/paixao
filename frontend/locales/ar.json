@@ -34,7 +34,21 @@
     "loginTitle": "تدريب كرة القدم",
     "loginSubtitle": "نظام الوصفات المتقدم",
     "registerTitle": "إنشاء حساب",
-    "registerSubtitle": "انضم إلى المنصة"
+    "registerSubtitle": "انضم إلى المنصة",
+    "fillAllFields": "يرجى ملء جميع الحقول",
+    "invalidCredentials": "بيانات اعتماد غير صالحة. يرجى تسجيل الدخول مرة أخرى.",
+    "enableBiometrics": "تفعيل البيومتري؟",
+    "biometricsPrompt": "هل تريد تفعيل تسجيل الدخول بالبصمة/FaceID؟",
+    "loginWithFaceID": "تسجيل الدخول بـ FaceID",
+    "loginWithBiometrics": "تسجيل الدخول بالبصمة",
+    "passwordsDoNotMatch": "كلمات المرور غير متطابقة",
+    "passwordMinLength": "يجب أن تحتوي كلمة المرور على 6 أحرف على الأقل",
+    "mustAcceptTerms": "يجب قبول شروط الاستخدام وسياسة الخصوصية",
+    "logoutConfirm": "هل أنت متأكد من تسجيل الخروج؟",
+    "acceptTerms": "لقد قرأت وأوافق على",
+    "termsOfUse": "شروط الاستخدام",
+    "and": "و",
+    "privacyPolicy": "سياسة الخصوصية"
   },
   "tabs": {
     "athletes": "الرياضيون",
@@ -73,11 +87,24 @@
     "muscleSoreness": "آلام العضلات",
     "stress": "التوتر",
     "mood": "المزاج",
-    "readiness": "الاستعداد"
+    "readiness": "الاستعداد",
+    "generateLink": "إنشاء رابط الصحة"
   },
   "settings": {
     "title": "الإعدادات",
     "language": "اللغة",
-    "selectLanguage": "اختر اللغة"
+    "selectLanguage": "اختر اللغة",
+    "account": "الحساب",
+    "subscriptionTools": "الاشتراك والأدوات",
+    "manageSubscription": "إدارة الاشتراك",
+    "legal": "قانوني",
+    "about": "حول",
+    "version": "الإصدار",
+    "logout": "تسجيل الخروج"
+  },
+  "features": {
+    "aiAnalysis": "تحليل الذكاء الاصطناعي",
+    "acwrFatigue": "ACWR والتعب",
+    "comparisons": "المقارنات"
   }
 }
