@@ -16,8 +16,10 @@ import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { Athlete } from '../types';
+import { colors } from '../constants/theme';
 
 export default function AddAthlete() {
   const router = useRouter();
@@ -90,136 +92,177 @@ export default function AddAthlete() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Novo Atleta</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.dark.secondary, colors.dark.primary]}
+        style={styles.gradient}
       >
-        <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
-          {photoBase64 ? (
-            <Image source={{ uri: photoBase64 }} style={styles.photo} />
-          ) : (
-            <View style={styles.photoPlaceholder}>
-              <Ionicons name="camera" size={32} color="#9ca3af" />
-              <Text style={styles.photoText}>Adicionar Foto</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              Nome completo <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: João Silva"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              Data de nascimento <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="AAAA-MM-DD (Ex: 2000-01-15)"
-              value={birthDate}
-              onChangeText={setBirthDate}
-              keyboardType="numbers-and-punctuation"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>
-              Posição <Text style={styles.required}>*</Text>
-            </Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ex: Atacante, Meio-campo, Zagueiro"
-              value={position}
-              onChangeText={setPosition}
-              autoCapitalize="words"
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-              <Text style={styles.label}>Altura (cm)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: 175"
-                value={height}
-                onChangeText={setHeight}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-              <Text style={styles.label}>Peso (kg)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ex: 70"
-                value={weight}
-                onChangeText={setWeight}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, createMutation.isPending && styles.buttonDisabled]}
-            onPress={handleSubmit}
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.buttonText}>Cadastrar Atleta</Text>
-            )}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.spectral.cyan} />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Novo Atleta</Text>
+          <View style={{ width: 40 }} />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        <KeyboardAvoidingView
+          style={styles.keyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TouchableOpacity style={styles.photoContainer} onPress={pickImage}>
+              {photoBase64 ? (
+                <Image source={{ uri: photoBase64 }} style={styles.photo} />
+              ) : (
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="camera" size={32} color={colors.spectral.cyan} />
+                  <Text style={styles.photoText}>Adicionar Foto</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.form}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Nome completo <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={[styles.inputContainer, styles.glowEffect]}>
+                  <Ionicons name="person-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: João Silva"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Data de nascimento <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={[styles.inputContainer, styles.glowEffect]}>
+                  <Ionicons name="calendar-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="AAAA-MM-DD (Ex: 2000-01-15)"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={birthDate}
+                    onChangeText={setBirthDate}
+                    keyboardType="numbers-and-punctuation"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>
+                  Posição <Text style={styles.required}>*</Text>
+                </Text>
+                <View style={[styles.inputContainer, styles.glowEffect]}>
+                  <Ionicons name="football-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Ex: Atacante, Meio-campo, Zagueiro"
+                    placeholderTextColor={colors.text.tertiary}
+                    value={position}
+                    onChangeText={setPosition}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Altura (cm)</Text>
+                  <View style={[styles.inputContainer, styles.glowEffect]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ex: 175"
+                      placeholderTextColor={colors.text.tertiary}
+                      value={height}
+                      onChangeText={setHeight}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Peso (kg)</Text>
+                  <View style={[styles.inputContainer, styles.glowEffect]}>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Ex: 70"
+                      placeholderTextColor={colors.text.tertiary}
+                      value={weight}
+                      onChangeText={setWeight}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.button}
+                onPress={handleSubmit}
+                disabled={createMutation.isPending}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={colors.gradients.green}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.buttonGradient}
+                >
+                  {createMutation.isPending ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="add-circle" size={24} color="#ffffff" />
+                      <Text style={styles.buttonText}>Cadastrar Atleta</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+  },
+  gradient: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },
   backButton: {
     padding: 8,
+    width: 40,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text.primary,
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -235,21 +278,23 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
+    borderWidth: 3,
+    borderColor: colors.spectral.cyan,
   },
   photoPlaceholder: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.dark.card,
     borderWidth: 2,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(0, 212, 255, 0.3)',
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
   },
   photoText: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: colors.text.secondary,
     marginTop: 8,
   },
   form: {
@@ -261,39 +306,59 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.text.secondary,
     marginBottom: 8,
   },
   required: {
-    color: '#dc2626',
+    color: colors.status.error,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 212, 255, 0.2)',
+    paddingHorizontal: 16,
+  },
+  glowEffect: {
+    shadowColor: colors.spectral.cyan,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 10,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    flex: 1,
+    height: 56,
     fontSize: 16,
-    color: '#111827',
+    color: colors.text.primary,
   },
   row: {
     flexDirection: 'row',
   },
   button: {
-    backgroundColor: '#2563eb',
-    borderRadius: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginTop: 8,
+    shadowColor: colors.spectral.green,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  buttonGradient: {
     height: 56,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-  },
-  buttonDisabled: {
-    backgroundColor: '#93c5fd',
+    gap: 8,
   },
   buttonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
