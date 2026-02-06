@@ -101,3 +101,147 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Sistema de prescrição de treinamentos de futebol com autenticação JWT, gestão de atletas, coleta de dados GPS, questionários de wellness, avaliações físicas e análise com IA"
+
+backend:
+  - task: "JWT Authentication (Register/Login/Me)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Implementado e testado via curl. Registro, login e get user funcionando corretamente. Token JWT sendo gerado e validado."
+  
+  - task: "CRUD de Atletas"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoints de criar, listar, obter, atualizar e deletar atletas implementados e testados. Suporte para foto em base64, dados antropométricos."
+  
+  - task: "Dados GPS"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoint de criar e listar dados GPS por atleta implementado e testado. Inclui distâncias, sprints, acelerações/desacelerações."
+  
+  - task: "Wellness Questionnaires"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Endpoint de criar e listar questionários de wellness implementado e testado. Calcula automaticamente wellness_score e readiness_score."
+  
+  - task: "Physical Assessments"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoints implementados mas não testados ainda. Estrutura flexível para diferentes tipos de avaliação."
+
+frontend:
+  - task: "Autenticação JWT (Login/Register)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/login.tsx, /app/frontend/app/register.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Telas de login e registro implementadas com AuthContext, SecureStore para token. Precisa testar integração completa."
+  
+  - task: "Lista de Atletas"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/athletes.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Tela de lista de atletas com React Query, cards visuais, FAB para adicionar. Precisa testar."
+  
+  - task: "Adicionar Atleta"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/add-athlete.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Formulário completo para adicionar atleta com upload de foto (base64), validação de campos. Precisa testar."
+  
+  - task: "Navegação Bottom Tabs"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/_layout.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Navegação por tabs implementada: Atletas, Dados, Perfil. Precisa testar."
+  
+  - task: "Tela de Perfil com Logout"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Tela de perfil do usuário com opção de logout. Precisa testar."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 0
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "JWT Authentication Backend"
+    - "CRUD de Atletas Backend"
+    - "Autenticação Frontend"
+    - "Lista e Adicionar Atletas Frontend"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Fase 1 implementada: Backend completo com JWT auth, CRUD atletas, GPS, wellness e assessments. Frontend com auth, navegação tabs, lista/adicionar atletas. Backend testado via curl e funcionando. Frontend precisa de teste completo de integração."
