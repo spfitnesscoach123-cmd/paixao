@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { GPSData } from '../../types';
+import { colors } from '../../constants/theme';
 
 interface GPSChartProps {
   data: GPSData[];
@@ -10,7 +11,18 @@ interface GPSChartProps {
   color?: string;
 }
 
-export const GPSChart: React.FC<GPSChartProps> = ({ data, metric, title, color = '#2563eb' }) => {
+// Extract period name from notes
+const extractPeriod = (notes?: string): string => {
+  if (!notes) return 'N/A';
+  const period = notes.replace('Período: ', '');
+  // Shorten period names
+  if (period.toLowerCase().includes('1st half')) return '1st Half';
+  if (period.toLowerCase().includes('2nd half')) return '2nd Half';
+  if (period.toLowerCase().includes('session')) return 'Session (Total)';
+  return period;
+};
+
+export const GPSChart: React.FC<GPSChartProps> = ({ data, metric, title, color = colors.accent.primary }) => {
   if (!data || data.length === 0) {
     return (
       <View style={styles.emptyContainer}>
@@ -28,29 +40,47 @@ export const GPSChart: React.FC<GPSChartProps> = ({ data, metric, title, color =
     value: item[metric] as number,
     label: item.date.split('-')[2], // Show only day
     date: item.date,
+    period: extractPeriod(item.notes),
   }));
 
-  const maxValue = Math.max(...chartData.map(d => d.value));
-  const minValue = Math.min(...chartData.map(d => d.value));
-  const avgValue = chartData.reduce((sum, d) => sum + d.value, 0) / chartData.length;
+  // Group data by period to show period stats instead of max/min/avg
+  const periodStats: { [key: string]: { total: number; count: number } } = {};
+  sortedData.forEach(item => {
+    const period = extractPeriod(item.notes);
+    if (!periodStats[period]) {
+      periodStats[period] = { total: 0, count: 0 };
+    }
+    periodStats[period].total += item[metric] as number;
+    periodStats[period].count += 1;
+  });
+
+  // Calculate averages per period
+  const periodAverages = Object.entries(periodStats).map(([period, stats]) => ({
+    period,
+    average: stats.total / stats.count,
+  }));
+
+  // Sort periods: Session first, then 1st Half, then 2nd Half
+  const sortOrder = ['Session (Total)', '1st Half', '2nd Half'];
+  periodAverages.sort((a, b) => {
+    const indexA = sortOrder.findIndex(s => a.period.includes(s.replace(' (Total)', '')));
+    const indexB = sortOrder.findIndex(s => b.period.includes(s.replace(' (Total)', '')));
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       
       <View style={styles.statsRow}>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Média</Text>
-          <Text style={styles.statValue}>{avgValue.toFixed(0)}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Máximo</Text>
-          <Text style={styles.statValue}>{maxValue.toFixed(0)}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statLabel}>Mínimo</Text>
-          <Text style={styles.statValue}>{minValue.toFixed(0)}</Text>
-        </View>
+        {periodAverages.slice(0, 3).map((stat, index) => (
+          <View key={stat.period} style={styles.statItem}>
+            <Text style={styles.statLabel}>{stat.period}</Text>
+            <Text style={[styles.statValue, { color: index === 0 ? colors.accent.primary : colors.text.primary }]}>
+              {stat.average.toFixed(0)}
+            </Text>
+          </View>
+        ))}
       </View>
 
       <LineChart
@@ -68,13 +98,14 @@ export const GPSChart: React.FC<GPSChartProps> = ({ data, metric, title, color =
         spacing={40}
         initialSpacing={10}
         noOfSections={4}
-        yAxisColor="#e5e7eb"
-        xAxisColor="#e5e7eb"
+        yAxisColor={colors.border.default}
+        xAxisColor={colors.border.default}
         yAxisTextStyle={styles.axisText}
         xAxisLabelTextStyle={styles.axisText}
         hideDataPoints={false}
         dataPointsColor={color}
         dataPointsRadius={4}
+        backgroundColor={colors.dark.card}
       />
     </View>
   );
@@ -82,51 +113,58 @@ export const GPSChart: React.FC<GPSChartProps> = ({ data, metric, title, color =
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.dark.cardSolid,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   title: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 12,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 16,
-    paddingVertical: 8,
-    backgroundColor: '#f9fafb',
+    paddingVertical: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
     borderRadius: 8,
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: 11,
+    color: colors.text.secondary,
     marginBottom: 4,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.text.primary,
   },
   axisText: {
     fontSize: 10,
-    color: '#9ca3af',
+    color: colors.text.tertiary,
   },
   emptyContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.dark.cardSolid,
     borderRadius: 12,
     padding: 32,
     alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   emptyText: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.text.secondary,
   },
 });
