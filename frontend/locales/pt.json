@@ -102,7 +102,17 @@
     "viewCharts": "Ver Gráficos Detalhados",
     "athleteNotFound": "Atleta não encontrado",
     "info": "Info",
-    "assessments": "Avaliações"
+    "assessments": "Avaliações",
+    "addPhoto": "Adicionar Foto",
+    "namePlaceholder": "Ex: João Silva",
+    "birthDatePlaceholder": "AAAA-MM-DD (Ex: 2000-01-15)",
+    "positionPlaceholder": "Ex: Atacante, Meio-campo, Zagueiro",
+    "heightPlaceholder": "Ex: 175",
+    "weightPlaceholder": "Ex: 70",
+    "registerAthlete": "Cadastrar Atleta",
+    "errorCreating": "Erro ao cadastrar atleta",
+    "galleryPermission": "É necessário permitir acesso à galeria",
+    "invalidDateFormat": "Data inválida. Use o formato AAAA-MM-DD"
   },
   "gps": {
     "title": "Dados GPS",
