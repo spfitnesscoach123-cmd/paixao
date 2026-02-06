@@ -1339,16 +1339,16 @@ async def get_acwr_detailed_analysis(
     # Determine overall risk
     if "high" in risk_levels:
         overall_risk = "high"
-        recommendation = "⚠️ ATENÇÃO: Um ou mais parâmetros estão em zona de alto risco. Recomenda-se redução imediata da carga de treino."
+        recommendation = t("acwr_detail_high")
     elif risk_levels.count("moderate") >= 2:
         overall_risk = "moderate"
-        recommendation = "Alguns parâmetros estão elevados. Monitore a fadiga e considere ajustar o volume de treino."
+        recommendation = t("acwr_detail_moderate")
     elif "optimal" in risk_levels and risk_levels.count("optimal") >= 3:
         overall_risk = "optimal"
-        recommendation = "Carga de treino equilibrada! Continue mantendo este padrão."
+        recommendation = t("acwr_detail_optimal")
     else:
         overall_risk = "low"
-        recommendation = "Carga de treino baixa. Considere aumentar progressivamente a intensidade."
+        recommendation = t("acwr_detail_low")
     
     return ACWRDetailedAnalysis(
         athlete_id=athlete_id,
