@@ -120,7 +120,7 @@ export default function DataScreen() {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              tintColor={colors.spectral.cyan}
+              tintColor={colors.accent.primary}
             />
           }
         >
