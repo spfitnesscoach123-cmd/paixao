@@ -273,55 +273,125 @@ export default function AthleteDetails() {
                 onPress={() => router.push(`/athlete/${id}/add-gps`)}
               >
                 <Ionicons name="add-circle" size={24} color="#2563eb" />
-                <Text style={styles.actionButtonText}>Entrada Manual</Text>
+                <Text style={styles.actionButtonText}>{t('gps.manualEntry')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => router.push(`/athlete/${id}/upload-gps`)}
               >
                 <Ionicons name="cloud-upload" size={24} color="#2563eb" />
-                <Text style={styles.actionButtonText}>Upload CSV</Text>
+                <Text style={styles.actionButtonText}>{t('gps.uploadCSV')}</Text>
               </TouchableOpacity>
             </View>
 
+            {/* Session count summary */}
+            {groupedSessions.length > 0 && (
+              <View style={styles.sessionSummary}>
+                <Text style={styles.sessionSummaryText}>
+                  {groupedSessions.length} {t('gps.sessions')} • {gpsData?.length || 0} {t('gps.periods')}
+                </Text>
+              </View>
+            )}
+
             {gpsLoading ? (
               <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
-            ) : gpsData && gpsData.length > 0 ? (
-              gpsData.map((item, index) => (
-                <View key={item.id || `gps-${index}`} style={styles.dataCard}>
-                  <View style={styles.dataHeader}>
-                    <Ionicons name="location" size={20} color={colors.accent.primary} />
-                    <Text style={styles.dataDate}>{item.date}</Text>
-                    {item.notes && (
-                      <View style={styles.periodBadge}>
-                        <Text style={styles.periodText}>{item.notes.replace('Período: ', '')}</Text>
+            ) : groupedSessions.length > 0 ? (
+              groupedSessions.map((session) => {
+                const isExpanded = expandedSessions.includes(session.session_id);
+                const hasPeriods = session.periods.length > 1;
+                
+                return (
+                  <View key={session.session_id} style={styles.sessionCard}>
+                    {/* Session Header - Clickable to expand */}
+                    <TouchableOpacity 
+                      style={styles.sessionHeader}
+                      onPress={() => hasPeriods && toggleSessionExpand(session.session_id)}
+                      activeOpacity={hasPeriods ? 0.7 : 1}
+                    >
+                      <View style={styles.sessionHeaderLeft}>
+                        <View style={styles.sessionIconBox}>
+                          <Ionicons name="calendar" size={20} color={colors.accent.primary} />
+                        </View>
+                        <View>
+                          <Text style={styles.sessionDate}>{session.date}</Text>
+                          <Text style={styles.sessionName}>{session.session_name}</Text>
+                        </View>
+                      </View>
+                      <View style={styles.sessionHeaderRight}>
+                        {hasPeriods && (
+                          <View style={styles.periodCountBadge}>
+                            <Text style={styles.periodCountText}>{session.periods.length} {t('gps.periods')}</Text>
+                          </View>
+                        )}
+                        {hasPeriods && (
+                          <Ionicons 
+                            name={isExpanded ? 'chevron-up' : 'chevron-down'} 
+                            size={20} 
+                            color={colors.text.secondary} 
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Session Totals */}
+                    <View style={styles.sessionTotals}>
+                      <Text style={styles.sessionTotalsTitle}>{t('gps.sessionTotals')}</Text>
+                      <View style={styles.dataGrid}>
+                        <View style={styles.dataItem}>
+                          <Text style={styles.dataLabel}>{t('gps.totalDistance')}</Text>
+                          <Text style={styles.dataValueLarge}>{session.totals.total_distance.toFixed(0)}m</Text>
+                        </View>
+                        <View style={styles.dataItem}>
+                          <Text style={styles.dataLabel}>{t('gps.highIntensity')}</Text>
+                          <Text style={styles.dataValueLarge}>{session.totals.high_intensity_distance.toFixed(0)}m</Text>
+                        </View>
+                        <View style={styles.dataItem}>
+                          <Text style={styles.dataLabel}>{t('gps.sprints')}</Text>
+                          <Text style={styles.dataValueLarge}>{session.totals.number_of_sprints}</Text>
+                        </View>
+                        <View style={styles.dataItem}>
+                          <Text style={styles.dataLabel}>{t('gps.maxSpeed')}</Text>
+                          <Text style={styles.dataValueLarge}>{session.totals.max_speed.toFixed(1)} km/h</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Expanded Period Details */}
+                    {isExpanded && hasPeriods && (
+                      <View style={styles.periodsContainer}>
+                        <Text style={styles.periodsTitle}>{t('gps.periodDetails')}</Text>
+                        {session.periods.map((period, pIndex) => {
+                          const periodName = period.period_name || period.notes?.replace('Período: ', '') || `${t('gps.period')} ${pIndex + 1}`;
+                          return (
+                            <View key={period.id || `period-${pIndex}`} style={styles.periodItem}>
+                              <View style={styles.periodHeader}>
+                                <View style={styles.periodBadgeSmall}>
+                                  <Text style={styles.periodBadgeText}>{periodName}</Text>
+                                </View>
+                              </View>
+                              <View style={styles.periodDataRow}>
+                                <Text style={styles.periodDataText}>
+                                  {t('gps.dist')}: {period.total_distance.toFixed(0)}m
+                                </Text>
+                                <Text style={styles.periodDataText}>
+                                  {t('gps.hid')}: {period.high_intensity_distance.toFixed(0)}m
+                                </Text>
+                                <Text style={styles.periodDataText}>
+                                  {t('gps.spr')}: {period.number_of_sprints}
+                                </Text>
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
                   </View>
-                  <View style={styles.dataGrid}>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Dist. Total</Text>
-                      <Text style={styles.dataValue}>{item.total_distance.toFixed(0)}m</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Alta Int.</Text>
-                      <Text style={styles.dataValue}>{item.high_intensity_distance.toFixed(0)}m</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Sprints</Text>
-                      <Text style={styles.dataValue}>{item.number_of_sprints}</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Vel. Máx</Text>
-                      <Text style={styles.dataValue}>{item.max_speed?.toFixed(1) || '-'} km/h</Text>
-                    </View>
-                  </View>
-                </View>
-              ))
+                );
+              })
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="location-outline" size={48} color={colors.text.tertiary} />
-                <Text style={styles.emptyText}>Nenhum dado GPS registrado</Text>
+                <Text style={styles.emptyText}>{t('gps.noData')}</Text>
               </View>
             )}
           </View>
