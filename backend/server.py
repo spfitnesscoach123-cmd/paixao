@@ -892,8 +892,11 @@ def calculate_training_load(gps_data: GPSData) -> float:
 @api_router.get("/analysis/acwr/{athlete_id}")
 async def get_acwr_analysis(
     athlete_id: str,
+    lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
+    t = lambda key: get_analysis_text(lang, key)
+    
     # Verify athlete belongs to current user
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
@@ -916,7 +919,7 @@ async def get_acwr_analysis(
     if len(gps_records) < 7:
         raise HTTPException(
             status_code=400, 
-            detail="Insufficient data. Need at least 7 days of GPS data for ACWR calculation."
+            detail=t("ai_no_data")
         )
     
     # Convert to GPSData objects and calculate loads
@@ -933,7 +936,7 @@ async def get_acwr_analysis(
             acute_loads.append(load)
     
     if not acute_loads or not chronic_loads:
-        raise HTTPException(status_code=400, detail="Unable to calculate ACWR")
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
     
     acute_load = sum(acute_loads)
     chronic_load = sum(chronic_loads) / 4  # Average per week over 4 weeks
@@ -944,16 +947,16 @@ async def get_acwr_analysis(
     # Determine risk level and recommendation
     if acwr_ratio < 0.8:
         risk_level = "low"
-        recommendation = "Carga de treino abaixo do ideal. Considere aumentar gradualmente a intensidade para manter a forma física."
+        recommendation = t("acwr_low")
     elif 0.8 <= acwr_ratio <= 1.3:
         risk_level = "optimal"
-        recommendation = "Carga de treino ótima! Continue mantendo este equilíbrio entre treino e recuperação."
+        recommendation = t("acwr_optimal")
     elif 1.3 < acwr_ratio <= 1.5:
         risk_level = "moderate"
-        recommendation = "Carga de treino moderadamente elevada. Monitore sinais de fadiga e considere reduzir volume nos próximos dias."
+        recommendation = t("acwr_moderate")
     else:
         risk_level = "high"
-        recommendation = "⚠️ ATENÇÃO: Carga de treino muito elevada! Alto risco de lesão. Recomenda-se redução imediata da carga e priorizar recuperação."
+        recommendation = t("acwr_high")
     
     return ACWRAnalysis(
         acute_load=round(acute_load, 2),
