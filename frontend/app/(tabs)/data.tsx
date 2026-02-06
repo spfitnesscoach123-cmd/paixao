@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 20,
     overflow: 'hidden',
-    shadowColor: colors.spectral.purple,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 20,
