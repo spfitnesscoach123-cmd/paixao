@@ -263,12 +263,12 @@ export default function AthleteDetails() {
             </TouchableOpacity>
 
             {wellnessLoading ? (
-              <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 32 }} />
+              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
             ) : wellnessData && wellnessData.length > 0 ? (
-              wellnessData.map((item) => (
-                <View key={item.id} style={styles.dataCard}>
+              wellnessData.map((item, index) => (
+                <View key={item.id || `wellness-${index}`} style={styles.dataCard}>
                   <View style={styles.dataHeader}>
-                    <Ionicons name="fitness" size={20} color="#10b981" />
+                    <Ionicons name="fitness" size={20} color={colors.status.success} />
                     <Text style={styles.dataDate}>{item.date}</Text>
                   </View>
                   <View style={styles.scoreRow}>
