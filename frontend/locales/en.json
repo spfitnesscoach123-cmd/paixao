@@ -53,7 +53,8 @@
     "loginWithBiometrics": "Login with Biometrics",
     "passwordsDoNotMatch": "Passwords do not match",
     "passwordMinLength": "Password must be at least 6 characters",
-    "mustAcceptTerms": "You must accept the Terms of Use and Privacy Policy"
+    "mustAcceptTerms": "You must accept the Terms of Use and Privacy Policy",
+    "logoutConfirm": "Are you sure you want to logout?"
   },
   "tabs": {
     "athletes": "Athletes",
