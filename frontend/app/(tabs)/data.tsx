@@ -129,8 +129,8 @@ export default function DataScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerGreeting}>Dashboard</Text>
-              <Text style={styles.headerTitle}>Visão da Equipe</Text>
+              <Text style={styles.headerGreeting}>{t('tabs.dashboard')}</Text>
+              <Text style={styles.headerTitle}>{t('dashboard.teamOverview')}</Text>
             </View>
             <TouchableOpacity
               style={styles.compareButton}
@@ -159,8 +159,8 @@ export default function DataScreen() {
             >
               <Ionicons name="cloud-upload" size={28} color="#ffffff" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.importTitle}>Importar Dados Catapult</Text>
-                <Text style={styles.importSubtitle}>CSV automático com múltiplos atletas</Text>
+                <Text style={styles.importTitle}>{t('dashboard.importCatapult')}</Text>
+                <Text style={styles.importSubtitle}>{t('dashboard.importSubtitle')}</Text>
               </View>
               <Ionicons name="chevron-forward" size={24} color="#ffffff" />
             </LinearGradient>
@@ -172,9 +172,9 @@ export default function DataScreen() {
               <View style={styles.cardsGrid}>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title="ATLETAS"
+                    title={t('dashboard.athletes')}
                     value={stats.totalAthletes}
-                    subtitle="Total cadastrados"
+                    subtitle={t('dashboard.totalRegistered')}
                     icon="people"
                     gradientColors={colors.gradients.secondary}
                     onPress={() => router.push('/(tabs)/athletes')}
@@ -182,9 +182,9 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title="SESSÕES"
+                    title={t('dashboard.sessions')}
                     value={stats.totalSessions}
-                    subtitle={`${stats.recentSessions} últimos 7d`}
+                    subtitle={`${stats.recentSessions} ${t('dashboard.last7days')}`}
                     icon="bar-chart"
                     gradientColors={colors.gradients.accent}
                   />
@@ -194,9 +194,9 @@ export default function DataScreen() {
               <View style={styles.cardsGrid}>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title="DISTÂNCIA MÉDIA"
+                    title={t('dashboard.avgDistance')}
                     value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
-                    subtitle="Por sessão"
+                    subtitle={t('dashboard.perSession')}
                     icon="fitness"
                     gradientColors={colors.gradients.primary}
                   />
