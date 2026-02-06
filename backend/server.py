@@ -1772,31 +1772,11 @@ Formate sua resposta de forma estruturada e profissional.""",
         chat = LlmChat(
             api_key=emergent_key,
             session_id=f"analysis_{athlete_id}_{datetime.utcnow().timestamp()}",
-            system_message="""Você é um especialista em ciência do esporte e treinamento de futebol.
-Analise os dados fornecidos e forneça insights profissionais, práticos e acionáveis.
-Responda em português brasileiro de forma clara e objetiva."""
+            system_message=lp["system"]
         ).with_model("openai", "gpt-4o")
         
         user_message = UserMessage(
-            text=f"""{data_summary}
-
-Com base nesses dados, forneça uma análise profissional completa incluindo:
-
-1. RESUMO EXECUTIVO (2-3 linhas sobre o estado atual do atleta)
-
-2. PONTOS FORTES (2-3 aspectos positivos identificados nos dados)
-
-3. PONTOS DE ATENÇÃO (2-3 áreas que requerem monitoramento ou ajuste)
-
-4. RECOMENDAÇÕES ESPECÍFICAS (3-4 ações concretas para otimizar o treinamento)
-
-5. ZONAS DE TREINAMENTO RECOMENDADAS:
-   - Zona de Recuperação: distância e características
-   - Zona Aeróbica: distância e características  
-   - Zona Anaeróbica: distância e características
-   - Zona Máxima: distância e características
-
-Formate sua resposta de forma estruturada e profissional."""
+            text=f"{data_summary}\n\n{lp['analysis_prompt']}"
         )
         
         response = await chat.send_message(user_message)
@@ -1815,18 +1795,20 @@ Formate sua resposta de forma estruturada e profissional."""
             line = line.strip()
             if not line:
                 continue
-                
-            if "RESUMO" in line.upper() or "EXECUTIVO" in line.upper():
+            
+            # Detect sections based on common keywords in multiple languages
+            line_upper = line.upper()
+            if "RESUMO" in line_upper or "SUMMARY" in line_upper or "EXECUTIVO" in line_upper:
                 current_section = "summary"
-            elif "FORTE" in line.upper() or "POSITIVO" in line.upper():
+            elif "FORTE" in line_upper or "STRENGTH" in line_upper or "POSITIVO" in line_upper:
                 current_section = "strengths"
-            elif "ATENÇÃO" in line.upper() or "PREOCUP" in line.upper():
+            elif "ATENÇÃO" in line_upper or "CONCERN" in line_upper or "ATTENTION" in line_upper or "PREOCUP" in line_upper:
                 current_section = "concerns"
-            elif "RECOMENDA" in line.upper():
+            elif "RECOMENDA" in line_upper or "RECOMMENDATION" in line_upper:
                 current_section = "recommendations"
-            elif "ZONA" in line.upper() and "TREINAMENTO" in line.upper():
+            elif "ZONA" in line_upper or "ZONE" in line_upper:
                 current_section = "zones"
-            elif line.startswith('-') or line.startswith('•') or line[0].isdigit():
+            elif line.startswith('-') or line.startswith('•') or (len(line) > 0 and line[0].isdigit()):
                 content = line.lstrip('-•0123456789. ')
                 if current_section == "strengths":
                     strengths.append(content)
