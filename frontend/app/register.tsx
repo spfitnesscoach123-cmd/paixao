@@ -146,14 +146,40 @@ export default function Register() {
               />
             </View>
 
+            {/* Terms and Privacy Checkbox */}
+            <View style={styles.termsContainer}>
+              <TouchableOpacity
+                style={styles.checkbox}
+                onPress={() => setAcceptedTerms(!acceptedTerms)}
+              >
+                <Ionicons
+                  name={acceptedTerms ? 'checkbox' : 'square-outline'}
+                  size={24}
+                  color={acceptedTerms ? colors.accent.primary : colors.text.tertiary}
+                />
+              </TouchableOpacity>
+              <View style={styles.termsTextContainer}>
+                <Text style={styles.termsText}>
+                  Li e aceito os{' '}
+                  <Text style={styles.termsLink} onPress={() => router.push('/terms-of-use')}>
+                    Termos de Uso
+                  </Text>
+                  {' '}e a{' '}
+                  <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>
+                    Política de Privacidade
+                  </Text>
+                </Text>
+              </View>
+            </View>
+
             <TouchableOpacity
-              style={styles.button}
+              style={[styles.button, !acceptedTerms && styles.buttonDisabled]}
               onPress={handleRegister}
-              disabled={isLoading}
+              disabled={isLoading || !acceptedTerms}
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={colors.gradients.primary}
+                colors={acceptedTerms ? colors.gradients.primary : [colors.text.disabled, colors.text.disabled]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
