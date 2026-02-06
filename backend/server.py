@@ -1279,7 +1279,7 @@ async def get_acwr_detailed_analysis(
     # Total Distance
     acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["td"], chronic_data["td"])
     metrics.append(ACWRDetailedMetric(
-        name="Distância Total",
+        name=t("metric_total_distance"),
         acute_load=acute,
         chronic_load=chronic,
         acwr_ratio=ratio,
@@ -1291,7 +1291,7 @@ async def get_acwr_detailed_analysis(
     # HSR (20-25 km/h)
     acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["hsr"], chronic_data["hsr"])
     metrics.append(ACWRDetailedMetric(
-        name="HSR (20-25 km/h)",
+        name=t("metric_hsr"),
         acute_load=acute,
         chronic_load=chronic,
         acwr_ratio=ratio,
@@ -1303,7 +1303,7 @@ async def get_acwr_detailed_analysis(
     # HID (15-20 km/h)
     acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["hid"], chronic_data["hid"])
     metrics.append(ACWRDetailedMetric(
-        name="HID (15-20 km/h)",
+        name=t("metric_hid"),
         acute_load=acute,
         chronic_load=chronic,
         acwr_ratio=ratio,
@@ -1315,7 +1315,7 @@ async def get_acwr_detailed_analysis(
     # Sprint (+25 km/h)
     acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["sprint"], chronic_data["sprint"])
     metrics.append(ACWRDetailedMetric(
-        name="Sprint (+25 km/h)",
+        name=t("metric_sprint"),
         acute_load=acute,
         chronic_load=chronic,
         acwr_ratio=ratio,
@@ -1327,7 +1327,7 @@ async def get_acwr_detailed_analysis(
     # Acc/Dec
     acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["acc_dec"], chronic_data["acc_dec"])
     metrics.append(ACWRDetailedMetric(
-        name="Acc/Dec",
+        name=t("metric_acc_dec"),
         acute_load=acute,
         chronic_load=chronic,
         acwr_ratio=ratio,
