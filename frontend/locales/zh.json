@@ -1,0 +1,83 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "save": "保存",
+    "cancel": "取消",
+    "confirm": "确认",
+    "delete": "删除",
+    "edit": "编辑",
+    "back": "返回",
+    "next": "下一步",
+    "send": "发送",
+    "search": "搜索",
+    "filter": "筛选",
+    "all": "全部",
+    "none": "无",
+    "yes": "是",
+    "no": "否",
+    "error": "错误",
+    "success": "成功",
+    "warning": "警告"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出",
+    "register": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "fullName": "全名",
+    "forgotPassword": "忘记密码？",
+    "noAccount": "没有账户？",
+    "hasAccount": "已有账户？",
+    "createAccount": "创建账户",
+    "loginTitle": "足球训练",
+    "loginSubtitle": "高级处方系统",
+    "registerTitle": "创建账户",
+    "registerSubtitle": "加入平台"
+  },
+  "tabs": {
+    "athletes": "运动员",
+    "dashboard": "仪表板",
+    "profile": "个人资料"
+  },
+  "athletes": {
+    "title": "运动员",
+    "addAthlete": "添加运动员",
+    "editProfile": "编辑资料",
+    "noAthletes": "暂无运动员",
+    "addFirst": "添加第一个运动员或导入CSV",
+    "name": "全名",
+    "birthDate": "出生日期",
+    "position": "位置",
+    "height": "身高（厘米）",
+    "weight": "体重（公斤）",
+    "age": "年龄",
+    "years": "岁"
+  },
+  "gps": {
+    "title": "GPS数据",
+    "totalDistance": "总距离",
+    "highIntensity": "高强度",
+    "sprints": "冲刺",
+    "maxSpeed": "最大速度",
+    "noData": "暂无GPS数据",
+    "importCSV": "导入Catapult CSV"
+  },
+  "wellness": {
+    "title": "健康状况",
+    "questionnaire": "健康问卷",
+    "sleepHours": "睡眠时间",
+    "sleepQuality": "睡眠质量",
+    "fatigue": "疲劳",
+    "muscleSoreness": "肌肉酸痛",
+    "stress": "压力",
+    "mood": "情绪",
+    "readiness": "准备状态"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "selectLanguage": "选择语言"
+  }
+}

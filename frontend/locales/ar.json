@@ -1,0 +1,83 @@
+{
+  "common": {
+    "loading": "جاري التحميل...",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "confirm": "تأكيد",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "back": "رجوع",
+    "next": "التالي",
+    "send": "إرسال",
+    "search": "بحث",
+    "filter": "تصفية",
+    "all": "الكل",
+    "none": "لا شيء",
+    "yes": "نعم",
+    "no": "لا",
+    "error": "خطأ",
+    "success": "نجاح",
+    "warning": "تحذير"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "register": "التسجيل",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "fullName": "الاسم الكامل",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "noAccount": "ليس لديك حساب؟",
+    "hasAccount": "لديك حساب بالفعل؟",
+    "createAccount": "إنشاء حساب",
+    "loginTitle": "تدريب كرة القدم",
+    "loginSubtitle": "نظام الوصفات المتقدم",
+    "registerTitle": "إنشاء حساب",
+    "registerSubtitle": "انضم إلى المنصة"
+  },
+  "tabs": {
+    "athletes": "الرياضيون",
+    "dashboard": "لوحة التحكم",
+    "profile": "الملف الشخصي"
+  },
+  "athletes": {
+    "title": "الرياضيون",
+    "addAthlete": "إضافة رياضي",
+    "editProfile": "تعديل الملف الشخصي",
+    "noAthletes": "لا يوجد رياضيون مسجلون",
+    "addFirst": "أضف أول رياضي أو استورد CSV",
+    "name": "الاسم الكامل",
+    "birthDate": "تاريخ الميلاد",
+    "position": "المركز",
+    "height": "الطول (سم)",
+    "weight": "الوزن (كجم)",
+    "age": "العمر",
+    "years": "سنة"
+  },
+  "gps": {
+    "title": "بيانات GPS",
+    "totalDistance": "المسافة الإجمالية",
+    "highIntensity": "كثافة عالية",
+    "sprints": "السرعات القصوى",
+    "maxSpeed": "السرعة القصوى",
+    "noData": "لا توجد بيانات GPS",
+    "importCSV": "استيراد Catapult CSV"
+  },
+  "wellness": {
+    "title": "الصحة",
+    "questionnaire": "استبيان الصحة",
+    "sleepHours": "ساعات النوم",
+    "sleepQuality": "جودة النوم",
+    "fatigue": "التعب",
+    "muscleSoreness": "آلام العضلات",
+    "stress": "التوتر",
+    "mood": "المزاج",
+    "readiness": "الاستعداد"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "selectLanguage": "اختر اللغة"
+  }
+}

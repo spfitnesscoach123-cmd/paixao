@@ -1,0 +1,83 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "back": "Retour",
+    "next": "Suivant",
+    "send": "Envoyer",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "all": "Tous",
+    "none": "Aucun",
+    "yes": "Oui",
+    "no": "Non",
+    "error": "Erreur",
+    "success": "Succès",
+    "warning": "Avertissement"
+  },
+  "auth": {
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "register": "S'inscrire",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "confirmPassword": "Confirmer le mot de passe",
+    "fullName": "Nom complet",
+    "forgotPassword": "Mot de passe oublié ?",
+    "noAccount": "Pas de compte ?",
+    "hasAccount": "Déjà un compte ?",
+    "createAccount": "Créer un Compte",
+    "loginTitle": "Football Training",
+    "loginSubtitle": "Système Avancé de Prescription",
+    "registerTitle": "Créer un Compte",
+    "registerSubtitle": "Rejoignez la plateforme"
+  },
+  "tabs": {
+    "athletes": "Athlètes",
+    "dashboard": "Tableau de bord",
+    "profile": "Profil"
+  },
+  "athletes": {
+    "title": "Athlètes",
+    "addAthlete": "Ajouter un Athlète",
+    "editProfile": "Modifier le Profil",
+    "noAthletes": "Aucun athlète enregistré",
+    "addFirst": "Ajoutez votre premier athlète ou importez CSV",
+    "name": "Nom complet",
+    "birthDate": "Date de naissance",
+    "position": "Position",
+    "height": "Taille (cm)",
+    "weight": "Poids (kg)",
+    "age": "Âge",
+    "years": "ans"
+  },
+  "gps": {
+    "title": "Données GPS",
+    "totalDistance": "Distance Totale",
+    "highIntensity": "Haute Intensité",
+    "sprints": "Sprints",
+    "maxSpeed": "Vit. Maximale",
+    "noData": "Aucune donnée GPS enregistrée",
+    "importCSV": "Importer CSV Catapult"
+  },
+  "wellness": {
+    "title": "Bien-être",
+    "questionnaire": "Questionnaire de Bien-être",
+    "sleepHours": "Heures de sommeil",
+    "sleepQuality": "Qualité du sommeil",
+    "fatigue": "Fatigue",
+    "muscleSoreness": "Douleur musculaire",
+    "stress": "Stress",
+    "mood": "Humeur",
+    "readiness": "Préparation"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "selectLanguage": "Sélectionner la Langue"
+  }
+}
