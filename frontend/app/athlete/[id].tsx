@@ -138,11 +138,49 @@ export default function AthleteDetails() {
   }, [gpsData, t]);
 
   const toggleSessionExpand = (sessionId: string) => {
-    setExpandedSessions(prev => 
-      prev.includes(sessionId) 
+    setExpandedSessions(prev => {
+      const isCurrentlyExpanded = prev.includes(sessionId);
+      // If collapsing, clear selected period for this session
+      if (isCurrentlyExpanded && selectedPeriod?.sessionId === sessionId) {
+        setSelectedPeriod(null);
+      }
+      return isCurrentlyExpanded 
         ? prev.filter(id => id !== sessionId)
-        : [...prev, sessionId]
-    );
+        : [...prev, sessionId];
+    });
+  };
+
+  const togglePeriodSelection = (sessionId: string, periodIndex: number) => {
+    setSelectedPeriod(prev => {
+      // If clicking the same period, deselect it
+      if (prev?.sessionId === sessionId && prev?.periodIndex === periodIndex) {
+        return null;
+      }
+      // Select the new period
+      return { sessionId, periodIndex };
+    });
+  };
+
+  // Get the data to display (either selected period or session totals)
+  const getDisplayData = (session: GroupedSession) => {
+    if (selectedPeriod?.sessionId === session.session_id) {
+      const period = session.periods[selectedPeriod.periodIndex];
+      if (period) {
+        return {
+          total_distance: period.total_distance || 0,
+          high_intensity_distance: period.high_intensity_distance || 0,
+          number_of_sprints: period.number_of_sprints || 0,
+          max_speed: period.max_speed || 0,
+          isSelectedPeriod: true,
+          periodName: period.period_name || period.notes?.replace('Período: ', '') || `${t('gps.period')} ${selectedPeriod.periodIndex + 1}`
+        };
+      }
+    }
+    return {
+      ...session.totals,
+      isSelectedPeriod: false,
+      periodName: null
+    };
   };
 
   const deleteMutation = useMutation({
