@@ -38,7 +38,7 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={colors.gradients.cyan}
+        colors={colors.gradients.primary}
         style={styles.header}
       >
         <View style={styles.avatarGlow}>
