@@ -150,7 +150,7 @@ export default function DataScreen() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={colors.gradients.purple}
+              colors={colors.gradients.primary}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.importGradient}
