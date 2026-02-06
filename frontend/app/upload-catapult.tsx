@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,15 +7,16 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import api from '../services/api';
 import { parseCatapultCSV, validateCatapultCSV } from '../utils/csvParser';
 import { Athlete } from '../types';
+import { colors } from '../constants/theme';
 
 export default function UploadCatapultCSV() {
   const router = useRouter();
@@ -28,6 +29,7 @@ export default function UploadCatapultCSV() {
   const [matchedAthletes, setMatchedAthletes] = useState<{[key: string]: string}>({});
   const [unmatchedPlayers, setUnmatchedPlayers] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [recordsPerPlayer, setRecordsPerPlayer] = useState<{[key: string]: number}>({});
 
   // Get all athletes
   const { data: athletes } = useQuery({
@@ -47,19 +49,21 @@ export default function UploadCatapultCSV() {
 
       const { data: records } = parseCatapultCSV(csvData);
       
-      // If createMissing is true, create new athletes
+      // Create a copy of matchedAthletes to update
+      const updatedMatchedAthletes = { ...matchedAthletes };
+      
+      // If createMissing is true, create new athletes FIRST
       if (createMissing && unmatchedPlayers.length > 0) {
         for (const playerName of unmatchedPlayers) {
           try {
             const response = await api.post('/athletes', {
               name: playerName,
-              birth_date: '2000-01-01', // Default date
+              birth_date: '2000-01-01',
               position: 'Não especificado',
             });
             
-            // Add to matched athletes
             const newAthlete = response.data;
-            matchedAthletes[playerName] = newAthlete.id || newAthlete._id;
+            updatedMatchedAthletes[playerName] = newAthlete.id || newAthlete._id;
           } catch (error) {
             console.error(`Error creating athlete ${playerName}:`, error);
           }
@@ -69,8 +73,9 @@ export default function UploadCatapultCSV() {
       let successCount = 0;
       let skippedCount = 0;
       const errors: string[] = [];
+      const importedByPlayer: {[key: string]: number} = {};
 
-      // Import records for each player
+      // Group records by player name and import each player's data to their profile
       for (const record of records) {
         const playerName = record.player_name;
         
@@ -79,16 +84,19 @@ export default function UploadCatapultCSV() {
           continue;
         }
 
-        // Find matching athlete
-        const athleteId = matchedAthletes[playerName];
+        // Find matching athlete ID
+        const athleteId = updatedMatchedAthletes[playerName];
         
         if (!athleteId) {
           skippedCount++;
-          errors.push(`Atleta não encontrado: ${playerName}`);
+          if (!errors.includes(`Atleta não encontrado: ${playerName}`)) {
+            errors.push(`Atleta não encontrado: ${playerName}`);
+          }
           continue;
         }
 
         try {
+          // Import GPS data for THIS specific athlete
           await api.post('/gps-data', {
             athlete_id: athleteId,
             date: record.date,
@@ -105,23 +113,30 @@ export default function UploadCatapultCSV() {
             notes: record.period_name ? `Período: ${record.period_name}` : undefined,
           });
           successCount++;
+          importedByPlayer[playerName] = (importedByPlayer[playerName] || 0) + 1;
         } catch (error: any) {
           errors.push(`Erro ao importar ${playerName}: ${error.message}`);
         }
       }
 
-      return { successCount, skippedCount, errors };
+      return { successCount, skippedCount, errors, importedByPlayer };
     },
-    onSuccess: ({ successCount, skippedCount, errors }) => {
+    onSuccess: ({ successCount, skippedCount, errors, importedByPlayer }) => {
       queryClient.invalidateQueries({ queryKey: ['gps'] });
-      queryClient.invalidateQueries({ queryKey: ['athletes'] }); // Refresh athletes list
+      queryClient.invalidateQueries({ queryKey: ['athletes'] });
       
-      let message = `${successCount} registros importados com sucesso!`;
+      // Build detailed success message
+      let message = `✅ ${successCount} registros importados com sucesso!\n\n`;
+      message += '📊 Por atleta:\n';
+      Object.entries(importedByPlayer).forEach(([name, count]) => {
+        message += `• ${name}: ${count} registro(s)\n`;
+      });
+      
       if (skippedCount > 0) {
-        message += `\n${skippedCount} registros ignorados.`;
+        message += `\n⚠️ ${skippedCount} registros ignorados.`;
       }
       if (errors.length > 0) {
-        message += `\n\nErros:\n${errors.slice(0, 3).join('\n')}`;
+        message += `\n\n❌ Erros:\n${errors.slice(0, 3).join('\n')}`;
         if (errors.length > 3) {
           message += `\n... e mais ${errors.length - 3} erros`;
         }
@@ -135,19 +150,27 @@ export default function UploadCatapultCSV() {
     },
   });
 
-  const matchPlayerNames = (playerNamesFromCSV: string[]) => {
+  const matchPlayerNames = (playerNamesFromCSV: string[], csvContent: string) => {
     if (!athletes) return;
 
     const matched: {[key: string]: string} = {};
     const unmatched: string[] = [];
+    const recordsCount: {[key: string]: number} = {};
+
+    // Count records per player
+    const { data: records } = parseCatapultCSV(csvContent);
+    records.forEach(record => {
+      if (record.player_name) {
+        recordsCount[record.player_name] = (recordsCount[record.player_name] || 0) + 1;
+      }
+    });
+    setRecordsPerPlayer(recordsCount);
 
     playerNamesFromCSV.forEach(playerName => {
-      // Try to match by exact name first
       let athlete = athletes.find(a => 
         a.name.toLowerCase().trim() === playerName.toLowerCase().trim()
       );
 
-      // If not found, try partial match (contains)
       if (!athlete) {
         athlete = athletes.find(a => 
           a.name.toLowerCase().includes(playerName.toLowerCase()) ||
@@ -169,7 +192,7 @@ export default function UploadCatapultCSV() {
   const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel', '*/*'],
         copyToCacheDirectory: true,
       });
 
@@ -178,17 +201,14 @@ export default function UploadCatapultCSV() {
         const file = result.assets[0];
         setFileName(file.name);
 
-        // Read file content
         const response = await fetch(file.uri);
         const content = await response.text();
         setFileContent(content);
 
-        // Parse and extract player names
         try {
           const { data: records } = parseCatapultCSV(content);
           setRecordCount(records.length);
           
-          // Get unique player names
           const uniquePlayerNames = [...new Set(
             records
               .map(r => r.player_name)
@@ -196,7 +216,7 @@ export default function UploadCatapultCSV() {
           )];
           
           setPlayerNames(uniquePlayerNames);
-          matchPlayerNames(uniquePlayerNames);
+          matchPlayerNames(uniquePlayerNames, content);
         } catch (error) {
           Alert.alert('Aviso', 'Não foi possível analisar o arquivo. Verifique o formato.');
         }
@@ -216,17 +236,17 @@ export default function UploadCatapultCSV() {
       return;
     }
 
+    const matchedCount = Object.keys(matchedAthletes).length;
+    const totalPlayers = playerNames.length;
+
     if (unmatchedPlayers.length > 0) {
       Alert.alert(
         'Criar Atletas Automaticamente?',
-        `${unmatchedPlayers.length} jogadores não foram encontrados:\n\n${unmatchedPlayers.join('\n')}\n\nDeseja criar esses atletas automaticamente?`,
+        `${unmatchedPlayers.length} jogadores não foram encontrados:\n\n${unmatchedPlayers.slice(0, 5).join('\n')}${unmatchedPlayers.length > 5 ? '\n...' : ''}\n\nDeseja criar perfis para esses atletas?`,
         [
-          { 
-            text: 'Cancelar', 
-            style: 'cancel' 
-          },
+          { text: 'Cancelar', style: 'cancel' },
           {
-            text: 'Ignorar e Importar',
+            text: 'Ignorar',
             onPress: () => uploadMutation.mutate({ csvData: fileContent, createMissing: false }),
           },
           {
@@ -239,7 +259,7 @@ export default function UploadCatapultCSV() {
     } else {
       Alert.alert(
         'Confirmar Import',
-        `Deseja importar ${recordCount} registros para ${playerNames.length} atletas?`,
+        `Importar dados para ${totalPlayers} atletas?\n\nCada atleta receberá apenas seus próprios dados GPS.`,
         [
           { text: 'Cancelar', style: 'cancel' },
           {
@@ -253,109 +273,130 @@ export default function UploadCatapultCSV() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Import CSV Catapult</Text>
-        <View style={{ width: 24 }} />
-      </View>
-
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={48} color="#2563eb" />
-          <Text style={styles.infoTitle}>Import para Múltiplos Atletas</Text>
-          <Text style={styles.infoText}>
-            O sistema irá associar automaticamente os dados do CSV aos atletas cadastrados pelo nome.
-          </Text>
+      <LinearGradient
+        colors={[colors.dark.secondary, colors.dark.primary]}
+        style={styles.gradient}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Import CSV Catapult</Text>
+          <View style={{ width: 24 }} />
         </View>
 
-        <TouchableOpacity
-          style={styles.pickButton}
-          onPress={pickDocument}
-          disabled={isProcessing}
-        >
-          {isProcessing ? (
-            <ActivityIndicator color="#2563eb" />
-          ) : (
-            <>
-              <Ionicons name="document" size={24} color="#2563eb" />
-              <Text style={styles.pickButtonText}>Selecionar Arquivo CSV</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.infoCard}>
+            <LinearGradient
+              colors={colors.gradients.card}
+              style={styles.infoGradient}
+            >
+              <Ionicons name="information-circle" size={48} color={colors.accent.primary} />
+              <Text style={styles.infoTitle}>Import Inteligente</Text>
+              <Text style={styles.infoText}>
+                O sistema associa automaticamente os dados de cada jogador ao seu perfil pelo nome no CSV.
+              </Text>
+            </LinearGradient>
+          </View>
 
-        {fileName && (
-          <View style={styles.fileCard}>
-            <View style={styles.fileHeader}>
-              <Ionicons name="document-text" size={32} color="#10b981" />
-              <View style={styles.fileInfo}>
-                <Text style={styles.fileName}>{fileName}</Text>
-                <Text style={styles.fileRecords}>
-                  {recordCount} registros • {playerNames.length} jogadores
-                </Text>
-              </View>
-            </View>
-
-            {/* Matched Athletes */}
-            {Object.keys(matchedAthletes).length > 0 && (
-              <View style={styles.matchSection}>
-                <Text style={styles.matchTitle}>
-                  ✅ Atletas Encontrados ({Object.keys(matchedAthletes).length})
-                </Text>
-                {Object.keys(matchedAthletes).map(playerName => (
-                  <View key={playerName} style={styles.matchItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10b981" />
-                    <Text style={styles.matchText}>{playerName}</Text>
-                  </View>
-                ))}
-              </View>
+          <TouchableOpacity
+            style={styles.pickButton}
+            onPress={pickDocument}
+            disabled={isProcessing}
+            activeOpacity={0.8}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color={colors.accent.primary} />
+            ) : (
+              <>
+                <Ionicons name="document" size={28} color={colors.accent.primary} />
+                <Text style={styles.pickButtonText}>Selecionar Arquivo CSV</Text>
+              </>
             )}
+          </TouchableOpacity>
 
-            {/* Unmatched Players */}
-            {unmatchedPlayers.length > 0 && (
-              <View style={styles.unmatchSection}>
-                <Text style={styles.unmatchTitle}>
-                  ➕ Novos Atletas ({unmatchedPlayers.length})
-                </Text>
-                <Text style={styles.unmatchSubtitle}>
-                  Esses atletas não estão cadastrados e serão criados automaticamente:
-                </Text>
-                {unmatchedPlayers.map(playerName => (
-                  <View key={playerName} style={styles.unmatchItem}>
-                    <Ionicons name="person-add" size={16} color="#2563eb" />
-                    <Text style={styles.unmatchText}>{playerName}</Text>
-                  </View>
-                ))}
-                <View style={styles.unmatchInfo}>
-                  <Ionicons name="information-circle" size={16} color="#6b7280" />
-                  <Text style={styles.unmatchInfoText}>
-                    Posição: "Não especificado" (edite depois)
+          {fileName && (
+            <View style={styles.fileCard}>
+              <View style={styles.fileHeader}>
+                <View style={styles.fileIconContainer}>
+                  <Ionicons name="document-text" size={32} color={colors.status.success} />
+                </View>
+                <View style={styles.fileInfo}>
+                  <Text style={styles.fileName}>{fileName}</Text>
+                  <Text style={styles.fileRecords}>
+                    {recordCount} registros • {playerNames.length} jogadores
                   </Text>
                 </View>
               </View>
-            )}
 
-            <TouchableOpacity
-              style={[
-                styles.uploadButton,
-                (uploadMutation.isPending || Object.keys(matchedAthletes).length === 0) && styles.uploadButtonDisabled
-              ]}
-              onPress={handleUpload}
-              disabled={uploadMutation.isPending || Object.keys(matchedAthletes).length === 0}
-            >
-              {uploadMutation.isPending ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <>
-                  <Ionicons name="cloud-upload" size={24} color="#ffffff" />
-                  <Text style={styles.uploadButtonText}>Importar Dados</Text>
-                </>
+              {/* Matched Athletes */}
+              {Object.keys(matchedAthletes).length > 0 && (
+                <View style={styles.matchSection}>
+                  <Text style={styles.matchTitle}>
+                    ✅ Atletas Encontrados ({Object.keys(matchedAthletes).length})
+                  </Text>
+                  {Object.keys(matchedAthletes).map(playerName => (
+                    <View key={playerName} style={styles.matchItem}>
+                      <Ionicons name="checkmark-circle" size={18} color={colors.status.success} />
+                      <Text style={styles.matchText}>{playerName}</Text>
+                      <Text style={styles.matchCount}>
+                        {recordsPerPlayer[playerName] || 0} reg.
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               )}
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
+
+              {/* Unmatched Players */}
+              {unmatchedPlayers.length > 0 && (
+                <View style={styles.unmatchSection}>
+                  <Text style={styles.unmatchTitle}>
+                    ➕ Novos Atletas ({unmatchedPlayers.length})
+                  </Text>
+                  <Text style={styles.unmatchSubtitle}>
+                    Serão criados automaticamente se você confirmar:
+                  </Text>
+                  {unmatchedPlayers.map(playerName => (
+                    <View key={playerName} style={styles.unmatchItem}>
+                      <Ionicons name="person-add" size={18} color={colors.accent.primary} />
+                      <Text style={styles.unmatchText}>{playerName}</Text>
+                      <Text style={styles.matchCount}>
+                        {recordsPerPlayer[playerName] || 0} reg.
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.uploadButton,
+                  uploadMutation.isPending && styles.uploadButtonDisabled
+                ]}
+                onPress={handleUpload}
+                disabled={uploadMutation.isPending}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={uploadMutation.isPending ? [colors.text.tertiary, colors.text.tertiary] : colors.gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.uploadGradient}
+                >
+                  {uploadMutation.isPending ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <>
+                      <Ionicons name="cloud-upload" size={24} color="#ffffff" />
+                      <Text style={styles.uploadButtonText}>Importar Dados</Text>
+                    </>
+                  )}
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      </LinearGradient>
     </View>
   );
 }
@@ -363,13 +404,14 @@ export default function UploadCatapultCSV() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+  },
+  gradient: {
+    flex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -380,7 +422,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: colors.text.primary,
     flex: 1,
     textAlign: 'center',
   },
@@ -391,52 +433,68 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   infoCard: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
+    borderRadius: 16,
+    overflow: 'hidden',
     marginBottom: 24,
+  },
+  infoGradient: {
+    padding: 24,
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1e40af',
+    color: colors.text.primary,
     marginTop: 12,
     marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#1e40af',
+    color: colors.text.secondary,
     textAlign: 'center',
+    lineHeight: 20,
   },
   pickButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 24,
     borderWidth: 2,
-    borderColor: '#2563eb',
+    borderColor: colors.border.default,
     borderStyle: 'dashed',
     gap: 12,
   },
   pickButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2563eb',
+    color: colors.accent.primary,
   },
   fileCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: colors.dark.cardSolid,
+    borderRadius: 16,
+    padding: 20,
     marginTop: 24,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   fileHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 20,
+    gap: 16,
+  },
+  fileIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   fileInfo: {
     flex: 1,
@@ -444,95 +502,97 @@ const styles = StyleSheet.create({
   fileName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.text.primary,
     marginBottom: 4,
   },
   fileRecords: {
     fontSize: 14,
-    color: '#10b981',
+    color: colors.status.success,
+    fontWeight: '500',
   },
   matchSection: {
     marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 8,
+    padding: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   matchTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#15803d',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: colors.status.success,
+    marginBottom: 12,
   },
   matchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
+    marginBottom: 8,
+    gap: 10,
   },
   matchText: {
-    fontSize: 13,
-    color: '#166534',
+    fontSize: 14,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  matchCount: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '500',
   },
   unmatchSection: {
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#eff6ff',
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#2563eb',
-    borderStyle: 'dashed',
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   unmatchTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1e40af',
+    fontWeight: '700',
+    color: colors.accent.primary,
     marginBottom: 4,
   },
   unmatchSubtitle: {
     fontSize: 13,
-    color: '#1e40af',
+    color: colors.text.secondary,
     marginBottom: 12,
   },
   unmatchItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
+    marginBottom: 8,
+    gap: 10,
   },
   unmatchText: {
-    fontSize: 13,
-    color: '#1e3a8a',
+    fontSize: 14,
+    color: colors.text.primary,
     fontWeight: '500',
-  },
-  unmatchInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#bfdbfe',
-    gap: 6,
-  },
-  unmatchInfoText: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontStyle: 'italic',
+    flex: 1,
   },
   uploadButton: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    shadowColor: colors.accent.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  uploadButtonDisabled: {
+    shadowOpacity: 0,
+  },
+  uploadGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#10b981',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  uploadButtonDisabled: {
-    backgroundColor: '#d1d5db',
+    padding: 18,
+    gap: 10,
   },
   uploadButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#ffffff',
   },
 });
