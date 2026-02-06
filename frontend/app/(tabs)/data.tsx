@@ -9,10 +9,12 @@ import { Athlete, GPSData, WellnessQuestionnaire } from '../../types';
 import { ImpactCard } from '../../components/dashboard/ImpactCard';
 import { QuickStat } from '../../components/dashboard/QuickStat';
 import { colors } from '../../constants/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function DataScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const { data: athletes } = useQuery({
