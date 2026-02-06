@@ -174,7 +174,7 @@ export default function DataScreen() {
                     value={stats.totalAthletes}
                     subtitle="Total cadastrados"
                     icon="people"
-                    gradientColors={colors.gradients.cyan}
+                    gradientColors={colors.gradients.secondary}
                     onPress={() => router.push('/(tabs)/athletes')}
                   />
                 </View>
@@ -184,7 +184,7 @@ export default function DataScreen() {
                     value={stats.totalSessions}
                     subtitle={`${stats.recentSessions} últimos 7d`}
                     icon="bar-chart"
-                    gradientColors={colors.gradients.green}
+                    gradientColors={colors.gradients.accent}
                   />
                 </View>
               </View>
@@ -196,7 +196,7 @@ export default function DataScreen() {
                     value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
                     subtitle="Por sessão"
                     icon="fitness"
-                    gradientColors={colors.gradients.teal}
+                    gradientColors={colors.gradients.primary}
                   />
                 </View>
                 <View style={styles.cardHalf}>
@@ -205,7 +205,7 @@ export default function DataScreen() {
                     value={stats.avgWellness.toFixed(1)}
                     subtitle="/10"
                     icon="heart"
-                    gradientColors={colors.gradients.pink}
+                    gradientColors={colors.gradients.secondary}
                     trend={stats.wellnessTrend}
                     trendValue="vs. semana"
                   />
@@ -248,7 +248,7 @@ export default function DataScreen() {
                     label="Sessões/Atleta"
                     value={(stats.totalSessions / (stats.totalAthletes || 1)).toFixed(1)}
                     icon="analytics"
-                    color={colors.spectral.cyan}
+                    color={colors.accent.primary}
                   />
                 </View>
                 <View style={styles.quickStatItem}>
@@ -256,7 +256,7 @@ export default function DataScreen() {
                     label="Atividade 7d"
                     value={`${stats.recentSessions}`}
                     icon="pulse"
-                    color={colors.spectral.green}
+                    color={colors.accent.tertiary}
                     trend="up"
                   />
                 </View>
