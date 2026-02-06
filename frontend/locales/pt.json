@@ -207,7 +207,13 @@
     "recovery": "Recuperação",
     "aerobic": "Aeróbica",
     "anaerobic": "Anaeróbica",
-    "maximal": "Máxima"
+    "maximal": "Máxima",
+    "acwrEvolution": "Evolução do ACWR",
+    "loadingChart": "Carregando gráfico...",
+    "insufficientDataChart": "Dados insuficientes para o gráfico",
+    "average": "Média",
+    "current": "Atual",
+    "trend": "Tendência"
   },
   "comparison": {
     "title": "Comparações Dinâmicas",
