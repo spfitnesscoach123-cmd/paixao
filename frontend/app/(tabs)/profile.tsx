@@ -57,7 +57,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
-                <Ionicons name="person-outline" size={22} color={colors.spectral.cyan} />
+                <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
               </View>
               <Text style={styles.menuItemText}>Editar Perfil</Text>
             </View>
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarGlow: {
-    shadowColor: colors.spectral.cyan,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.spectral.cyan,
+    color: colors.accent.primary,
     marginBottom: 12,
     marginLeft: 4,
     letterSpacing: 1,

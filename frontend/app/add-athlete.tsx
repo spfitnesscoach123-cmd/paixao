@@ -99,7 +99,7 @@ export default function AddAthlete() {
       >
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.spectral.cyan} />
+            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Novo Atleta</Text>
           <View style={{ width: 40 }} />
@@ -119,7 +119,7 @@ export default function AddAthlete() {
                 <Image source={{ uri: photoBase64 }} style={styles.photo} />
               ) : (
                 <View style={styles.photoPlaceholder}>
-                  <Ionicons name="camera" size={32} color={colors.spectral.cyan} />
+                  <Ionicons name="camera" size={32} color={colors.accent.primary} />
                   <Text style={styles.photoText}>Adicionar Foto</Text>
                 </View>
               )}
@@ -131,7 +131,7 @@ export default function AddAthlete() {
                   Nome completo <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
-                  <Ionicons name="person-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <Ionicons name="person-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Ex: João Silva"
@@ -148,7 +148,7 @@ export default function AddAthlete() {
                   Data de nascimento <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
-                  <Ionicons name="calendar-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <Ionicons name="calendar-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="AAAA-MM-DD (Ex: 2000-01-15)"
@@ -165,7 +165,7 @@ export default function AddAthlete() {
                   Posição <Text style={styles.required}>*</Text>
                 </Text>
                 <View style={[styles.inputContainer, styles.glowEffect]}>
-                  <Ionicons name="football-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+                  <Ionicons name="football-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="Ex: Atacante, Meio-campo, Zagueiro"
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
     borderWidth: 3,
-    borderColor: colors.spectral.cyan,
+    borderColor: colors.accent.primary,
   },
   photoPlaceholder: {
     width: 120,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   glowEffect: {
-    shadowColor: colors.spectral.cyan,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 10,

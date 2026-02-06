@@ -115,7 +115,7 @@ export default function AthleteDetails() {
   if (athleteLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.spectral.cyan} />
+        <ActivityIndicator size="large" color={colors.accent.primary} />
       </View>
     );
   }
@@ -135,7 +135,7 @@ export default function AthleteDetails() {
           <View style={styles.tabContent}>
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
-                <Ionicons name="calendar" size={20} color={colors.spectral.cyan} />
+                <Ionicons name="calendar" size={20} color={colors.accent.primary} />
                 <Text style={styles.infoLabel}>Idade:</Text>
                 <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} anos</Text>
               </View>
@@ -164,9 +164,9 @@ export default function AthleteDetails() {
               style={styles.chartsButton}
               onPress={() => router.push(`/athlete/${id}/charts`)}
             >
-              <Ionicons name="bar-chart" size={20} color={colors.spectral.cyan} />
+              <Ionicons name="bar-chart" size={20} color={colors.accent.primary} />
               <Text style={styles.chartsButtonText}>Ver Gráficos Detalhados</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.spectral.cyan} />
+              <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: colors.spectral.cyan,
+    borderColor: colors.accent.primary,
   },
   photoPlaceholder: {
     width: 100,
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: colors.spectral.cyan,
+    borderBottomColor: colors.accent.primary,
   },
   tabText: {
     fontSize: 12,
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   activeTabText: {
-    color: colors.spectral.cyan,
+    color: colors.accent.primary,
   },
   content: {
     flex: 1,
@@ -586,12 +586,12 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: colors.spectral.cyan,
+    borderColor: colors.accent.primary,
   },
   chartsButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.spectral.cyan,
+    color: colors.accent.primary,
     marginLeft: 8,
     marginRight: 8,
     flex: 1,
@@ -616,13 +616,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.spectral.cyan,
+    borderColor: colors.accent.primary,
     gap: 8,
   },
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.spectral.cyan,
+    color: colors.accent.primary,
   },
   addButton: {
     flexDirection: 'row',
