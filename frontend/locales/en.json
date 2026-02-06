@@ -102,7 +102,17 @@
     "viewCharts": "View Detailed Charts",
     "athleteNotFound": "Athlete not found",
     "info": "Info",
-    "assessments": "Assessments"
+    "assessments": "Assessments",
+    "addPhoto": "Add Photo",
+    "namePlaceholder": "e.g. John Smith",
+    "birthDatePlaceholder": "YYYY-MM-DD (e.g. 2000-01-15)",
+    "positionPlaceholder": "e.g. Forward, Midfielder, Defender",
+    "heightPlaceholder": "e.g. 175",
+    "weightPlaceholder": "e.g. 70",
+    "registerAthlete": "Register Athlete",
+    "errorCreating": "Error creating athlete",
+    "galleryPermission": "Gallery access permission required",
+    "invalidDateFormat": "Invalid date. Use format YYYY-MM-DD"
   },
   "gps": {
     "title": "GPS Data",
