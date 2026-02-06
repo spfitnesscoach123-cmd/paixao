@@ -150,7 +150,7 @@ export default function Login() {
               <Ionicons name="mail-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder={t('auth.email')}
                 placeholderTextColor={colors.text.tertiary}
                 value={email}
                 onChangeText={setEmail}
@@ -164,7 +164,7 @@ export default function Login() {
               <Ionicons name="lock-closed-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Senha"
+                placeholder={t('auth.password')}
                 placeholderTextColor={colors.text.tertiary}
                 value={password}
                 onChangeText={setPassword}
@@ -177,7 +177,7 @@ export default function Login() {
               style={styles.forgotPassword}
               onPress={() => router.push('/forgot-password')}
             >
-              <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
+              <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -195,7 +195,7 @@ export default function Login() {
                 {isLoading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.buttonText}>Entrar</Text>
+                  <Text style={styles.buttonText}>{t('auth.login')}</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -214,7 +214,7 @@ export default function Login() {
                   color={colors.accent.primary} 
                 />
                 <Text style={styles.biometricButtonText}>
-                  {Platform.OS === 'ios' ? 'Entrar com FaceID' : 'Entrar com Biometria'}
+                  {Platform.OS === 'ios' ? t('auth.loginWithFaceID') : t('auth.loginWithBiometrics')}
                 </Text>
               </TouchableOpacity>
             )}
@@ -224,7 +224,7 @@ export default function Login() {
               onPress={() => router.push('/register')}
             >
               <Text style={styles.registerText}>
-                Não tem uma conta? <Text style={styles.registerTextBold}>Registre-se</Text>
+                {t('auth.noAccount')} <Text style={styles.registerTextBold}>{t('auth.register')}</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -232,15 +232,15 @@ export default function Login() {
           <View style={styles.features}>
             <View style={styles.featureItem}>
               <Ionicons name="analytics" size={24} color={colors.accent.primary} />
-              <Text style={styles.featureText}>Análise com IA</Text>
+              <Text style={styles.featureText}>{t('features.aiAnalysis')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="stats-chart" size={24} color={colors.accent.tertiary} />
-              <Text style={styles.featureText}>ACWR & Fadiga</Text>
+              <Text style={styles.featureText}>{t('features.acwrFatigue')}</Text>
             </View>
             <View style={styles.featureItem}>
               <Ionicons name="people" size={24} color={colors.accent.blue} />
-              <Text style={styles.featureText}>Comparações</Text>
+              <Text style={styles.featureText}>{t('features.comparisons')}</Text>
             </View>
           </View>
         </ScrollView>
