@@ -230,6 +230,11 @@ const styles = StyleSheet.create({
     marginRight: 12,
     overflow: 'hidden',
   },
+  athletePhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
   athleteInfo: {
     flex: 1,
   },
