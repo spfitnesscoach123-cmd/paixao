@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,24 @@ import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, Comprehens
 import { format } from 'date-fns';
 import { AnalysisTab } from '../../components/AnalysisTab';
 import { colors } from '../../constants/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
+
+// Interface for grouped session data
+interface GroupedSession {
+  session_id: string;
+  session_name: string;
+  date: string;
+  periods: GPSData[];
+  totals: {
+    total_distance: number;
+    high_intensity_distance: number;
+    sprint_distance: number;
+    number_of_sprints: number;
+    number_of_accelerations: number;
+    number_of_decelerations: number;
+    max_speed: number;
+  };
+}
 
 type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
 
