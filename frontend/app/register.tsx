@@ -90,8 +90,8 @@ export default function Register() {
                 <Ionicons name="person-add" size={40} color="#ffffff" />
               </LinearGradient>
             </View>
-            <Text style={styles.title}>Criar Conta</Text>
-            <Text style={styles.subtitle}>Junte-se à plataforma</Text>
+            <Text style={styles.title}>{t('auth.createAccount')}</Text>
+            <Text style={styles.subtitle}>{t('auth.registerSubtitle')}</Text>
             <View style={styles.spectralLine} />
           </View>
 
@@ -100,7 +100,7 @@ export default function Register() {
               <Ionicons name="person-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Nome completo"
+                placeholder={t('auth.fullName')}
                 placeholderTextColor={colors.text.tertiary}
                 value={name}
                 onChangeText={setName}
@@ -112,7 +112,7 @@ export default function Register() {
               <Ionicons name="mail-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder={t('auth.email')}
                 placeholderTextColor={colors.text.tertiary}
                 value={email}
                 onChangeText={setEmail}
@@ -126,7 +126,7 @@ export default function Register() {
               <Ionicons name="lock-closed-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Senha"
+                placeholder={t('auth.password')}
                 placeholderTextColor={colors.text.tertiary}
                 value={password}
                 onChangeText={setPassword}
@@ -139,7 +139,7 @@ export default function Register() {
               <Ionicons name="shield-checkmark-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Confirmar senha"
+                placeholder={t('auth.confirmPassword')}
                 placeholderTextColor={colors.text.tertiary}
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
@@ -162,13 +162,13 @@ export default function Register() {
               </TouchableOpacity>
               <View style={styles.termsTextContainer}>
                 <Text style={styles.termsText}>
-                  Li e aceito os{' '}
+                  {t('auth.acceptTerms')}{' '}
                   <Text style={styles.termsLink} onPress={() => router.push('/terms-of-use')}>
-                    Termos de Uso
+                    {t('auth.termsOfUse')}
                   </Text>
-                  {' '}e a{' '}
+                  {' '}{t('auth.and')}{' '}
                   <Text style={styles.termsLink} onPress={() => router.push('/privacy-policy')}>
-                    Política de Privacidade
+                    {t('auth.privacyPolicy')}
                   </Text>
                 </Text>
               </View>
@@ -189,7 +189,7 @@ export default function Register() {
                 {isLoading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.buttonText}>Criar Conta</Text>
+                  <Text style={styles.buttonText}>{t('auth.createAccount')}</Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
@@ -199,7 +199,7 @@ export default function Register() {
               onPress={() => router.back()}
             >
               <Text style={styles.loginText}>
-                Já tem uma conta? <Text style={styles.loginTextBold}>Entrar</Text>
+                {t('auth.hasAccount')} <Text style={styles.loginTextBold}>{t('auth.login')}</Text>
               </Text>
             </TouchableOpacity>
           </View>
