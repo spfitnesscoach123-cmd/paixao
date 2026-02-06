@@ -80,7 +80,7 @@ export default function AthletesScreen() {
             <View style={styles.athleteDetails}>
               <View style={styles.detailBadge}>
                 <Ionicons name="calendar-outline" size={12} color={colors.accent.light} />
-                <Text style={styles.detailText}>{calculateAge(item.birth_date)} anos</Text>
+                <Text style={styles.detailText}>{calculateAge(item.birth_date)} {t('athletes.years')}</Text>
               </View>
               <View style={styles.detailBadge}>
                 <Ionicons name="football-outline" size={12} color={colors.accent.tertiary} />
