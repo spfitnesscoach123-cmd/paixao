@@ -12,7 +12,6 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Line, Text as SvgText, Rect, G } from 'react-native-svg';
 import api from '../services/api';
 import { Athlete, GPSData } from '../types';
 import { colors } from '../constants/theme';
@@ -32,13 +31,13 @@ const POSITION_COLORS: { [key: string]: string } = {
   'Meia': '#ec4899',
 };
 
-type CompareMode = 'athletes' | 'sessions' | 'position-group' | 'position-vs-position';
+type CompareMode = 'athletes' | 'sessions' | 'position-group';
 
 interface QuadrantData {
   id: string;
   name: string;
-  x: number; // Total Distance
-  y: number; // High Intensity Distance
+  x: number;
+  y: number;
   color: string;
   position?: string;
   session?: string;
@@ -52,7 +51,6 @@ export default function CompareAthletes() {
   const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('all');
 
-  // Fetch all athletes
   const { data: athletes, isLoading: loadingAthletes } = useQuery({
     queryKey: ['athletes'],
     queryFn: async () => {
@@ -61,18 +59,18 @@ export default function CompareAthletes() {
     },
   });
 
-  // Fetch GPS data for all athletes
   const { data: allGpsData, isLoading: loadingGps } = useQuery({
-    queryKey: ['all-gps-data'],
+    queryKey: ['all-gps-data', athletes?.length],
     queryFn: async () => {
-      if (!athletes) return {};
+      if (!athletes || athletes.length === 0) return {};
       const gpsMap: { [athleteId: string]: GPSData[] } = {};
       
       for (const athlete of athletes) {
         const id = athlete.id || athlete._id;
+        if (!id) continue;
         try {
           const response = await api.get<GPSData[]>(`/gps-data/athlete/${id}`);
-          gpsMap[id] = response.data;
+          gpsMap[id] = response.data || [];
         } catch (error) {
           gpsMap[id] = [];
         }
@@ -82,66 +80,64 @@ export default function CompareAthletes() {
     enabled: !!athletes && athletes.length > 0,
   });
 
-  // Get unique positions
   const positions = useMemo(() => {
     if (!athletes) return [];
     const uniquePositions = [...new Set(athletes.map(a => a.position))];
     return uniquePositions.filter(p => p && p !== 'Não especificado');
   }, [athletes]);
 
-  // Filter GPS data by date range
   const filterByDate = (data: GPSData[]) => {
-    if (dateRange === 'all') return data;
+    if (!data || dateRange === 'all') return data || [];
     const now = new Date();
     const days = dateRange === '7d' ? 7 : 30;
     const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
     return data.filter(d => new Date(d.date) >= cutoff);
   };
 
-  // Calculate quadrant data based on compare mode
   const quadrantData: QuadrantData[] = useMemo(() => {
     if (!athletes || !allGpsData) return [];
 
     const data: QuadrantData[] = [];
 
     if (compareMode === 'athletes') {
-      // Compare selected athletes - average of all their sessions
       selectedAthletes.forEach((athleteId, index) => {
         const athlete = athletes.find(a => (a.id || a._id) === athleteId);
         const gpsData = filterByDate(allGpsData[athleteId] || []);
         
         if (athlete && gpsData.length > 0) {
-          const avgTotalDistance = gpsData.reduce((sum, d) => sum + d.total_distance, 0) / gpsData.length;
-          const avgHighIntensity = gpsData.reduce((sum, d) => sum + d.high_intensity_distance, 0) / gpsData.length;
+          const avgTotalDistance = gpsData.reduce((sum, d) => sum + (d.total_distance || 0), 0) / gpsData.length;
+          const avgHighIntensity = gpsData.reduce((sum, d) => sum + (d.high_intensity_distance || 0), 0) / gpsData.length;
           
-          data.push({
-            id: athleteId,
-            name: athlete.name,
-            x: avgTotalDistance,
-            y: avgHighIntensity,
-            color: ATHLETE_COLORS[index % ATHLETE_COLORS.length],
-            position: athlete.position,
-          });
+          if (!isNaN(avgTotalDistance) && !isNaN(avgHighIntensity)) {
+            data.push({
+              id: athleteId,
+              name: athlete.name,
+              x: avgTotalDistance,
+              y: avgHighIntensity,
+              color: ATHLETE_COLORS[index % ATHLETE_COLORS.length],
+              position: athlete.position,
+            });
+          }
         }
       });
     } else if (compareMode === 'sessions' && selectedAthlete) {
-      // Compare sessions of a single athlete
       const athlete = athletes.find(a => (a.id || a._id) === selectedAthlete);
       const gpsData = filterByDate(allGpsData[selectedAthlete] || []);
       
       gpsData.forEach((session, index) => {
         const periodName = session.notes?.replace('Período: ', '') || `Sessão ${index + 1}`;
-        data.push({
-          id: `${session.id || index}`,
-          name: periodName,
-          x: session.total_distance,
-          y: session.high_intensity_distance,
-          color: ATHLETE_COLORS[index % ATHLETE_COLORS.length],
-          session: session.date,
-        });
+        if (!isNaN(session.total_distance) && !isNaN(session.high_intensity_distance)) {
+          data.push({
+            id: `${session.id || index}`,
+            name: periodName,
+            x: session.total_distance || 0,
+            y: session.high_intensity_distance || 0,
+            color: ATHLETE_COLORS[index % ATHLETE_COLORS.length],
+            session: session.date,
+          });
+        }
       });
     } else if (compareMode === 'position-group') {
-      // Compare groups by position - average of each position
       selectedPositions.forEach((position, index) => {
         const positionAthletes = athletes.filter(a => a.position === position);
         
@@ -151,11 +147,12 @@ export default function CompareAthletes() {
         
         positionAthletes.forEach(athlete => {
           const athleteId = athlete.id || athlete._id;
+          if (!athleteId) return;
           const gpsData = filterByDate(allGpsData[athleteId] || []);
           
           gpsData.forEach(d => {
-            totalDistance += d.total_distance;
-            totalHighIntensity += d.high_intensity_distance;
+            totalDistance += d.total_distance || 0;
+            totalHighIntensity += d.high_intensity_distance || 0;
             count++;
           });
         });
@@ -171,62 +168,10 @@ export default function CompareAthletes() {
           });
         }
       });
-    } else if (compareMode === 'position-vs-position') {
-      // Compare individual athletes from different positions
-      selectedPositions.forEach((position, posIndex) => {
-        const positionAthletes = athletes.filter(a => a.position === position);
-        
-        positionAthletes.forEach((athlete, athIndex) => {
-          const athleteId = athlete.id || athlete._id;
-          const gpsData = filterByDate(allGpsData[athleteId] || []);
-          
-          if (gpsData.length > 0) {
-            const avgTotalDistance = gpsData.reduce((sum, d) => sum + d.total_distance, 0) / gpsData.length;
-            const avgHighIntensity = gpsData.reduce((sum, d) => sum + d.high_intensity_distance, 0) / gpsData.length;
-            
-            data.push({
-              id: athleteId,
-              name: athlete.name,
-              x: avgTotalDistance,
-              y: avgHighIntensity,
-              color: POSITION_COLORS[position] || ATHLETE_COLORS[posIndex % ATHLETE_COLORS.length],
-              position,
-            });
-          }
-        });
-      });
     }
 
     return data;
   }, [athletes, allGpsData, compareMode, selectedAthletes, selectedAthlete, selectedPositions, dateRange]);
-
-  // Calculate quadrant boundaries (median values)
-  const { medianX, medianY, minX, maxX, minY, maxY } = useMemo(() => {
-    if (quadrantData.length === 0) {
-      return { medianX: 5000, medianY: 500, minX: 0, maxX: 10000, minY: 0, maxY: 1000 };
-    }
-
-    const xValues = quadrantData.map(d => d.x).sort((a, b) => a - b);
-    const yValues = quadrantData.map(d => d.y).sort((a, b) => a - b);
-    
-    const medX = xValues[Math.floor(xValues.length / 2)];
-    const medY = yValues[Math.floor(yValues.length / 2)];
-    
-    const padding = 0.1;
-    const minXVal = Math.min(...xValues) * (1 - padding);
-    const maxXVal = Math.max(...xValues) * (1 + padding);
-    const minYVal = Math.min(...yValues) * (1 - padding);
-    const maxYVal = Math.max(...yValues) * (1 + padding);
-
-    return {
-      medianX: medX,
-      medianY: medY,
-      minX: Math.max(0, minXVal),
-      maxX: maxXVal,
-      minY: Math.max(0, minYVal),
-      maxY: maxYVal,
-    };
-  }, [quadrantData]);
 
   const toggleAthlete = (athleteId: string) => {
     if (selectedAthletes.includes(athleteId)) {
@@ -245,17 +190,37 @@ export default function CompareAthletes() {
   };
 
   const chartWidth = Dimensions.get('window').width - 48;
-  const chartHeight = 300;
-  const chartPadding = 50;
+  const chartHeight = 280;
 
-  // Convert data coordinates to SVG coordinates
-  const toSvgX = (x: number) => {
-    return chartPadding + ((x - minX) / (maxX - minX)) * (chartWidth - chartPadding * 2);
-  };
+  // Calculate chart bounds with safety checks
+  const chartBounds = useMemo(() => {
+    if (quadrantData.length === 0) {
+      return { minX: 0, maxX: 10000, minY: 0, maxY: 1000, medianX: 5000, medianY: 500 };
+    }
 
-  const toSvgY = (y: number) => {
-    return chartHeight - chartPadding - ((y - minY) / (maxY - minY)) * (chartHeight - chartPadding * 2);
-  };
+    const xValues = quadrantData.map(d => d.x).filter(v => !isNaN(v) && isFinite(v));
+    const yValues = quadrantData.map(d => d.y).filter(v => !isNaN(v) && isFinite(v));
+    
+    if (xValues.length === 0 || yValues.length === 0) {
+      return { minX: 0, maxX: 10000, minY: 0, maxY: 1000, medianX: 5000, medianY: 500 };
+    }
+
+    const sortedX = [...xValues].sort((a, b) => a - b);
+    const sortedY = [...yValues].sort((a, b) => a - b);
+    
+    const medX = sortedX[Math.floor(sortedX.length / 2)];
+    const medY = sortedY[Math.floor(sortedY.length / 2)];
+    
+    const padding = 0.15;
+    const minX = Math.max(0, Math.min(...xValues) * (1 - padding));
+    const maxX = Math.max(...xValues) * (1 + padding);
+    const minY = Math.max(0, Math.min(...yValues) * (1 - padding));
+    const maxY = Math.max(...yValues) * (1 + padding);
+
+    return { minX, maxX, minY, maxY, medianX: medX, medianY: medY };
+  }, [quadrantData]);
+
+  const isLoading = loadingAthletes || loadingGps;
 
   const renderQuadrantChart = () => {
     if (quadrantData.length === 0) {
@@ -267,207 +232,63 @@ export default function CompareAthletes() {
       );
     }
 
-    const medianSvgX = toSvgX(medianX);
-    const medianSvgY = toSvgY(medianY);
+    const { minX, maxX, minY, maxY, medianX, medianY } = chartBounds;
+    const rangeX = maxX - minX || 1;
+    const rangeY = maxY - minY || 1;
 
     return (
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Análise de Quadrantes</Text>
         <Text style={styles.chartSubtitle}>X: Distância Total (m) | Y: Alta Intensidade (m)</Text>
         
-        <Svg width={chartWidth} height={chartHeight + 40}>
-          {/* Quadrant background colors */}
-          <Rect
-            x={chartPadding}
-            y={chartPadding}
-            width={medianSvgX - chartPadding}
-            height={medianSvgY - chartPadding}
-            fill="rgba(239, 68, 68, 0.1)"
-          />
-          <Rect
-            x={medianSvgX}
-            y={chartPadding}
-            width={chartWidth - chartPadding - medianSvgX}
-            height={medianSvgY - chartPadding}
-            fill="rgba(16, 185, 129, 0.15)"
-          />
-          <Rect
-            x={chartPadding}
-            y={medianSvgY}
-            width={medianSvgX - chartPadding}
-            height={chartHeight - chartPadding - medianSvgY}
-            fill="rgba(245, 158, 11, 0.1)"
-          />
-          <Rect
-            x={medianSvgX}
-            y={medianSvgY}
-            width={chartWidth - chartPadding - medianSvgX}
-            height={chartHeight - chartPadding - medianSvgY}
-            fill="rgba(59, 130, 246, 0.1)"
-          />
-
-          {/* Quadrant labels */}
-          <SvgText
-            x={chartPadding + 10}
-            y={chartPadding + 20}
-            fill={colors.status.error}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Baixo Volume
-          </SvgText>
-          <SvgText
-            x={chartPadding + 10}
-            y={chartPadding + 32}
-            fill={colors.status.error}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Alta Intensidade
-          </SvgText>
-
-          <SvgText
-            x={chartWidth - chartPadding - 60}
-            y={chartPadding + 20}
-            fill={colors.status.success}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Alto Volume
-          </SvgText>
-          <SvgText
-            x={chartWidth - chartPadding - 60}
-            y={chartPadding + 32}
-            fill={colors.status.success}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Alta Intensidade
-          </SvgText>
-
-          <SvgText
-            x={chartPadding + 10}
-            y={chartHeight - chartPadding - 20}
-            fill={colors.status.warning}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Baixo Volume
-          </SvgText>
-          <SvgText
-            x={chartPadding + 10}
-            y={chartHeight - chartPadding - 8}
-            fill={colors.status.warning}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Baixa Intensidade
-          </SvgText>
-
-          <SvgText
-            x={chartWidth - chartPadding - 60}
-            y={chartHeight - chartPadding - 20}
-            fill={colors.accent.blue}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Alto Volume
-          </SvgText>
-          <SvgText
-            x={chartWidth - chartPadding - 60}
-            y={chartHeight - chartPadding - 8}
-            fill={colors.accent.blue}
-            fontSize="10"
-            fontWeight="bold"
-          >
-            Baixa Intensidade
-          </SvgText>
-
-          {/* Median lines */}
-          <Line
-            x1={medianSvgX}
-            y1={chartPadding}
-            x2={medianSvgX}
-            y2={chartHeight - chartPadding}
-            stroke={colors.text.tertiary}
-            strokeWidth="1"
-            strokeDasharray="5,5"
-          />
-          <Line
-            x1={chartPadding}
-            y1={medianSvgY}
-            x2={chartWidth - chartPadding}
-            y2={medianSvgY}
-            stroke={colors.text.tertiary}
-            strokeWidth="1"
-            strokeDasharray="5,5"
-          />
-
-          {/* Axes */}
-          <Line
-            x1={chartPadding}
-            y1={chartHeight - chartPadding}
-            x2={chartWidth - chartPadding}
-            y2={chartHeight - chartPadding}
-            stroke={colors.border.default}
-            strokeWidth="2"
-          />
-          <Line
-            x1={chartPadding}
-            y1={chartPadding}
-            x2={chartPadding}
-            y2={chartHeight - chartPadding}
-            stroke={colors.border.default}
-            strokeWidth="2"
-          />
-
-          {/* Axis labels */}
-          <SvgText
-            x={chartWidth / 2}
-            y={chartHeight - 5}
-            fill={colors.text.secondary}
-            fontSize="11"
-            textAnchor="middle"
-            fontWeight="600"
-          >
-            Distância Total (m)
-          </SvgText>
-          <SvgText
-            x={15}
-            y={chartHeight / 2}
-            fill={colors.text.secondary}
-            fontSize="11"
-            textAnchor="middle"
-            fontWeight="600"
-            rotation="-90"
-            origin={`15, ${chartHeight / 2}`}
-          >
-            Alta Intensidade (m)
-          </SvgText>
+        <View style={styles.chartArea}>
+          {/* Quadrant backgrounds */}
+          <View style={styles.quadrantGrid}>
+            <View style={[styles.quadrant, styles.quadrantTopLeft]}>
+              <Text style={styles.quadrantLabel}>Baixo Vol.</Text>
+              <Text style={styles.quadrantLabel}>Alta Int.</Text>
+            </View>
+            <View style={[styles.quadrant, styles.quadrantTopRight]}>
+              <Text style={styles.quadrantLabel}>Alto Vol.</Text>
+              <Text style={styles.quadrantLabel}>Alta Int.</Text>
+            </View>
+            <View style={[styles.quadrant, styles.quadrantBottomLeft]}>
+              <Text style={styles.quadrantLabel}>Baixo Vol.</Text>
+              <Text style={styles.quadrantLabel}>Baixa Int.</Text>
+            </View>
+            <View style={[styles.quadrant, styles.quadrantBottomRight]}>
+              <Text style={styles.quadrantLabel}>Alto Vol.</Text>
+              <Text style={styles.quadrantLabel}>Baixa Int.</Text>
+            </View>
+          </View>
 
           {/* Data points */}
-          {quadrantData.map((point, index) => (
-            <G key={point.id}>
-              <Circle
-                cx={toSvgX(point.x)}
-                cy={toSvgY(point.y)}
-                r={12}
-                fill={point.color}
-                opacity={0.9}
-              />
-              <SvgText
-                x={toSvgX(point.x)}
-                y={toSvgY(point.y) + 4}
-                fill="#ffffff"
-                fontSize="9"
-                fontWeight="bold"
-                textAnchor="middle"
+          {quadrantData.map((point, index) => {
+            const xPercent = ((point.x - minX) / rangeX) * 100;
+            const yPercent = 100 - ((point.y - minY) / rangeY) * 100;
+            
+            return (
+              <View
+                key={point.id}
+                style={[
+                  styles.dataPoint,
+                  {
+                    left: `${Math.min(Math.max(xPercent, 5), 95)}%`,
+                    top: `${Math.min(Math.max(yPercent, 5), 95)}%`,
+                    backgroundColor: point.color,
+                  },
+                ]}
               >
-                {index + 1}
-              </SvgText>
-            </G>
-          ))}
-        </Svg>
+                <Text style={styles.dataPointText}>{index + 1}</Text>
+              </View>
+            );
+          })}
+        </View>
+
+        {/* Axes labels */}
+        <View style={styles.axisLabels}>
+          <Text style={styles.axisLabel}>← Dist. Total (m) →</Text>
+        </View>
 
         {/* Legend */}
         <View style={styles.legend}>
@@ -488,8 +309,6 @@ export default function CompareAthletes() {
       </View>
     );
   };
-
-  const isLoading = loadingAthletes || loadingGps;
 
   return (
     <View style={styles.container}>
@@ -539,16 +358,6 @@ export default function CompareAthletes() {
                   Grupos por Posição
                 </Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity
-                style={[styles.modeButton, compareMode === 'position-vs-position' && styles.modeButtonActive]}
-                onPress={() => setCompareMode('position-vs-position')}
-              >
-                <Ionicons name="git-compare" size={18} color={compareMode === 'position-vs-position' ? '#ffffff' : colors.accent.primary} />
-                <Text style={[styles.modeButtonText, compareMode === 'position-vs-position' && styles.modeButtonTextActive]}>
-                  Posição vs Posição
-                </Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
 
@@ -575,14 +384,14 @@ export default function CompareAthletes() {
           ) : (
             <>
               {/* Selection Area */}
-              {compareMode === 'athletes' && (
+              {compareMode === 'athletes' && athletes && athletes.length > 0 && (
                 <View style={styles.selectionArea}>
                   <Text style={styles.selectionTitle}>
                     Selecione Atletas ({selectedAthletes.length}/10)
                   </Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {athletes?.map((athlete, index) => {
-                      const athleteId = athlete.id || athlete._id;
+                    {athletes.map((athlete, index) => {
+                      const athleteId = athlete.id || athlete._id || `athlete-${index}`;
                       const isSelected = selectedAthletes.includes(athleteId);
                       return (
                         <TouchableOpacity
@@ -607,12 +416,12 @@ export default function CompareAthletes() {
                 </View>
               )}
 
-              {compareMode === 'sessions' && (
+              {compareMode === 'sessions' && athletes && athletes.length > 0 && (
                 <View style={styles.selectionArea}>
                   <Text style={styles.selectionTitle}>Selecione um Atleta</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {athletes?.map(athlete => {
-                      const athleteId = athlete.id || athlete._id;
+                    {athletes.map((athlete, index) => {
+                      const athleteId = athlete.id || athlete._id || `athlete-${index}`;
                       const isSelected = selectedAthlete === athleteId;
                       return (
                         <TouchableOpacity
@@ -630,7 +439,7 @@ export default function CompareAthletes() {
                 </View>
               )}
 
-              {(compareMode === 'position-group' || compareMode === 'position-vs-position') && (
+              {compareMode === 'position-group' && positions.length > 0 && (
                 <View style={styles.selectionArea}>
                   <Text style={styles.selectionTitle}>Selecione Posições</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -898,6 +707,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.text.secondary,
     marginBottom: 16,
+  },
+  chartArea: {
+    height: 280,
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  quadrantGrid: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  quadrant: {
+    width: '50%',
+    height: '50%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 8,
+  },
+  quadrantTopLeft: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+  },
+  quadrantTopRight: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+  },
+  quadrantBottomLeft: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+  },
+  quadrantBottomRight: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  quadrantLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+  dataPoint: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: -14,
+    marginTop: -14,
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  dataPointText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  axisLabels: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  axisLabel: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    fontWeight: '600',
   },
   emptyChart: {
     backgroundColor: colors.dark.cardSolid,
