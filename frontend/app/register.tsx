@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
@@ -25,26 +26,27 @@ export default function Register() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { register } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const handleRegister = async () => {
     if (!name || !email || !password || !confirmPassword) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos');
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Erro', 'As senhas não coincidem');
+      Alert.alert(t('common.error'), t('auth.passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
+      Alert.alert(t('common.error'), t('auth.passwordMinLength'));
       return;
     }
 
     if (!acceptedTerms) {
-      Alert.alert('Erro', 'Você precisa aceitar os Termos de Uso e a Política de Privacidade');
+      Alert.alert(t('common.error'), t('auth.mustAcceptTerms'));
       return;
     }
 
@@ -53,7 +55,7 @@ export default function Register() {
       await register(email, password, name);
       router.replace('/(tabs)/athletes');
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      Alert.alert(t('common.error'), error.message);
     } finally {
       setIsLoading(false);
     }
