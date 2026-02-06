@@ -34,7 +34,21 @@
     "loginTitle": "Football Training",
     "loginSubtitle": "Sistema Avanzado de Prescripción",
     "registerTitle": "Crear Cuenta",
-    "registerSubtitle": "Únete a la plataforma"
+    "registerSubtitle": "Únete a la plataforma",
+    "fillAllFields": "Por favor, completa todos los campos",
+    "invalidCredentials": "Credenciales inválidas. Inicia sesión nuevamente.",
+    "enableBiometrics": "¿Habilitar biometría?",
+    "biometricsPrompt": "¿Deseas habilitar el inicio de sesión con FaceID/huella digital?",
+    "loginWithFaceID": "Iniciar con FaceID",
+    "loginWithBiometrics": "Iniciar con biometría",
+    "passwordsDoNotMatch": "Las contraseñas no coinciden",
+    "passwordMinLength": "La contraseña debe tener al menos 6 caracteres",
+    "mustAcceptTerms": "Debes aceptar los Términos de Uso y la Política de Privacidad",
+    "logoutConfirm": "¿Estás seguro de que deseas cerrar sesión?",
+    "acceptTerms": "He leído y acepto los",
+    "termsOfUse": "Términos de Uso",
+    "and": "y la",
+    "privacyPolicy": "Política de Privacidad"
   },
   "tabs": {
     "athletes": "Atletas",
@@ -73,11 +87,24 @@
     "muscleSoreness": "Dolor muscular",
     "stress": "Estrés",
     "mood": "Estado de ánimo",
-    "readiness": "Preparación"
+    "readiness": "Preparación",
+    "generateLink": "Generar enlace Wellness"
   },
   "settings": {
     "title": "Configuración",
     "language": "Idioma",
-    "selectLanguage": "Seleccionar Idioma"
+    "selectLanguage": "Seleccionar Idioma",
+    "account": "Cuenta",
+    "subscriptionTools": "Suscripción y Herramientas",
+    "manageSubscription": "Gestionar Suscripción",
+    "legal": "Legal",
+    "about": "Acerca de",
+    "version": "Versión",
+    "logout": "Cerrar Sesión"
+  },
+  "features": {
+    "aiAnalysis": "Análisis con IA",
+    "acwrFatigue": "ACWR y Fatiga",
+    "comparisons": "Comparaciones"
   }
 }
