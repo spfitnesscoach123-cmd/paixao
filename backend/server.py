@@ -799,6 +799,227 @@ async def get_acwr_analysis(
         recommendation=recommendation
     )
 
+# ============= ACWR DETAILED ANALYSIS =============
+
+class ACWRDetailedMetric(BaseModel):
+    name: str
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str
+    unit: str
+
+class ACWRDetailedAnalysis(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    metrics: List[ACWRDetailedMetric]
+    overall_risk: str
+    recommendation: str
+
+def calculate_metric_acwr(acute_values: List[float], chronic_values: List[float]) -> tuple:
+    """Calculate ACWR for a specific metric"""
+    if not acute_values or not chronic_values:
+        return 0, 0, 0, "unknown"
+    
+    acute_load = sum(acute_values)
+    chronic_load = sum(chronic_values) / 4 if chronic_values else 0
+    
+    if chronic_load > 0:
+        acwr_ratio = round(acute_load / chronic_load, 2)
+    else:
+        acwr_ratio = 0
+    
+    # Determine risk level
+    if acwr_ratio < 0.8:
+        risk_level = "low"
+    elif 0.8 <= acwr_ratio <= 1.3:
+        risk_level = "optimal"
+    elif 1.3 < acwr_ratio <= 1.5:
+        risk_level = "moderate"
+    else:
+        risk_level = "high"
+    
+    return round(acute_load, 2), round(chronic_load, 2), acwr_ratio, risk_level
+
+@api_router.get("/analysis/acwr-detailed/{athlete_id}", response_model=ACWRDetailedAnalysis)
+async def get_acwr_detailed_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get detailed ACWR analysis for multiple metrics:
+    - Total Distance
+    - HSR (High Speed Running: 20-25 km/h)
+    - HID (High Intensity Distance: 15-20 km/h)  
+    - Sprint Distance (+25 km/h)
+    - Acc/Dec (Accelerations + Decelerations)
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data from last 28 days
+    today = datetime.utcnow()
+    date_28_days_ago = (today - timedelta(days=28)).strftime("%Y-%m-%d")
+    date_7_days_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_28_days_ago}
+    }).to_list(1000)
+    
+    if len(gps_records) < 7:
+        raise HTTPException(
+            status_code=400,
+            detail="Dados insuficientes. Necessário pelo menos 7 dias de dados GPS para cálculo do ACWR."
+        )
+    
+    # Group data by session to avoid counting periods multiple times
+    sessions = {}
+    for record in gps_records:
+        session_key = record.get("session_id") or record.get("date", "unknown")
+        period_name = (record.get("period_name") or record.get("notes", "").replace("Período: ", "") or "").lower()
+        
+        # Only use "session" or "total" periods, or if there's only one record per session
+        if session_key not in sessions:
+            sessions[session_key] = {
+                "date": record.get("date"),
+                "total_distance": 0,
+                "high_speed_running": 0,
+                "high_intensity_distance": 0,
+                "sprint_distance": 0,
+                "acc_dec": 0,
+                "has_session_total": False
+            }
+        
+        # If this is a session/total period, use it
+        if "session" in period_name or "total" in period_name:
+            sessions[session_key]["total_distance"] = record.get("total_distance", 0)
+            sessions[session_key]["high_speed_running"] = record.get("high_speed_running", 0) or record.get("high_intensity_distance", 0) * 0.3
+            sessions[session_key]["high_intensity_distance"] = record.get("high_intensity_distance", 0)
+            sessions[session_key]["sprint_distance"] = record.get("sprint_distance", 0)
+            sessions[session_key]["acc_dec"] = record.get("number_of_accelerations", 0) + record.get("number_of_decelerations", 0)
+            sessions[session_key]["has_session_total"] = True
+        elif not sessions[session_key]["has_session_total"]:
+            # Sum periods if no session total
+            sessions[session_key]["total_distance"] += record.get("total_distance", 0)
+            sessions[session_key]["high_speed_running"] += record.get("high_speed_running", 0) or 0
+            sessions[session_key]["high_intensity_distance"] += record.get("high_intensity_distance", 0)
+            sessions[session_key]["sprint_distance"] += record.get("sprint_distance", 0)
+            sessions[session_key]["acc_dec"] += record.get("number_of_accelerations", 0) + record.get("number_of_decelerations", 0)
+    
+    # Separate acute (last 7 days) and chronic (last 28 days) data
+    acute_data = {"td": [], "hsr": [], "hid": [], "sprint": [], "acc_dec": []}
+    chronic_data = {"td": [], "hsr": [], "hid": [], "sprint": [], "acc_dec": []}
+    
+    for session in sessions.values():
+        session_date = session.get("date", "")
+        
+        chronic_data["td"].append(session["total_distance"])
+        chronic_data["hsr"].append(session["high_speed_running"])
+        chronic_data["hid"].append(session["high_intensity_distance"])
+        chronic_data["sprint"].append(session["sprint_distance"])
+        chronic_data["acc_dec"].append(session["acc_dec"])
+        
+        if session_date >= date_7_days_ago:
+            acute_data["td"].append(session["total_distance"])
+            acute_data["hsr"].append(session["high_speed_running"])
+            acute_data["hid"].append(session["high_intensity_distance"])
+            acute_data["sprint"].append(session["sprint_distance"])
+            acute_data["acc_dec"].append(session["acc_dec"])
+    
+    # Calculate ACWR for each metric
+    metrics = []
+    risk_levels = []
+    
+    # Total Distance
+    acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["td"], chronic_data["td"])
+    metrics.append(ACWRDetailedMetric(
+        name="Distância Total",
+        acute_load=acute,
+        chronic_load=chronic,
+        acwr_ratio=ratio,
+        risk_level=risk,
+        unit="m"
+    ))
+    risk_levels.append(risk)
+    
+    # HSR (20-25 km/h)
+    acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["hsr"], chronic_data["hsr"])
+    metrics.append(ACWRDetailedMetric(
+        name="HSR (20-25 km/h)",
+        acute_load=acute,
+        chronic_load=chronic,
+        acwr_ratio=ratio,
+        risk_level=risk,
+        unit="m"
+    ))
+    risk_levels.append(risk)
+    
+    # HID (15-20 km/h)
+    acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["hid"], chronic_data["hid"])
+    metrics.append(ACWRDetailedMetric(
+        name="HID (15-20 km/h)",
+        acute_load=acute,
+        chronic_load=chronic,
+        acwr_ratio=ratio,
+        risk_level=risk,
+        unit="m"
+    ))
+    risk_levels.append(risk)
+    
+    # Sprint (+25 km/h)
+    acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["sprint"], chronic_data["sprint"])
+    metrics.append(ACWRDetailedMetric(
+        name="Sprint (+25 km/h)",
+        acute_load=acute,
+        chronic_load=chronic,
+        acwr_ratio=ratio,
+        risk_level=risk,
+        unit="m"
+    ))
+    risk_levels.append(risk)
+    
+    # Acc/Dec
+    acute, chronic, ratio, risk = calculate_metric_acwr(acute_data["acc_dec"], chronic_data["acc_dec"])
+    metrics.append(ACWRDetailedMetric(
+        name="Acc/Dec",
+        acute_load=acute,
+        chronic_load=chronic,
+        acwr_ratio=ratio,
+        risk_level=risk,
+        unit="count"
+    ))
+    risk_levels.append(risk)
+    
+    # Determine overall risk
+    if "high" in risk_levels:
+        overall_risk = "high"
+        recommendation = "⚠️ ATENÇÃO: Um ou mais parâmetros estão em zona de alto risco. Recomenda-se redução imediata da carga de treino."
+    elif risk_levels.count("moderate") >= 2:
+        overall_risk = "moderate"
+        recommendation = "Alguns parâmetros estão elevados. Monitore a fadiga e considere ajustar o volume de treino."
+    elif "optimal" in risk_levels and risk_levels.count("optimal") >= 3:
+        overall_risk = "optimal"
+        recommendation = "Carga de treino equilibrada! Continue mantendo este padrão."
+    else:
+        overall_risk = "low"
+        recommendation = "Carga de treino baixa. Considere aumentar progressivamente a intensidade."
+    
+    return ACWRDetailedAnalysis(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=today.strftime("%Y-%m-%d"),
+        metrics=metrics,
+        overall_risk=overall_risk,
+        recommendation=recommendation
+    )
+
 @api_router.get("/analysis/fatigue/{athlete_id}")
 async def get_fatigue_analysis(
     athlete_id: str,
