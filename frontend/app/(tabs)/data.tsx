@@ -155,7 +155,14 @@ export default function DataScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.importGradient}
             >
-              <Ionicons name=\"cloud-upload\" size={28} color=\"#ffffff\" />\n              <View style={{ flex: 1 }}>\n                <Text style={styles.importTitle}>Importar Dados Catapult</Text>\n                <Text style={styles.importSubtitle}>CSV automático com múltiplos atletas</Text>\n              </View>\n              <Ionicons name=\"chevron-forward\" size={24} color=\"#ffffff\" />\n            </LinearGradient>\n          </TouchableOpacity>
+              <Ionicons name="cloud-upload" size={28} color="#ffffff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.importTitle}>Importar Dados Catapult</Text>
+                <Text style={styles.importSubtitle}>CSV automático com múltiplos atletas</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+            </LinearGradient>
+          </TouchableOpacity>
 
           {stats && (
             <View style={styles.content}>
