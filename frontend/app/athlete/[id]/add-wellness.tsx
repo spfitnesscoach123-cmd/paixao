@@ -10,7 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMutation, useQueryClient } from '@tantml:invoke name="@tanstack/react-query">';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { Slider } from '../../../components/Slider';
