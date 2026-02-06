@@ -161,6 +161,15 @@ export default function AthleteDetails() {
             </View>
 
             <TouchableOpacity 
+              style={styles.editButton}
+              onPress={() => router.push(`/athlete/${id}/edit`)}
+            >
+              <Ionicons name="create-outline" size={20} color={colors.accent.primary} />
+              <Text style={styles.editButtonText}>Editar Perfil</Text>
+              <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={styles.chartsButton}
               onPress={() => router.push(`/athlete/${id}/charts`)}
             >
