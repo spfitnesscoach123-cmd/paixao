@@ -417,6 +417,17 @@ export default function AthleteDetails() {
           />
           <Text style={[styles.tabText, activeTab === 'assessments' && styles.activeTabText]}>Avaliações</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'analysis' && styles.activeTab]}
+          onPress={() => setActiveTab('analysis')}
+        >
+          <Ionicons 
+            name="analytics" 
+            size={20} 
+            color={activeTab === 'analysis' ? '#2563eb' : '#9ca3af'} 
+          />
+          <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>Análises</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
