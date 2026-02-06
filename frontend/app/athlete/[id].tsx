@@ -18,6 +18,7 @@ import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format } from 'date-fns';
 import { AnalysisTab } from '../../components/AnalysisTab';
+import { ExportPDFButton } from '../../components/ExportPDFButton';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 
