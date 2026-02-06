@@ -32,21 +32,21 @@ interface AnalysisTabProps {
 
 export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
 
   const { data: analysis, isLoading, error, refetch } = useQuery({
-    queryKey: ['analysis', athleteId],
+    queryKey: ['analysis', athleteId, locale],
     queryFn: async () => {
-      const response = await api.get<ComprehensiveAnalysis>(`/analysis/comprehensive/${athleteId}`);
+      const response = await api.get<ComprehensiveAnalysis>(`/analysis/comprehensive/${athleteId}?lang=${locale}`);
       return response.data;
     },
     enabled: !!athleteId,
   });
 
   const { data: acwrDetailed, isLoading: acwrLoading } = useQuery({
-    queryKey: ['acwr-detailed', athleteId],
+    queryKey: ['acwr-detailed', athleteId, locale],
     queryFn: async () => {
-      const response = await api.get<ACWRDetailedAnalysis>(`/analysis/acwr-detailed/${athleteId}`);
+      const response = await api.get<ACWRDetailedAnalysis>(`/analysis/acwr-detailed/${athleteId}?lang=${locale}`);
       return response.data;
     },
     enabled: !!athleteId,
@@ -55,7 +55,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const response = await api.get<ComprehensiveAnalysis>(`/analysis/comprehensive/${athleteId}`);
+      const response = await api.get<ComprehensiveAnalysis>(`/analysis/comprehensive/${athleteId}?lang=${locale}`);
       return response.data;
     },
     onSuccess: (data) => {
