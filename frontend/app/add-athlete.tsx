@@ -20,10 +20,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { Athlete } from '../types';
 import { colors } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function AddAthlete() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useLanguage();
   
   const [name, setName] = useState('');
   const [birthDate, setBirthDate] = useState('');
@@ -39,11 +41,11 @@ export default function AddAthlete() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['athletes'] });
-      Alert.alert('Sucesso', 'Atleta cadastrado com sucesso!');
+      Alert.alert(t('common.success'), t('athletes.athleteCreated'));
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao cadastrar atleta');
+      Alert.alert(t('common.error'), error.response?.data?.detail || t('athletes.errorCreating'));
     },
   });
 
@@ -51,7 +53,7 @@ export default function AddAthlete() {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     
     if (!permissionResult.granted) {
-      Alert.alert('Permissão negada', 'É necessário permitir acesso à galeria');
+      Alert.alert(t('common.error'), t('athletes.galleryPermission'));
       return;
     }
 
@@ -70,14 +72,14 @@ export default function AddAthlete() {
 
   const handleSubmit = () => {
     if (!name || !birthDate || !position) {
-      Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios');
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
     // Validate date format (YYYY-MM-DD)
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dateRegex.test(birthDate)) {
-      Alert.alert('Erro', 'Data de nascimento inválida. Use o formato AAAA-MM-DD');
+      Alert.alert(t('common.error'), t('athletes.invalidDateFormat'));
       return;
     }
 
