@@ -68,3 +68,35 @@ export interface PhysicalAssessment {
   notes?: string;
   created_at?: string;
 }
+
+export interface ACWRAnalysis {
+  acute_load: number;
+  chronic_load: number;
+  acwr_ratio: number;
+  risk_level: 'low' | 'optimal' | 'moderate' | 'high';
+  recommendation: string;
+}
+
+export interface FatigueAnalysis {
+  fatigue_level: 'low' | 'moderate' | 'high' | 'critical';
+  fatigue_score: number;
+  contributing_factors: string[];
+  recommendation: string;
+}
+
+export interface AIInsights {
+  summary: string;
+  strengths: string[];
+  concerns: string[];
+  recommendations: string[];
+  training_zones: Record<string, string>;
+}
+
+export interface ComprehensiveAnalysis {
+  athlete_id: string;
+  athlete_name: string;
+  analysis_date: string;
+  acwr?: ACWRAnalysis;
+  fatigue?: FatigueAnalysis;
+  ai_insights?: AIInsights;
+}
