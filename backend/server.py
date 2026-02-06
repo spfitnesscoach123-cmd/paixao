@@ -1655,6 +1655,435 @@ async def get_comprehensive_analysis(
     
     return result
 
+# ============= PDF REPORT GENERATION =============
+
+# Translations for PDF reports
+PDF_TRANSLATIONS = {
+    "en": {
+        "athlete_report": "Athlete Report",
+        "generated_on": "Generated on",
+        "personal_info": "Personal Information",
+        "name": "Name",
+        "position": "Position",
+        "age": "Age",
+        "years": "years",
+        "gps_summary": "GPS Data Summary",
+        "total_sessions": "Total Sessions",
+        "avg_distance": "Average Distance",
+        "avg_high_intensity": "Avg High Intensity",
+        "avg_sprints": "Avg Sprints",
+        "max_speed_recorded": "Max Speed Recorded",
+        "acwr_analysis": "ACWR Analysis",
+        "metric": "Metric",
+        "acute_load": "Acute Load (7d)",
+        "chronic_load": "Chronic Load (28d)",
+        "acwr_ratio": "ACWR Ratio",
+        "risk_level": "Risk Level",
+        "overall_risk": "Overall Risk",
+        "recommendation": "Recommendation",
+        "recent_sessions": "Recent Sessions",
+        "date": "Date",
+        "distance": "Distance",
+        "high_int": "High Int.",
+        "sprints": "Sprints",
+        "period": "Period",
+        "no_data": "No data available",
+        "risk_low": "Low Risk",
+        "risk_optimal": "Optimal",
+        "risk_moderate": "Moderate",
+        "risk_high": "High Risk",
+        "page": "Page",
+    },
+    "pt": {
+        "athlete_report": "Relatório do Atleta",
+        "generated_on": "Gerado em",
+        "personal_info": "Informações Pessoais",
+        "name": "Nome",
+        "position": "Posição",
+        "age": "Idade",
+        "years": "anos",
+        "gps_summary": "Resumo dos Dados GPS",
+        "total_sessions": "Total de Sessões",
+        "avg_distance": "Distância Média",
+        "avg_high_intensity": "Alta Intensidade Média",
+        "avg_sprints": "Sprints Médios",
+        "max_speed_recorded": "Velocidade Máxima Registrada",
+        "acwr_analysis": "Análise ACWR",
+        "metric": "Métrica",
+        "acute_load": "Carga Aguda (7d)",
+        "chronic_load": "Carga Crônica (28d)",
+        "acwr_ratio": "Ratio ACWR",
+        "risk_level": "Nível de Risco",
+        "overall_risk": "Risco Geral",
+        "recommendation": "Recomendação",
+        "recent_sessions": "Sessões Recentes",
+        "date": "Data",
+        "distance": "Distância",
+        "high_int": "Alta Int.",
+        "sprints": "Sprints",
+        "period": "Período",
+        "no_data": "Sem dados disponíveis",
+        "risk_low": "Baixo Risco",
+        "risk_optimal": "Ótimo",
+        "risk_moderate": "Moderado",
+        "risk_high": "Alto Risco",
+        "page": "Página",
+    },
+    "es": {
+        "athlete_report": "Informe del Atleta",
+        "generated_on": "Generado el",
+        "personal_info": "Información Personal",
+        "name": "Nombre",
+        "position": "Posición",
+        "age": "Edad",
+        "years": "años",
+        "gps_summary": "Resumen de Datos GPS",
+        "total_sessions": "Total de Sesiones",
+        "avg_distance": "Distancia Promedio",
+        "avg_high_intensity": "Alta Intensidad Promedio",
+        "avg_sprints": "Sprints Promedio",
+        "max_speed_recorded": "Velocidad Máxima Registrada",
+        "acwr_analysis": "Análisis ACWR",
+        "metric": "Métrica",
+        "acute_load": "Carga Aguda (7d)",
+        "chronic_load": "Carga Crónica (28d)",
+        "acwr_ratio": "Ratio ACWR",
+        "risk_level": "Nivel de Riesgo",
+        "overall_risk": "Riesgo General",
+        "recommendation": "Recomendación",
+        "recent_sessions": "Sesiones Recientes",
+        "date": "Fecha",
+        "distance": "Distancia",
+        "high_int": "Alta Int.",
+        "sprints": "Sprints",
+        "period": "Período",
+        "no_data": "Sin datos disponibles",
+        "risk_low": "Bajo Riesgo",
+        "risk_optimal": "Óptimo",
+        "risk_moderate": "Moderado",
+        "risk_high": "Alto Riesgo",
+        "page": "Página",
+    },
+    "fr": {
+        "athlete_report": "Rapport de l'Athlète",
+        "generated_on": "Généré le",
+        "personal_info": "Informations Personnelles",
+        "name": "Nom",
+        "position": "Position",
+        "age": "Âge",
+        "years": "ans",
+        "gps_summary": "Résumé des Données GPS",
+        "total_sessions": "Total des Sessions",
+        "avg_distance": "Distance Moyenne",
+        "avg_high_intensity": "Haute Intensité Moyenne",
+        "avg_sprints": "Sprints Moyens",
+        "max_speed_recorded": "Vitesse Max Enregistrée",
+        "acwr_analysis": "Analyse ACWR",
+        "metric": "Métrique",
+        "acute_load": "Charge Aiguë (7j)",
+        "chronic_load": "Charge Chronique (28j)",
+        "acwr_ratio": "Ratio ACWR",
+        "risk_level": "Niveau de Risque",
+        "overall_risk": "Risque Global",
+        "recommendation": "Recommandation",
+        "recent_sessions": "Sessions Récentes",
+        "date": "Date",
+        "distance": "Distance",
+        "high_int": "Haute Int.",
+        "sprints": "Sprints",
+        "period": "Période",
+        "no_data": "Aucune donnée disponible",
+        "risk_low": "Risque Faible",
+        "risk_optimal": "Optimal",
+        "risk_moderate": "Modéré",
+        "risk_high": "Risque Élevé",
+        "page": "Page",
+    },
+}
+
+def get_translation(lang: str, key: str) -> str:
+    """Get translation for a key in the specified language"""
+    translations = PDF_TRANSLATIONS.get(lang, PDF_TRANSLATIONS["en"])
+    return translations.get(key, PDF_TRANSLATIONS["en"].get(key, key))
+
+def get_risk_label(lang: str, risk_level: str) -> str:
+    """Get translated risk level label"""
+    risk_map = {
+        "low": "risk_low",
+        "optimal": "risk_optimal",
+        "moderate": "risk_moderate",
+        "high": "risk_high",
+    }
+    return get_translation(lang, risk_map.get(risk_level, "risk_moderate"))
+
+@api_router.get("/reports/athlete/{athlete_id}/pdf")
+async def generate_athlete_pdf_report(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a PDF report for an athlete in the specified language"""
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+    
+    t = lambda key: get_translation(lang, key)
+    
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(100)
+    
+    # Get ACWR data
+    acwr_data = None
+    try:
+        acwr_response = await get_acwr_detailed_analysis(athlete_id, current_user)
+        acwr_data = acwr_response
+    except:
+        pass
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=1.5*cm,
+        leftMargin=1.5*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        fontSize=24,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        textColor=rl_colors.HexColor('#8b5cf6')
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceBefore=15,
+        spaceAfter=10,
+        textColor=rl_colors.HexColor('#3b82f6')
+    )
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6
+    )
+    
+    story = []
+    
+    # Title
+    story.append(Paragraph(f"📊 {t('athlete_report')}", title_style))
+    story.append(Paragraph(f"{t('generated_on')}: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Personal Info Section
+    story.append(Paragraph(f"👤 {t('personal_info')}", heading_style))
+    
+    # Calculate age
+    age = "-"
+    if athlete.get("birth_date"):
+        try:
+            birth = datetime.strptime(str(athlete["birth_date"]), "%Y-%m-%d")
+            age = (datetime.utcnow() - birth).days // 365
+        except:
+            pass
+    
+    info_data = [
+        [t('name'), athlete.get("name", "-")],
+        [t('position'), athlete.get("position", "-")],
+        [t('age'), f"{age} {t('years')}" if age != "-" else "-"],
+    ]
+    
+    info_table = Table(info_data, colWidths=[4*cm, 10*cm])
+    info_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), rl_colors.HexColor('#f3f4f6')),
+        ('TEXTCOLOR', (0, 0), (0, -1), rl_colors.HexColor('#374151')),
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#e5e7eb')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 10),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ]))
+    story.append(info_table)
+    story.append(Spacer(1, 20))
+    
+    # GPS Summary
+    story.append(Paragraph(f"📍 {t('gps_summary')}", heading_style))
+    
+    if gps_records:
+        total_sessions = len(set([r.get("session_id", r.get("date")) for r in gps_records]))
+        avg_distance = sum([r.get("total_distance", 0) for r in gps_records]) / len(gps_records) if gps_records else 0
+        avg_high_int = sum([r.get("high_intensity_distance", 0) for r in gps_records]) / len(gps_records) if gps_records else 0
+        avg_sprints = sum([r.get("number_of_sprints", 0) for r in gps_records]) / len(gps_records) if gps_records else 0
+        max_speed = max([r.get("max_speed", 0) or 0 for r in gps_records]) if gps_records else 0
+        
+        gps_summary_data = [
+            [t('total_sessions'), str(total_sessions)],
+            [t('avg_distance'), f"{avg_distance:.0f}m"],
+            [t('avg_high_intensity'), f"{avg_high_int:.0f}m"],
+            [t('avg_sprints'), f"{avg_sprints:.1f}"],
+            [t('max_speed_recorded'), f"{max_speed:.1f} km/h"],
+        ]
+        
+        gps_table = Table(gps_summary_data, colWidths=[6*cm, 8*cm])
+        gps_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), rl_colors.HexColor('#ede9fe')),
+            ('TEXTCOLOR', (0, 0), (0, -1), rl_colors.HexColor('#5b21b6')),
+            ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (0, 0), (0, -1), 'RIGHT'),
+            ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#c4b5fd')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 10),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ]))
+        story.append(gps_table)
+    else:
+        story.append(Paragraph(t('no_data'), normal_style))
+    
+    story.append(Spacer(1, 20))
+    
+    # ACWR Analysis
+    story.append(Paragraph(f"📈 {t('acwr_analysis')}", heading_style))
+    
+    if acwr_data and hasattr(acwr_data, 'metrics') and acwr_data.metrics:
+        # Header row
+        acwr_table_data = [
+            [t('metric'), t('acute_load'), t('chronic_load'), t('acwr_ratio'), t('risk_level')]
+        ]
+        
+        for metric in acwr_data.metrics:
+            risk_label = get_risk_label(lang, metric.risk_level)
+            acwr_table_data.append([
+                metric.name,
+                f"{metric.acute_load:.0f}",
+                f"{metric.chronic_load:.0f}",
+                f"{metric.acwr_ratio:.2f}",
+                risk_label
+            ])
+        
+        acwr_table = Table(acwr_table_data, colWidths=[4*cm, 2.5*cm, 3*cm, 2.5*cm, 2.5*cm])
+        
+        # Style based on risk levels
+        table_style = [
+            ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#8b5cf6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#c4b5fd')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]
+        
+        # Color code risk levels
+        for i, metric in enumerate(acwr_data.metrics, start=1):
+            if metric.risk_level == "high":
+                table_style.append(('BACKGROUND', (4, i), (4, i), rl_colors.HexColor('#fecaca')))
+                table_style.append(('TEXTCOLOR', (4, i), (4, i), rl_colors.HexColor('#991b1b')))
+            elif metric.risk_level == "moderate":
+                table_style.append(('BACKGROUND', (4, i), (4, i), rl_colors.HexColor('#fef3c7')))
+                table_style.append(('TEXTCOLOR', (4, i), (4, i), rl_colors.HexColor('#92400e')))
+            elif metric.risk_level == "optimal":
+                table_style.append(('BACKGROUND', (4, i), (4, i), rl_colors.HexColor('#d1fae5')))
+                table_style.append(('TEXTCOLOR', (4, i), (4, i), rl_colors.HexColor('#065f46')))
+            else:
+                table_style.append(('BACKGROUND', (4, i), (4, i), rl_colors.HexColor('#dbeafe')))
+                table_style.append(('TEXTCOLOR', (4, i), (4, i), rl_colors.HexColor('#1e40af')))
+        
+        acwr_table.setStyle(TableStyle(table_style))
+        story.append(acwr_table)
+        story.append(Spacer(1, 10))
+        
+        # Overall risk and recommendation
+        overall_risk_label = get_risk_label(lang, acwr_data.overall_risk)
+        story.append(Paragraph(f"<b>{t('overall_risk')}:</b> {overall_risk_label}", normal_style))
+        story.append(Paragraph(f"<b>{t('recommendation')}:</b> {acwr_data.recommendation}", normal_style))
+    else:
+        story.append(Paragraph(t('no_data'), normal_style))
+    
+    story.append(Spacer(1, 20))
+    
+    # Recent Sessions
+    story.append(Paragraph(f"📅 {t('recent_sessions')}", heading_style))
+    
+    if gps_records:
+        sessions_data = [[t('date'), t('distance'), t('high_int'), t('sprints'), t('period')]]
+        
+        for record in gps_records[:15]:  # Last 15 records
+            period_name = record.get("period_name") or record.get("notes", "").replace("Período: ", "") or "-"
+            sessions_data.append([
+                record.get("date", "-"),
+                f"{record.get('total_distance', 0):.0f}m",
+                f"{record.get('high_intensity_distance', 0):.0f}m",
+                str(record.get("number_of_sprints", 0)),
+                period_name[:15]  # Truncate period name
+            ])
+        
+        sessions_table = Table(sessions_data, colWidths=[3*cm, 2.5*cm, 2.5*cm, 2*cm, 4*cm])
+        sessions_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#bfdbfe')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#f0f9ff')]),
+        ]))
+        story.append(sessions_table)
+    else:
+        story.append(Paragraph(t('no_data'), normal_style))
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    # Return PDF as streaming response
+    filename = f"report_{athlete.get('name', 'athlete').replace(' ', '_')}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # Include the router in the main app
 app.include_router(api_router)
 
