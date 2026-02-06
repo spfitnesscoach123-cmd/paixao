@@ -17,7 +17,8 @@
     "no": "No",
     "error": "Error",
     "success": "Success",
-    "warning": "Warning"
+    "warning": "Warning",
+    "tryAgain": "Try Again"
   },
   "auth": {
     "login": "Login",
