@@ -2,8 +2,11 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../constants/theme';
+import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function TabsLayout() {
+  const { t } = useLanguage();
+  
   return (
     <Tabs
       screenOptions={{
@@ -35,7 +38,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="athletes"
         options={{
-          title: 'Atletas',
+          title: t('tabs.athletes'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size + 2} color={color} />
           ),
@@ -44,7 +47,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="data"
         options={{
-          title: 'Dashboard',
+          title: t('tabs.dashboard'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stats-chart" size={size + 2} color={color} />
           ),
@@ -53,7 +56,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
+          title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size + 2} color={color} />
           ),
