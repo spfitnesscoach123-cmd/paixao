@@ -251,9 +251,12 @@ export default function AthleteDetails() {
               onPress={() => router.push(`/athlete/${id}/charts`)}
             >
               <Ionicons name="bar-chart" size={20} color={colors.accent.primary} />
-              <Text style={styles.chartsButtonText}>Ver Gráficos Detalhados</Text>
+              <Text style={styles.chartsButtonText}>{t('athletes.viewCharts')}</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
+
+            {/* Export PDF Button */}
+            <ExportPDFButton athleteId={id} athleteName={athlete.name} />
 
             <TouchableOpacity 
               style={styles.deleteButton}
