@@ -1819,61 +1819,30 @@ Formate sua resposta de forma estruturada e profissional.""",
             elif current_section == "summary" and len(line) > 20:
                 summary += line + " "
         
-        # Default zones if not properly parsed
-        training_zones = {
-            "recovery": "Até 5km, ritmo leve, FC < 70% máxima",
-            "aerobic": "5-8km, ritmo moderado, FC 70-85% máxima",
-            "anaerobic": "Alta intensidade, sprints curtos, FC 85-95% máxima",
-            "maximum": "Esforço máximo, sprints, FC > 95% máxima"
-        }
+        # Default zones using translated values
+        training_zones = lp["zones"]
         
+        defaults = lp["defaults"]
         return AIInsights(
-            summary=summary.strip() if summary else "Análise dos dados do atleta concluída com sucesso.",
-            strengths=strengths if strengths else ["Dados consistentes de treinamento"],
-            concerns=concerns if concerns else ["Continue monitorando regularmente"],
-            recommendations=recommendations if recommendations else ["Manter rotina atual de monitoramento"],
+            summary=summary.strip() if summary else defaults["summary"],
+            strengths=strengths if strengths else [defaults["strength"]],
+            concerns=concerns if concerns else [defaults["concern"]],
+            recommendations=recommendations if recommendations else [defaults["recommendation"]],
             training_zones=training_zones
         )
         
     except Exception as e:
         logger.error(f"AI Analysis error: {str(e)}")
-        # Fallback to rule-based insights
-        avg_wellness = statistics.mean([w['wellness_score'] for w in wellness_records]) if wellness_records else 0
-        avg_readiness = statistics.mean([w['readiness_score'] for w in wellness_records]) if wellness_records else 0
-        
-        summary = f"Atleta apresenta wellness médio de {avg_wellness:.1f}/10 e prontidão de {avg_readiness:.1f}/10."
-        
-        strengths = []
-        if avg_wellness >= 7:
-            strengths.append("Bom estado geral de bem-estar")
-        if len(gps_records) >= 10:
-            strengths.append("Frequência de treino consistente")
-        if avg_readiness >= 7:
-            strengths.append("Alto nível de prontidão para treino")
-            
-        concerns = []
-        if avg_wellness < 6:
-            concerns.append("Wellness score abaixo do ideal")
-        if avg_readiness < 6:
-            concerns.append("Baixa prontidão para treinos intensos")
-            
-        recommendations = [
-            "Manter monitoramento regular de wellness",
-            "Ajustar carga de treino baseado em feedback diário",
-            "Priorizar qualidade do sono e recuperação"
-        ]
+        # Fallback to rule-based insights using translated text
+        defaults = lp["defaults"]
+        zones = lp["zones"]
         
         return AIInsights(
-            summary=summary,
-            strengths=strengths if strengths else ["Coleta de dados regular"],
-            concerns=concerns if concerns else ["Continue monitorando"],
-            recommendations=recommendations,
-            training_zones={
-                "recovery": "Até 5km, ritmo leve",
-                "aerobic": "5-8km, ritmo moderado",
-                "anaerobic": "Alta intensidade, sprints curtos",
-                "maximum": "Esforço máximo"
-            }
+            summary=defaults["summary"],
+            strengths=[defaults["strength"]],
+            concerns=[defaults["concern"]],
+            recommendations=[defaults["recommendation"]],
+            training_zones=zones
         )
 
 @api_router.get("/analysis/comprehensive/{athlete_id}")
