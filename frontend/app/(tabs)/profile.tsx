@@ -76,6 +76,54 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Assinatura & Ferramentas</Text>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
+                <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
+              </View>
+              <Text style={styles.menuItemText}>Gerenciar Assinatura</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/generate-wellness-link')}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
+                <Ionicons name="link-outline" size={22} color={colors.status.success} />
+              </View>
+              <Text style={styles.menuItemText}>Gerar Link Wellness</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Legal</Text>
+          
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
+                <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent.tertiary} />
+              </View>
+              <Text style={styles.menuItemText}>Política de Privacidade</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/terms-of-use')}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
+                <Ionicons name="document-text-outline" size={22} color={colors.accent.blue} />
+              </View>
+              <Text style={styles.menuItemText}>Termos de Uso</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Sobre</Text>
           
           <TouchableOpacity style={styles.menuItem}>
