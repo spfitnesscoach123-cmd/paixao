@@ -215,6 +215,14 @@
     "current": "Current",
     "trend": "Trend"
   },
+  "reports": {
+    "exportPDF": "Export PDF Report",
+    "generating": "Generating...",
+    "downloadStarted": "Download started",
+    "shareReport": "Share Report",
+    "savedTo": "Report saved to",
+    "exportError": "Error exporting report"
+  },
   "common": {
   "comparison": {
     "title": "Dynamic Comparisons",
