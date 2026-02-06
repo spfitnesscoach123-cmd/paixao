@@ -53,7 +53,8 @@
     "loginWithBiometrics": "Entrar com Biometria",
     "passwordsDoNotMatch": "As senhas não coincidem",
     "passwordMinLength": "A senha deve ter pelo menos 6 caracteres",
-    "mustAcceptTerms": "Você precisa aceitar os Termos de Uso e a Política de Privacidade"
+    "mustAcceptTerms": "Você precisa aceitar os Termos de Uso e a Política de Privacidade",
+    "logoutConfirm": "Tem certeza que deseja sair?"
   },
   "tabs": {
     "athletes": "Atletas",
