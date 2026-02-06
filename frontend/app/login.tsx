@@ -57,8 +57,8 @@ export default function Login() {
   const handleBiometricLogin = async () => {
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Login com biometria',
-        fallbackLabel: 'Usar senha',
+        promptMessage: t('auth.login'),
+        fallbackLabel: t('auth.password'),
         disableDeviceFallback: false,
       });
 
@@ -72,7 +72,7 @@ export default function Login() {
             await login(savedEmail, savedPassword);
             router.replace('/(tabs)/athletes');
           } catch (error: any) {
-            Alert.alert('Erro', 'Credenciais salvas inválidas. Faça login novamente.');
+            Alert.alert(t('common.error'), t('auth.invalidCredentials'));
             // Clear invalid credentials
             await AsyncStorage.multiRemove([BIOMETRIC_EMAIL_KEY, BIOMETRIC_PASSWORD_KEY, BIOMETRIC_ENABLED_KEY]);
             setHasSavedCredentials(false);
