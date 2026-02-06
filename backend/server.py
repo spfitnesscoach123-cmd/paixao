@@ -473,6 +473,93 @@ async def get_athlete_gps_data(
         record["_id"] = str(record["_id"])
     return [GPSData(**record) for record in gps_records]
 
+@api_router.get("/gps-data/athlete/{athlete_id}/sessions")
+async def get_athlete_sessions(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get GPS data grouped by sessions (aggregated from periods)"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    # Group by session_id or by date if no session_id
+    sessions = {}
+    for record in gps_records:
+        session_key = record.get("session_id") or record.get("date", "unknown")
+        
+        if session_key not in sessions:
+            sessions[session_key] = {
+                "session_id": session_key,
+                "session_name": record.get("session_name", f"Sessão {record.get('date', 'N/A')}"),
+                "date": record.get("date"),
+                "periods": [],
+                "totals": {
+                    "total_distance": 0,
+                    "high_intensity_distance": 0,
+                    "high_speed_running": 0,
+                    "sprint_distance": 0,
+                    "number_of_sprints": 0,
+                    "number_of_accelerations": 0,
+                    "number_of_decelerations": 0,
+                },
+                "max_speed": 0,
+                "max_acceleration": 0,
+                "max_deceleration": 0,
+            }
+        
+        period_name = record.get("period_name") or record.get("notes", "").replace("Período: ", "") or "Full Session"
+        sessions[session_key]["periods"].append({
+            "period_name": period_name,
+            "total_distance": record.get("total_distance", 0),
+            "high_intensity_distance": record.get("high_intensity_distance", 0),
+            "high_speed_running": record.get("high_speed_running", 0),
+            "sprint_distance": record.get("sprint_distance", 0),
+            "number_of_sprints": record.get("number_of_sprints", 0),
+            "number_of_accelerations": record.get("number_of_accelerations", 0),
+            "number_of_decelerations": record.get("number_of_decelerations", 0),
+            "max_speed": record.get("max_speed", 0),
+        })
+        
+        # Sum totals (for periods that are not "Session" to avoid double counting)
+        period_lower = period_name.lower()
+        if "session" not in period_lower and "total" not in period_lower:
+            sessions[session_key]["totals"]["total_distance"] += record.get("total_distance", 0)
+            sessions[session_key]["totals"]["high_intensity_distance"] += record.get("high_intensity_distance", 0)
+            sessions[session_key]["totals"]["high_speed_running"] += record.get("high_speed_running", 0) or 0
+            sessions[session_key]["totals"]["sprint_distance"] += record.get("sprint_distance", 0)
+            sessions[session_key]["totals"]["number_of_sprints"] += record.get("number_of_sprints", 0)
+            sessions[session_key]["totals"]["number_of_accelerations"] += record.get("number_of_accelerations", 0)
+            sessions[session_key]["totals"]["number_of_decelerations"] += record.get("number_of_decelerations", 0)
+        elif len(sessions[session_key]["periods"]) == 1:
+            # If this is the only period (Session/Total), use its values
+            sessions[session_key]["totals"]["total_distance"] = record.get("total_distance", 0)
+            sessions[session_key]["totals"]["high_intensity_distance"] = record.get("high_intensity_distance", 0)
+            sessions[session_key]["totals"]["high_speed_running"] = record.get("high_speed_running", 0) or 0
+            sessions[session_key]["totals"]["sprint_distance"] = record.get("sprint_distance", 0)
+            sessions[session_key]["totals"]["number_of_sprints"] = record.get("number_of_sprints", 0)
+            sessions[session_key]["totals"]["number_of_accelerations"] = record.get("number_of_accelerations", 0)
+            sessions[session_key]["totals"]["number_of_decelerations"] = record.get("number_of_decelerations", 0)
+        
+        # Track max values
+        if record.get("max_speed", 0) > sessions[session_key]["max_speed"]:
+            sessions[session_key]["max_speed"] = record.get("max_speed", 0)
+        if record.get("max_acceleration", 0) > sessions[session_key]["max_acceleration"]:
+            sessions[session_key]["max_acceleration"] = record.get("max_acceleration", 0)
+        if record.get("max_deceleration", 0) > sessions[session_key]["max_deceleration"]:
+            sessions[session_key]["max_deceleration"] = record.get("max_deceleration", 0)
+    
+    return list(sessions.values())
+
 # ============= WELLNESS ROUTES =============
 
 def calculate_wellness_scores(data: WellnessQuestionnaireCreate) -> tuple:
