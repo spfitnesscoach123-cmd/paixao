@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire } from '../../../types';
 import { GPSChart } from '../../../components/charts/GPSChart';
 import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
+import { colors } from '../../../constants/theme';
 
 export default function AthleteCharts() {
   const { id } = useLocalSearchParams<{ id: string }>();
