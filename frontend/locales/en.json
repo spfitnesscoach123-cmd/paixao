@@ -221,5 +221,28 @@
     "aiAnalysis": "AI Analysis",
     "acwrFatigue": "ACWR & Fatigue",
     "comparisons": "Comparisons"
+  },
+  "comparison": {
+    "title": "Dynamic Comparisons",
+    "compareMode": "Comparison Mode",
+    "betweenAthletes": "Between Athletes",
+    "sessions": "Sessions",
+    "positionGroups": "Position Groups",
+    "period": "Period",
+    "days7": "7 days",
+    "days30": "30 days",
+    "selectAthletes": "Select Athletes",
+    "selectAthlete": "Select an Athlete",
+    "selectPositions": "Select Positions",
+    "quadrantAnalysis": "Quadrant Analysis",
+    "lowVolume": "Low Vol.",
+    "highVolume": "High Vol.",
+    "lowIntensity": "Low Int.",
+    "highIntensity": "High Int.",
+    "statsSummary": "Statistical Summary",
+    "avgTotalDist": "Avg Total Dist.",
+    "avgHighInt": "Avg High Int.",
+    "highestDist": "Highest Distance",
+    "highestInt": "Highest High Int."
   }
 }
