@@ -115,7 +115,7 @@ export default function AthleteDetails() {
   if (athleteLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color={colors.spectral.cyan} />
       </View>
     );
   }
@@ -135,25 +135,25 @@ export default function AthleteDetails() {
           <View style={styles.tabContent}>
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
-                <Ionicons name="calendar" size={20} color="#6b7280" />
+                <Ionicons name="calendar" size={20} color={colors.spectral.cyan} />
                 <Text style={styles.infoLabel}>Idade:</Text>
                 <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} anos</Text>
               </View>
               <View style={styles.infoRow}>
-                <Ionicons name="football" size={20} color="#6b7280" />
+                <Ionicons name="football" size={20} color={colors.spectral.green} />
                 <Text style={styles.infoLabel}>Posição:</Text>
                 <Text style={styles.infoValue}>{athlete.position}</Text>
               </View>
               {athlete.height && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="resize" size={20} color="#6b7280" />
+                  <Ionicons name="resize" size={20} color={colors.spectral.teal} />
                   <Text style={styles.infoLabel}>Altura:</Text>
                   <Text style={styles.infoValue}>{athlete.height} cm</Text>
                 </View>
               )}
               {athlete.weight && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="barbell" size={20} color="#6b7280" />
+                  <Ionicons name="barbell" size={20} color={colors.spectral.purple} />
                   <Text style={styles.infoLabel}>Peso:</Text>
                   <Text style={styles.infoValue}>{athlete.weight} kg</Text>
                 </View>
@@ -164,16 +164,16 @@ export default function AthleteDetails() {
               style={styles.chartsButton}
               onPress={() => router.push(`/athlete/${id}/charts`)}
             >
-              <Ionicons name="bar-chart" size={20} color="#2563eb" />
+              <Ionicons name="bar-chart" size={20} color={colors.spectral.cyan} />
               <Text style={styles.chartsButtonText}>Ver Gráficos Detalhados</Text>
-              <Ionicons name="chevron-forward" size={20} color="#2563eb" />
+              <Ionicons name="chevron-forward" size={20} color={colors.spectral.cyan} />
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.deleteButton}
               onPress={handleDelete}
             >
-              <Ionicons name="trash-outline" size={20} color="#dc2626" />
+              <Ionicons name="trash-outline" size={20} color={colors.status.error} />
               <Text style={styles.deleteButtonText}>Excluir Atleta</Text>
             </TouchableOpacity>
           </View>
