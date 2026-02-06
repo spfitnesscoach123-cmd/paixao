@@ -217,13 +217,21 @@ export default function UploadCatapultCSV() {
 
     if (unmatchedPlayers.length > 0) {
       Alert.alert(
-        'Atletas Não Encontrados',
-        `${unmatchedPlayers.length} jogadores do CSV não foram encontrados no sistema:\n\n${unmatchedPlayers.join('\n')}\n\nEsses dados serão ignorados. Deseja continuar?`,
+        'Criar Atletas Automaticamente?',
+        `${unmatchedPlayers.length} jogadores não foram encontrados:\n\n${unmatchedPlayers.join('\n')}\n\nDeseja criar esses atletas automaticamente?`,
         [
-          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Cancelar', 
+            style: 'cancel' 
+          },
           {
-            text: 'Continuar',
-            onPress: () => uploadMutation.mutate(fileContent),
+            text: 'Ignorar e Importar',
+            onPress: () => uploadMutation.mutate({ csvData: fileContent, createMissing: false }),
+          },
+          {
+            text: 'Criar e Importar',
+            onPress: () => uploadMutation.mutate({ csvData: fileContent, createMissing: true }),
+            style: 'default',
           },
         ]
       );
@@ -235,7 +243,7 @@ export default function UploadCatapultCSV() {
           { text: 'Cancelar', style: 'cancel' },
           {
             text: 'Importar',
-            onPress: () => uploadMutation.mutate(fileContent),
+            onPress: () => uploadMutation.mutate({ csvData: fileContent, createMissing: false }),
           },
         ]
       );
