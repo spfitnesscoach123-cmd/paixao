@@ -39,13 +39,32 @@ export default function UploadCatapultCSV() {
   });
 
   const uploadMutation = useMutation({
-    mutationFn: async (csvData: string) => {
+    mutationFn: async ({ csvData, createMissing }: { csvData: string, createMissing: boolean }) => {
       const validation = validateCatapultCSV(csvData);
       if (!validation.valid) {
         throw new Error(validation.error);
       }
 
       const { data: records } = parseCatapultCSV(csvData);
+      
+      // If createMissing is true, create new athletes
+      if (createMissing && unmatchedPlayers.length > 0) {
+        for (const playerName of unmatchedPlayers) {
+          try {
+            const response = await api.post('/athletes', {
+              name: playerName,
+              birth_date: '2000-01-01', // Default date
+              position: 'Não especificado',
+            });
+            
+            // Add to matched athletes
+            const newAthlete = response.data;
+            matchedAthletes[playerName] = newAthlete.id || newAthlete._id;
+          } catch (error) {
+            console.error(`Error creating athlete ${playerName}:`, error);
+          }
+        }
+      }
       
       let successCount = 0;
       let skippedCount = 0;
