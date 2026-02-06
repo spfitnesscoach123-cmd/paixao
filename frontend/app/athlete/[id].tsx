@@ -13,10 +13,12 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format } from 'date-fns';
 import { AnalysisTab } from '../../components/AnalysisTab';
+import { colors } from '../../constants/theme';
 
 type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
 
