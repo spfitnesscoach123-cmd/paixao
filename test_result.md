@@ -118,6 +118,9 @@ backend:
         comment: "Implementado e testado via curl. Registro, login e get user funcionando corretamente. Token JWT sendo gerado e validado."
       - working: true
         agent: "testing"
+        comment: "Todos os testes automatizados passaram (22/22). Auth flow completo validado incluindo casos de erro."
+      - working: true
+        agent: "testing"
         comment: "Comprehensive automated testing completed. All authentication flows verified: register, login, get current user, invalid credentials handling, duplicate registration prevention. JWT tokens working correctly. All security tests passed."
   
   - task: "CRUD de Atletas"
