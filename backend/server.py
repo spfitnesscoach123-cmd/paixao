@@ -1182,6 +1182,150 @@ async def get_acwr_detailed_analysis(
         recommendation=recommendation
     )
 
+# ============= ACWR HISTORY FOR CHARTS =============
+
+class ACWRHistoryPoint(BaseModel):
+    date: str
+    acwr: float
+    acute: float
+    chronic: float
+    risk_level: str
+
+class ACWRHistoryResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    metric: str
+    history: List[ACWRHistoryPoint]
+
+@api_router.get("/analysis/acwr-history/{athlete_id}")
+async def get_acwr_history(
+    athlete_id: str,
+    metric: str = "total_distance",
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get ACWR history for charts. 
+    Metrics: total_distance, hsr, hid, sprint, acc_dec
+    Returns daily ACWR values for the specified period.
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data from extended period (days + 28 for chronic calculation)
+    today = datetime.utcnow()
+    start_date = (today - timedelta(days=days + 28)).strftime("%Y-%m-%d")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": start_date}
+    }).sort("date", 1).to_list(1000)
+    
+    if len(gps_records) < 7:
+        return ACWRHistoryResponse(
+            athlete_id=athlete_id,
+            athlete_name=athlete["name"],
+            metric=metric,
+            history=[]
+        )
+    
+    # Group data by date
+    daily_data = {}
+    for record in gps_records:
+        date = record.get("date", "")
+        if not date:
+            continue
+            
+        if date not in daily_data:
+            daily_data[date] = {
+                "total_distance": 0,
+                "hsr": 0,
+                "hid": 0,
+                "sprint": 0,
+                "acc_dec": 0
+            }
+        
+        daily_data[date]["total_distance"] += record.get("total_distance", 0)
+        daily_data[date]["hsr"] += record.get("high_speed_running", 0) or record.get("high_intensity_distance", 0) * 0.3
+        daily_data[date]["hid"] += record.get("high_intensity_distance", 0)
+        daily_data[date]["sprint"] += record.get("sprint_distance", 0)
+        daily_data[date]["acc_dec"] += record.get("number_of_accelerations", 0) + record.get("number_of_decelerations", 0)
+    
+    # Sort dates
+    sorted_dates = sorted(daily_data.keys())
+    
+    # Calculate rolling ACWR for each day
+    history = []
+    
+    for i, current_date in enumerate(sorted_dates):
+        # Need at least 7 days of data before this date for acute
+        if i < 6:
+            continue
+        
+        # Get dates for acute (7 days) and chronic (28 days) periods
+        current_dt = datetime.strptime(current_date, "%Y-%m-%d")
+        target_start = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+        
+        # Only include dates within the requested range
+        if current_date < target_start:
+            continue
+        
+        acute_start = (current_dt - timedelta(days=7)).strftime("%Y-%m-%d")
+        chronic_start = (current_dt - timedelta(days=28)).strftime("%Y-%m-%d")
+        
+        # Calculate acute load (last 7 days)
+        acute_values = []
+        chronic_values = []
+        
+        for d in sorted_dates:
+            if d > current_date:
+                continue
+            if d >= acute_start and d <= current_date:
+                acute_values.append(daily_data[d].get(metric, 0))
+            if d >= chronic_start and d <= current_date:
+                chronic_values.append(daily_data[d].get(metric, 0))
+        
+        if len(acute_values) < 3 or len(chronic_values) < 7:
+            continue
+        
+        acute_load = sum(acute_values) / len(acute_values) if acute_values else 0
+        chronic_load = sum(chronic_values) / len(chronic_values) if chronic_values else 0
+        
+        if chronic_load > 0:
+            acwr = acute_load / chronic_load
+        else:
+            acwr = 0
+        
+        # Determine risk level
+        if acwr >= 1.5:
+            risk = "high"
+        elif acwr >= 1.3:
+            risk = "moderate"
+        elif acwr >= 0.8:
+            risk = "optimal"
+        else:
+            risk = "low"
+        
+        history.append(ACWRHistoryPoint(
+            date=current_date,
+            acwr=round(acwr, 2),
+            acute=round(acute_load, 0),
+            chronic=round(chronic_load, 0),
+            risk_level=risk
+        ))
+    
+    return ACWRHistoryResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        metric=metric,
+        history=history
+    )
+
 @api_router.get("/analysis/fatigue/{athlete_id}")
 async def get_fatigue_analysis(
     athlete_id: str,
