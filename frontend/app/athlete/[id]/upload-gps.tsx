@@ -24,6 +24,7 @@ export default function UploadGPS() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [recordCount, setRecordCount] = useState(0);
+  const [playerNames, setPlayerNames] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const uploadMutation = useMutation({
