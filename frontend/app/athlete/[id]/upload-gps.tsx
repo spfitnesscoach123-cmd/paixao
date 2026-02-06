@@ -330,6 +330,6 @@ const styles = StyleSheet.create({
   codeText: {
     fontSize: 11,
     color: '#10b981',
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
