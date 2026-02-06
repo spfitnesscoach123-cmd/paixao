@@ -33,11 +33,24 @@ export default function UploadGPS() {
         throw new Error(validation.error);
       }
 
-      const records = parseCatapultCSV(csvData);
+      const { data: records, metadata } = parseCatapultCSV(csvData);
+      
+      // Import all records (multiple periods if available)
       const promises = records.map(record =>
         api.post('/gps-data', {
           athlete_id: id,
-          ...record,
+          date: record.date,
+          total_distance: record.total_distance,
+          high_intensity_distance: record.high_intensity_distance,
+          high_speed_running: record.high_speed_running,
+          sprint_distance: record.sprint_distance,
+          number_of_sprints: record.number_of_sprints,
+          number_of_accelerations: record.number_of_accelerations,
+          number_of_decelerations: record.number_of_decelerations,
+          max_speed: record.max_speed,
+          max_acceleration: record.max_acceleration,
+          max_deceleration: record.max_deceleration,
+          notes: record.period_name ? `Período: ${record.period_name}` : undefined,
         })
       );
 
