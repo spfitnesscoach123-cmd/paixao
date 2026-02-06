@@ -326,10 +326,10 @@ export default function AthleteDetails() {
             </TouchableOpacity>
 
             {assessmentsLoading ? (
-              <ActivityIndicator size="large" color="#2563eb" style={{ marginTop: 32 }} />
+              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
             ) : assessments && assessments.length > 0 ? (
-              assessments.map((item) => (
-                <View key={item.id} style={styles.dataCard}>
+              assessments.map((item, index) => (
+                <View key={item.id || `assessment-${index}`} style={styles.dataCard}>
                   <View style={styles.dataHeader}>
                     <Ionicons 
                       name={item.assessment_type === 'strength' ? 'barbell' : item.assessment_type === 'aerobic' ? 'heart' : 'body'} 
