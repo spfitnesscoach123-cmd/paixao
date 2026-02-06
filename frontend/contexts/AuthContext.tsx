@@ -1,7 +1,36 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import { User, AuthResponse } from '../types';
+
+// Simple storage abstraction that works on web and native
+const storage = {
+  getItem: async (key: string): Promise<string | null> => {
+    if (Platform.OS === 'web') {
+      return AsyncStorage.getItem(key);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      return SecureStore.getItemAsync(key);
+    }
+  },
+  setItem: async (key: string, value: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      await AsyncStorage.setItem(key, value);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.setItemAsync(key, value);
+    }
+  },
+  deleteItem: async (key: string): Promise<void> => {
+    if (Platform.OS === 'web') {
+      await AsyncStorage.removeItem(key);
+    } else {
+      const SecureStore = await import('expo-secure-store');
+      await SecureStore.deleteItemAsync(key);
+    }
+  },
+};
 
 interface AuthContextType {
   user: User | null;
@@ -24,14 +53,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAuthStatus = async () => {
     try {
-      const token = await SecureStore.getItemAsync('access_token');
+      const token = await storage.getItem('access_token');
       if (token) {
         const response = await api.get('/auth/me');
         setUser(response.data);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      await SecureStore.deleteItemAsync('access_token');
+      try {
+        await storage.deleteItem('access_token');
+      } catch (e) {
+        // Ignore deletion errors
+      }
     } finally {
       setIsLoading(false);
     }
@@ -43,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
       });
-      await SecureStore.setItemAsync('access_token', response.data.access_token);
+      await storage.setItem('access_token', response.data.access_token);
       setUser(response.data.user);
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Login failed');
@@ -57,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         password,
         name,
       });
-      await SecureStore.setItemAsync('access_token', response.data.access_token);
+      await storage.setItem('access_token', response.data.access_token);
       setUser(response.data.user);
     } catch (error: any) {
       throw new Error(error.response?.data?.detail || 'Registration failed');
@@ -65,7 +98,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await SecureStore.deleteItemAsync('access_token');
+    try {
+      await storage.deleteItem('access_token');
+    } catch (e) {
+      // Ignore deletion errors
+    }
     setUser(null);
   };
 
