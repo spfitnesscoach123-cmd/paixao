@@ -59,7 +59,7 @@ export default function Register() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <LinearGradient
-        colors={[colors.dark.primary, colors.dark.secondary]}
+        colors={[colors.dark.secondary, colors.dark.primary]}
         style={styles.background}
       >
         <ScrollView
@@ -70,13 +70,13 @@ export default function Register() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.spectral.cyan} />
+            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
             <View style={styles.iconGlow}>
               <LinearGradient
-                colors={colors.gradients.green}
+                colors={colors.gradients.primary}
                 style={styles.iconGradient}
               >
                 <Ionicons name="person-add" size={40} color="#ffffff" />
@@ -89,7 +89,7 @@ export default function Register() {
 
           <View style={styles.form}>
             <View style={[styles.inputContainer, styles.glowEffect]}>
-              <Ionicons name="person-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Nome completo"
@@ -101,7 +101,7 @@ export default function Register() {
             </View>
 
             <View style={[styles.inputContainer, styles.glowEffect]}>
-              <Ionicons name="mail-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <Ionicons name="mail-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Email"
@@ -115,7 +115,7 @@ export default function Register() {
             </View>
 
             <View style={[styles.inputContainer, styles.glowEffect]}>
-              <Ionicons name="lock-closed-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Senha"
@@ -128,7 +128,7 @@ export default function Register() {
             </View>
 
             <View style={[styles.inputContainer, styles.glowEffect]}>
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.spectral.cyan} style={styles.inputIcon} />
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
                 placeholder="Confirmar senha"
@@ -147,7 +147,7 @@ export default function Register() {
               activeOpacity={0.8}
             >
               <LinearGradient
-                colors={colors.gradients.green}
+                colors={colors.gradients.primary}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.buttonGradient}
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   iconGlow: {
     marginBottom: 16,
-    shadowColor: colors.spectral.green,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 14,
-    color: colors.spectral.green,
+    color: colors.accent.light,
     textAlign: 'center',
     fontWeight: '600',
     letterSpacing: 1,
@@ -228,10 +228,10 @@ const styles = StyleSheet.create({
   spectralLine: {
     width: 60,
     height: 3,
-    backgroundColor: colors.spectral.cyan,
+    backgroundColor: colors.accent.blue,
     marginTop: 12,
     borderRadius: 2,
-    shadowColor: colors.spectral.cyan,
+    shadowColor: colors.accent.blue,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,
@@ -245,12 +245,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 255, 0.2)',
+    borderColor: colors.border.default,
     marginBottom: 16,
     paddingHorizontal: 16,
   },
   glowEffect: {
-    shadowColor: colors.spectral.cyan,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 8,
-    shadowColor: colors.spectral.green,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   loginTextBold: {
-    color: colors.spectral.cyan,
+    color: colors.accent.light,
     fontWeight: '700',
   },
 });
