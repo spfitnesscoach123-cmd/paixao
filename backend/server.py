@@ -1793,6 +1793,7 @@ Formate sua resposta de forma estruturada e profissional."""
 @api_router.get("/analysis/comprehensive/{athlete_id}")
 async def get_comprehensive_analysis(
     athlete_id: str,
+    lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
     """Get all analyses in one endpoint"""
@@ -1811,19 +1812,19 @@ async def get_comprehensive_analysis(
     
     # Try to get each analysis (non-blocking)
     try:
-        acwr = await get_acwr_analysis(athlete_id, current_user)
+        acwr = await get_acwr_analysis(athlete_id, lang, current_user)
         result.acwr = acwr
     except:
         pass
     
     try:
-        fatigue = await get_fatigue_analysis(athlete_id, current_user)
+        fatigue = await get_fatigue_analysis(athlete_id, lang, current_user)
         result.fatigue = fatigue
     except:
         pass
     
     try:
-        insights = await get_ai_insights(athlete_id, current_user)
+        insights = await get_ai_insights(athlete_id, lang, current_user)
         result.ai_insights = insights
     except:
         pass
