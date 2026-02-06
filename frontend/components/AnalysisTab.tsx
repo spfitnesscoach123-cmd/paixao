@@ -239,6 +239,9 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         </View>
       )}
 
+      {/* ACWR Evolution Chart - NEW */}
+      <ACWREvolutionChart athleteId={athleteId} />
+
       {/* Loading state for ACWR detailed */}
       {acwrLoading && (
         <View style={styles.card}>
