@@ -6,6 +6,7 @@ import api from '../services/api';
 import { ComprehensiveAnalysis } from '../types';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { ACWREvolutionChart } from './ACWREvolutionChart';
 
 interface ACWRDetailedMetric {
   name: string;
