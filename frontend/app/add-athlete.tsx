@@ -181,11 +181,11 @@ export default function AddAthlete() {
 
               <View style={styles.row}>
                 <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                  <Text style={styles.label}>Altura (cm)</Text>
+                  <Text style={styles.label}>{t('athletes.height')}</Text>
                   <View style={[styles.inputContainer, styles.glowEffect]}>
                     <TextInput
                       style={styles.input}
-                      placeholder="Ex: 175"
+                      placeholder={t('athletes.heightPlaceholder')}
                       placeholderTextColor={colors.text.tertiary}
                       value={height}
                       onChangeText={setHeight}
@@ -195,11 +195,11 @@ export default function AddAthlete() {
                 </View>
 
                 <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                  <Text style={styles.label}>Peso (kg)</Text>
+                  <Text style={styles.label}>{t('athletes.weight')}</Text>
                   <View style={[styles.inputContainer, styles.glowEffect]}>
                     <TextInput
                       style={styles.input}
-                      placeholder="Ex: 70"
+                      placeholder={t('athletes.weightPlaceholder')}
                       placeholderTextColor={colors.text.tertiary}
                       value={weight}
                       onChangeText={setWeight}
@@ -226,7 +226,7 @@ export default function AddAthlete() {
                   ) : (
                     <>
                       <Ionicons name="add-circle" size={24} color="#ffffff" />
-                      <Text style={styles.buttonText}>Cadastrar Atleta</Text>
+                      <Text style={styles.buttonText}>{t('athletes.registerAthlete')}</Text>
                     </>
                   )}
                 </LinearGradient>
