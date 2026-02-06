@@ -87,7 +87,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos');
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
@@ -98,12 +98,12 @@ export default function Login() {
       // Ask to save credentials for biometric login
       if (isBiometricSupported) {
         Alert.alert(
-          'Habilitar Biometria?',
-          'Deseja habilitar login com FaceID/impressão digital para próximas vezes?',
+          t('auth.enableBiometrics'),
+          t('auth.biometricsPrompt'),
           [
-            { text: 'Não', style: 'cancel' },
+            { text: t('common.no'), style: 'cancel' },
             {
-              text: 'Sim',
+              text: t('common.yes'),
               onPress: async () => {
                 await AsyncStorage.setItem(BIOMETRIC_EMAIL_KEY, email);
                 await AsyncStorage.setItem(BIOMETRIC_PASSWORD_KEY, password);
@@ -116,7 +116,7 @@ export default function Login() {
       
       router.replace('/(tabs)/athletes');
     } catch (error: any) {
-      Alert.alert('Erro', error.message);
+      Alert.alert(t('common.error'), error.message);
     } finally {
       setIsLoading(false);
     }
