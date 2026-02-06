@@ -1181,6 +1181,7 @@ def calculate_metric_acwr(acute_values: List[float], chronic_values: List[float]
 @api_router.get("/analysis/acwr-detailed/{athlete_id}", response_model=ACWRDetailedAnalysis)
 async def get_acwr_detailed_analysis(
     athlete_id: str,
+    lang: str = "en",
     current_user: dict = Depends(get_current_user)
 ):
     """Get detailed ACWR analysis for multiple metrics:
@@ -1190,6 +1191,8 @@ async def get_acwr_detailed_analysis(
     - Sprint Distance (+25 km/h)
     - Acc/Dec (Accelerations + Decelerations)
     """
+    t = lambda key: get_analysis_text(lang, key)
+    
     # Verify athlete belongs to current user
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
@@ -1212,7 +1215,7 @@ async def get_acwr_detailed_analysis(
     if len(gps_records) < 7:
         raise HTTPException(
             status_code=400,
-            detail="Dados insuficientes. Necessário pelo menos 7 dias de dados GPS para cálculo do ACWR."
+            detail=t("ai_no_data")
         )
     
     # Group data by session to avoid counting periods multiple times
