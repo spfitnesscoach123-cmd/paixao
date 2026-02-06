@@ -10,6 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,17 +56,13 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <View style={styles.iconGlow}>
-              <LinearGradient
-                colors={colors.gradients.primary}
-                style={styles.iconGradient}
-              >
-                <Ionicons name="football" size={48} color="#ffffff" />
-              </LinearGradient>
+            <View style={styles.logoContainer}>
+              <Image
+                source={require('../assets/logo.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
-            <Text style={styles.title}>Football Training</Text>
-            <Text style={styles.subtitle}>Sistema Avançado de Prescrição</Text>
-            <View style={styles.spectralLine} />
           </View>
 
           <View style={styles.form}>
@@ -160,46 +157,18 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 48,
+    marginBottom: 40,
   },
-  iconGlow: {
-    marginBottom: 20,
+  logoContainer: {
     shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
+    shadowOpacity: 0.5,
     shadowRadius: 30,
     elevation: 10,
   },
-  iconGradient: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.accent.light,
-    textAlign: 'center',
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  spectralLine: {
-    width: 60,
-    height: 3,
-    backgroundColor: colors.accent.blue,
-    marginTop: 12,
-    borderRadius: 2,
-    shadowColor: colors.accent.blue,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
+  logo: {
+    width: 180,
+    height: 180,
   },
   form: {
     width: '100%',
