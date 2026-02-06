@@ -633,6 +633,168 @@ async def get_athlete_wellness(
         record["_id"] = str(record["_id"])
     return [WellnessQuestionnaire(**record) for record in wellness_records]
 
+# ============= PUBLIC WELLNESS ROUTES (for athletes without login) =============
+
+class WellnessLinkCreate(BaseModel):
+    coach_id: str
+    expires_days: int = 7
+
+class WellnessLink(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    coach_id: str
+    link_token: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    is_active: bool = True
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class PublicWellnessSubmit(BaseModel):
+    athlete_id: str
+    date: str
+    sleep_hours: float
+    sleep_quality: int  # 1-10
+    fatigue: int  # 1-10
+    muscle_soreness: int  # 1-10
+    stress: int  # 1-10
+    mood: int  # 1-10
+    hydration: Optional[int] = None  # 1-10
+    nutrition: Optional[int] = None  # 1-10
+    notes: Optional[str] = None
+
+@api_router.post("/wellness/generate-link")
+async def generate_wellness_link(
+    expires_days: int = 7,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a shareable link for athletes to submit wellness questionnaires"""
+    import secrets
+    
+    link_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(days=expires_days)
+    
+    wellness_link = WellnessLink(
+        coach_id=current_user["_id"],
+        link_token=link_token,
+        expires_at=expires_at
+    )
+    
+    result = await db.wellness_links.insert_one(wellness_link.model_dump(by_alias=True, exclude=["id"]))
+    wellness_link.id = str(result.inserted_id)
+    
+    return {
+        "link_token": link_token,
+        "expires_at": expires_at.isoformat(),
+        "share_url": f"/wellness-form/{link_token}"
+    }
+
+@api_router.get("/wellness/public/{link_token}/athletes")
+async def get_athletes_for_wellness_link(link_token: str):
+    """Get list of athletes for a wellness link (public, no auth required)"""
+    # Verify link is valid
+    link = await db.wellness_links.find_one({
+        "link_token": link_token,
+        "is_active": True,
+        "expires_at": {"$gte": datetime.utcnow()}
+    })
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+    
+    # Get athletes for this coach
+    athletes = await db.athletes.find({
+        "coach_id": link["coach_id"]
+    }).to_list(1000)
+    
+    # Return only names and IDs
+    return [{"id": str(a["_id"]), "name": a["name"]} for a in athletes]
+
+@api_router.post("/wellness/public/{link_token}/submit")
+async def submit_public_wellness(
+    link_token: str,
+    wellness_data: PublicWellnessSubmit
+):
+    """Submit wellness questionnaire via public link (no auth required)"""
+    # Verify link is valid
+    link = await db.wellness_links.find_one({
+        "link_token": link_token,
+        "is_active": True,
+        "expires_at": {"$gte": datetime.utcnow()}
+    })
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+    
+    # Verify athlete belongs to this coach
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(wellness_data.athlete_id),
+        "coach_id": link["coach_id"]
+    })
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Calculate readiness score
+    readiness_score = round(
+        (wellness_data.sleep_quality * 2 +
+         (10 - wellness_data.fatigue) * 2 +
+         (10 - wellness_data.muscle_soreness) * 1.5 +
+         (10 - wellness_data.stress) * 1 +
+         wellness_data.mood * 1.5) / 8, 1
+    )
+    
+    # Create wellness record
+    wellness_record = {
+        "athlete_id": wellness_data.athlete_id,
+        "coach_id": link["coach_id"],
+        "date": wellness_data.date,
+        "sleep_hours": wellness_data.sleep_hours,
+        "sleep_quality": wellness_data.sleep_quality,
+        "fatigue": wellness_data.fatigue,
+        "muscle_soreness": wellness_data.muscle_soreness,
+        "stress": wellness_data.stress,
+        "mood": wellness_data.mood,
+        "hydration": wellness_data.hydration,
+        "nutrition": wellness_data.nutrition,
+        "readiness_score": readiness_score,
+        "notes": wellness_data.notes,
+        "created_at": datetime.utcnow(),
+        "submitted_via": "public_link"
+    }
+    
+    result = await db.wellness.insert_one(wellness_record)
+    
+    # Generate feedback report for the athlete
+    feedback = {
+        "athlete_name": athlete["name"],
+        "date": wellness_data.date,
+        "readiness_score": readiness_score,
+        "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
+        "recommendations": []
+    }
+    
+    if wellness_data.sleep_hours < 7:
+        feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
+    if wellness_data.sleep_quality < 6:
+        feedback["recommendations"].append("Considere melhorar sua higiene do sono")
+    if wellness_data.fatigue > 7:
+        feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
+    if wellness_data.muscle_soreness > 7:
+        feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
+    if wellness_data.stress > 7:
+        feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
+    
+    if not feedback["recommendations"]:
+        feedback["recommendations"].append("Ótimo! Você está em boas condições!")
+    
+    return {
+        "success": True,
+        "message": "Questionário enviado com sucesso!",
+        "feedback": feedback
+    }
+
 # ============= PHYSICAL ASSESSMENT ROUTES =============
 
 @api_router.post("/assessments", response_model=PhysicalAssessment)
