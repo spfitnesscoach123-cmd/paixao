@@ -91,7 +91,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 211, 238, 0.2)' }]}>
-                <Ionicons name="help-circle-outline" size={22} color={colors.spectral.teal} />
+                <Ionicons name="help-circle-outline" size={22} color={colors.accent.blue} />
               </View>
               <Text style={styles.menuItemText}>Ajuda</Text>
             </View>

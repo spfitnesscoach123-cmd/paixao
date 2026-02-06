@@ -146,7 +146,7 @@ export default function AthleteDetails() {
               </View>
               {athlete.height && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="resize" size={20} color={colors.spectral.teal} />
+                  <Ionicons name="resize" size={20} color={colors.accent.blue} />
                   <Text style={styles.infoLabel}>Altura:</Text>
                   <Text style={styles.infoValue}>{athlete.height} cm</Text>
                 </View>
