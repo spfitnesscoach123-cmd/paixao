@@ -62,6 +62,25 @@
     "dashboard": "Dashboard",
     "profile": "Profile"
   },
+  "dashboard": {
+    "teamOverview": "Team Overview",
+    "importCatapult": "Import Catapult Data",
+    "importSubtitle": "Automatic CSV with multiple athletes",
+    "athletes": "ATHLETES",
+    "sessions": "SESSIONS",
+    "avgDistance": "AVG DISTANCE",
+    "wellness": "WELLNESS",
+    "totalRegistered": "Total registered",
+    "last7days": "last 7d",
+    "perSession": "Per session",
+    "vsWeek": "vs. week",
+    "topPerformer": "TOP PERFORMER",
+    "average": "Average",
+    "session": "session",
+    "quickStats": "Quick Statistics",
+    "sessionsPerAthlete": "Sessions/Athlete",
+    "activity7d": "Activity 7d"
+  },
   "athletes": {
     "title": "Athletes",
     "addAthlete": "Add Athlete",
@@ -80,7 +99,10 @@
     "athleteCreated": "Athlete created successfully!",
     "athleteUpdated": "Profile updated successfully!",
     "athleteDeleted": "Athlete deleted successfully!",
-    "viewCharts": "View Detailed Charts"
+    "viewCharts": "View Detailed Charts",
+    "athleteNotFound": "Athlete not found",
+    "info": "Info",
+    "assessments": "Assessments"
   },
   "gps": {
     "title": "GPS Data",
