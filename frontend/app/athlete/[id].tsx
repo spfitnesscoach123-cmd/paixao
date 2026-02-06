@@ -159,6 +159,15 @@ export default function AthleteDetails() {
             </View>
 
             <TouchableOpacity 
+              style={styles.chartsButton}
+              onPress={() => router.push(`/athlete/${id}/charts`)}
+            >
+              <Ionicons name="bar-chart" size={20} color="#2563eb" />
+              <Text style={styles.chartsButtonText}>Ver Gráficos Detalhados</Text>
+              <Ionicons name="chevron-forward" size={20} color="#2563eb" />
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={styles.deleteButton}
               onPress={handleDelete}
             >
