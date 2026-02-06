@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 26,
     overflow: 'hidden',
-    shadowColor: colors.spectral.green,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 20,
