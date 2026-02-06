@@ -153,7 +153,7 @@ export default function AthleteDetails() {
               )}
               {athlete.weight && (
                 <View style={styles.infoRow}>
-                  <Ionicons name="barbell" size={20} color={colors.spectral.purple} />
+                  <Ionicons name="barbell" size={20} color={colors.accent.secondary} />
                   <Text style={styles.infoLabel}>Peso:</Text>
                   <Text style={styles.infoValue}>{athlete.weight} kg</Text>
                 </View>
@@ -668,7 +668,7 @@ const styles = StyleSheet.create({
   typeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.spectral.purple,
+    color: colors.accent.secondary,
   },
   dataGrid: {
     flexDirection: 'row',

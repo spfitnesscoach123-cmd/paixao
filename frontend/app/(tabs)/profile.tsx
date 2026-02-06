@@ -81,7 +81,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
-                <Ionicons name="information-circle-outline" size={22} color={colors.spectral.purple} />
+                <Ionicons name="information-circle-outline" size={22} color={colors.accent.secondary} />
               </View>
               <Text style={styles.menuItemText}>Sobre o App</Text>
             </View>
