@@ -207,7 +207,13 @@
     "recovery": "Recovery",
     "aerobic": "Aerobic",
     "anaerobic": "Anaerobic",
-    "maximal": "Maximal"
+    "maximal": "Maximal",
+    "acwrEvolution": "ACWR Evolution",
+    "loadingChart": "Loading chart...",
+    "insufficientDataChart": "Insufficient data for chart",
+    "average": "Average",
+    "current": "Current",
+    "trend": "Trend"
   },
   "common": {
   "comparison": {
