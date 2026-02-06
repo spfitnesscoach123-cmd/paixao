@@ -287,7 +287,7 @@ export default function AthleteDetails() {
               onPress={() => router.push(`/athlete/${id}/edit`)}
             >
               <Ionicons name="create-outline" size={20} color={colors.accent.primary} />
-              <Text style={styles.editButtonText}>Editar Perfil</Text>
+              <Text style={styles.editButtonText}>{t('athletes.editProfile')}</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
 
@@ -308,7 +308,7 @@ export default function AthleteDetails() {
               onPress={handleDelete}
             >
               <Ionicons name="trash-outline" size={20} color={colors.status.error} />
-              <Text style={styles.deleteButtonText}>Excluir Atleta</Text>
+              <Text style={styles.deleteButtonText}>{t('athletes.deleteAthlete')}</Text>
             </TouchableOpacity>
           </View>
         );
