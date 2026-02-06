@@ -49,6 +49,11 @@ export default function UploadCatapultCSV() {
 
       const { data: records } = parseCatapultCSV(csvData);
       
+      // Generate unique session ID for this CSV upload
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const sessionDate = records[0]?.date || new Date().toISOString().split('T')[0];
+      const sessionName = fileName?.replace('.csv', '') || `Sessão ${sessionDate}`;
+      
       // Create a copy of matchedAthletes to update
       const updatedMatchedAthletes = { ...matchedAthletes };
       
@@ -96,10 +101,13 @@ export default function UploadCatapultCSV() {
         }
 
         try {
-          // Import GPS data for THIS specific athlete
+          // Import GPS data for THIS specific athlete with session info
           await api.post('/gps-data', {
             athlete_id: athleteId,
             date: record.date,
+            session_id: sessionId,
+            session_name: sessionName,
+            period_name: record.period_name || 'Full Session',
             total_distance: record.total_distance,
             high_intensity_distance: record.high_intensity_distance,
             high_speed_running: record.high_speed_running,
