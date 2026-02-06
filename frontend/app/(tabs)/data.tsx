@@ -113,10 +113,9 @@ export default function DataScreen() {
             <View style={styles.athleteCardContent}>
               <View style={styles.athletePhotoPlaceholder}>
                 {athlete.photo_base64 ? (
-                  <img 
-                    src={athlete.photo_base64} 
-                    style={{ width: '100%', height: '100%', borderRadius: 25 }}
-                    alt={athlete.name}
+                  <Image 
+                    source={{ uri: athlete.photo_base64 }} 
+                    style={styles.athletePhoto}
                   />
                 ) : (
                   <Ionicons name="person" size={24} color="#9ca3af" />
