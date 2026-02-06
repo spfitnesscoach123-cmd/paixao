@@ -44,7 +44,16 @@
     "acceptTerms": "Li e aceito os",
     "termsOfUse": "Termos de Uso",
     "and": "e a",
-    "privacyPolicy": "Política de Privacidade"
+    "privacyPolicy": "Política de Privacidade",
+    "fillAllFields": "Por favor, preencha todos os campos",
+    "invalidCredentials": "Credenciais inválidas. Faça login novamente.",
+    "enableBiometrics": "Habilitar Biometria?",
+    "biometricsPrompt": "Deseja habilitar login com FaceID/impressão digital para próximas vezes?",
+    "loginWithFaceID": "Entrar com FaceID",
+    "loginWithBiometrics": "Entrar com Biometria",
+    "passwordsDoNotMatch": "As senhas não coincidem",
+    "passwordMinLength": "A senha deve ter pelo menos 6 caracteres",
+    "mustAcceptTerms": "Você precisa aceitar os Termos de Uso e a Política de Privacidade"
   },
   "tabs": {
     "athletes": "Atletas",
