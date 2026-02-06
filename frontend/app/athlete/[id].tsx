@@ -140,7 +140,7 @@ export default function AthleteDetails() {
                 <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} anos</Text>
               </View>
               <View style={styles.infoRow}>
-                <Ionicons name="football" size={20} color={colors.spectral.green} />
+                <Ionicons name="football" size={20} color={colors.accent.tertiary} />
                 <Text style={styles.infoLabel}>Posição:</Text>
                 <Text style={styles.infoValue}>{athlete.position}</Text>
               </View>
@@ -628,7 +628,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.spectral.green,
+    backgroundColor: colors.accent.tertiary,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,

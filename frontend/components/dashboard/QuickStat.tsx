@@ -23,7 +23,7 @@ export const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color,
         <View style={styles.valueRow}>
           <Text style={styles.value}>{value}</Text>
           {trend && (
-            <View style={[styles.trendBadge, { backgroundColor: trend === 'up' ? colors.spectral.green : colors.status.error }]}>
+            <View style={[styles.trendBadge, { backgroundColor: trend === 'up' ? colors.accent.tertiary : colors.status.error }]}>
               <Ionicons 
                 name={trend === 'up' ? 'arrow-up' : 'arrow-down'} 
                 size={12} 

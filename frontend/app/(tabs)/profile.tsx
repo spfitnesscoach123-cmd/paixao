@@ -67,7 +67,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 255, 136, 0.2)' }]}>
-                <Ionicons name="lock-closed-outline" size={22} color={colors.spectral.green} />
+                <Ionicons name="lock-closed-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <Text style={styles.menuItemText}>Alterar Senha</Text>
             </View>
