@@ -68,11 +68,12 @@ class BackendTester:
             else:
                 raise ValueError(f"Unsupported method: {method}")
             
-            return response.status_code, response.json() if response.text else {}
+            try:
+                return response.status_code, response.json() if response.text else {}
+            except json.JSONDecodeError:
+                return response.status_code, {"error": "Invalid JSON response", "text": response.text}
         except requests.exceptions.RequestException as e:
             return None, str(e)
-        except json.JSONDecodeError:
-            return response.status_code, {"error": "Invalid JSON response"}
     
     def test_authentication(self):
         """Test authentication flow"""
