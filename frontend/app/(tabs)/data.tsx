@@ -203,13 +203,13 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title="WELLNESS"
+                    title={t('dashboard.wellness')}
                     value={stats.avgWellness.toFixed(1)}
                     subtitle="/10"
                     icon="heart"
                     gradientColors={colors.gradients.secondary}
                     trend={stats.wellnessTrend}
-                    trendValue="vs. semana"
+                    trendValue={t('dashboard.vsWeek')}
                   />
                 </View>
               </View>
@@ -230,10 +230,10 @@ export default function DataScreen() {
                         <Ionicons name="trophy" size={48} color="rgba(255,255,255,0.3)" />
                       </View>
                       <View style={styles.topPerformerContent}>
-                        <Text style={styles.topPerformerLabel}>🏆 MELHOR DESEMPENHO</Text>
+                        <Text style={styles.topPerformerLabel}>🏆 {t('dashboard.topPerformer')}</Text>
                         <Text style={styles.topPerformerName}>{stats.topPerformer.athlete.name}</Text>
                         <Text style={styles.topPerformerValue}>
-                          Média: {(stats.topPerformer.avgDistance / 1000).toFixed(1)}km/sessão
+                          {t('dashboard.average')}: {(stats.topPerformer.avgDistance / 1000).toFixed(1)}km/{t('dashboard.session')}
                         </Text>
                       </View>
                       <Ionicons name="chevron-forward" size={24} color="rgba(255,255,255,0.8)" />
@@ -243,11 +243,11 @@ export default function DataScreen() {
               )}
 
               {/* Quick Stats */}
-              <Text style={styles.sectionTitle}>Estatísticas Rápidas</Text>
+              <Text style={styles.sectionTitle}>{t('dashboard.quickStats')}</Text>
               <View style={styles.quickStatsGrid}>
                 <View style={styles.quickStatItem}>
                   <QuickStat
-                    label="Sessões/Atleta"
+                    label={t('dashboard.sessionsPerAthlete')}
                     value={(stats.totalSessions / (stats.totalAthletes || 1)).toFixed(1)}
                     icon="analytics"
                     color={colors.accent.primary}
@@ -255,7 +255,7 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.quickStatItem}>
                   <QuickStat
-                    label="Atividade 7d"
+                    label={t('dashboard.activity7d')}
                     value={`${stats.recentSessions}`}
                     icon="pulse"
                     color={colors.accent.tertiary}
