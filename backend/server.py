@@ -130,11 +130,14 @@ class GPSData(BaseModel):
     date: str
     total_distance: float
     high_intensity_distance: float
+    high_speed_running: Optional[float] = None
     sprint_distance: float
     number_of_sprints: int
     number_of_accelerations: int
     number_of_decelerations: int
     max_speed: Optional[float] = None
+    max_acceleration: Optional[float] = None
+    max_deceleration: Optional[float] = None
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
