@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,30 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
+import { useLanguage } from '../../contexts/LanguageContext';
 import { colors } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
+  const { t, locale, setLocale, languages } = useLanguage();
   const router = useRouter();
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
 
   const handleLogout = () => {
     Alert.alert(
-      'Sair',
-      'Tem certeza que deseja sair?',
+      t('settings.logout'),
+      t('auth.logoutConfirm'),
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Sair',
+          text: t('settings.logout'),
           style: 'destructive',
           onPress: async () => {
             await logout();
@@ -34,6 +39,13 @@ export default function ProfileScreen() {
       ]
     );
   };
+
+  const handleLanguageSelect = async (code: string) => {
+    await setLocale(code);
+    setShowLanguageModal(false);
+  };
+
+  const currentLanguage = languages.find(l => l.code === locale);
 
   return (
     <View style={styles.container}>
@@ -52,38 +64,41 @@ export default function ProfileScreen() {
 
       <ScrollView style={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Conta</Text>
+          <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
           
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
                 <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={styles.menuItemText}>Editar Perfil</Text>
+              <Text style={styles.menuItemText}>{t('athletes.editProfile')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 255, 136, 0.2)' }]}>
-                <Ionicons name="lock-closed-outline" size={22} color={colors.accent.tertiary} />
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
+                <Ionicons name="language-outline" size={22} color={colors.accent.tertiary} />
               </View>
-              <Text style={styles.menuItemText}>Alterar Senha</Text>
+              <View>
+                <Text style={styles.menuItemText}>{t('settings.language')}</Text>
+                <Text style={styles.menuItemSubtext}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Assinatura & Ferramentas</Text>
+          <Text style={styles.sectionTitle}>{t('settings.subscriptionTools')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
                 <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={styles.menuItemText}>Gerenciar Assinatura</Text>
+              <Text style={styles.menuItemText}>{t('settings.manageSubscription')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
@@ -93,21 +108,21 @@ export default function ProfileScreen() {
               <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
                 <Ionicons name="link-outline" size={22} color={colors.status.success} />
               </View>
-              <Text style={styles.menuItemText}>Gerar Link Wellness</Text>
+              <Text style={styles.menuItemText}>{t('wellness.generateLink')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal</Text>
+          <Text style={styles.sectionTitle}>{t('settings.legal')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
                 <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent.tertiary} />
               </View>
-              <Text style={styles.menuItemText}>Política de Privacidade</Text>
+              <Text style={styles.menuItemText}>{t('auth.privacyPolicy')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
@@ -117,34 +132,26 @@ export default function ProfileScreen() {
               <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
                 <Ionicons name="document-text-outline" size={22} color={colors.accent.blue} />
               </View>
-              <Text style={styles.menuItemText}>Termos de Uso</Text>
+              <Text style={styles.menuItemText}>{t('auth.termsOfUse')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sobre</Text>
+          <Text style={styles.sectionTitle}>{t('settings.about')}</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
                 <Ionicons name="information-circle-outline" size={22} color={colors.accent.secondary} />
               </View>
-              <Text style={styles.menuItemText}>Sobre o App</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.menuItem}>
-            <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(34, 211, 238, 0.2)' }]}>
-                <Ionicons name="help-circle-outline" size={22} color={colors.accent.blue} />
+              <View>
+                <Text style={styles.menuItemText}>{t('settings.version')}</Text>
+                <Text style={styles.menuItemSubtext}>1.0.0</Text>
               </View>
-              <Text style={styles.menuItemText}>Ajuda</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-          </TouchableOpacity>
+          </View>
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -153,10 +160,52 @@ export default function ProfileScreen() {
             style={styles.logoutGradient}
           >
             <Ionicons name="log-out-outline" size={24} color="#ffffff" />
-            <Text style={styles.logoutText}>Sair</Text>
+            <Text style={styles.logoutText}>{t('settings.logout')}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Language Selection Modal */}
+      <Modal
+        visible={showLanguageModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('settings.selectLanguage')}</Text>
+              <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <FlatList
+              data={languages}
+              keyExtractor={(item) => item.code}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.languageItem,
+                    item.code === locale && styles.languageItemActive,
+                  ]}
+                  onPress={() => handleLanguageSelect(item.code)}
+                >
+                  <Text style={styles.languageFlag}>{item.flag}</Text>
+                  <View style={styles.languageTextContainer}>
+                    <Text style={styles.languageName}>{item.nativeName}</Text>
+                    <Text style={styles.languageNameEn}>{item.name}</Text>
+                  </View>
+                  {item.code === locale && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.accent.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -241,6 +290,11 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     fontWeight: '600',
   },
+  menuItemSubtext: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
   logoutButton: {
     margin: 16,
     marginTop: 32,
@@ -264,5 +318,59 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#ffffff',
     letterSpacing: 0.5,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.dark.secondary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '70%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 8,
+    backgroundColor: colors.dark.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  languageItemActive: {
+    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  languageFlag: {
+    fontSize: 28,
+    marginRight: 16,
+  },
+  languageTextContainer: {
+    flex: 1,
+  },
+  languageName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  languageNameEn: {
+    fontSize: 13,
+    color: colors.text.secondary,
   },
 });
