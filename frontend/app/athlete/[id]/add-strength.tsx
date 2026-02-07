@@ -226,94 +226,136 @@ const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
   );
 };
 
-// Velocity Loss Chart Component
-const VelocityLossChart = ({ data }: { data: Array<{ set: number; velocity: number; loss_percent: number }> }) => {
-  const { locale } = useLanguage();
-  const chartWidth = screenWidth - 80;
-  const chartHeight = 130;
-  const padding = { top: 15, right: 15, bottom: 25, left: 35 };
+// Velocity Loss Chart Component - Responsive with Fatigue Alert
+const VelocityLossChart = ({ data, locale }: { data: Array<{ set: number; velocity: number; loss_percent: number }>, locale: string }) => {
+  // Make chart responsive
+  const chartWidth = Math.min(screenWidth - 48, 400);
+  const chartHeight = Math.min(chartWidth * 0.4, 150);
+  const padding = { top: 15, right: 15, bottom: 30, left: 40 };
   
   if (!data || data.length === 0) return null;
   
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
   
-  const maxLoss = Math.max(...data.map(d => d.loss_percent), 30);
+  const maxLoss = Math.max(...data.map(d => d.loss_percent), 35);
+  const hasHighFatigue = data.some(d => d.loss_percent >= 30);
   
-  const barWidth = (innerWidth / data.length) * 0.6;
-  const barGap = (innerWidth / data.length) * 0.4;
+  const barWidth = Math.min((innerWidth / data.length) * 0.6, 40);
+  const barGap = (innerWidth - barWidth * data.length) / (data.length + 1);
   
   const getBarColor = (loss: number) => {
     if (loss < 10) return '#10b981';
     if (loss < 20) return '#f59e0b';
+    if (loss < 30) return '#f97316';
     return '#ef4444';
   };
   
   return (
-    <Svg width={chartWidth} height={chartHeight}>
-      {/* Grid lines */}
-      {[0, 10, 20, 30].map((val, i) => (
-        <G key={`grid-${i}`}>
-          <Line
-            x1={padding.left}
-            y1={padding.top + innerHeight - (val / maxLoss) * innerHeight}
-            x2={chartWidth - padding.right}
-            y2={padding.top + innerHeight - (val / maxLoss) * innerHeight}
-            stroke={colors.border.default}
-            strokeWidth="1"
-            strokeDasharray="4 4"
-          />
-          <SvgText
-            x={padding.left - 5}
-            y={padding.top + innerHeight - (val / maxLoss) * innerHeight + 4}
-            textAnchor="end"
-            fill={colors.text.tertiary}
-            fontSize="9"
-          >
-            {val}%
-          </SvgText>
-        </G>
-      ))}
+    <View>
+      {/* Fatigue Alert Banner */}
+      {hasHighFatigue && (
+        <View style={{
+          backgroundColor: 'rgba(239, 68, 68, 0.15)',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 12,
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderWidth: 1,
+          borderColor: 'rgba(239, 68, 68, 0.3)',
+        }}>
+          <Ionicons name="warning" size={20} color="#ef4444" style={{ marginRight: 8 }} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: '#ef4444', fontWeight: 'bold', fontSize: 13 }}>
+              {locale === 'pt' ? '⚠️ Acúmulo de Fadiga Detectado!' : '⚠️ Fatigue Accumulation Detected!'}
+            </Text>
+            <Text style={{ color: '#f87171', fontSize: 11, marginTop: 2 }}>
+              {locale === 'pt' 
+                ? 'Perda de velocidade >30% indica fadiga excessiva. Reduza volume ou carga.'
+                : 'Velocity loss >30% indicates excessive fatigue. Reduce volume or load.'}
+            </Text>
+          </View>
+        </View>
+      )}
       
-      {/* Bars */}
-      {data.map((d, i) => {
-        const x = padding.left + i * (barWidth + barGap) + barGap / 2;
-        const barHeight = (d.loss_percent / maxLoss) * innerHeight;
-        const y = padding.top + innerHeight - barHeight;
-        
-        return (
-          <G key={i}>
-            <Rect
-              x={x}
-              y={y}
-              width={barWidth}
-              height={barHeight}
-              fill={getBarColor(d.loss_percent)}
-              rx={4}
+      <Svg width={chartWidth} height={chartHeight}>
+        {/* Grid lines with 30% threshold */}
+        {[0, 10, 20, 30].map((val, i) => (
+          <G key={`grid-${i}`}>
+            <Line
+              x1={padding.left}
+              y1={padding.top + innerHeight - (val / maxLoss) * innerHeight}
+              x2={chartWidth - padding.right}
+              y2={padding.top + innerHeight - (val / maxLoss) * innerHeight}
+              stroke={val === 30 ? '#ef4444' : colors.border.default}
+              strokeWidth={val === 30 ? '2' : '1'}
+              strokeDasharray={val === 30 ? '6 3' : '4 4'}
             />
             <SvgText
-              x={x + barWidth / 2}
-              y={chartHeight - 5}
-              textAnchor="middle"
-              fill={colors.text.secondary}
+              x={padding.left - 5}
+              y={padding.top + innerHeight - (val / maxLoss) * innerHeight + 4}
+              textAnchor="end"
+              fill={val === 30 ? '#ef4444' : colors.text.tertiary}
               fontSize="9"
+              fontWeight={val === 30 ? 'bold' : 'normal'}
             >
-              Set {d.set}
-            </SvgText>
-            <SvgText
-              x={x + barWidth / 2}
-              y={y - 3}
-              textAnchor="middle"
-              fill={colors.text.primary}
-              fontSize="8"
-              fontWeight="bold"
-            >
-              {d.loss_percent.toFixed(0)}%
+              {val}%
             </SvgText>
           </G>
-        );
-      })}
-    </Svg>
+        ))}
+        
+        {/* Danger zone label */}
+        <SvgText
+          x={chartWidth - padding.right - 5}
+          y={padding.top + innerHeight - (30 / maxLoss) * innerHeight - 5}
+          textAnchor="end"
+          fill="#ef4444"
+          fontSize="8"
+        >
+          {locale === 'pt' ? 'Zona de Fadiga' : 'Fatigue Zone'}
+        </SvgText>
+        
+        {/* Bars */}
+        {data.map((d, i) => {
+          const x = padding.left + barGap + i * (barWidth + barGap);
+          const barHeight = Math.max((d.loss_percent / maxLoss) * innerHeight, 2);
+          const y = padding.top + innerHeight - barHeight;
+          
+          return (
+            <G key={i}>
+              <Rect
+                x={x}
+                y={y}
+                width={barWidth}
+                height={barHeight}
+                fill={getBarColor(d.loss_percent)}
+                rx={4}
+              />
+              <SvgText
+                x={x + barWidth / 2}
+                y={chartHeight - 8}
+                textAnchor="middle"
+                fill={colors.text.secondary}
+                fontSize="9"
+              >
+                S{d.set}
+              </SvgText>
+              <SvgText
+                x={x + barWidth / 2}
+                y={y - 4}
+                textAnchor="middle"
+                fill={d.loss_percent >= 30 ? '#ef4444' : colors.text.primary}
+                fontSize="9"
+                fontWeight="bold"
+              >
+                {d.loss_percent.toFixed(0)}%
+              </SvgText>
+            </G>
+          );
+        })}
+      </Svg>
+    </View>
   );
 };
 
