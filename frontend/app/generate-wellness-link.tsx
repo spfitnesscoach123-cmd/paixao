@@ -118,22 +118,22 @@ export default function GenerateWellnessLink() {
               <View style={styles.optionsCard}>
                 <Text style={styles.optionLabel}>Validade do Link:</Text>
                 <View style={styles.daysSelector}>
-                  {[3, 7, 14, 30].map((days) => (
+                  {DURATION_OPTIONS.map((option) => (
                     <TouchableOpacity
-                      key={days}
+                      key={option.value}
                       style={[
                         styles.dayButton,
-                        expiresDays === days && styles.dayButtonActive,
+                        expiresHours === option.value && styles.dayButtonActive,
                       ]}
-                      onPress={() => setExpiresDays(days)}
+                      onPress={() => setExpiresHours(option.value)}
                     >
                       <Text
                         style={[
                           styles.dayButtonText,
-                          expiresDays === days && styles.dayButtonTextActive,
+                          expiresHours === option.value && styles.dayButtonTextActive,
                         ]}
                       >
-                        {days} dias
+                        {option.labelPt}
                       </Text>
                     </TouchableOpacity>
                   ))}
