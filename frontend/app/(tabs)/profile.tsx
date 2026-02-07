@@ -50,7 +50,7 @@ export default function ProfileScreen() {
   const currentLanguage = languages.find(l => l.code === locale);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.dark.primary }]}>
       <LinearGradient
         colors={colors.gradients.primary}
         style={styles.header}
@@ -64,16 +64,16 @@ export default function ProfileScreen() {
         <Text style={styles.email}>{user?.email}</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.account')}</Text>
+      <ScrollView style={[styles.content, { backgroundColor: colors.dark.primary }]}>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.account')}</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
                 <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={styles.menuItemText}>{t('athletes.editProfile')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('athletes.editProfile')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
