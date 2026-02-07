@@ -706,6 +706,45 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#ef4444',
     fontWeight: '600',
   },
+  // New position card styles for group averages
+  cardSubtitle: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    marginTop: -12,
+    marginBottom: 16,
+  },
+  positionCard: {
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  positionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  positionMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  positionMetric: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  positionMetricValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  positionMetricLabel: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
   distanceCard: {
     borderRadius: 16,
     overflow: 'hidden',
