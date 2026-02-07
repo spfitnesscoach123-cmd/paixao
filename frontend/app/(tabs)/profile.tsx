@@ -120,51 +120,51 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => router.push('/subscription')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
                 <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('settings.manageSubscription')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.manageSubscription')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
-                <Ionicons name="link-outline" size={22} color={staticColors.status.success} />
+                <Ionicons name="link-outline" size={22} color={colors.status.success} />
               </View>
-              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('wellness.generateLink')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('wellness.generateLink')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.legal')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.legal')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-                <Ionicons name="shield-checkmark-outline" size={22} color={staticColors.accent.tertiary} />
+                <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.privacyPolicy')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/terms-of-use')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-                <Ionicons name="document-text-outline" size={22} color={staticColors.accent.blue} />
+                <Ionicons name="document-text-outline" size={22} color={colors.accent.blue} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.termsOfUse')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
@@ -174,7 +174,7 @@ export default function ProfileScreen() {
           <View style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
-                <Ionicons name="information-circle-outline" size={22} color={staticColors.accent.secondary} />
+                <Ionicons name="information-circle-outline" size={22} color={colors.accent.secondary} />
               </View>
               <View>
                 <Text style={styles.menuItemText}>{t('settings.version')}</Text>
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('settings.selectLanguage')}</Text>
               <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
-                <Ionicons name="close" size={24} color={staticColors.text.primary} />
+                <Ionicons name="close" size={24} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
             
@@ -240,10 +240,10 @@ export default function ProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createProfileStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: staticColors.dark.primary,
+    backgroundColor: colors.dark.primary,
   },
   header: {
     padding: 32,
