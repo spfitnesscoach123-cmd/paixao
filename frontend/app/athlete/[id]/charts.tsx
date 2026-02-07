@@ -162,21 +162,21 @@ export default function AthleteCharts() {
             <GPSChart
               data={gpsData}
               metric="high_intensity_distance"
-              title="Distância Alta Intensidade (metros)"
+              title={labels.highIntensityDistance}
               color="#f59e0b"
             />
             
             <GPSChart
               data={gpsData}
               metric="sprint_distance"
-              title="Distância em Sprints (metros)"
+              title={labels.sprintDistance}
               color="#ef4444"
             />
             
             <GPSChart
               data={gpsData}
               metric="number_of_sprints"
-              title="Número de Sprints"
+              title={labels.numberOfSprints}
               color="#8b5cf6"
             />
           </>
@@ -185,11 +185,11 @@ export default function AthleteCharts() {
         {/* Wellness Stats */}
         {wellnessStats && (
           <>
-            <Text style={styles.sectionTitle}>Estatísticas Wellness</Text>
+            <Text style={styles.sectionTitle}>{labels.wellnessStats}</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Wellness Médio"
+                  title={labels.avgWellness}
                   value={`${wellnessStats.avgWellness}/10`}
                   icon="heart"
                   color="#10b981"
@@ -197,7 +197,7 @@ export default function AthleteCharts() {
               </View>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Prontidão Média"
+                  title={labels.avgReadiness}
                   value={`${wellnessStats.avgReadiness}/10`}
                   icon="checkmark-circle"
                   color="#2563eb"
@@ -205,7 +205,7 @@ export default function AthleteCharts() {
               </View>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Sono Médio"
+                  title={labels.avgSleep}
                   value={`${wellnessStats.avgSleep}h`}
                   icon="moon"
                   color="#8b5cf6"
@@ -218,7 +218,7 @@ export default function AthleteCharts() {
         {/* Wellness Chart */}
         {wellnessData && wellnessData.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Evolução Wellness</Text>
+            <Text style={styles.sectionTitle}>{labels.wellnessEvolution}</Text>
             <WellnessChart data={wellnessData} />
           </>
         )}
