@@ -365,11 +365,23 @@ export default function AthleteDetails() {
               </TouchableOpacity>
             </View>
 
+            {/* GPS Date Filter */}
+            <GPSDateFilter 
+              onFilterChange={(start, end) => {
+                const key = start === null ? 'all' : 
+                            start && end && start === end ? 'custom' : 
+                            gpsDateFilter.activeKey;
+                setGpsDateFilter({ start, end, activeKey: key });
+              }}
+              activeFilter={gpsDateFilter.activeKey}
+            />
+
             {/* Session count summary */}
             {groupedSessions.length > 0 && (
               <View style={styles.sessionSummary}>
                 <Text style={styles.sessionSummaryText}>
                   {groupedSessions.length} {t('gps.sessions')} • {gpsData?.length || 0} {t('gps.periods')}
+                  {gpsDateFilter.start && ` (${t('gps.filtered') || 'filtrado'})`}
                 </Text>
               </View>
             )}
