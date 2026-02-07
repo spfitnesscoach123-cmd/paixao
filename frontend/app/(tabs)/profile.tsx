@@ -251,7 +251,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     alignItems: 'center',
   },
   avatarGlow: {
-    shadowColor: staticColors.accent.primary,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -287,7 +287,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: staticColors.accent.primary,
+    color: colors.accent.primary,
     marginBottom: 12,
     marginLeft: 4,
     letterSpacing: 1,
@@ -296,12 +296,12 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: staticColors.dark.card,
+    backgroundColor: colors.dark.card,
     padding: 16,
     borderRadius: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: staticColors.border.default,
+    borderColor: colors.border.default,
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -317,12 +317,12 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   },
   menuItemText: {
     fontSize: 15,
-    color: staticColors.text.primary,
+    color: colors.text.primary,
     fontWeight: '600',
   },
   menuItemSubtext: {
     fontSize: 12,
-    color: staticColors.text.secondary,
+    color: colors.text.secondary,
     marginTop: 2,
   },
   logoutButton: {
@@ -356,7 +356,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: staticColors.dark.secondary,
+    backgroundColor: colors.dark.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -371,7 +371,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: staticColors.text.primary,
+    color: colors.text.primary,
   },
   languageItem: {
     flexDirection: 'row',
@@ -379,12 +379,12 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: staticColors.dark.card,
+    backgroundColor: colors.dark.card,
     borderWidth: 1,
-    borderColor: staticColors.border.default,
+    borderColor: colors.border.default,
   },
   languageItemActive: {
-    borderColor: staticColors.accent.primary,
+    borderColor: colors.accent.primary,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   languageFlag: {
@@ -397,10 +397,10 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   languageName: {
     fontSize: 16,
     fontWeight: '600',
-    color: staticColors.text.primary,
+    color: colors.text.primary,
   },
   languageNameEn: {
     fontSize: 13,
-    color: staticColors.text.secondary,
+    color: colors.text.secondary,
   },
 });
