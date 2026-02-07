@@ -3027,6 +3027,10 @@ async def get_team_dashboard(
     fatigue_count = 0
     total_sessions = 0
     total_distance = 0
+    total_power = 0
+    power_count = 0
+    total_body_fat = 0
+    body_fat_count = 0
     
     risk_distribution = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
     position_summary: Dict[str, Dict[str, Any]] = {}
