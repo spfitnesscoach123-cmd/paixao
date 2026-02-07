@@ -102,9 +102,24 @@ export default function AthleteDetails() {
   const groupedSessions = useMemo((): GroupedSession[] => {
     if (!gpsData || gpsData.length === 0) return [];
 
+    // Filter GPS data by date range
+    let filteredData = gpsData;
+    if (gpsDateFilter.start && gpsDateFilter.end) {
+      const startDate = parseISO(gpsDateFilter.start);
+      const endDate = parseISO(gpsDateFilter.end);
+      filteredData = gpsData.filter(record => {
+        try {
+          const recordDate = parseISO(record.date);
+          return isWithinInterval(recordDate, { start: startDate, end: endDate });
+        } catch {
+          return false;
+        }
+      });
+    }
+
     const sessionMap = new Map<string, GroupedSession>();
 
-    gpsData.forEach((record) => {
+    filteredData.forEach((record) => {
       // Use session_id if available, otherwise create one from date
       const sessionKey = record.session_id || `legacy_${record.date}`;
       const sessionName = record.session_name || t('gps.session');
@@ -144,7 +159,15 @@ export default function AthleteDetails() {
     return Array.from(sessionMap.values()).sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [gpsData, t]);
+  }, [gpsData, t, gpsDateFilter]);
+
+  // Handler for GPS date filter change
+  const handleGpsDateFilterChange = (start: string | null, end: string | null) => {
+    const activeKey = start && end ? 'custom' : 
+                      start === null && end === null ? 'all' :
+                      gpsDateFilter.activeKey;
+    setGpsDateFilter({ start, end, activeKey });
+  };
 
   const toggleSessionExpand = (sessionId: string) => {
     setExpandedSessions(prev => {
