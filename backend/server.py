@@ -4046,6 +4046,520 @@ async def export_team_csv(
 
 # ============= SUBSCRIPTION ENDPOINTS =============
 
+# ============= WEARABLE IMPORT ENDPOINTS =============
+
+@api_router.get("/wearables/supported")
+async def get_supported_wearables():
+    """Get list of supported wearable integrations"""
+    return {
+        "import_methods": [
+            {
+                "id": "fit_file",
+                "name": "FIT File Import",
+                "description_pt": "Importe arquivos .FIT exportados de dispositivos Garmin, Polar, Suunto e outros",
+                "description_en": "Import .FIT files exported from Garmin, Polar, Suunto and other devices",
+                "supported_devices": ["Garmin", "Polar", "Suunto", "Wahoo", "Coros"],
+                "file_types": [".fit"]
+            },
+            {
+                "id": "csv_import",
+                "name": "CSV Import",
+                "description_pt": "Importe dados de GPS e treino via arquivo CSV",
+                "description_en": "Import GPS and training data via CSV file",
+                "supported_devices": ["Any device with CSV export"],
+                "file_types": [".csv"]
+            }
+        ],
+        "planned_integrations": [
+            {
+                "id": "garmin_connect",
+                "name": "Garmin Connect",
+                "status": "planned",
+                "description": "Direct sync with Garmin Connect API (requires developer credentials)"
+            },
+            {
+                "id": "polar_flow",
+                "name": "Polar Flow",
+                "status": "planned",
+                "description": "Direct sync with Polar Flow API"
+            }
+        ]
+    }
+
+@api_router.post("/wearables/import/csv")
+async def import_wearable_csv(
+    athlete_id: str,
+    file: UploadFile = File(...),
+    data_type: str = "gps",  # gps, heart_rate, training
+    current_user: dict = Depends(get_current_user)
+):
+    """Import wearable data from CSV file"""
+    import csv
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Read CSV content
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    reader = csv.DictReader(decoded.splitlines())
+    
+    imported_records = []
+    
+    for row in reader:
+        if data_type == "gps":
+            # Expected columns: date, total_distance, high_intensity_distance, sprints, max_speed
+            gps_record = {
+                "athlete_id": athlete_id,
+                "coach_id": current_user["_id"],
+                "date": row.get("date", ""),
+                "total_distance": float(row.get("total_distance", 0) or 0),
+                "high_intensity_distance": float(row.get("high_intensity_distance", 0) or 0),
+                "number_of_sprints": int(row.get("sprints", 0) or 0),
+                "max_speed": float(row.get("max_speed", 0) or 0),
+                "source": "csv_import",
+                "device": row.get("device", "Unknown"),
+                "imported_at": datetime.utcnow()
+            }
+            await db.gps_data.insert_one(gps_record)
+            imported_records.append(gps_record)
+            
+        elif data_type == "heart_rate":
+            # Expected: date, resting_hr, max_hr, avg_hr
+            hr_record = {
+                "athlete_id": athlete_id,
+                "coach_id": current_user["_id"],
+                "date": row.get("date", ""),
+                "resting_heart_rate": int(row.get("resting_hr", 0) or 0),
+                "max_heart_rate": int(row.get("max_hr", 0) or 0),
+                "average_heart_rate": int(row.get("avg_hr", 0) or 0),
+                "source": "csv_import",
+                "imported_at": datetime.utcnow()
+            }
+            await db.heart_rate_data.insert_one(hr_record)
+            imported_records.append(hr_record)
+    
+    return {
+        "success": True,
+        "records_imported": len(imported_records),
+        "data_type": data_type,
+        "athlete_id": athlete_id
+    }
+
+# ============= VBT (VELOCITY BASED TRAINING) INTEGRATION =============
+
+class VBTProvider(str, Enum):
+    GYMAWARE = "gymaware"
+    PUSH_BAND = "push_band"
+    BEAST = "beast"
+    TENDO = "tendo"
+    VITRUVE = "vitruve"
+    MANUAL = "manual"
+
+class VBTDataCreate(BaseModel):
+    athlete_id: str
+    date: str
+    provider: VBTProvider
+    exercise: str
+    sets: List[dict]  # [{reps: int, mean_velocity: float, peak_velocity: float, load_kg: float, power_watts: float, rom_cm: float}]
+    notes: Optional[str] = None
+
+@api_router.get("/vbt/providers")
+async def get_vbt_providers():
+    """Get supported VBT providers and their import formats"""
+    return {
+        "providers": [
+            {
+                "id": "gymaware",
+                "name": "GymAware",
+                "description_pt": "Sistema VBT profissional com encoder linear",
+                "description_en": "Professional VBT system with linear encoder",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "rom", "force"],
+                "import_format": "csv",
+                "website": "https://gymaware.com"
+            },
+            {
+                "id": "push_band",
+                "name": "PUSH Band",
+                "description_pt": "Sensor vestível para VBT",
+                "description_en": "Wearable sensor for VBT",
+                "metrics": ["mean_velocity", "peak_velocity", "power"],
+                "import_format": "csv",
+                "website": "https://www.trainwithpush.com"
+            },
+            {
+                "id": "vitruve",
+                "name": "Vitruve",
+                "description_pt": "Encoder VBT compacto e acessível",
+                "description_en": "Compact and affordable VBT encoder",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
+                "import_format": "csv",
+                "website": "https://vitruve.fit"
+            },
+            {
+                "id": "beast",
+                "name": "Beast Sensor",
+                "description_pt": "Sensor IMU para VBT",
+                "description_en": "IMU sensor for VBT",
+                "metrics": ["mean_velocity", "peak_velocity", "power"],
+                "import_format": "csv"
+            },
+            {
+                "id": "tendo",
+                "name": "Tendo Unit",
+                "description_pt": "Sistema VBT clássico para força",
+                "description_en": "Classic VBT system for strength",
+                "metrics": ["mean_velocity", "peak_velocity", "power"],
+                "import_format": "manual"
+            },
+            {
+                "id": "manual",
+                "name": "Manual Entry",
+                "description_pt": "Entrada manual de dados VBT",
+                "description_en": "Manual VBT data entry",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
+                "import_format": "form"
+            }
+        ],
+        "exercises": [
+            "Back Squat", "Front Squat", "Bench Press", "Deadlift", 
+            "Power Clean", "Hang Clean", "Snatch", "Push Press",
+            "Overhead Press", "Hip Thrust", "Romanian Deadlift",
+            "Jump Squat", "Trap Bar Deadlift"
+        ]
+    }
+
+@api_router.post("/vbt/data")
+async def create_vbt_data(
+    data: VBTDataCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create VBT (Velocity Based Training) data entry"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Calculate summary metrics
+    all_velocities = [s.get("mean_velocity", 0) for s in data.sets if s.get("mean_velocity")]
+    all_powers = [s.get("power_watts", 0) for s in data.sets if s.get("power_watts")]
+    all_loads = [s.get("load_kg", 0) for s in data.sets if s.get("load_kg")]
+    
+    vbt_record = {
+        "athlete_id": data.athlete_id,
+        "coach_id": current_user["_id"],
+        "date": data.date,
+        "provider": data.provider.value,
+        "exercise": data.exercise,
+        "sets": data.sets,
+        "summary": {
+            "total_sets": len(data.sets),
+            "total_reps": sum(s.get("reps", 0) for s in data.sets),
+            "avg_velocity": sum(all_velocities) / len(all_velocities) if all_velocities else 0,
+            "max_velocity": max(all_velocities) if all_velocities else 0,
+            "avg_power": sum(all_powers) / len(all_powers) if all_powers else 0,
+            "max_power": max(all_powers) if all_powers else 0,
+            "max_load": max(all_loads) if all_loads else 0
+        },
+        "notes": data.notes,
+        "created_at": datetime.utcnow()
+    }
+    
+    result = await db.vbt_data.insert_one(vbt_record)
+    vbt_record["_id"] = str(result.inserted_id)
+    
+    return vbt_record
+
+@api_router.get("/vbt/athlete/{athlete_id}")
+async def get_athlete_vbt_data(
+    athlete_id: str,
+    exercise: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get VBT data for an athlete"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    query = {
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }
+    
+    if exercise:
+        query["exercise"] = exercise
+    
+    records = await db.vbt_data.find(query).sort("date", -1).to_list(100)
+    
+    for record in records:
+        record["_id"] = str(record["_id"])
+    
+    return records
+
+@api_router.post("/vbt/import/csv")
+async def import_vbt_csv(
+    athlete_id: str,
+    provider: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Import VBT data from CSV file (GymAware, PUSH, Vitruve formats)"""
+    import csv
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    reader = csv.DictReader(decoded.splitlines())
+    
+    # Group by exercise and date
+    exercises_data = {}
+    
+    for row in reader:
+        date = row.get("date", row.get("Date", ""))
+        exercise = row.get("exercise", row.get("Exercise", row.get("Movement", "")))
+        
+        key = f"{date}_{exercise}"
+        if key not in exercises_data:
+            exercises_data[key] = {
+                "date": date,
+                "exercise": exercise,
+                "sets": []
+            }
+        
+        set_data = {
+            "reps": int(row.get("reps", row.get("Reps", 1)) or 1),
+            "mean_velocity": float(row.get("mean_velocity", row.get("Mean Velocity", row.get("Avg Velocity", 0))) or 0),
+            "peak_velocity": float(row.get("peak_velocity", row.get("Peak Velocity", row.get("Max Velocity", 0))) or 0),
+            "load_kg": float(row.get("load_kg", row.get("Load", row.get("Weight", 0))) or 0),
+            "power_watts": float(row.get("power_watts", row.get("Power", row.get("Avg Power", 0))) or 0),
+            "rom_cm": float(row.get("rom_cm", row.get("ROM", row.get("Range of Motion", 0))) or 0)
+        }
+        exercises_data[key]["sets"].append(set_data)
+    
+    # Store each exercise session
+    imported_count = 0
+    for key, exercise_data in exercises_data.items():
+        all_velocities = [s["mean_velocity"] for s in exercise_data["sets"] if s["mean_velocity"]]
+        all_powers = [s["power_watts"] for s in exercise_data["sets"] if s["power_watts"]]
+        all_loads = [s["load_kg"] for s in exercise_data["sets"] if s["load_kg"]]
+        
+        vbt_record = {
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"],
+            "date": exercise_data["date"],
+            "provider": provider,
+            "exercise": exercise_data["exercise"],
+            "sets": exercise_data["sets"],
+            "summary": {
+                "total_sets": len(exercise_data["sets"]),
+                "total_reps": sum(s["reps"] for s in exercise_data["sets"]),
+                "avg_velocity": sum(all_velocities) / len(all_velocities) if all_velocities else 0,
+                "max_velocity": max(all_velocities) if all_velocities else 0,
+                "avg_power": sum(all_powers) / len(all_powers) if all_powers else 0,
+                "max_power": max(all_powers) if all_powers else 0,
+                "max_load": max(all_loads) if all_loads else 0
+            },
+            "source": "csv_import",
+            "created_at": datetime.utcnow()
+        }
+        
+        await db.vbt_data.insert_one(vbt_record)
+        imported_count += 1
+    
+    return {
+        "success": True,
+        "exercises_imported": imported_count,
+        "provider": provider,
+        "athlete_id": athlete_id
+    }
+
+@api_router.get("/vbt/analysis/{athlete_id}")
+async def get_vbt_analysis(
+    athlete_id: str,
+    exercise: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get VBT analysis with velocity-load profiling and fatigue detection"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get VBT data for this exercise
+    records = await db.vbt_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "exercise": exercise
+    }).sort("date", -1).to_list(50)
+    
+    if not records:
+        raise HTTPException(status_code=400, detail="No VBT data available for this exercise")
+    
+    # Calculate Load-Velocity Profile (LVP)
+    load_velocity_points = []
+    for record in records:
+        for set_data in record.get("sets", []):
+            if set_data.get("load_kg") and set_data.get("mean_velocity"):
+                load_velocity_points.append({
+                    "load": set_data["load_kg"],
+                    "velocity": set_data["mean_velocity"],
+                    "date": record["date"]
+                })
+    
+    # Calculate estimated 1RM based on load-velocity relationship
+    # Using Bazuelo-Ruiz et al. formula: 1RM velocity ≈ 0.17 m/s for most exercises
+    mvt_velocity = 0.17  # Minimum Velocity Threshold
+    
+    if len(load_velocity_points) >= 2:
+        # Simple linear regression for load-velocity
+        loads = [p["load"] for p in load_velocity_points]
+        velocities = [p["velocity"] for p in load_velocity_points]
+        
+        n = len(loads)
+        sum_x = sum(loads)
+        sum_y = sum(velocities)
+        sum_xy = sum(l * v for l, v in zip(loads, velocities))
+        sum_x2 = sum(l ** 2 for l in loads)
+        
+        if (n * sum_x2 - sum_x ** 2) != 0:
+            slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x ** 2)
+            intercept = (sum_y - slope * sum_x) / n
+            
+            # Estimated 1RM where velocity = MVT
+            if slope != 0:
+                estimated_1rm = (mvt_velocity - intercept) / slope
+            else:
+                estimated_1rm = None
+        else:
+            slope = 0
+            intercept = 0
+            estimated_1rm = None
+    else:
+        slope = 0
+        intercept = 0
+        estimated_1rm = None
+    
+    # Velocity loss analysis (fatigue indicator)
+    latest_record = records[0]
+    velocity_loss_data = []
+    if len(latest_record.get("sets", [])) >= 2:
+        first_set_velocity = latest_record["sets"][0].get("mean_velocity", 0)
+        for i, set_data in enumerate(latest_record["sets"]):
+            velocity = set_data.get("mean_velocity", 0)
+            if first_set_velocity > 0:
+                loss_percent = ((first_set_velocity - velocity) / first_set_velocity) * 100
+                velocity_loss_data.append({
+                    "set": i + 1,
+                    "velocity": velocity,
+                    "loss_percent": round(loss_percent, 1)
+                })
+    
+    # Calculate trend
+    trend = "stable"
+    if len(records) >= 3:
+        recent_avg = sum(r["summary"]["avg_velocity"] for r in records[:3]) / 3
+        older_avg = sum(r["summary"]["avg_velocity"] for r in records[-3:]) / 3
+        if recent_avg > older_avg * 1.05:
+            trend = "improving"
+        elif recent_avg < older_avg * 0.95:
+            trend = "declining"
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "exercise": exercise,
+        "latest_session": {
+            "date": latest_record["date"],
+            "sets": len(latest_record.get("sets", [])),
+            "avg_velocity": latest_record["summary"]["avg_velocity"],
+            "max_velocity": latest_record["summary"]["max_velocity"],
+            "max_power": latest_record["summary"]["max_power"],
+            "max_load": latest_record["summary"]["max_load"]
+        },
+        "load_velocity_profile": {
+            "slope": round(slope, 4) if slope else None,
+            "intercept": round(intercept, 2) if intercept else None,
+            "estimated_1rm": round(estimated_1rm, 1) if estimated_1rm else None,
+            "mvt_velocity": mvt_velocity,
+            "data_points": len(load_velocity_points)
+        },
+        "velocity_loss_analysis": velocity_loss_data,
+        "trend": trend,
+        "history": [
+            {
+                "date": r["date"],
+                "avg_velocity": r["summary"]["avg_velocity"],
+                "max_velocity": r["summary"]["max_velocity"],
+                "max_load": r["summary"]["max_load"]
+            } for r in records[:10]
+        ],
+        "recommendations": {
+            "pt": get_vbt_recommendations_pt(velocity_loss_data, trend, estimated_1rm),
+            "en": get_vbt_recommendations_en(velocity_loss_data, trend, estimated_1rm)
+        }.get(lang, get_vbt_recommendations_en(velocity_loss_data, trend, estimated_1rm))
+    }
+
+def get_vbt_recommendations_pt(velocity_loss, trend, estimated_1rm):
+    recs = []
+    if velocity_loss and len(velocity_loss) > 1:
+        max_loss = max(vl["loss_percent"] for vl in velocity_loss)
+        if max_loss > 20:
+            recs.append("⚠️ Perda de velocidade alta (>20%) indica fadiga significativa. Considere reduzir volume.")
+        elif max_loss < 10:
+            recs.append("✅ Baixa perda de velocidade. Pode aumentar intensidade ou volume.")
+    
+    if trend == "improving":
+        recs.append("📈 Tendência de melhora na velocidade. Continue progredindo gradualmente.")
+    elif trend == "declining":
+        recs.append("📉 Tendência de queda. Considere período de recuperação ou deload.")
+    
+    if estimated_1rm:
+        recs.append(f"💪 1RM estimado: {estimated_1rm:.1f} kg baseado no perfil carga-velocidade.")
+    
+    return recs
+
+def get_vbt_recommendations_en(velocity_loss, trend, estimated_1rm):
+    recs = []
+    if velocity_loss and len(velocity_loss) > 1:
+        max_loss = max(vl["loss_percent"] for vl in velocity_loss)
+        if max_loss > 20:
+            recs.append("⚠️ High velocity loss (>20%) indicates significant fatigue. Consider reducing volume.")
+        elif max_loss < 10:
+            recs.append("✅ Low velocity loss. Can increase intensity or volume.")
+    
+    if trend == "improving":
+        recs.append("📈 Improving velocity trend. Continue progressing gradually.")
+    elif trend == "declining":
+        recs.append("📉 Declining trend. Consider recovery period or deload.")
+    
+    if estimated_1rm:
+        recs.append(f"💪 Estimated 1RM: {estimated_1rm:.1f} kg based on load-velocity profile.")
+    
+    return recs
+
 @api_router.get("/subscription/plans")
 async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
     """Get all available subscription plans with regional pricing"""
