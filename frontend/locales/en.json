@@ -198,6 +198,16 @@
     "questionnaires": "Questionnaires",
     "noDataForCharts": "Add questionnaires to see analysis"
   },
+  "assessments": {
+    "title": "Assessments",
+    "addStrength": "Strength Assessment",
+    "addOther": "Other Assessment",
+    "history": "Assessment History",
+    "noData": "No assessments recorded",
+    "strength": "Strength",
+    "aerobic": "Aerobic",
+    "bodyComp": "Body Composition"
+  },
   "analysis": {
     "title": "Analysis",
     "completeAnalysis": "Complete Analysis",
