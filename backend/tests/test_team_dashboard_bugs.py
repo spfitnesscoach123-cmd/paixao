@@ -53,13 +53,16 @@ class TestTeamDashboardBugFixes:
     
     def test_position_summary_structure(self):
         """Test that position_summary has all required fields for group averages"""
+        # Use unique position name to avoid conflicts with other test data
+        unique_position = f"TestMidfielder_{uuid.uuid4().hex[:6]}"
+        
         # Create test athletes in same position
         athletes = []
         for i in range(2):
             response = self.session.post(f"{BASE_URL}/api/athletes", json={
                 "name": f"TEST_Midfielder_{i}_{uuid.uuid4().hex[:6]}",
                 "birth_date": "2000-01-01",
-                "position": "Midfielder"
+                "position": unique_position
             })
             assert response.status_code == 200, f"Failed to create athlete: {response.text}"
             athlete = response.json()
@@ -92,10 +95,10 @@ class TestTeamDashboardBugFixes:
         data = response.json()
         position_summary = data.get("position_summary", {})
         
-        # Check Midfielder position exists
-        assert "Midfielder" in position_summary, f"Midfielder not in position_summary: {position_summary.keys()}"
+        # Check our unique position exists
+        assert unique_position in position_summary, f"{unique_position} not in position_summary: {position_summary.keys()}"
         
-        midfielder_stats = position_summary["Midfielder"]
+        position_stats = position_summary[unique_position]
         
         # Verify all required fields exist
         required_fields = [
