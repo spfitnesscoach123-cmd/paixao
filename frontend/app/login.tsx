@@ -188,6 +188,10 @@ export default function Login() {
               onPress={handleLogin}
               disabled={isLoading}
               activeOpacity={0.8}
+              testID="login-button"
+              accessibilityRole="button"
+              // @ts-ignore - Web-specific onClick handler for Playwright compatibility
+              onClick={Platform.OS === 'web' ? handleLogin : undefined}
             >
               <LinearGradient
                 colors={colors.gradients.primary}
