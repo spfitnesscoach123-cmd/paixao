@@ -605,7 +605,7 @@ export default function AthleteDetails() {
       case 'assessments':
         return (
           <View style={styles.tabContent}>
-            {/* Action buttons - Força e Composição Corporal */}
+            {/* Action buttons - Força, Composição Corporal, VBT */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 style={styles.actionButton}
@@ -622,6 +622,23 @@ export default function AthleteDetails() {
                 <Text style={styles.actionButtonText}>{t('assessments.bodyComposition') || 'Composição Corporal'}</Text>
               </TouchableOpacity>
             </View>
+            
+            {/* VBT Button */}
+            <TouchableOpacity
+              style={styles.vbtButton}
+              onPress={() => router.push(`/athlete/${id}/vbt`)}
+            >
+              <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.vbtButtonGradient}>
+                <Ionicons name="speedometer" size={24} color="#ffffff" />
+                <View style={styles.vbtButtonContent}>
+                  <Text style={styles.vbtButtonTitle}>VBT - Velocity Based Training</Text>
+                  <Text style={styles.vbtButtonSubtitle}>
+                    {locale === 'pt' ? 'Análise de velocidade e potência' : 'Velocity and power analysis'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
 
             {/* Strength Analysis Section */}
             <View style={styles.strengthAnalysisSection}>
