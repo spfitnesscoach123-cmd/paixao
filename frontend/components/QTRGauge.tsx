@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Path, Circle, G, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface QTRGaugeProps {
@@ -11,6 +11,7 @@ interface QTRGaugeProps {
 
 export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   
   // Clamp score between 0 and 100
   const clampedScore = Math.max(0, Math.min(100, score));
