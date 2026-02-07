@@ -100,7 +100,7 @@ export default function AthleteCharts() {
           <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {athlete?.name} - Gráficos
+          {athlete?.name} - {labels.charts}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -109,11 +109,11 @@ export default function AthleteCharts() {
         {/* GPS Stats */}
         {stats && (
           <>
-            <Text style={styles.sectionTitle}>Estatísticas GPS</Text>
+            <Text style={styles.sectionTitle}>{labels.gpsStats}</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Sessões"
+                  title={labels.sessions}
                   value={stats.totalSessions}
                   icon="calendar"
                   color="#2563eb"
@@ -121,7 +121,7 @@ export default function AthleteCharts() {
               </View>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Dist. Média"
+                  title={labels.avgDistance}
                   value={`${stats.avgDistance}m`}
                   icon="fitness"
                   color="#10b981"
@@ -129,7 +129,7 @@ export default function AthleteCharts() {
               </View>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Sprints Médios"
+                  title={labels.avgSprints}
                   value={stats.avgSprints}
                   icon="flash"
                   color="#f59e0b"
@@ -137,7 +137,7 @@ export default function AthleteCharts() {
               </View>
               <View style={styles.statCardWrapper}>
                 <StatCard
-                  title="Vel. Máxima"
+                  title={labels.maxSpeed}
                   value={`${stats.maxSpeed} km/h`}
                   icon="speedometer"
                   color="#ef4444"
@@ -150,12 +150,12 @@ export default function AthleteCharts() {
         {/* GPS Charts */}
         {gpsData && gpsData.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Evolução GPS</Text>
+            <Text style={styles.sectionTitle}>{labels.gpsEvolution}</Text>
             
             <GPSChart
               data={gpsData}
               metric="total_distance"
-              title="Distância Total (metros)"
+              title={labels.totalDistance}
               color="#2563eb"
             />
             
