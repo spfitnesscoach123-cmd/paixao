@@ -444,13 +444,14 @@ class TestDecimalInputForVelocity:
         })
         assert response.status_code == 200
         athlete = response.json()
-        self.created_athletes.append(athlete["id"])
+        athlete_id = athlete.get("_id") or athlete.get("id")
+        self.created_athletes.append(athlete_id)
         
         today = datetime.now().strftime("%Y-%m-%d")
         
         # Submit strength assessment with decimal speed values
         response = self.session.post(f"{BASE_URL}/api/assessments", json={
-            "athlete_id": athlete["id"],
+            "athlete_id": athlete_id,
             "date": today,
             "assessment_type": "strength",
             "metrics": {
