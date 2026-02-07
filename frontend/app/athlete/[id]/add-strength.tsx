@@ -894,7 +894,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.setInput}
                     placeholder="kg"
-                    value={set.load_kg ? String(set.load_kg) : ''}
+                    value={getVbtInputValue(i, 'load_kg', set.load_kg)}
                     onChangeText={(v) => handleSetChange(i, 'load_kg', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
@@ -902,7 +902,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.setInput}
                     placeholder="m/s"
-                    value={set.mean_velocity ? String(set.mean_velocity) : ''}
+                    value={getVbtInputValue(i, 'mean_velocity', set.mean_velocity)}
                     onChangeText={(v) => handleSetChange(i, 'mean_velocity', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
@@ -910,7 +910,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.setInput}
                     placeholder="W"
-                    value={set.power_watts ? String(set.power_watts) : ''}
+                    value={getVbtInputValue(i, 'power_watts', set.power_watts)}
                     onChangeText={(v) => handleSetChange(i, 'power_watts', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
