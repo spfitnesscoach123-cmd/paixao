@@ -2488,10 +2488,10 @@ Formate sua resposta de forma estruturada e profissional.""",
                 "recommendation": "Manter rotina atual de monitoramento"
             },
             "zones": {
-                "recovery": "Até 5km, ritmo leve, FC < 70% máxima",
-                "aerobic": "5-8km, ritmo moderado, FC 70-85% máxima",
-                "anaerobic": "Alta intensidade, sprints curtos, FC 85-95% máxima",
-                "maximum": "Esforço máximo, sprints, FC > 95% máxima"
+                "recovery": "Zona 1: <60% v.max (Recuperação, trote leve)",
+                "aerobic": "Zona 2: 60-75% v.max (Base aeróbica, ritmo estável)",
+                "anaerobic": "Zona 3: 75-90% v.max (Corridas de tempo, limiar)",
+                "maximum": "Zona 4: >90% v.max (Sprints, velocidade máxima)"
             }
         }
     }
