@@ -51,9 +51,9 @@ export default function ProfileScreen() {
   const currentLanguage = languages.find(l => l.code === locale);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.dark.primary }]}>
+    <View style={[styles.container, { backgroundColor: staticColors.dark.primary }]}>
       <LinearGradient
-        colors={colors.gradients.primary}
+        colors={staticColors.gradients.primary}
         style={styles.header}
       >
         <View style={styles.avatarGlow}>
@@ -65,44 +65,44 @@ export default function ProfileScreen() {
         <Text style={styles.email}>{user?.email}</Text>
       </LinearGradient>
 
-      <ScrollView style={[styles.content, { backgroundColor: colors.dark.primary }]}>
-        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.account')}</Text>
+      <ScrollView style={[styles.content, { backgroundColor: staticColors.dark.primary }]}>
+        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.account')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
-                <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
+                <Ionicons name="person-outline" size={22} color={staticColors.accent.primary} />
               </View>
-              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('athletes.editProfile')}</Text>
+              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('athletes.editProfile')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-                <Ionicons name="language-outline" size={22} color={colors.accent.tertiary} />
+                <Ionicons name="language-outline" size={22} color={staticColors.accent.tertiary} />
               </View>
               <View>
-                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.language')}</Text>
-                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
+                <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('settings.language')}</Text>
+                <Text style={[styles.menuItemSubtext, { color: staticColors.text.tertiary }]}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
 
           {/* Theme Toggle */}
-          <View style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
+          <View style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
-                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? colors.accent.primary : '#f59e0b'} />
+                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? staticColors.accent.primary : '#f59e0b'} />
               </View>
               <View>
-                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>
+                <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>
                   {t('settings.theme') || (locale === 'pt' ? 'Tema' : 'Theme')}
                 </Text>
-                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>
+                <Text style={[styles.menuItemSubtext, { color: staticColors.text.tertiary }]}>
                   {isDark 
                     ? (locale === 'pt' ? 'Modo Escuro' : 'Dark Mode')
                     : (locale === 'pt' ? 'Modo Claro' : 'Light Mode')
@@ -113,57 +113,57 @@ export default function ProfileScreen() {
             <Switch
               value={!isDark}
               onValueChange={toggleTheme}
-              trackColor={{ false: colors.accent.secondary, true: '#f59e0b' }}
-              thumbColor={isDark ? colors.accent.primary : '#ffffff'}
+              trackColor={{ false: staticColors.accent.secondary, true: '#f59e0b' }}
+              thumbColor={isDark ? staticColors.accent.primary : '#ffffff'}
             />
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
+        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/subscription')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
-                <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
+                <Ionicons name="diamond-outline" size={22} color={staticColors.accent.primary} />
               </View>
-              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.manageSubscription')}</Text>
+              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('settings.manageSubscription')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
-                <Ionicons name="link-outline" size={22} color={colors.status.success} />
+                <Ionicons name="link-outline" size={22} color={staticColors.status.success} />
               </View>
-              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('wellness.generateLink')}</Text>
+              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('wellness.generateLink')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.legal')}</Text>
+        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.legal')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-                <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent.tertiary} />
+                <Ionicons name="shield-checkmark-outline" size={22} color={staticColors.accent.tertiary} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.privacyPolicy')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/terms-of-use')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-                <Ionicons name="document-text-outline" size={22} color={colors.accent.blue} />
+                <Ionicons name="document-text-outline" size={22} color={staticColors.accent.blue} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.termsOfUse')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
@@ -173,7 +173,7 @@ export default function ProfileScreen() {
           <View style={styles.menuItem}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
-                <Ionicons name="information-circle-outline" size={22} color={colors.accent.secondary} />
+                <Ionicons name="information-circle-outline" size={22} color={staticColors.accent.secondary} />
               </View>
               <View>
                 <Text style={styles.menuItemText}>{t('settings.version')}</Text>
@@ -206,7 +206,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t('settings.selectLanguage')}</Text>
               <TouchableOpacity onPress={() => setShowLanguageModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.primary} />
+                <Ionicons name="close" size={24} color={staticColors.text.primary} />
               </TouchableOpacity>
             </View>
             
@@ -227,7 +227,7 @@ export default function ProfileScreen() {
                     <Text style={styles.languageNameEn}>{item.name}</Text>
                   </View>
                   {item.code === locale && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.accent.primary} />
+                    <Ionicons name="checkmark-circle" size={24} color={staticColors.accent.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.accent.primary,
+    color: staticColors.accent.primary,
     marginBottom: 12,
     marginLeft: 4,
     letterSpacing: 1,
@@ -295,12 +295,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.dark.card,
+    backgroundColor: staticColors.dark.card,
     padding: 16,
     borderRadius: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: staticColors.border.default,
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -316,12 +316,12 @@ const styles = StyleSheet.create({
   },
   menuItemText: {
     fontSize: 15,
-    color: colors.text.primary,
+    color: staticColors.text.primary,
     fontWeight: '600',
   },
   menuItemSubtext: {
     fontSize: 12,
-    color: colors.text.secondary,
+    color: staticColors.text.secondary,
     marginTop: 2,
   },
   logoutButton: {
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.dark.secondary,
+    backgroundColor: staticColors.dark.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: staticColors.text.primary,
   },
   languageItem: {
     flexDirection: 'row',
@@ -378,12 +378,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     marginBottom: 8,
-    backgroundColor: colors.dark.card,
+    backgroundColor: staticColors.dark.card,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: staticColors.border.default,
   },
   languageItemActive: {
-    borderColor: colors.accent.primary,
+    borderColor: staticColors.accent.primary,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   languageFlag: {
@@ -396,10 +396,10 @@ const styles = StyleSheet.create({
   languageName: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: staticColors.text.primary,
   },
   languageNameEn: {
     fontSize: 13,
-    color: colors.text.secondary,
+    color: staticColors.text.secondary,
   },
 });
