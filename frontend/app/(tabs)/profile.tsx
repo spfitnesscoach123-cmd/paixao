@@ -72,7 +72,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
-                <Ionicons name="person-outline" size={22} color={staticColors.accent.primary} />
+                <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
               </View>
               <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('athletes.editProfile')}</Text>
             </View>
@@ -96,7 +96,7 @@ export default function ProfileScreen() {
           <View style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
-                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? staticColors.accent.primary : '#f59e0b'} />
+                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? colors.accent.primary : '#f59e0b'} />
               </View>
               <View>
                 <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>
@@ -114,7 +114,7 @@ export default function ProfileScreen() {
               value={!isDark}
               onValueChange={toggleTheme}
               trackColor={{ false: staticColors.accent.secondary, true: '#f59e0b' }}
-              thumbColor={isDark ? staticColors.accent.primary : '#ffffff'}
+              thumbColor={isDark ? colors.accent.primary : '#ffffff'}
             />
           </View>
         </View>
@@ -125,7 +125,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
-                <Ionicons name="diamond-outline" size={22} color={staticColors.accent.primary} />
+                <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
               <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('settings.manageSubscription')}</Text>
             </View>
@@ -227,7 +227,7 @@ export default function ProfileScreen() {
                     <Text style={styles.languageNameEn}>{item.name}</Text>
                   </View>
                   {item.code === locale && (
-                    <Ionicons name="checkmark-circle" size={24} color={staticColors.accent.primary} />
+                    <Ionicons name="checkmark-circle" size={24} color={colors.accent.primary} />
                   )}
                 </TouchableOpacity>
               )}
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarGlow: {
-    shadowColor: staticColors.accent.primary,
+    shadowColor: colors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: staticColors.accent.primary,
+    color: colors.accent.primary,
     marginBottom: 12,
     marginLeft: 4,
     letterSpacing: 1,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     borderColor: staticColors.border.default,
   },
   languageItemActive: {
-    borderColor: staticColors.accent.primary,
+    borderColor: colors.accent.primary,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   languageFlag: {
