@@ -347,8 +347,14 @@ export default function AthleteDetails() {
               <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
 
-            {/* Export PDF Button */}
-            <ExportPDFButton athleteId={id} athleteName={athlete.name} />
+            {/* Export Buttons - PDF/CSV */}
+            <ExportButtons 
+              athleteId={id} 
+              athleteName={athlete.name} 
+              locale={locale}
+              bodyCompositionId={bodyCompositionData?.[0]?._id}
+              showBodyCompReport={bodyCompositionData && bodyCompositionData.length > 0}
+            />
 
             <TouchableOpacity 
               style={styles.deleteButton}
