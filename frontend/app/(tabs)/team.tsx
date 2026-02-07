@@ -54,11 +54,22 @@ interface TeamDashboardStats {
   team_avg_power?: number;
 }
 
+interface PositionSummary {
+  count: number;
+  avg_acwr: number;
+  avg_wellness: number;
+  avg_fatigue: number;
+  avg_distance: number;
+  avg_sprints: number;
+  avg_max_speed: number;
+  high_risk_count: number;
+}
+
 interface TeamDashboardResponse {
   stats: TeamDashboardStats;
   athletes: TeamDashboardAthlete[];
   risk_distribution: { [key: string]: number };
-  position_summary: { [key: string]: { count: number; avg_acwr: number; high_risk_count: number } };
+  position_summary: { [key: string]: PositionSummary };
   alerts: string[];
 }
 
