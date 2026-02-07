@@ -132,16 +132,18 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - [x] Strength analysis with normative comparisons
 - [x] Peripheral fatigue detection algorithm
 
-### P1 (Next Priority)
-- [ ] Add sample GPS data for testing date filter
-- [ ] Add sample wellness data for testing QTR calculations
-- [ ] Strength assessment history graphs (evolution over season)
-- [ ] Full i18n audit - remaining hardcoded strings
+### P1 (Completed)
+- [x] Added sample GPS data (15 sessions) for testing date filter
+- [x] Added sample Wellness data (25 questionnaires) for testing QTR calculations
+- [x] Added sample Strength data (12 assessments) for testing evolution
+- [x] Strength assessment history graphs (StrengthHistoryChart component)
+- [x] Full i18n audit - charts.tsx now uses dynamic locale-based labels
 
-### P2 (Future)
+### P2 (Next Priority)
 - [ ] Push notifications for wellness reminders
 - [ ] Team-wide statistics dashboard
-- [ ] Export functionality enhancements
+- [ ] Export strength assessment reports
+- [ ] Comparison of strength between athletes
 - [ ] Performance optimizations for large datasets
 
 ---
