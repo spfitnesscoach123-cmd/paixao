@@ -198,6 +198,16 @@
     "questionnaires": "Questionários",
     "noDataForCharts": "Adicione questionários para ver análises"
   },
+  "assessments": {
+    "title": "Avaliações",
+    "addStrength": "Avaliação de Força",
+    "addOther": "Outra Avaliação",
+    "history": "Histórico de Avaliações",
+    "noData": "Nenhuma avaliação registrada",
+    "strength": "Força",
+    "aerobic": "Aeróbico",
+    "bodyComp": "Composição Corporal"
+  },
   "analysis": {
     "title": "Análises",
     "completeAnalysis": "Análise Completa",
