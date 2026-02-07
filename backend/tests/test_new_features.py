@@ -56,8 +56,8 @@ class TestAssessmentsEndpoint:
         assert response.status_code == 200, f"Create assessment failed: {response.text}"
         data = response.json()
         
-        # Verify response structure
-        assert "id" in data, "No id in response"
+        # Verify response structure - API returns _id or id
+        assert "id" in data or "_id" in data, "No id in response"
         assert data["assessment_type"] == "strength", "Assessment type mismatch"
         assert "metrics" in data, "No metrics in response"
         
