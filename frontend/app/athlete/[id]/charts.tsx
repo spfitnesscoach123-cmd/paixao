@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -10,10 +10,31 @@ import { GPSChart } from '../../../components/charts/GPSChart';
 import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
 import { colors } from '../../../constants/theme';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function AthleteCharts() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { t, locale } = useLanguage();
+  
+  const labels = useMemo(() => ({
+    charts: locale === 'pt' ? 'Gráficos' : 'Charts',
+    gpsStats: locale === 'pt' ? 'Estatísticas GPS' : 'GPS Statistics',
+    sessions: locale === 'pt' ? 'Sessões' : 'Sessions',
+    avgDistance: locale === 'pt' ? 'Dist. Média' : 'Avg Distance',
+    avgSprints: locale === 'pt' ? 'Sprints Médios' : 'Avg Sprints',
+    maxSpeed: locale === 'pt' ? 'Vel. Máxima' : 'Max Speed',
+    gpsEvolution: locale === 'pt' ? 'Evolução GPS' : 'GPS Evolution',
+    totalDistance: locale === 'pt' ? 'Distância Total (metros)' : 'Total Distance (meters)',
+    highIntensityDistance: locale === 'pt' ? 'Distância Alta Intensidade (metros)' : 'High Intensity Distance (meters)',
+    sprintDistance: locale === 'pt' ? 'Distância em Sprints (metros)' : 'Sprint Distance (meters)',
+    numberOfSprints: locale === 'pt' ? 'Número de Sprints' : 'Number of Sprints',
+    wellnessStats: locale === 'pt' ? 'Estatísticas Wellness' : 'Wellness Statistics',
+    avgWellness: locale === 'pt' ? 'Wellness Médio' : 'Avg Wellness',
+    avgReadiness: locale === 'pt' ? 'Prontidão Média' : 'Avg Readiness',
+    avgSleep: locale === 'pt' ? 'Sono Médio' : 'Avg Sleep',
+    wellnessEvolution: locale === 'pt' ? 'Evolução Wellness' : 'Wellness Evolution',
+  }), [locale]);
 
   const { data: athlete } = useQuery({
     queryKey: ['athlete', id],
