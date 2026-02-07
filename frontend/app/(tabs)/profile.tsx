@@ -84,40 +84,66 @@ export default function ProfileScreen() {
                 <Ionicons name="language-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <View>
-                <Text style={styles.menuItemText}>{t('settings.language')}</Text>
-                <Text style={styles.menuItemSubtext}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
+                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.language')}</Text>
+                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
+
+          {/* Theme Toggle */}
+          <View style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
+                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? colors.accent.primary : '#f59e0b'} />
+              </View>
+              <View>
+                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>
+                  {t('settings.theme') || (locale === 'pt' ? 'Tema' : 'Theme')}
+                </Text>
+                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>
+                  {isDark 
+                    ? (locale === 'pt' ? 'Modo Escuro' : 'Dark Mode')
+                    : (locale === 'pt' ? 'Modo Claro' : 'Light Mode')
+                  }
+                </Text>
+              </View>
+            </View>
+            <Switch
+              value={!isDark}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.accent.secondary, true: '#f59e0b' }}
+              thumbColor={isDark ? colors.accent.primary : '#ffffff'}
+            />
+          </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.subscriptionTools')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
           
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/subscription')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
                 <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={styles.menuItemText}>{t('settings.manageSubscription')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.manageSubscription')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/generate-wellness-link')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
                 <Ionicons name="link-outline" size={22} color={colors.status.success} />
               </View>
-              <Text style={styles.menuItemText}>{t('wellness.generateLink')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('wellness.generateLink')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.legal')}</Text>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.legal')}</Text>
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
             <View style={styles.menuItemContent}>
