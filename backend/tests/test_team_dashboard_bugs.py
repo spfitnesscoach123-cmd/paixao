@@ -107,25 +107,25 @@ class TestTeamDashboardBugFixes:
         ]
         
         for field in required_fields:
-            assert field in midfielder_stats, f"Missing field '{field}' in position_summary"
+            assert field in position_stats, f"Missing field '{field}' in position_summary"
         
         # Verify count is correct
-        assert midfielder_stats["count"] == 2, f"Expected 2 athletes, got {midfielder_stats['count']}"
+        assert position_stats["count"] == 2, f"Expected 2 athletes, got {position_stats['count']}"
         
         # Verify avg_distance is an average (should be between 8000 and 9000)
-        avg_dist = midfielder_stats["avg_distance"]
+        avg_dist = position_stats["avg_distance"]
         assert 8000 <= avg_dist <= 9000, f"avg_distance {avg_dist} should be between 8000-9000"
         
         # Verify avg_sprints is an average (should be between 10 and 11)
-        avg_sprints = midfielder_stats["avg_sprints"]
+        avg_sprints = position_stats["avg_sprints"]
         assert 10 <= avg_sprints <= 11, f"avg_sprints {avg_sprints} should be between 10-11"
         
         # Verify avg_max_speed is an average (should be between 28 and 29)
-        avg_max_speed = midfielder_stats["avg_max_speed"]
+        avg_max_speed = position_stats["avg_max_speed"]
         assert 28 <= avg_max_speed <= 29, f"avg_max_speed {avg_max_speed} should be between 28-29"
         
         print(f"✓ Position summary structure verified with all required fields")
-        print(f"  - count: {midfielder_stats['count']}")
+        print(f"  - count: {position_stats['count']}")
         print(f"  - avg_distance: {avg_dist}")
         print(f"  - avg_sprints: {avg_sprints}")
         print(f"  - avg_max_speed: {avg_max_speed}")
