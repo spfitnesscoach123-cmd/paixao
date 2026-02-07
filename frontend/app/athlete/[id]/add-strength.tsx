@@ -65,19 +65,26 @@ const EXERCISES = [
 ];
 
 const PROVIDERS = [
-  { id: 'gymaware', name: 'GymAware' },
-  { id: 'push_band', name: 'PUSH Band' },
-  { id: 'vitruve', name: 'Vitruve' },
-  { id: 'beast', name: 'Beast Sensor' },
-  { id: 'tendo', name: 'Tendo Unit' },
-  { id: 'manual', name: 'Manual' },
+  { id: 'gymaware', name: 'GymAware', inputMethod: 'API/Bluetooth' },
+  { id: 'push_band', name: 'PUSH Band', inputMethod: 'App Sync' },
+  { id: 'vitruve', name: 'Vitruve', inputMethod: 'App Sync' },
+  { id: 'beast', name: 'Beast Sensor', inputMethod: 'Bluetooth' },
+  { id: 'tendo', name: 'Tendo Unit', inputMethod: 'USB/CSV' },
+  { id: 'manual', name: 'Manual', inputMethod: 'Manual' },
 ];
 
-// Load-Velocity Profile Chart Component
+// Helper to format decimal input
+const formatDecimalInput = (value: string): string => {
+  // Replace comma with dot for decimal
+  return value.replace(',', '.');
+};
+
+// Load-Velocity Profile Chart Component - Responsive
 const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
   const { locale } = useLanguage();
-  const chartWidth = screenWidth - 80;
-  const chartHeight = 180;
+  // Make chart responsive
+  const chartWidth = Math.min(screenWidth - 48, 400);
+  const chartHeight = Math.min(chartWidth * 0.5, 180);
   const padding = { top: 20, right: 20, bottom: 40, left: 50 };
   
   const innerWidth = chartWidth - padding.left - padding.right;
