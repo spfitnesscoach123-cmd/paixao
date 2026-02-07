@@ -139,12 +139,22 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - [x] Strength assessment history graphs (StrengthHistoryChart component)
 - [x] Full i18n audit - charts.tsx now uses dynamic locale-based labels
 
-### P2 (Next Priority)
+### P2 (In Progress)
+- [x] Theme switching system (Dark/Light mode toggle in Profile)
+- [x] ThemeContext and ThemeProvider created
+- [x] Light theme color palette defined
+- [ ] Apply theme to all screens (partially done - Profile screen)
 - [ ] Push notifications for wellness reminders
 - [ ] Team-wide statistics dashboard
 - [ ] Export strength assessment reports
 - [ ] Comparison of strength between athletes
 - [ ] Performance optimizations for large datasets
+
+### P3 (Backlog)
+- [ ] Complete light mode for all screens
+- [ ] Email alerts for critical fatigue levels
+- [ ] Team averages comparison
+- [ ] Advanced filtering for comparisons
 
 ---
 
