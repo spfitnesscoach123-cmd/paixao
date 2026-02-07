@@ -16,6 +16,7 @@ import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
 
 interface TeamDashboardAthlete {
   id: string;
