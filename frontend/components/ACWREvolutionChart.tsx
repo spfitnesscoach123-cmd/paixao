@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LineChart } from 'react-native-gifted-charts';
 import api from '../services/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface ACWRHistoryPoint {

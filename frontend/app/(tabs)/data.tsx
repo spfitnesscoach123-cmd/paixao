@@ -8,7 +8,7 @@ import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire } from '../../types';
 import { ImpactCard } from '../../components/dashboard/ImpactCard';
 import { QuickStat } from '../../components/dashboard/QuickStat';
-import { useTheme } from '../../contexts/ThemeContext';
+import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function DataScreen() {

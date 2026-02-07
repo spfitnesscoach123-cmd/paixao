@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-gifted-charts';
 import { GPSData } from '../../types';
-import { useTheme } from '../../contexts/ThemeContext';
+import { colors } from '../../constants/theme';
 
 interface GPSChartProps {
   data: GPSData[];

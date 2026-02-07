@@ -16,7 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import api from '../services/api';
 import { parseCatapultCSV, validateCatapultCSV } from '../utils/csvParser';
 import { Athlete } from '../types';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 
 export default function UploadCatapultCSV() {
   const router = useRouter();

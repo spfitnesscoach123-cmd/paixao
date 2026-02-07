@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');

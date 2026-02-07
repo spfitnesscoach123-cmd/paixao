@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import api from '../services/api';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 
 export default function GenerateWellnessLink() {
   const router = useRouter();

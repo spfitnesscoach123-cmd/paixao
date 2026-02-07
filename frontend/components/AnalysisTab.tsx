@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { ComprehensiveAnalysis } from '../types';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ACWREvolutionChart } from './ACWREvolutionChart';
 

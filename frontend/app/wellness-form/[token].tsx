@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
 import api from '../../services/api';
-import { useTheme } from '../../contexts/ThemeContext';
+import { colors } from '../../constants/theme';
 
 interface Athlete {
   id: string;
