@@ -227,11 +227,12 @@ class TestTeamDashboardBugFixes:
             })
             assert response.status_code == 200
             athlete = response.json()
-            self.created_athletes.append(athlete["id"])
+            athlete_id = athlete.get("_id") or athlete.get("id")
+            self.created_athletes.append(athlete_id)
             
             # Add GPS data
             response = self.session.post(f"{BASE_URL}/api/gps-data", json={
-                "athlete_id": athlete["id"],
+                "athlete_id": athlete_id,
                 "date": today,
                 "session_name": "Training",
                 "period_name": "Full Session",
