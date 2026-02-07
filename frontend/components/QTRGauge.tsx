@@ -11,7 +11,6 @@ interface QTRGaugeProps {
 
 export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
   
   // Clamp score between 0 and 100
   const clampedScore = Math.max(0, Math.min(100, score));
