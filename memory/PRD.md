@@ -14,6 +14,7 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - Multilingual support (i18n)
 - PDF report generation
 - Strength assessments with fatigue detection
+- **NEW**: Subscription-based monetization system with regional pricing
 
 ## User Personas
 - **Head Coaches**: Need team-wide overview, player comparisons, workload management
@@ -35,20 +36,16 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 ### GPS Data
 - Manual entry and CSV import (Catapult format)
 - Session-based grouping with period breakdowns
-- **NEW: Date range filtering** (7 days, 30 days, this month, custom)
+- Date range filtering (7 days, 30 days, this month, custom)
 - Metrics: distance, high intensity, sprints, accelerations, decelerations, max speed
 
 ### Wellness / Recovery
 - Daily questionnaire tracking (fatigue, sleep, stress, mood, muscle soreness)
-- **NEW: QTR Score (Qualidade Total de Recuperação)** - 0-100 scale with gauge visualization
-  - 0-30: Ruim (Poor)
-  - 31-60: Regular
-  - 61-85: Bom (Good)
-  - 85-100: Excelente (Excellent)
-- **NEW: Parameter correlation charts** (14-day evolution)
-- **NEW: Trend analysis** (improving/declining/stable)
+- QTR Score (Qualidade Total de Recuperação) - 0-100 scale with gauge visualization
+- Parameter correlation charts (14-day evolution)
+- Trend analysis (improving/declining/stable)
 
-### Strength Assessments (NEW)
+### Strength Assessments
 - **Parameters tracked:**
   - Mean Power (W)
   - Peak Power (W)
@@ -56,10 +53,10 @@ Build and maintain a comprehensive athlete analytics platform featuring:
   - Peak Speed (m/s)
   - RSI (Reactive Strength Index)
   - Fatigue Index (%)
-- **Normative classifications** based on football literature
-- **Historical comparison** with athlete's personal peak values
-- **Peripheral fatigue detection**: RSI drop + Peak Power drop = injury risk alert
-- **AI-powered insights** for strength profile analysis
+- Normative classifications based on football literature
+- Historical comparison with athlete's personal peak values
+- Peripheral fatigue detection: RSI drop + Peak Power drop = injury risk alert
+- AI-powered insights for strength profile analysis
 
 ### Analysis Features
 - ACWR calculation (Acute 7-day vs Chronic 28-day)
@@ -81,6 +78,55 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 
 ---
 
+## Subscription System (NEW - Feb 7, 2025)
+
+### Plan Tiers
+
+| Plan | Brazil (BRL) | International (USD) | Athletes | History |
+|------|-------------|---------------------|----------|---------|
+| Essencial | R$ 39,90 | $ 7,99 | 25 | 3 months |
+| Profissional | R$ 89,90 | $ 17,99 | 50 | Unlimited |
+| Elite | R$ 159,90 | $ 29,99 | Unlimited | Unlimited |
+
+### Plan Features
+
+**Essencial**
+- Up to 25 athletes
+- Quick GPS and Wellness registration
+- Weekly load visualization
+- 3 months history
+- Basic performance reports
+- NO: Detailed ACWR, Athlete comparison, Fatigue alerts, PDF/CSV export, AI insights
+
+**Profissional** (⭐ Most Popular)
+- Up to 50 athletes
+- Everything in Essencial
+- Detailed ACWR by metric
+- Athlete comparison
+- Contextual risk alerts
+- Complete monthly reports
+- PDF and CSV export
+- Unlimited history
+- NO: AI insights, Multiple users, Priority support
+
+**Elite**
+- Unlimited athletes
+- Everything in Profissional
+- AI-generated insights
+- Peripheral fatigue detection
+- Up to 2 simultaneous users
+- Priority support
+- Custom reports
+- Integration API (coming soon)
+
+### Trial Period
+- All plans include 7-day free trial
+- Full access to plan features during trial
+- Auto-detects user region for pricing (Brazil = BRL, other = USD)
+- Payment via In-App Purchase (App Store / Google Play) - **MOCKED**
+
+---
+
 ## Tech Stack
 - **Frontend**: React Native (Expo for Web), TypeScript, React Navigation, React Query
 - **Backend**: Python, FastAPI, Motor (MongoDB async driver)
@@ -94,19 +140,21 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 ## What's Been Implemented
 
 ### February 7, 2025 (Current Session)
-- **GPS Date Filter**: Added GPSDateFilter component with quick filter buttons (All, 7 days, 30 days, This month, Custom)
-- **QTR Gauge**: Created QTRGauge component with SVG-based speedometer visualization
-- **Wellness Charts**: Added WellnessCharts component with parameter evolution graphs and QTR calculation
-- **Strength Assessment Form**: Created add-strength.tsx for manual entry of strength metrics
-- **Strength Analysis API**: New endpoint `/api/analysis/strength/{athlete_id}` with normative comparisons
-- **Strength Analysis Charts**: Frontend component for visualizing strength metrics and fatigue detection
-- **Peripheral Fatigue Detection**: Algorithm to detect accumulated muscle fatigue (RSI + Peak Power drops)
-- **Updated translations**: Added assessments section to en.json and pt.json
+- **Subscription System**: Complete implementation with 3 tiers (Essencial, Profissional, Elite)
+- **Regional Pricing**: Auto-detects region, shows BRL for Brazil, USD for international
+- **Backend Endpoints**: /api/subscription/plans, /current, /subscribe, /cancel
+- **Frontend Subscription Page**: Shows current plan, trial status, all plans with features
+- **Bug Fix P0**: Fixed "Unmatched Route" error for add-strength.tsx (import paths corrected)
 
-### February 6, 2025 (Previous Session)
-- Fixed duplicated `ANALYSIS_TRANSLATIONS` and `get_analysis_text` definitions
-- Added `lang` parameter to analysis functions for multilingual AI content
-- Completed translation of AI-generated insights
+### February 6-7, 2025 (Previous Sessions)
+- GPS Date Filter: Added GPSDateFilter component with quick filter buttons
+- QTR Gauge: Created QTRGauge component with SVG-based speedometer visualization
+- Wellness Charts: Added WellnessCharts component with parameter evolution graphs
+- Strength Assessment Form: Created add-strength.tsx for manual entry of strength metrics
+- Strength Analysis API: New endpoint `/api/analysis/strength/{athlete_id}`
+- Strength Analysis Charts: Frontend component for visualizing strength metrics
+- Peripheral Fatigue Detection: Algorithm to detect accumulated muscle fatigue
+- Theme toggle: Basic Dark/Light mode toggle in Profile
 
 ### Previously Implemented
 - Full authentication system (login, register, password reset)
@@ -131,30 +179,27 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - [x] Strength assessment form with new parameters
 - [x] Strength analysis with normative comparisons
 - [x] Peripheral fatigue detection algorithm
+- [x] Subscription system with 3 tiers
+- [x] Regional pricing (BRL/USD)
+- [x] Bug fix: add-strength.tsx navigation
 
-### P1 (Completed)
-- [x] Added sample GPS data (15 sessions) for testing date filter
-- [x] Added sample Wellness data (25 questionnaires) for testing QTR calculations
-- [x] Added sample Strength data (12 assessments) for testing evolution
-- [x] Strength assessment history graphs (StrengthHistoryChart component)
-- [x] Full i18n audit - charts.tsx now uses dynamic locale-based labels
+### P1 (In Progress)
+- [ ] Full i18n audit - ensure all strings use t() function
+- [ ] Theme switching (Dark/Light) applied to all screens
 
-### P2 (In Progress)
-- [x] Theme switching system (Dark/Light mode toggle in Profile)
-- [x] ThemeContext and ThemeProvider created
-- [x] Light theme color palette defined
-- [ ] Apply theme to all screens (partially done - Profile screen)
-- [ ] Push notifications for wellness reminders
+### P2 (Backlog)
 - [ ] Team-wide statistics dashboard
+- [ ] Push notifications for wellness reminders
 - [ ] Export strength assessment reports
 - [ ] Comparison of strength between athletes
 - [ ] Performance optimizations for large datasets
 
-### P3 (Backlog)
-- [ ] Complete light mode for all screens
+### P3 (Future)
 - [ ] Email alerts for critical fatigue levels
 - [ ] Team averages comparison
 - [ ] Advanced filtering for comparisons
+- [ ] Integration API for Elite plan
+- [ ] Multi-user authentication for Elite plan
 
 ---
 
@@ -184,7 +229,7 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 
 ### Assessments
 - `GET /api/assessments/athlete/{id}` - Get all assessments
-- `POST /api/assessments` - Add assessment (strength, aerobic, body_composition)
+- `POST /api/assessments` - Add assessment
 
 ### Analysis (all support `?lang=en|pt|es|fr`)
 - `GET /api/analysis/acwr/{id}` - Basic ACWR
@@ -193,28 +238,17 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - `GET /api/analysis/fatigue/{id}` - Fatigue analysis
 - `GET /api/analysis/ai-insights/{id}` - AI-generated insights
 - `GET /api/analysis/comprehensive/{id}` - All analyses combined
-- `GET /api/analysis/strength/{id}` - **NEW** Strength analysis with normatives
+- `GET /api/analysis/strength/{id}` - Strength analysis with normatives
+
+### Subscription (NEW)
+- `GET /api/subscription/plans` - Get all plans with regional pricing
+- `GET /api/subscription/current` - Get user's current subscription
+- `POST /api/subscription/subscribe` - Subscribe to a plan (starts trial)
+- `POST /api/subscription/cancel` - Cancel subscription
+- `GET /api/subscription/check-feature/{feature}` - Check feature access
 
 ### Reports
 - `GET /api/reports/athlete/{id}/pdf?lang=xx` - Generate PDF report
-
----
-
-## Strength Assessment Normatives (Football Players)
-
-| Metric | Excellent | Good | Average | Below Average | Unit |
-|--------|-----------|------|---------|---------------|------|
-| Mean Power | ≥2500 | ≥2200 | ≥1900 | ≥1600 | W |
-| Peak Power | ≥4000 | ≥3500 | ≥3000 | ≥2500 | W |
-| Mean Speed | ≥1.5 | ≥1.3 | ≥1.1 | ≥0.9 | m/s |
-| Peak Speed | ≥3.0 | ≥2.6 | ≥2.2 | ≥1.8 | m/s |
-| RSI | ≥2.5 | ≥2.0 | ≥1.5 | ≥1.0 | - |
-| Fatigue Index | <30% | <50% | <70% | ≥70% | % |
-
-**Peripheral Fatigue Detection:**
-- RSI drop >10% from peak + Peak Power drop >10% from peak = Accumulated peripheral fatigue
-- Fatigue Index >70% = High fatigue alert
-- Both conditions = Injury risk warning
 
 ---
 
@@ -223,9 +257,5 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - Password: `test`
 - Athlete ID: `69862b75fc9efff29476e3ce`
 
-## Database Schema (MongoDB Collections)
-- `users`: id, email, hashed_password, name, created_at
-- `athletes`: id, coach_id, name, birth_date, position, height, weight, photo_base64
-- `gps_data`: id, athlete_id, coach_id, date, session_id, session_name, period_name, metrics...
-- `wellness`: id, athlete_id, coach_id, date, sleep_hours, sleep_quality, fatigue, muscle_soreness, stress, mood, readiness_score, wellness_score
-- `assessments`: id, athlete_id, coach_id, date, assessment_type, metrics (flexible dict), notes
+## Preview URL
+- https://team-stats-9.preview.emergentagent.com
