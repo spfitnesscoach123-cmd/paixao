@@ -605,7 +605,7 @@ export default function AthleteDetails() {
       case 'assessments':
         return (
           <View style={styles.tabContent}>
-            {/* Action buttons */}
+            {/* Action buttons - Força e Composição Corporal */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 style={styles.actionButton}
@@ -616,10 +616,10 @@ export default function AthleteDetails() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButton}
-                onPress={() => router.push(`/athlete/${id}/add-assessment`)}
+                onPress={() => router.push(`/athlete/${id}/add-body-composition`)}
               >
-                <Ionicons name="add-circle" size={24} color={colors.accent.secondary} />
-                <Text style={styles.actionButtonText}>{t('assessments.addOther') || 'Outra Avaliação'}</Text>
+                <Ionicons name="body" size={24} color={colors.accent.secondary} />
+                <Text style={styles.actionButtonText}>{t('assessments.bodyComposition') || 'Composição Corporal'}</Text>
               </TouchableOpacity>
             </View>
 
