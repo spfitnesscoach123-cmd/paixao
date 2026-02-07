@@ -124,8 +124,8 @@ class TestBodyCompositionAPI:
         expected_bmi = payload["weight"] / ((payload["height"] / 100) ** 2)
         assert abs(data["bmi"] - expected_bmi) < 0.1, f"BMI mismatch: {data['bmi']} vs {expected_bmi}"
         
-        # Store ID for cleanup
-        self.created_id = data.get("id")
+        # Store ID for cleanup (API returns _id)
+        self.created_id = data.get("id") or data.get("_id")
         
         print(f"✓ Guedes male: BF={data['body_fat_percentage']:.1f}%, Lean={data['lean_mass_kg']:.1f}kg, Fat={data['fat_mass_kg']:.1f}kg, BMI={data['bmi']:.1f}")
         
@@ -179,9 +179,10 @@ class TestBodyCompositionAPI:
         
         print(f"✓ PJ7: BF={data['body_fat_percentage']:.1f}%, Density={data.get('body_density', 'N/A')}")
         
-        # Cleanup
-        if data.get("id"):
-            self.session.delete(f"{BASE_URL}/api/body-composition/{data['id']}")
+        # Cleanup (API returns _id)
+        comp_id = data.get("id") or data.get("_id")
+        if comp_id:
+            self.session.delete(f"{BASE_URL}/api/body-composition/{comp_id}")
     
     def test_create_body_composition_faulkner_4(self):
         """Test POST /api/body-composition with Faulkner 4 protocol"""
@@ -217,9 +218,10 @@ class TestBodyCompositionAPI:
         
         print(f"✓ Faulkner 4: BF={data['body_fat_percentage']:.1f}% (expected ~{expected_bf:.1f}%)")
         
-        # Cleanup
-        if data.get("id"):
-            self.session.delete(f"{BASE_URL}/api/body-composition/{data['id']}")
+        # Cleanup (API returns _id)
+        comp_id = data.get("id") or data.get("_id")
+        if comp_id:
+            self.session.delete(f"{BASE_URL}/api/body-composition/{comp_id}")
     
     def test_get_athlete_body_compositions(self):
         """Test GET /api/body-composition/athlete/{athlete_id}"""
@@ -239,7 +241,8 @@ class TestBodyCompositionAPI:
         
         create_response = self.session.post(f"{BASE_URL}/api/body-composition", json=payload)
         assert create_response.status_code == 200
-        created_id = create_response.json().get("id")
+        # API returns _id instead of id
+        created_id = create_response.json().get("id") or create_response.json().get("_id")
         
         # Get all body compositions for athlete
         response = self.session.get(f"{BASE_URL}/api/body-composition/athlete/{TEST_ATHLETE_ID}")
@@ -249,8 +252,8 @@ class TestBodyCompositionAPI:
         data = response.json()
         assert isinstance(data, list), "Response should be a list"
         
-        # Verify the created composition is in the list
-        found = any(bc.get("id") == created_id for bc in data)
+        # Verify the created composition is in the list (check both id and _id)
+        found = any((bc.get("id") == created_id or bc.get("_id") == created_id) for bc in data)
         assert found, "Created body composition not found in list"
         
         print(f"✓ Retrieved {len(data)} body composition(s) for athlete")
@@ -277,11 +280,13 @@ class TestBodyCompositionAPI:
         
         create_response = self.session.post(f"{BASE_URL}/api/body-composition", json=payload)
         assert create_response.status_code == 200
-        created_id = create_response.json().get("id")
+        # API returns _id instead of id
+        created_id = create_response.json().get("id") or create_response.json().get("_id")
+        assert created_id, "No ID returned from create"
         
         # Delete the body composition
         delete_response = self.session.delete(f"{BASE_URL}/api/body-composition/{created_id}")
-        assert delete_response.status_code == 200, f"Expected 200, got {delete_response.status_code}"
+        assert delete_response.status_code == 200, f"Expected 200, got {delete_response.status_code}: {delete_response.text}"
         
         # Verify it's deleted by trying to get it
         get_response = self.session.get(f"{BASE_URL}/api/body-composition/{created_id}")
@@ -321,9 +326,10 @@ class TestBodyCompositionAPI:
             
             print(f"✓ BMI {data['bmi']:.1f} classified as {data['bmi_classification']}")
             
-            # Cleanup
-            if data.get("id"):
-                self.session.delete(f"{BASE_URL}/api/body-composition/{data['id']}")
+            # Cleanup (API returns _id)
+            comp_id = data.get("id") or data.get("_id")
+            if comp_id:
+                self.session.delete(f"{BASE_URL}/api/body-composition/{comp_id}")
     
     def test_invalid_athlete_id(self):
         """Test creating body composition with invalid athlete ID"""
@@ -402,9 +408,10 @@ class TestBodyCompositionCalculations:
         
         print(f"✓ Mass calculations verified: {data['lean_mass_kg']:.1f} + {data['fat_mass_kg']:.1f} = {total_calculated:.1f}kg")
         
-        # Cleanup
-        if data.get("id"):
-            self.session.delete(f"{BASE_URL}/api/body-composition/{data['id']}")
+        # Cleanup (API returns _id)
+        comp_id = data.get("id") or data.get("_id")
+        if comp_id:
+            self.session.delete(f"{BASE_URL}/api/body-composition/{comp_id}")
 
 
 if __name__ == "__main__":
