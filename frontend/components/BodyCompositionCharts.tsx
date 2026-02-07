@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Circle, G, Text as SvgText, Rect, Ellipse } from 'react-native-svg';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import Svg, { Path, Circle, G, Text as SvgText, Rect, Ellipse, Defs, LinearGradient, RadialGradient, Stop, Filter, FeGaussianBlur, FeOffset, FeMerge, FeMergeNode } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
