@@ -208,6 +208,118 @@ class PhysicalAssessment(BaseModel):
         populate_by_name = True
         json_encoders = {ObjectId: str}
 
+# ============= SUBSCRIPTION MODELS =============
+
+class SubscriptionPlan(str, Enum):
+    FREE_TRIAL = "free_trial"
+    ESSENCIAL = "essencial"
+    PROFISSIONAL = "profissional"
+    ELITE = "elite"
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    TRIAL = "trial"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+# Plan limits configuration
+PLAN_LIMITS = {
+    "free_trial": {
+        "name": "Trial Grátis",
+        "price": 0,
+        "max_athletes": 999,  # Unlimited during trial
+        "history_months": 12,
+        "features": ["all"],  # All features during trial
+        "trial_days": 7,
+        "export_pdf": True,
+        "export_csv": True,
+        "advanced_analytics": True,
+        "ai_insights": True,
+        "fatigue_alerts": True,
+        "multi_user": False,
+        "max_users": 1,
+    },
+    "essencial": {
+        "name": "Essencial",
+        "price": 39.90,
+        "max_athletes": 25,
+        "history_months": 3,
+        "features": ["basic_reports", "weekly_view", "quick_registration"],
+        "trial_days": 7,
+        "export_pdf": False,
+        "export_csv": False,
+        "advanced_analytics": False,
+        "ai_insights": False,
+        "fatigue_alerts": False,
+        "multi_user": False,
+        "max_users": 1,
+    },
+    "profissional": {
+        "name": "Profissional",
+        "price": 89.90,
+        "max_athletes": 50,
+        "history_months": -1,  # Unlimited
+        "features": ["basic_reports", "weekly_view", "monthly_reports", "athlete_comparison", "context_alerts"],
+        "trial_days": 7,
+        "export_pdf": True,
+        "export_csv": True,
+        "advanced_analytics": True,
+        "ai_insights": False,
+        "fatigue_alerts": True,
+        "multi_user": False,
+        "max_users": 1,
+    },
+    "elite": {
+        "name": "Elite",
+        "price": 159.90,
+        "max_athletes": -1,  # Unlimited
+        "history_months": -1,  # Unlimited
+        "features": ["all"],
+        "trial_days": 7,
+        "export_pdf": True,
+        "export_csv": True,
+        "advanced_analytics": True,
+        "ai_insights": True,
+        "fatigue_alerts": True,
+        "multi_user": True,
+        "max_users": 2,
+        "priority_support": True,
+        "custom_branding": True,
+    },
+}
+
+class SubscriptionCreate(BaseModel):
+    plan: SubscriptionPlan
+    payment_method: Optional[str] = None
+
+class Subscription(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    user_id: str
+    plan: str
+    status: str
+    start_date: datetime
+    trial_end_date: Optional[datetime] = None
+    current_period_end: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class SubscriptionResponse(BaseModel):
+    plan: str
+    plan_name: str
+    status: str
+    price: float
+    max_athletes: int
+    current_athletes: int
+    history_months: int
+    days_remaining: Optional[int] = None
+    trial_end_date: Optional[str] = None
+    features: dict
+    limits_reached: dict
+
 # ============= AUTH HELPERS =============
 
 def hash_password(password: str) -> str:
