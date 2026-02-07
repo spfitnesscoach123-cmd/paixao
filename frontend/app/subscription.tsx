@@ -90,13 +90,23 @@ export default function Subscription() {
       setIsLoading(true);
       const lang = locale === 'pt' ? 'pt' : 'en';
       
-      const [plansRes, currentRes] = await Promise.all([
-        api.get(`/subscription/plans?lang=${lang}&region=${region}`),
-        api.get(`/subscription/current?lang=${lang}&region=${region}`),
-      ]);
-
-      setPlans(plansRes.data);
-      setCurrentSubscription(currentRes.data);
+      // Fetch plans first (public endpoint)
+      try {
+        const plansRes = await api.get(`/subscription/plans?lang=${lang}&region=${region}`);
+        setPlans(plansRes.data);
+      } catch (plansError) {
+        console.error('Error fetching plans:', plansError);
+      }
+      
+      // Fetch current subscription (requires auth, may fail)
+      try {
+        const currentRes = await api.get(`/subscription/current?lang=${lang}&region=${region}`);
+        setCurrentSubscription(currentRes.data);
+      } catch (subError) {
+        console.error('Error fetching current subscription:', subError);
+        // Don't fail entirely - user may not be logged in
+        setCurrentSubscription(null);
+      }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
     } finally {
