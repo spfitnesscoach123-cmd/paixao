@@ -293,6 +293,14 @@ export default function TeamDashboard() {
               </LinearGradient>
             </View>
           </View>
+          
+          {/* ACWR Legend */}
+          <View style={styles.acwrLegendCard}>
+            <Text style={styles.acwrLegendTitle}>
+              {locale === 'pt' ? 'Classificação ACWR' : 'ACWR Classification'}
+            </Text>
+            <ACWRLegend locale={locale} />
+          </View>
 
           {/* Risk Distribution */}
           <View style={styles.card}>
