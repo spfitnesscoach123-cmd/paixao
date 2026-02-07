@@ -494,6 +494,20 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: 8,
     marginBottom: 16,
   },
+  acwrLegendCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  acwrLegendTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginBottom: 10,
+  },
   statCard: {
     width: '48%',
     borderRadius: 12,
