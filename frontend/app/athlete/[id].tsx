@@ -759,6 +759,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.dark.primary,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginTop: 16,
+    marginBottom: 12,
+    paddingLeft: 4,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
