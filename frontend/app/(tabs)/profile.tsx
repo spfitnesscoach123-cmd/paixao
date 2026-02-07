@@ -242,7 +242,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.dark.primary,
+    backgroundColor: staticColors.dark.primary,
   },
   header: {
     padding: 32,
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarGlow: {
-    shadowColor: colors.accent.primary,
+    shadowColor: staticColors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
