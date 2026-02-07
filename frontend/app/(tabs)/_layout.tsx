@@ -33,6 +33,7 @@ export default function TabsLayout() {
           fontWeight: 'bold',
           fontSize: 18,
         },
+        headerShown: false,
       }}
     >
       <Tabs.Screen
@@ -41,6 +42,15 @@ export default function TabsLayout() {
           title: t('tabs.athletes'),
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="people" size={size + 2} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="team"
+        options={{
+          title: t('tabs.team') || 'Equipe',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="analytics" size={size + 2} color={color} />
           ),
         }}
       />
