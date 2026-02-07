@@ -1,126 +1,135 @@
 # PRD - Peak Perform - Athlete Performance Tracking
 
 ## Original Problem Statement
-Sistema de rastreamento de desempenho de atletas com:
-- Autenticação de usuários
-- Gerenciamento de atletas
-- Dados GPS e wellness
-- Avaliações físicas (força e composição corporal)
-- Análises de IA para insights de desempenho
-- Sistema de assinaturas em 3 níveis
-- Dashboard de equipe
-- Suporte a múltiplos idiomas (PT/EN)
+Sistema de rastreamento de desempenho de atletas com avaliações físicas, composição corporal, integração com wearables e sistemas VBT.
 
 ## Current Architecture
 - **Backend**: FastAPI (Python) + MongoDB
 - **Frontend**: React Native (Expo) + TypeScript
 - **AI Integration**: OpenAI via Emergent LLM Key
-- **Auth**: JWT-based authentication
 
 ## What's Been Implemented
 
-### ✅ Core Features (Completed)
+### ✅ Core Features
 - User authentication (login/register)
 - Athlete CRUD operations
-- GPS data tracking and analysis
-- Wellness questionnaires
-- QTR (Quality of Recovery) gauge
+- GPS data tracking with filters
+- Wellness questionnaires + QTR gauge
 - Strength assessments with auto fatigue calculation
-- Subscription system (3 tiers: Essencial, Profissional, Elite)
-- Team dashboard with aggregated stats
+- Subscription system (3 tiers)
+- Team dashboard
 - i18n support (PT/EN)
 
-### ✅ Body Composition Feature (NEW - Feb 2026)
-**Backend Endpoints:**
-- `GET /api/body-composition/protocols` - List available protocols
-- `POST /api/body-composition` - Create new assessment
-- `GET /api/body-composition/athlete/{id}` - Get athlete's assessments
-- `GET /api/body-composition/{id}` - Get specific assessment
-- `DELETE /api/body-composition/{id}` - Delete assessment
-- `GET /api/analysis/body-composition/{id}` - AI analysis
-
-**Supported Protocols:**
-1. Guedes (1985) - 3 skinfolds (Brazilian validated)
-2. Pollock & Jackson 7 - 7 skinfolds
-3. Pollock & Jackson 9 - 9 skinfolds (most comprehensive)
-4. Faulkner 4 - 4 skinfolds (athletes)
+### ✅ Body Composition (Feb 2026)
+**Protocols:**
+- Guedes (1985) - 3 skinfolds (Brazilian)
+- Pollock & Jackson 7 - 7 skinfolds
+- Pollock & Jackson 9 - 9 skinfolds
+- Faulkner 4 - 4 skinfolds (athletes)
 
 **Calculated Metrics:**
-- Body Fat % (using Siri equation)
-- Lean Mass (kg)
-- Fat Mass (kg)
-- Bone Mass (kg) (estimated)
+- Body Fat % (Siri equation)
+- Lean/Fat/Bone Mass (kg)
 - BMI + Classification
-- Fat Distribution for 3D body visualization
+- Fat Distribution for 3D visualization
 
-**Frontend:**
-- Form page at `/athlete/[id]/add-body-composition.tsx`
-- Charts component at `/components/BodyCompositionCharts.tsx`
-- Updated translations (PT/EN)
-
-## Backlog (Prioritized)
-
-### P1 - High Priority
-- [ ] **Complete Global Theme Implementation** - 30+ files need refactoring
-- [ ] **Full i18n Audit** - Find and replace remaining hardcoded strings
-
-### P2 - Medium Priority
-- [ ] **Push Notifications** - Critical alerts system
-- [ ] **PDF Export for Body Composition** - Print-ready reports
-- [ ] **Body Composition in Team Dashboard** - Aggregated body comp stats
-- [ ] **3D Body Model Enhancement** - More detailed visualization
-- [ ] **Gamification/Leaderboards**
-
-### P3 - Future
-- [ ] **Advanced Reporting** - CSV/PDF export for all data
-- [ ] **Wearable Integration** - Garmin, Polar APIs
-- [ ] **VBT Integration** - GymAware and similar systems
-
-## Key API Endpoints
-
-### Authentication
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-
-### Athletes
-- `GET/POST /api/athletes`
-- `GET/PUT/DELETE /api/athletes/{id}`
-
-### Body Composition
+**Endpoints:**
 - `GET /api/body-composition/protocols`
 - `POST /api/body-composition`
 - `GET /api/body-composition/athlete/{id}`
 - `GET /api/analysis/body-composition/{id}`
 
-### Analysis
-- `GET /api/analysis/comprehensive/{athlete_id}`
-- `GET /api/analysis/strength/{athlete_id}`
-- `GET /api/analysis/body-composition/{athlete_id}`
-- `GET /api/dashboard/team`
+### ✅ Reports & Export (Feb 2026)
+**CSV Export:**
+- `GET /api/reports/athlete/{id}/csv?data_type=all|gps|wellness|strength|body_composition`
+- `GET /api/reports/team/csv`
+
+**PDF Reports:**
+- `GET /api/reports/athlete/{id}/pdf` - Complete athlete report
+- `GET /api/reports/body-composition/{id}/pdf` - Body composition report
+
+### ✅ Wearable Integration (Feb 2026)
+**Supported Methods:**
+- FIT file import (Garmin, Polar, Suunto, Wahoo, Coros)
+- CSV import (any device)
+
+**Endpoints:**
+- `GET /api/wearables/supported`
+- `POST /api/wearables/import/csv`
+
+**Planned (requires developer credentials):**
+- Garmin Connect direct sync
+- Polar Flow direct sync
+
+### ✅ VBT Integration (Feb 2026)
+**Supported Providers:**
+- GymAware
+- PUSH Band
+- Vitruve
+- Beast Sensor
+- Tendo Unit
+- Manual entry
+
+**Features:**
+- Load-Velocity Profile (LVP)
+- Estimated 1RM calculation
+- Velocity loss analysis (fatigue)
+- Trend analysis
+- AI recommendations
+
+**Endpoints:**
+- `GET /api/vbt/providers`
+- `POST /api/vbt/data`
+- `GET /api/vbt/athlete/{id}`
+- `POST /api/vbt/import/csv`
+- `GET /api/vbt/analysis/{id}?exercise=...`
+
+## Backlog
+
+### P1 - High Priority
+- [ ] **Complete Global Theme** - 30+ files need refactoring for light mode
+- [ ] **Full i18n Audit** - Replace remaining hardcoded strings
+
+### P2 - Medium Priority
+- [ ] **Push Notifications** - Critical alerts
+- [ ] **VBT Frontend UI** - Charts and forms for VBT data
+- [ ] **Wearable Import UI** - File upload interface
+
+### P3 - Future
+- [ ] **Direct Garmin/Polar API** - Requires developer program enrollment
+- [ ] **FIT file parser** - Parse binary FIT files directly
+
+## Key API Endpoints Summary
+
+### Authentication
+- `POST /api/auth/register`, `POST /api/auth/login`
+
+### Athletes
+- `GET/POST/PUT/DELETE /api/athletes/{id}`
+
+### Body Composition
+- `GET /api/body-composition/protocols`
+- `POST /api/body-composition`
+- `GET /api/analysis/body-composition/{id}`
+
+### VBT
+- `GET /api/vbt/providers`
+- `POST /api/vbt/data`
+- `GET /api/vbt/analysis/{id}?exercise=...`
+
+### Reports
+- `GET /api/reports/athlete/{id}/csv`
+- `GET /api/reports/body-composition/{id}/pdf`
+
+### Wearables
+- `GET /api/wearables/supported`
+- `POST /api/wearables/import/csv`
 
 ## Database Collections
-- `users` - User accounts
-- `athletes` - Athlete profiles
-- `gps_data` - GPS tracking data
-- `wellness` - Wellness questionnaires
-- `assessments` - Physical assessments (strength)
-- `body_compositions` - Body composition assessments (NEW)
-- `subscriptions` - User subscriptions
-
-## Technical Notes
-
-### Body Composition Calculations
-The system implements scientifically validated formulas:
-- **Body Density**: Calculated using protocol-specific equations
-- **Body Fat %**: Siri equation: `(495/density) - 450`
-- **BMI**: `weight(kg) / height(m)²`
-- **Bone Mass**: Estimated using Martin formula approximation
-
-### Theme System
-- ThemeContext exists at `/contexts/ThemeContext.tsx`
-- Toggle available in Profile screen
-- ~30 files still use hardcoded colors from `/constants/theme.ts`
-- Refactoring needed to apply theme globally
+- `users`, `athletes`, `gps_data`, `wellness`
+- `assessments`, `body_compositions`
+- `vbt_data`, `heart_rate_data` (NEW)
+- `subscriptions`
 
 ## Test Credentials
 - Email: `test@test.com`
