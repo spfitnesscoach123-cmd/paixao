@@ -1,19 +1,11 @@
-<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="6" time="1.941" timestamp="2026-02-07T21:23:46.812054+00:00" hostname="agent-env-fa9d75f5-f575-4c54-abd1-49eb0ca9d257"><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_position_summary_structure" time="0.314"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:67: in test_position_summary_structure
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_session_counting_unique_sessions" time="0.311"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:139: in test_session_counting_unique_sessions
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_position_group_averages_not_individual" time="0.312"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:228: in test_position_group_averages_not_individual
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestWellnessColorLogic" name="test_wellness_data_structure" time="0.273"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:319: in test_wellness_data_structure
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestDecimalInputForVelocity" name="test_vbt_decimal_velocity_input" time="0.268"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:388: in test_vbt_decimal_velocity_input
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestDecimalInputForVelocity" name="test_strength_assessment_decimal_speed" time="0.306"><failure message="KeyError: 'id'">tests/test_team_dashboard_bugs.py:442: in test_strength_assessment_decimal_speed
-    self.created_athletes.append(athlete["id"])
-                                 ^^^^^^^^^^^^^
-E   KeyError: 'id'</failure></testcase></testsuite></testsuites>
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="6" time="2.278" timestamp="2026-02-07T21:25:04.935807+00:00" hostname="agent-env-fa9d75f5-f575-4c54-abd1-49eb0ca9d257"><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_position_summary_structure" time="0.439"><failure message="AssertionError: Failed to get team dashboard: Internal Server Error&#10;assert 520 == 200&#10; +  where 520 = &lt;Response [520]&gt;.status_code">tests/test_team_dashboard_bugs.py:90: in test_position_summary_structure
+    assert response.status_code == 200, f"Failed to get team dashboard: {response.text}"
+E   AssertionError: Failed to get team dashboard: Internal Server Error
+E   assert 520 == 200
+E    +  where 520 = &lt;Response [520]&gt;.status_code</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_session_counting_unique_sessions" time="0.379"><failure message="assert 520 == 200&#10; +  where 520 = &lt;Response [520]&gt;.status_code">tests/test_team_dashboard_bugs.py:187: in test_session_counting_unique_sessions
+    assert response.status_code == 200
+E   assert 520 == 200
+E    +  where 520 = &lt;Response [520]&gt;.status_code</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestTeamDashboardBugFixes" name="test_position_group_averages_not_individual" time="0.427"><failure message="assert 520 == 200&#10; +  where 520 = &lt;Response [520]&gt;.status_code">tests/test_team_dashboard_bugs.py:251: in test_position_group_averages_not_individual
+    assert response.status_code == 200
+E   assert 520 == 200
+E    +  where 520 = &lt;Response [520]&gt;.status_code</failure></testcase><testcase classname="tests.test_team_dashboard_bugs.TestWellnessColorLogic" name="test_wellness_data_structure" time="0.286" /><testcase classname="tests.test_team_dashboard_bugs.TestDecimalInputForVelocity" name="test_vbt_decimal_velocity_input" time="0.339" /><testcase classname="tests.test_team_dashboard_bugs.TestDecimalInputForVelocity" name="test_strength_assessment_decimal_speed" time="0.294" /></testsuite></testsuites>
