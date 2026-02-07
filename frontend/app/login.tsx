@@ -33,7 +33,10 @@ export default function Login() {
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
   const { login } = useAuth();
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const router = useRouter();
+  
+  const styles = createLoginStyles(colors);
 
   useEffect(() => {
     checkBiometricSupport();
