@@ -1194,21 +1194,36 @@ def calculate_body_density_guedes(gender: str, skinfolds: dict) -> float:
     Guedes Protocol (1985) - Brazilian validated protocol
     Males: triceps, suprailiac, abdominal
     Females: triceps, suprailiac, thigh
+    
+    Uses log10 transformation for better accuracy
+    Reference: Guedes, D.P. (1985). Estudo da gordura corporal através da mensuração dos valores de densidade corporal e da espessura de dobras cutâneas em universitários.
     """
+    import math
+    
     if gender.lower() == 'male':
         sum_3 = (
             skinfolds.get('triceps', 0) +
             skinfolds.get('suprailiac', 0) +
             skinfolds.get('abdominal', 0)
         )
-        density = 1.17136 - (0.06706 * (sum_3 ** 0.5))
+        # Guedes male equation using log transformation
+        # BD = 1.1714 - 0.0671 * log10(sum_3)
+        if sum_3 > 0:
+            density = 1.1714 - (0.0671 * math.log10(sum_3))
+        else:
+            density = 1.0
     else:
         sum_3 = (
             skinfolds.get('triceps', 0) +
             skinfolds.get('suprailiac', 0) +
             skinfolds.get('thigh', 0)
         )
-        density = 1.1665 - (0.07063 * (sum_3 ** 0.5))
+        # Guedes female equation using log transformation
+        # BD = 1.1665 - 0.0706 * log10(sum_3)
+        if sum_3 > 0:
+            density = 1.1665 - (0.0706 * math.log10(sum_3))
+        else:
+            density = 1.0
     
     return density
 
