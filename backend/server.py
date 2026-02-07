@@ -2078,7 +2078,7 @@ async def get_strength_analysis(
     ai_insights = None
     try:
         emergent_key = os.environ.get('EMERGENT_LLM_KEY')
-        if emergent_key and len(assessed_metrics) > 0:
+        if emergent_key and len(analyzed_metrics) > 0:
             system_msg = "You are a sports science expert specializing in strength and conditioning for football players." if lang == "en" else "Você é um especialista em ciência do esporte, especializado em força e condicionamento para jogadores de futebol."
             
             metrics_summary = "\n".join([f"- {m.name}: {m.value}{m.unit} ({m.classification}, {m.percentile}th percentile)" for m in analyzed_metrics])
