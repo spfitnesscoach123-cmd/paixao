@@ -63,8 +63,9 @@ class TestTeamDashboardBugFixes:
             })
             assert response.status_code == 200, f"Failed to create athlete: {response.text}"
             athlete = response.json()
-            athletes.append(athlete)
-            self.created_athletes.append(athlete["id"])
+            athlete_id = athlete.get("_id") or athlete.get("id")
+            athletes.append({"id": athlete_id, **athlete})
+            self.created_athletes.append(athlete_id)
         
         # Add GPS data for each athlete
         today = datetime.now().strftime("%Y-%m-%d")
@@ -136,7 +137,8 @@ class TestTeamDashboardBugFixes:
         })
         assert response.status_code == 200
         athlete = response.json()
-        self.created_athletes.append(athlete["id"])
+        athlete_id = athlete.get("_id") or athlete.get("id")
+        self.created_athletes.append(athlete_id)
         
         today = datetime.now().strftime("%Y-%m-%d")
         yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -147,7 +149,7 @@ class TestTeamDashboardBugFixes:
         
         for period in periods:
             response = self.session.post(f"{BASE_URL}/api/gps-data", json={
-                "athlete_id": athlete["id"],
+                "athlete_id": athlete_id,
                 "date": today,
                 "session_id": session_id,
                 "session_name": "Match vs Team A",
@@ -165,7 +167,7 @@ class TestTeamDashboardBugFixes:
         # Create ANOTHER session on different day (should count as 2nd session)
         session_id_2 = str(uuid.uuid4())
         response = self.session.post(f"{BASE_URL}/api/gps-data", json={
-            "athlete_id": athlete["id"],
+            "athlete_id": athlete_id,
             "date": yesterday,
             "session_id": session_id_2,
             "session_name": "Training",
@@ -189,7 +191,7 @@ class TestTeamDashboardBugFixes:
         # Find our test athlete
         test_athlete = None
         for a in data["athletes"]:
-            if a["id"] == athlete["id"]:
+            if a["id"] == athlete_id:
                 test_athlete = a
                 break
         
