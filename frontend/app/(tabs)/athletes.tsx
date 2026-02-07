@@ -15,13 +15,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { Athlete } from '../../types';
-import { colors } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 
 export default function AthletesScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: athletes, isLoading } = useQuery({
@@ -108,6 +109,8 @@ export default function AthletesScreen() {
     </TouchableOpacity>
   );
 
+  const styles = createStyles(colors);
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -158,7 +161,7 @@ export default function AthletesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.primary,
