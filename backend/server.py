@@ -3240,7 +3240,7 @@ async def get_team_dashboard(
             wellness_score=wellness_score,
             total_sessions_7d=sessions_7d,
             avg_distance_7d=round(distance_7d / sessions_7d, 0) if sessions_7d > 0 else 0,
-            injury_risk=risk_level == "high" or (fatigue_score and fatigue_score > 70),
+            injury_risk=risk_level == "high" or (fatigue_score is not None and fatigue_score > 70),
             peripheral_fatigue=peripheral_fatigue
         ))
         
