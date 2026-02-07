@@ -209,6 +209,70 @@ class PhysicalAssessment(BaseModel):
         populate_by_name = True
         json_encoders = {ObjectId: str}
 
+# ============= BODY COMPOSITION MODELS =============
+
+class BodyCompositionProtocol(str, Enum):
+    GUEDES = "guedes"
+    POLLOCK_JACKSON_7 = "pollock_jackson_7"
+    POLLOCK_JACKSON_9 = "pollock_jackson_9"  # 9 skinfolds
+    FAULKNER_4 = "faulkner_4"
+
+class BodyCompositionCreate(BaseModel):
+    athlete_id: str
+    date: str
+    protocol: BodyCompositionProtocol
+    weight: float  # kg
+    height: float  # cm
+    age: int
+    gender: str  # "male" or "female"
+    # Skinfold measurements in mm
+    triceps: Optional[float] = None
+    subscapular: Optional[float] = None
+    suprailiac: Optional[float] = None
+    abdominal: Optional[float] = None
+    chest: Optional[float] = None
+    midaxillary: Optional[float] = None
+    thigh: Optional[float] = None
+    calf: Optional[float] = None
+    biceps: Optional[float] = None
+    notes: Optional[str] = None
+
+class BodyComposition(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    protocol: str
+    weight: float
+    height: float
+    age: int
+    gender: str
+    # Skinfold measurements
+    triceps: Optional[float] = None
+    subscapular: Optional[float] = None
+    suprailiac: Optional[float] = None
+    abdominal: Optional[float] = None
+    chest: Optional[float] = None
+    midaxillary: Optional[float] = None
+    thigh: Optional[float] = None
+    calf: Optional[float] = None
+    biceps: Optional[float] = None
+    # Calculated values
+    body_fat_percentage: float
+    lean_mass_kg: float  # Massa Isenta de Gordura
+    fat_mass_kg: float  # Massa de Gordura
+    bone_mass_kg: float  # Massa Óssea (estimated)
+    bmi: float  # Body Mass Index
+    bmi_classification: str
+    body_density: Optional[float] = None
+    fat_distribution: Optional[Dict[str, float]] = None  # For 3D visualization
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
 # ============= SUBSCRIPTION MODELS =============
 
 class SubscriptionPlan(str, Enum):
