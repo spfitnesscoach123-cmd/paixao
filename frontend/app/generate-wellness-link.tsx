@@ -25,12 +25,20 @@ export default function GenerateWellnessLink() {
     expiresAt: string;
     shareUrl: string;
   } | null>(null);
-  const [expiresDays, setExpiresDays] = useState(7);
+  const [expiresHours, setExpiresHours] = useState(24); // Default 24 hours
+
+  // Duration options in hours
+  const DURATION_OPTIONS = [
+    { value: 0.5, label: '30 min', labelPt: '30 min' },
+    { value: 2, label: '2 hours', labelPt: '2 horas' },
+    { value: 8, label: '8 hours', labelPt: '8 horas' },
+    { value: 24, label: '24 hours', labelPt: '24 horas' },
+  ];
 
   const handleGenerateLink = async () => {
     setIsGenerating(true);
     try {
-      const response = await api.post(`/wellness/generate-link?expires_days=${expiresDays}`);
+      const response = await api.post(`/wellness/generate-link?expires_hours=${expiresHours}`);
       
       // Construct full URL
       const baseUrl = Platform.OS === 'web' 
