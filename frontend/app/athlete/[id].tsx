@@ -628,6 +628,9 @@ export default function AthleteDetails() {
               <StrengthAnalysisCharts athleteId={id} />
             </View>
 
+            {/* Strength History Chart */}
+            <StrengthHistoryChart athleteId={id} />
+
             {/* Assessment History */}
             <Text style={styles.sectionTitle}>{t('assessments.history') || 'Histórico de Avaliações'}</Text>
             
