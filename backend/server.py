@@ -2675,6 +2675,221 @@ async def generate_athlete_pdf_report(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+# ============= SUBSCRIPTION ENDPOINTS =============
+
+@api_router.get("/subscription/plans")
+async def get_subscription_plans():
+    """Get all available subscription plans"""
+    plans = []
+    for plan_id, plan_data in PLAN_LIMITS.items():
+        if plan_id != "free_trial":  # Don't show trial as a purchasable plan
+            plans.append({
+                "id": plan_id,
+                "name": plan_data["name"],
+                "price": plan_data["price"],
+                "max_athletes": plan_data["max_athletes"],
+                "history_months": plan_data["history_months"],
+                "export_pdf": plan_data.get("export_pdf", False),
+                "export_csv": plan_data.get("export_csv", False),
+                "advanced_analytics": plan_data.get("advanced_analytics", False),
+                "ai_insights": plan_data.get("ai_insights", False),
+                "fatigue_alerts": plan_data.get("fatigue_alerts", False),
+                "multi_user": plan_data.get("multi_user", False),
+                "max_users": plan_data.get("max_users", 1),
+                "features": plan_data.get("features", []),
+                "trial_days": plan_data.get("trial_days", 7),
+            })
+    return plans
+
+@api_router.get("/subscription/current", response_model=SubscriptionResponse)
+async def get_current_subscription(current_user: dict = Depends(get_current_user)):
+    """Get current user's subscription status"""
+    user_id = current_user["_id"]
+    
+    # Get subscription from database
+    subscription = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": {"$in": ["active", "trial"]}
+    })
+    
+    # Count current athletes
+    athlete_count = await db.athletes.count_documents({"coach_id": user_id})
+    
+    if not subscription:
+        # Create default trial subscription
+        trial_end = datetime.utcnow() + timedelta(days=7)
+        new_subscription = {
+            "user_id": user_id,
+            "plan": "free_trial",
+            "status": "trial",
+            "start_date": datetime.utcnow(),
+            "trial_end_date": trial_end,
+            "current_period_end": trial_end,
+            "created_at": datetime.utcnow(),
+        }
+        await db.subscriptions.insert_one(new_subscription)
+        subscription = new_subscription
+    
+    plan = subscription.get("plan", "free_trial")
+    plan_limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free_trial"])
+    status = subscription.get("status", "trial")
+    
+    # Calculate days remaining
+    days_remaining = None
+    trial_end_str = None
+    if subscription.get("trial_end_date"):
+        trial_end = subscription["trial_end_date"]
+        if isinstance(trial_end, str):
+            trial_end = datetime.fromisoformat(trial_end)
+        days_remaining = max(0, (trial_end - datetime.utcnow()).days)
+        trial_end_str = trial_end.strftime("%Y-%m-%d")
+        
+        # Check if trial expired
+        if days_remaining == 0 and status == "trial":
+            await db.subscriptions.update_one(
+                {"_id": subscription.get("_id")},
+                {"$set": {"status": "expired"}}
+            )
+            status = "expired"
+    
+    # Calculate limits reached
+    max_athletes = plan_limits.get("max_athletes", 25)
+    limits_reached = {
+        "athletes": athlete_count >= max_athletes if max_athletes > 0 else False,
+        "export_pdf": not plan_limits.get("export_pdf", False),
+        "export_csv": not plan_limits.get("export_csv", False),
+        "advanced_analytics": not plan_limits.get("advanced_analytics", False),
+        "ai_insights": not plan_limits.get("ai_insights", False),
+    }
+    
+    return SubscriptionResponse(
+        plan=plan,
+        plan_name=plan_limits.get("name", "Trial"),
+        status=status,
+        price=plan_limits.get("price", 0),
+        max_athletes=max_athletes,
+        current_athletes=athlete_count,
+        history_months=plan_limits.get("history_months", 3),
+        days_remaining=days_remaining,
+        trial_end_date=trial_end_str,
+        features={
+            "export_pdf": plan_limits.get("export_pdf", False),
+            "export_csv": plan_limits.get("export_csv", False),
+            "advanced_analytics": plan_limits.get("advanced_analytics", False),
+            "ai_insights": plan_limits.get("ai_insights", False),
+            "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
+            "multi_user": plan_limits.get("multi_user", False),
+            "priority_support": plan_limits.get("priority_support", False),
+        },
+        limits_reached=limits_reached
+    )
+
+@api_router.post("/subscription/subscribe")
+async def subscribe_to_plan(
+    subscription_data: SubscriptionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Subscribe to a plan (simulated - no real payment)"""
+    user_id = current_user["_id"]
+    plan = subscription_data.plan.value
+    
+    if plan not in PLAN_LIMITS:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    
+    plan_limits = PLAN_LIMITS[plan]
+    
+    # Cancel any existing subscription
+    await db.subscriptions.update_many(
+        {"user_id": user_id, "status": {"$in": ["active", "trial"]}},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.utcnow()}}
+    )
+    
+    # Create new subscription
+    trial_end = datetime.utcnow() + timedelta(days=plan_limits.get("trial_days", 7))
+    period_end = datetime.utcnow() + timedelta(days=30)  # Monthly billing
+    
+    new_subscription = {
+        "user_id": user_id,
+        "plan": plan,
+        "status": "trial",  # Start with trial
+        "start_date": datetime.utcnow(),
+        "trial_end_date": trial_end,
+        "current_period_end": period_end,
+        "created_at": datetime.utcnow(),
+    }
+    
+    result = await db.subscriptions.insert_one(new_subscription)
+    
+    return {
+        "message": "Subscription created successfully",
+        "subscription_id": str(result.inserted_id),
+        "plan": plan,
+        "trial_end_date": trial_end.strftime("%Y-%m-%d"),
+        "status": "trial"
+    }
+
+@api_router.post("/subscription/cancel")
+async def cancel_subscription(current_user: dict = Depends(get_current_user)):
+    """Cancel current subscription"""
+    user_id = current_user["_id"]
+    
+    result = await db.subscriptions.update_one(
+        {"user_id": user_id, "status": {"$in": ["active", "trial"]}},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.utcnow()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    return {"message": "Subscription cancelled successfully"}
+
+@api_router.get("/subscription/check-feature/{feature}")
+async def check_feature_access(
+    feature: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check if user has access to a specific feature"""
+    user_id = current_user["_id"]
+    
+    subscription = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": {"$in": ["active", "trial"]}
+    })
+    
+    if not subscription:
+        return {"has_access": False, "reason": "no_subscription"}
+    
+    plan = subscription.get("plan", "free_trial")
+    plan_limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free_trial"])
+    
+    # Check trial expiration
+    if subscription.get("status") == "trial":
+        trial_end = subscription.get("trial_end_date")
+        if trial_end:
+            if isinstance(trial_end, str):
+                trial_end = datetime.fromisoformat(trial_end)
+            if datetime.utcnow() > trial_end:
+                return {"has_access": False, "reason": "trial_expired"}
+    
+    # Check feature access
+    feature_map = {
+        "export_pdf": plan_limits.get("export_pdf", False),
+        "export_csv": plan_limits.get("export_csv", False),
+        "advanced_analytics": plan_limits.get("advanced_analytics", False),
+        "ai_insights": plan_limits.get("ai_insights", False),
+        "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
+        "athlete_comparison": "athlete_comparison" in plan_limits.get("features", []) or "all" in plan_limits.get("features", []),
+    }
+    
+    has_access = feature_map.get(feature, False)
+    
+    return {
+        "has_access": has_access,
+        "feature": feature,
+        "plan": plan,
+        "upgrade_required": not has_access
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
