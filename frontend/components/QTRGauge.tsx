@@ -25,15 +25,15 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
 
   const classification = getClassification();
   
-  // Gauge dimensions
-  const strokeWidth = 15;
-  const radius = (size - strokeWidth) / 2;
+  // Gauge dimensions - adjusted for better fit
+  const strokeWidth = 14;
+  const radius = (size - strokeWidth) / 2 - 10; // Reduced radius slightly
   const centerX = size / 2;
   const centerY = size / 2;
   
-  // Arc calculations (180 degree arc - bottom half hidden)
-  const startAngle = 135; // Start from bottom-left
-  const endAngle = 405;   // End at bottom-right (270 degree sweep)
+  // Arc calculations (270 degree arc)
+  const startAngle = 135;
+  const endAngle = 405;
   const sweepAngle = 270;
   
   // Convert angle to radians
@@ -48,13 +48,8 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
     };
   };
   
-  // Background arc path
-  const bgStart = polarToCartesian(startAngle);
-  const bgEnd = polarToCartesian(endAngle);
-  
   // Progress arc path (based on score)
   const progressAngle = startAngle + (sweepAngle * clampedScore / 100);
-  const progressEnd = polarToCartesian(progressAngle);
   
   // Create arc path
   const describeArc = (start: number, end: number) => {
@@ -76,7 +71,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
     y: centerY + needleLength * Math.sin(toRadians(needleAngle)),
   };
 
-  // Color gradient stops based on zones
+  // Color gradient based on score
   const getGradientColor = () => {
     if (clampedScore <= 30) return '#ef4444';
     if (clampedScore <= 60) return '#f59e0b';
@@ -84,9 +79,12 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
     return '#22c55e';
   };
 
+  // Container height to fit gauge properly
+  const containerHeight = size * 0.85;
+
   return (
-    <View style={[styles.container, { width: size, height: size * 0.7 }]}>
-      <Svg width={size} height={size * 0.7} viewBox={`0 0 ${size} ${size * 0.7}`}>
+    <View style={[styles.container, { width: size, height: containerHeight }]}>
+      <Svg width={size} height={containerHeight} viewBox={`0 0 ${size} ${containerHeight}`}>
         <Defs>
           <LinearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
             <Stop offset="0%" stopColor="#ef4444" />
@@ -96,7 +94,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
           </LinearGradient>
         </Defs>
         
-        <G transform={`translate(0, -${size * 0.15})`}>
+        <G transform={`translate(0, ${size * 0.05})`}>
           {/* Background Arc */}
           <Path
             d={describeArc(startAngle, endAngle)}
@@ -161,8 +159,8 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
           
           {/* Zone Labels */}
           <SvgText
-            x={size * 0.12}
-            y={centerY + radius * 0.5}
+            x={size * 0.10}
+            y={centerY + radius * 0.6}
             fill="#ef4444"
             fontSize="10"
             fontWeight="500"
@@ -171,8 +169,8 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
             0
           </SvgText>
           <SvgText
-            x={size * 0.88}
-            y={centerY + radius * 0.5}
+            x={size * 0.90}
+            y={centerY + radius * 0.6}
             fill="#22c55e"
             fontSize="10"
             fontWeight="500"
@@ -184,7 +182,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
       </Svg>
       
       {/* Score Display */}
-      <View style={styles.scoreContainer}>
+      <View style={[styles.scoreContainer, { bottom: containerHeight * 0.12 }]}>
         <Text style={[styles.scoreValue, { color: classification.color }]}>
           {Math.round(clampedScore)}
         </Text>
@@ -195,7 +193,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
       
       {/* QTR Label */}
       <Text style={styles.qtrLabel}>QTR</Text>
-      <Text style={styles.qtrSubLabel}>{t('wellness.qtrTitle') || 'Qualidade Total de Recuperação'}</Text>
+      <Text style={[styles.qtrSubLabel, { bottom: 0 }]}>{t('wellness.qtrTitle') || 'Qualidade Total de Recuperação'}</Text>
     </View>
   );
 };
