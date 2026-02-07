@@ -2775,15 +2775,24 @@ async def generate_athlete_pdf_report(
 # ============= SUBSCRIPTION ENDPOINTS =============
 
 @api_router.get("/subscription/plans")
-async def get_subscription_plans():
-    """Get all available subscription plans"""
+async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
+    """Get all available subscription plans with regional pricing"""
     plans = []
+    is_brazil = region.upper() == "BR"
+    is_portuguese = lang.lower() in ["pt", "pt-br"]
+    
     for plan_id, plan_data in PLAN_LIMITS.items():
         if plan_id != "free_trial":  # Don't show trial as a purchasable plan
+            price = plan_data.get("price_brl", 0) if is_brazil else plan_data.get("price_usd", 0)
+            currency = "BRL" if is_brazil else "USD"
+            currency_symbol = "R$" if is_brazil else "$"
+            
             plans.append({
                 "id": plan_id,
-                "name": plan_data["name"],
-                "price": plan_data["price"],
+                "name": plan_data["name"] if is_portuguese else plan_data.get("name_en", plan_data["name"]),
+                "price": price,
+                "price_formatted": f"{currency_symbol} {price:.2f}".replace(".", ",") if is_brazil else f"{currency_symbol}{price:.2f}",
+                "currency": currency,
                 "max_athletes": plan_data["max_athletes"],
                 "history_months": plan_data["history_months"],
                 "export_pdf": plan_data.get("export_pdf", False),
@@ -2795,6 +2804,10 @@ async def get_subscription_plans():
                 "max_users": plan_data.get("max_users", 1),
                 "features": plan_data.get("features", []),
                 "trial_days": plan_data.get("trial_days", 7),
+                "description": plan_data.get("description_pt" if is_portuguese else "description_en", ""),
+                "features_list": plan_data.get("features_list_pt" if is_portuguese else "features_list_en", []),
+                "limitations": plan_data.get("limitations_pt" if is_portuguese else "limitations_en", []),
+                "popular": plan_data.get("popular", False),
             })
     return plans
 
