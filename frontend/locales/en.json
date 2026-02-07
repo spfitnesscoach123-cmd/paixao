@@ -136,7 +136,17 @@
     "hid": "HID",
     "spr": "Spr",
     "showTotals": "Show Totals",
-    "tapPeriodTip": "Tap a period to see its values above"
+    "tapPeriodTip": "Tap a period to see its values above",
+    "filterByDate": "Filter by date",
+    "filterAll": "All",
+    "filter7days": "7 days",
+    "filter30days": "30 days",
+    "filterMonth": "This month",
+    "filterCustom": "Custom",
+    "selectDateRange": "Select date range",
+    "startDate": "Start date",
+    "endDate": "End date",
+    "filtered": "filtered"
   },
   "wellness": {
     "title": "Wellness",
