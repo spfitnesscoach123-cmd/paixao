@@ -422,9 +422,19 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
     );
   };
   
-  // Composition Donut Chart
+  // Composition Donut Chart - fixed for proper arc rendering
   const CompositionDonut = () => {
     const total = data.lean_mass_kg + data.fat_mass_kg;
+    
+    // Prevent division by zero
+    if (total === 0) {
+      return (
+        <View style={styles.donutContainer}>
+          <Text style={{ color: colors.text.secondary }}>{t2.noData}</Text>
+        </View>
+      );
+    }
+    
     const leanPercent = (data.lean_mass_kg / total) * 100;
     const fatPercent = (data.fat_mass_kg / total) * 100;
     
@@ -432,8 +442,9 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
     const strokeWidth = 20;
     const circumference = 2 * Math.PI * radius;
     
-    const leanOffset = 0;
-    const fatOffset = (leanPercent / 100) * circumference;
+    // Calculate the length of each arc segment
+    const leanLength = (leanPercent / 100) * circumference;
+    const fatLength = (fatPercent / 100) * circumference;
     
     return (
       <View style={styles.donutContainer}>
@@ -448,7 +459,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
             strokeWidth={strokeWidth}
           />
           
-          {/* Lean mass arc */}
+          {/* Lean mass arc (green) - starts at top */}
           <Circle
             cx="80"
             cy="80"
@@ -456,13 +467,12 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
             fill="none"
             stroke="#10b981"
             strokeWidth={strokeWidth}
-            strokeDasharray={`${(leanPercent / 100) * circumference} ${circumference}`}
-            strokeDashoffset={-leanOffset}
-            strokeLinecap="round"
-            transform="rotate(-90 80 80)"
+            strokeDasharray={`${leanLength} ${circumference}`}
+            strokeDashoffset={circumference / 4}
+            strokeLinecap="butt"
           />
           
-          {/* Fat mass arc */}
+          {/* Fat mass arc (yellow/orange) - starts where lean ends */}
           <Circle
             cx="80"
             cy="80"
@@ -470,10 +480,9 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
             fill="none"
             stroke="#f59e0b"
             strokeWidth={strokeWidth}
-            strokeDasharray={`${(fatPercent / 100) * circumference} ${circumference}`}
-            strokeDashoffset={-fatOffset}
-            strokeLinecap="round"
-            transform="rotate(-90 80 80)"
+            strokeDasharray={`${fatLength} ${circumference}`}
+            strokeDashoffset={circumference / 4 - leanLength}
+            strokeLinecap="butt"
           />
           
           {/* Center text */}
