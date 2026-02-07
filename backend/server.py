@@ -2232,10 +2232,6 @@ async def get_strength_analysis(
                 variation_from_peak=round(variation, 1) if variation else None
             ))
     
-    # Calculate fatigue index
-    fatigue_index = metrics_data.get("fatigue_index", 0)
-    fatigue_alert = fatigue_index > 70
-    
     # Detect peripheral fatigue
     # Peripheral fatigue = RSI decrease + Peak Power decrease
     rsi_current = metrics_data.get("rsi", 0)
@@ -2246,6 +2242,55 @@ async def get_strength_analysis(
     rsi_drop = (rsi_peak - rsi_current) / rsi_peak * 100 if rsi_peak > 0 else 0
     power_drop = (peak_power_peak - peak_power_current) / peak_power_peak * 100 if peak_power_peak > 0 else 0
     
+    # Calculate fatigue index automatically based on power drop from historical peak
+    # Formula: 
+    # - power_drop > 30% => fatigue_index < 70% (low recovery)
+    # - power_drop 15-30% => fatigue_index 70-85% (moderate recovery)
+    # - power_drop < 15% => fatigue_index 85-100% (good recovery)
+    # We invert the logic: higher fatigue_index = more recovered = lower fatigue
+    # But the user wants to show "fatigue level" so we calculate actual fatigue percentage
+    
+    # Calculate fatigue based on power drop and RSI drop
+    # If power drops > 30%, fatigue is HIGH (>70%)
+    # If power drops 15-30%, fatigue is MODERATE (50-70%)
+    # If power drops < 15%, fatigue is LOW (<50%)
+    
+    manual_fatigue = metrics_data.get("fatigue_index", None)
+    if manual_fatigue is not None and manual_fatigue > 0:
+        # Use manual input if provided
+        fatigue_index = manual_fatigue
+    else:
+        # Calculate fatigue from power drop
+        # power_drop > 30% => fatigue_index = 80-100% (very fatigued)
+        # power_drop 20-30% => fatigue_index = 70-80% (high fatigue)
+        # power_drop 10-20% => fatigue_index = 50-70% (moderate fatigue)
+        # power_drop < 10% => fatigue_index = 0-50% (low fatigue/well recovered)
+        
+        if power_drop >= 30:
+            # Very high fatigue - scales from 80-100% based on how much above 30%
+            fatigue_index = min(100, 80 + (power_drop - 30) * 0.5)
+        elif power_drop >= 20:
+            # High fatigue - scales from 70-80%
+            fatigue_index = 70 + (power_drop - 20)
+        elif power_drop >= 10:
+            # Moderate fatigue - scales from 50-70%
+            fatigue_index = 50 + (power_drop - 10) * 2
+        elif power_drop >= 5:
+            # Low fatigue - scales from 30-50%
+            fatigue_index = 30 + (power_drop - 5) * 4
+        else:
+            # Well recovered - scales from 0-30%
+            fatigue_index = power_drop * 6
+        
+        # Also factor in RSI drop
+        if rsi_drop > 20:
+            fatigue_index = min(100, fatigue_index + 10)
+        elif rsi_drop > 10:
+            fatigue_index = min(100, fatigue_index + 5)
+        
+        fatigue_index = round(fatigue_index, 1)
+    
+    fatigue_alert = fatigue_index > 70
     peripheral_fatigue = (rsi_drop > 10 and power_drop > 10) or fatigue_index > 70
     
     # Overall classification
