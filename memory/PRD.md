@@ -14,7 +14,8 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - Multilingual support (i18n)
 - PDF report generation
 - Strength assessments with fatigue detection
-- **NEW**: Subscription-based monetization system with regional pricing
+- Subscription-based monetization system with regional pricing
+- Team-wide dashboard for coaches
 
 ## User Personas
 - **Head Coaches**: Need team-wide overview, player comparisons, workload management
@@ -52,10 +53,15 @@ Build and maintain a comprehensive athlete analytics platform featuring:
   - Mean Speed (m/s)
   - Peak Speed (m/s)
   - RSI (Reactive Strength Index)
-  - Fatigue Index (%)
+  - Fatigue Index (%) - **NOW AUTO-CALCULATED**
 - Normative classifications based on football literature
 - Historical comparison with athlete's personal peak values
-- Peripheral fatigue detection: RSI drop + Peak Power drop = injury risk alert
+- **Peripheral fatigue detection**: RSI drop + Peak Power drop = injury risk alert
+- **Auto fatigue calculation**:
+  - Power drop > 30% → Fatigue index > 80% (high fatigue/low recovery)
+  - Power drop 20-30% → Fatigue index 70-80%
+  - Power drop 10-20% → Fatigue index 50-70%
+  - Power drop < 10% → Fatigue index < 50% (well recovered)
 - AI-powered insights for strength profile analysis
 
 ### Analysis Features
@@ -78,7 +84,7 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 
 ---
 
-## Subscription System (NEW - Feb 7, 2025)
+## Subscription System (IMPLEMENTED - Feb 7, 2025)
 
 ### Plan Tiers
 
@@ -127,6 +133,24 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 
 ---
 
+## Team Dashboard (IMPLEMENTED - Feb 7, 2025)
+
+### Features
+- **Aggregated Stats**: Total athletes, high risk count, optimal count, fatigued count
+- **Team Averages**: Avg ACWR, Avg Wellness, Avg Fatigue, Sessions/Week
+- **Alerts Section**: Prioritized alerts for power drops, high ACWR, high fatigue
+- **Risk Distribution**: Donut chart showing athletes by risk level
+- **Athletes List**: Sortable by risk level, shows ACWR, fatigue %, injury risk indicators
+- **Position Summary**: Stats grouped by player position (Midfielder, Forward, etc.)
+- **Weekly Distance**: Total team distance this week
+
+### Automatic Alerts Generated
+- ⚡ Power drop > 30% (peripheral fatigue)
+- ⚠️ High ACWR (> 1.5)
+- 🔴 High fatigue (> 70%)
+
+---
+
 ## Tech Stack
 - **Frontend**: React Native (Expo for Web), TypeScript, React Navigation, React Query
 - **Backend**: Python, FastAPI, Motor (MongoDB async driver)
@@ -140,18 +164,18 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 ## What's Been Implemented
 
 ### February 7, 2025 (Current Session)
-- **Subscription System**: Complete implementation with 3 tiers (Essencial, Profissional, Elite)
-- **Regional Pricing**: Auto-detects region, shows BRL for Brazil, USD for international
-- **Backend Endpoints**: /api/subscription/plans, /current, /subscribe, /cancel
-- **Frontend Subscription Page**: Shows current plan, trial status, all plans with features
-- **Bug Fix P0**: Fixed "Unmatched Route" error for add-strength.tsx (import paths corrected)
+- **Team Dashboard**: Complete backend endpoint `/api/dashboard/team` + Frontend page
+- **Auto Fatigue Calculation**: fatigue_index now calculated from power_drop when not manually entered
+- **Subscription System**: 3 plans with regional pricing (BRL/USD), 7-day trial
+- **Bug Fix P0**: Navigation to add-strength.tsx working (import paths fixed)
+- **New Tab**: "Team" tab added to bottom navigation
 
 ### February 6-7, 2025 (Previous Sessions)
 - GPS Date Filter: Added GPSDateFilter component with quick filter buttons
 - QTR Gauge: Created QTRGauge component with SVG-based speedometer visualization
 - Wellness Charts: Added WellnessCharts component with parameter evolution graphs
 - Strength Assessment Form: Created add-strength.tsx for manual entry of strength metrics
-- Strength Analysis API: New endpoint `/api/analysis/strength/{athlete_id}`
+- Strength Analysis API: Endpoint `/api/analysis/strength/{athlete_id}`
 - Strength Analysis Charts: Frontend component for visualizing strength metrics
 - Peripheral Fatigue Detection: Algorithm to detect accumulated muscle fatigue
 - Theme toggle: Basic Dark/Light mode toggle in Profile
@@ -172,7 +196,7 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 
 ## Prioritized Backlog
 
-### P0 (Completed)
+### P0 (Completed ✅)
 - [x] GPS Date Filter with quick buttons
 - [x] QTR Gauge for wellness recovery score
 - [x] Wellness parameter correlation charts
@@ -182,13 +206,14 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - [x] Subscription system with 3 tiers
 - [x] Regional pricing (BRL/USD)
 - [x] Bug fix: add-strength.tsx navigation
+- [x] Team Dashboard with aggregated stats
+- [x] Auto fatigue calculation from power drop
 
-### P1 (In Progress)
+### P1 (Pending)
 - [ ] Full i18n audit - ensure all strings use t() function
 - [ ] Theme switching (Dark/Light) applied to all screens
 
 ### P2 (Backlog)
-- [ ] Team-wide statistics dashboard
 - [ ] Push notifications for wellness reminders
 - [ ] Export strength assessment reports
 - [ ] Comparison of strength between athletes
@@ -200,6 +225,7 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - [ ] Advanced filtering for comparisons
 - [ ] Integration API for Elite plan
 - [ ] Multi-user authentication for Elite plan
+- [ ] Gamification/Leaderboards
 
 ---
 
@@ -238,9 +264,12 @@ Build and maintain a comprehensive athlete analytics platform featuring:
 - `GET /api/analysis/fatigue/{id}` - Fatigue analysis
 - `GET /api/analysis/ai-insights/{id}` - AI-generated insights
 - `GET /api/analysis/comprehensive/{id}` - All analyses combined
-- `GET /api/analysis/strength/{id}` - Strength analysis with normatives
+- `GET /api/analysis/strength/{id}` - Strength analysis with auto fatigue calculation
 
-### Subscription (NEW)
+### Team Dashboard (NEW)
+- `GET /api/dashboard/team` - Get aggregated team statistics
+
+### Subscription
 - `GET /api/subscription/plans` - Get all plans with regional pricing
 - `GET /api/subscription/current` - Get user's current subscription
 - `POST /api/subscription/subscribe` - Subscribe to a plan (starts trial)
