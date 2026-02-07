@@ -483,15 +483,15 @@ const createStyles = (colors: any) => StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
     gap: 8,
     marginBottom: 16,
   },
   statCard: {
-    flex: 1,
-    minWidth: '30%',
-    maxWidth: '32%',
+    width: '48%',
     borderRadius: 12,
     overflow: 'hidden',
+    marginBottom: 4,
   },
   statCardGradient: {
     padding: 16,
