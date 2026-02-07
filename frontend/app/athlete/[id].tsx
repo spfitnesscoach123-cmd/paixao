@@ -101,6 +101,16 @@ export default function AthleteDetails() {
     },
   });
 
+  // Fetch body composition data
+  const { data: bodyCompositionData } = useQuery({
+    queryKey: ['body-composition', id],
+    queryFn: async () => {
+      const response = await api.get(`/body-composition/athlete/${id}`);
+      return response.data;
+    },
+    retry: false,
+  });
+
   // Group GPS data by session_id
   const groupedSessions = useMemo((): GroupedSession[] => {
     if (!gpsData || gpsData.length === 0) return [];
