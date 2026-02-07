@@ -3244,22 +3244,60 @@ async def get_team_dashboard(
             peripheral_fatigue=peripheral_fatigue
         ))
         
-        # Update position averages
+        # Update position averages - collect all metrics for group averaging
         if acwr:
-            if "total_acwr" not in position_summary[position]:
-                position_summary[position]["total_acwr"] = 0
-                position_summary[position]["acwr_count"] = 0
-            position_summary[position]["total_acwr"] += acwr
-            position_summary[position]["acwr_count"] += 1
+            position_summary[position]["_total_acwr"] += acwr
+            position_summary[position]["_acwr_count"] += 1
+        
+        if wellness_score:
+            position_summary[position]["_total_wellness"] += wellness_score
+            position_summary[position]["_wellness_count"] += 1
+        
+        if fatigue_score:
+            position_summary[position]["_total_fatigue"] += fatigue_score
+            position_summary[position]["_fatigue_count"] += 1
+        
+        # Aggregate GPS metrics for position group
+        if gps_data:
+            # Calculate average metrics from this athlete's recent GPS data
+            recent_gps = [g for g in gps_data[:7]]  # Last 7 records
+            if recent_gps:
+                avg_dist = sum(g.get("total_distance", 0) for g in recent_gps) / len(recent_gps)
+                avg_sprints = sum(g.get("number_of_sprints", 0) for g in recent_gps) / len(recent_gps)
+                max_speeds = [g.get("max_speed", 0) for g in recent_gps if g.get("max_speed")]
+                avg_max_speed = sum(max_speeds) / len(max_speeds) if max_speeds else 0
+                
+                position_summary[position]["_total_distance"] += avg_dist
+                position_summary[position]["_total_sprints"] += avg_sprints
+                position_summary[position]["_total_max_speed"] += avg_max_speed
+                position_summary[position]["_gps_count"] += 1
     
-    # Calculate averages for positions
+    # Calculate averages for positions and clean up accumulators
     for pos in position_summary:
-        if "acwr_count" in position_summary[pos] and position_summary[pos]["acwr_count"] > 0:
-            position_summary[pos]["avg_acwr"] = round(
-                position_summary[pos]["total_acwr"] / position_summary[pos]["acwr_count"], 2
-            )
-            del position_summary[pos]["total_acwr"]
-            del position_summary[pos]["acwr_count"]
+        ps = position_summary[pos]
+        
+        # Calculate ACWR average
+        if ps["_acwr_count"] > 0:
+            ps["avg_acwr"] = round(ps["_total_acwr"] / ps["_acwr_count"], 2)
+        
+        # Calculate wellness average
+        if ps["_wellness_count"] > 0:
+            ps["avg_wellness"] = round(ps["_total_wellness"] / ps["_wellness_count"], 1)
+        
+        # Calculate fatigue average
+        if ps["_fatigue_count"] > 0:
+            ps["avg_fatigue"] = round(ps["_total_fatigue"] / ps["_fatigue_count"], 1)
+        
+        # Calculate GPS metrics averages (group averages)
+        if ps["_gps_count"] > 0:
+            ps["avg_distance"] = round(ps["_total_distance"] / ps["_gps_count"], 0)
+            ps["avg_sprints"] = round(ps["_total_sprints"] / ps["_gps_count"], 1)
+            ps["avg_max_speed"] = round(ps["_total_max_speed"] / ps["_gps_count"], 1)
+        
+        # Remove accumulator fields from response
+        for key in list(ps.keys()):
+            if key.startswith("_"):
+                del ps[key]
     
     # Sort alerts by severity (⚠️ warnings last, 🔴 critical first)
     alerts.sort(key=lambda x: (0 if "🔴" in x else (1 if "⚡" in x else 2)))
