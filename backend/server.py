@@ -10,6 +10,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
+from enum import Enum
 import bcrypt
 import jwt
 from bson import ObjectId
