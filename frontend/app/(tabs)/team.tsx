@@ -31,6 +31,11 @@ interface TeamDashboardAthlete {
   avg_distance_7d: number;
   injury_risk: boolean;
   peripheral_fatigue: boolean;
+  // New fields for strength and body comp
+  mean_power?: number;
+  peak_power?: number;
+  body_fat_percentage?: number;
+  lean_mass_kg?: number;
 }
 
 interface TeamDashboardStats {
@@ -43,6 +48,9 @@ interface TeamDashboardStats {
   team_avg_fatigue: number;
   sessions_this_week: number;
   total_distance_this_week: number;
+  // New team averages
+  team_avg_body_fat?: number;
+  team_avg_power?: number;
 }
 
 interface TeamDashboardResponse {
