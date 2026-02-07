@@ -56,6 +56,7 @@ export default function AthleteDetails() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [refreshing, setRefreshing] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
