@@ -2812,9 +2812,14 @@ async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
     return plans
 
 @api_router.get("/subscription/current", response_model=SubscriptionResponse)
-async def get_current_subscription(current_user: dict = Depends(get_current_user)):
+async def get_current_subscription(
+    lang: str = "pt", 
+    region: str = "BR",
+    current_user: dict = Depends(get_current_user)
+):
     """Get current user's subscription status"""
     user_id = current_user["_id"]
+    is_brazil = region.upper() == "BR"
     
     # Get subscription from database
     subscription = await db.subscriptions.find_one({
@@ -2843,6 +2848,9 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
     plan = subscription.get("plan", "free_trial")
     plan_limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free_trial"])
     status = subscription.get("status", "trial")
+    
+    # Get price based on region
+    price = plan_limits.get("price_brl", 0) if is_brazil else plan_limits.get("price_usd", 0)
     
     # Calculate days remaining
     days_remaining = None
@@ -2876,7 +2884,7 @@ async def get_current_subscription(current_user: dict = Depends(get_current_user
         plan=plan,
         plan_name=plan_limits.get("name", "Trial"),
         status=status,
-        price=plan_limits.get("price", 0),
+        price=price,
         max_athletes=max_athletes,
         current_athletes=athlete_count,
         history_months=plan_limits.get("history_months", 3),
