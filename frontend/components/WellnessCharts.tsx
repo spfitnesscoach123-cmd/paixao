@@ -92,11 +92,28 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
   };
 
   const metrics = [
-    { key: 'fatigue', label: t('wellness.fatigue') || 'Fadiga', color: '#ef4444', data: sortedData.map(d => d.fatigue) },
-    { key: 'sleep_quality', label: t('wellness.sleepQuality') || 'Sono', color: '#3b82f6', data: sortedData.map(d => d.sleep_quality) },
-    { key: 'mood', label: t('wellness.mood') || 'Humor', color: '#10b981', data: sortedData.map(d => d.mood) },
-    { key: 'muscle_soreness', label: t('wellness.muscleSoreness') || 'Dor', color: '#f59e0b', data: sortedData.map(d => d.muscle_soreness) },
+    // Fadiga, Estresse, Dor: menor é melhor (verde para baixo, vermelho para alto)
+    // Cores invertidas: quanto MENOR o valor, MELHOR (mais verde)
+    { key: 'fatigue', label: t('wellness.fatigue') || 'Fadiga', color: '#ef4444', data: sortedData.map(d => d.fatigue), invertedColors: true },
+    { key: 'sleep_quality', label: t('wellness.sleepQuality') || 'Sono', color: '#3b82f6', data: sortedData.map(d => d.sleep_quality), invertedColors: false },
+    { key: 'mood', label: t('wellness.mood') || 'Humor', color: '#10b981', data: sortedData.map(d => d.mood), invertedColors: false },
+    { key: 'muscle_soreness', label: t('wellness.muscleSoreness') || 'Dor', color: '#f59e0b', data: sortedData.map(d => d.muscle_soreness), invertedColors: true },
   ];
+  
+  // Helper function to get color based on value and inverted logic
+  const getValueColor = (value: number, inverted: boolean) => {
+    if (inverted) {
+      // Lower is better: 1-3 green, 4-6 yellow, 7-10 red
+      if (value <= 3) return '#10b981'; // Green
+      if (value <= 6) return '#f59e0b'; // Yellow
+      return '#ef4444'; // Red
+    } else {
+      // Higher is better: 7-10 green, 4-6 yellow, 1-3 red
+      if (value >= 7) return '#10b981'; // Green
+      if (value >= 4) return '#f59e0b'; // Yellow
+      return '#ef4444'; // Red
+    }
+  };
 
   if (data.length === 0) {
     return (
