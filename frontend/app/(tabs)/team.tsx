@@ -332,9 +332,7 @@ export default function TeamDashboard() {
                 <View style={styles.athleteStats}>
                   <View style={styles.athleteStat}>
                     <Text style={styles.athleteStatLabel}>ACWR</Text>
-                    <Text style={[styles.athleteStatValue, { color: getRiskColor(athlete.risk_level) }]}>
-                      {athlete.acwr ?? '-'}
-                    </Text>
+                    <ACWRBadge value={athlete.acwr} size="small" showLabel={false} locale={locale} />
                   </View>
                   
                   <View style={styles.athleteStat}>
@@ -344,9 +342,9 @@ export default function TeamDashboard() {
                     </Text>
                   </View>
                   
-                  <View style={[styles.riskBadge, { backgroundColor: getRiskColor(athlete.risk_level) + '20' }]}>
-                    <Text style={[styles.riskBadgeText, { color: getRiskColor(athlete.risk_level) }]}>
-                      {getRiskLabel(athlete.risk_level)}
+                  <View style={[styles.riskBadge, { backgroundColor: getACWRClassification(athlete.acwr, locale).bgColor }]}>
+                    <Text style={[styles.riskBadgeText, { color: getACWRClassification(athlete.acwr, locale).color }]}>
+                      {getACWRClassification(athlete.acwr, locale).labelShort}
                     </Text>
                   </View>
                 </View>
