@@ -8,7 +8,7 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - **Frontend**: React Native (Expo) + TypeScript
 - **AI Integration**: OpenAI via Emergent LLM Key
 
-## What's Been Implemented (Feb 7, 2026)
+## What's Been Implemented
 
 ### ✅ Core Features
 - User authentication (login/register)
@@ -16,99 +16,82 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - GPS data tracking with filters
 - Wellness questionnaires + QTR gauge
 - Strength assessments with auto fatigue calculation
-- Subscription system (3 tiers)
-- Team dashboard with power/body fat averages
+- Team dashboard with comprehensive metrics
 - i18n support (PT/EN)
 
-### ✅ VBT Integration in Strength Page
-**Features:**
-- Integrated VBT into add-strength.tsx with tabs (Traditional Strength / VBT)
-- Exercise selector with 12 preset exercises
-- Device/Provider selection with input method info (GymAware, PUSH Band, Vitruve, etc.)
-- Multi-set data entry with decimal support (formatDecimalInput helper)
-- Load-Velocity Profile chart with regression line and 1RM estimation
-- Velocity Loss per Set bar chart with **>30% fatigue alert**
-- AI-powered recommendations
+### ✅ ACWR Classification System (Feb 7, 2026)
+| Range | Classification | Status |
+|-------|----------------|--------|
+| <0.8 | Losing Performance | Undertrained |
+| 0.8-1.3 | Sweet Spot | Optimal |
+| 1.3-1.5 | Caution Zone | Warning |
+| >1.5 | High Risk | Overtrained |
 
-**Endpoints:**
-- `GET /api/vbt/providers`
-- `POST /api/vbt/data`
-- `GET /api/vbt/analysis/{athlete_id}`
+**Components:**
+- `ACWRBadge.tsx` - Visual badge with color coding
+- `ACWRLegend.tsx` - Legend explaining ranges
+- `getACWRClassification()` - Helper function
+
+### ✅ Export Buttons PDF/CSV (Feb 7, 2026)
+**Component:** `ExportButtons.tsx`
+- CSV export (All data, GPS, Wellness, Strength)
+- PDF report export
+- Body Composition PDF report
+- Located on athlete detail page (Info tab)
+
+### ✅ Wellness Link Duration Options (Feb 7, 2026)
+**Updated Options:**
+- 30 minutes
+- 2 hours
+- 8 hours
+- 24 hours (default)
+
+**Backend:** `/api/wellness/generate-link?expires_hours=X`
+
+### ✅ Subscription Plans Updated (Feb 7, 2026)
+
+| Feature | Essencial | Profissional | Elite |
+|---------|-----------|--------------|-------|
+| **Max Athletes** | **20** | 50 | Ilimitado |
+| **Price BRL** | R$ 39,90 | R$ 89,90 | R$ 159,90 |
+| VBT Analysis | ❌ | ✅ | ✅ |
+| Body Composition | ❌ | ✅ | ✅ |
+| 3D Body Model | ❌ | ❌ | ✅ |
+| Fatigue Alerts | ❌ | ✅ | ✅ |
+| Export PDF/CSV | ❌ | ✅ | ✅ |
+| AI Insights | ❌ | ❌ | ✅ |
+| Multi-user | ❌ | ❌ | ✅ (2) |
+
+### ✅ VBT Integration
+- Integrated into Strength page with tabs
+- Load-Velocity Profile chart
+- Velocity Loss chart with 30% fatigue threshold
+- Device providers with input methods
 
 ### ✅ Body Composition
-**Protocols:**
-- Guedes (1985) - 3 skinfolds (Brazilian) - FORMULA FIXED to use log10
-- Pollock & Jackson 7 - 7 skinfolds
-- Pollock & Jackson 9 - 9 skinfolds
-- Faulkner 4 - 4 skinfolds (athletes)
+- 4 scientific protocols (Guedes, Pollock 7/9, Faulkner)
+- Dynamic form fields
+- 3D body model visualization (Elite only)
 
-**Features:**
-- Dynamic form with protocol selector
-- SVG body diagram showing measurement points
-- Protocol-specific skinfold fields
-
-### ✅ 3D Body Model Visualization
-**Features:**
-- Enhanced SVG 3D model with gradients and highlights
-- Front view and Side view toggle
-- **Improved value visibility**: White text on black background labels
-- Color-coded fat distribution (green/yellow/red)
-- Interactive region details with progress bars
-
-### ✅ Team Dashboard Enhancements
-**New Stats Cards:**
-- **Avg Power (W)**: Team average strength from assessments
-- **Body Fat %**: Team average body composition
-
-**Alerts:**
-- Power drop alerts (>30%)
-- High ACWR alerts
-- Fatigue alerts
-
-### ✅ Responsiveness Improvements
-- Charts use responsive dimensions based on screen width
-- `Dimensions.get('window')` for adaptive layouts
-- Mobile-first design approach
+### ✅ Team Dashboard
+- 6 stat cards (ACWR, Wellness, Fatigue, Power, Body Fat, Sessions)
+- ACWR Legend with classification
+- Risk distribution chart
+- Athlete list with ACWR badges
 
 ## Prioritized Backlog
 
 ### P1 - Next
-- [ ] Full i18n audit - translate remaining hardcoded strings
-- [ ] Global theme implementation (Light/Dark mode)
+- [ ] Full i18n audit
+- [ ] Global theme (Light/Dark)
 
 ### P2 - Planned
-- [ ] Push Notifications for critical alerts
-- [ ] UI for downloading PDF/CSV reports
-- [ ] Full OAuth wearable integration (Garmin Connect, Polar Flow)
+- [ ] Push Notifications
+- [ ] Full OAuth wearable integration
 
 ### P3 - Future
 - [ ] Gamification/Leaderboards
-- [ ] Advanced team analytics dashboard
 - [ ] Video analysis integration
-
-## Key Technical Notes
-
-### VBT Device Input Methods
-| Device | Input Method |
-|--------|-------------|
-| GymAware | API/Bluetooth |
-| PUSH Band | App Sync |
-| Vitruve | App Sync |
-| Beast Sensor | Bluetooth |
-| Tendo Unit | USB/CSV |
-| Manual | Manual Entry |
-
-### Decimal Input Fix
-```typescript
-const formatDecimalInput = (value: string): string => {
-  return value.replace(',', '.');
-};
-```
-
-### VBT Fatigue Detection
-- Velocity loss >30% triggers fatigue alert
-- Alert displayed as banner with warning message
-- Recommendation to reduce volume or load
 
 ## Test Credentials
 - **Email**: test@test.com
