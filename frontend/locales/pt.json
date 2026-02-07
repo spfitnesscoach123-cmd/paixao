@@ -344,7 +344,10 @@
     "legal": "Legal",
     "about": "Sobre",
     "version": "Versão",
-    "logout": "Sair da Conta"
+    "logout": "Sair da Conta",
+    "theme": "Tema",
+    "darkMode": "Modo Escuro",
+    "lightMode": "Modo Claro"
   },
   "features": {
     "aiAnalysis": "Análise com IA",
