@@ -537,56 +537,64 @@ export default function AthleteDetails() {
               onPress={() => router.push(`/athlete/${id}/add-wellness`)}
             >
               <Ionicons name="add" size={24} color="#ffffff" />
-              <Text style={styles.addButtonText}>Novo Questionário</Text>
+              <Text style={styles.addButtonText}>{t('wellness.newQuestionnaire') || 'Novo Questionário'}</Text>
             </TouchableOpacity>
+
+            {/* QTR Gauge and Charts */}
+            {wellnessData && wellnessData.length > 0 && (
+              <WellnessCharts data={wellnessData} />
+            )}
 
             {wellnessLoading ? (
               <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
             ) : wellnessData && wellnessData.length > 0 ? (
-              wellnessData.map((item, index) => (
-                <View key={item.id || `wellness-${index}`} style={styles.dataCard}>
-                  <View style={styles.dataHeader}>
-                    <Ionicons name="fitness" size={20} color={colors.status.success} />
-                    <Text style={styles.dataDate}>{item.date}</Text>
+              <>
+                <Text style={styles.sectionTitle}>{t('wellness.history') || 'Histórico'}</Text>
+                {wellnessData.map((item, index) => (
+                  <View key={item.id || `wellness-${index}`} style={styles.dataCard}>
+                    <View style={styles.dataHeader}>
+                      <Ionicons name="fitness" size={20} color={colors.status.success} />
+                      <Text style={styles.dataDate}>{item.date}</Text>
+                    </View>
+                    <View style={styles.scoreRow}>
+                      <View style={styles.scoreBox}>
+                        <Text style={styles.scoreLabel}>{t('wellness.wellness') || 'Wellness'}</Text>
+                        <Text style={[styles.scoreValue, { color: (item.wellness_score || 0) >= 7 ? '#10b981' : (item.wellness_score || 0) >= 5 ? '#f59e0b' : '#ef4444' }]}>
+                          {item.wellness_score?.toFixed(1) || '-'}
+                        </Text>
+                      </View>
+                      <View style={styles.scoreBox}>
+                        <Text style={styles.scoreLabel}>{t('wellness.readiness') || 'Prontidão'}</Text>
+                        <Text style={[styles.scoreValue, { color: (item.readiness_score || 0) >= 7 ? '#10b981' : (item.readiness_score || 0) >= 5 ? '#f59e0b' : '#ef4444' }]}>
+                          {item.readiness_score?.toFixed(1) || '-'}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.dataGrid}>
+                      <View style={styles.dataItem}>
+                        <Text style={styles.dataLabel}>{t('wellness.fatigue') || 'Fadiga'}</Text>
+                        <Text style={styles.dataValue}>{item.fatigue}/10</Text>
+                      </View>
+                      <View style={styles.dataItem}>
+                        <Text style={styles.dataLabel}>{t('wellness.sleep') || 'Sono'}</Text>
+                        <Text style={styles.dataValue}>{item.sleep_hours}h</Text>
+                      </View>
+                      <View style={styles.dataItem}>
+                        <Text style={styles.dataLabel}>{t('wellness.mood') || 'Humor'}</Text>
+                        <Text style={styles.dataValue}>{item.mood}/10</Text>
+                      </View>
+                      <View style={styles.dataItem}>
+                        <Text style={styles.dataLabel}>{t('wellness.hydration') || 'Hidratação'}</Text>
+                        <Text style={styles.dataValue}>{item.hydration || '-'}/10</Text>
+                      </View>
+                    </View>
                   </View>
-                  <View style={styles.scoreRow}>
-                    <View style={styles.scoreBox}>
-                      <Text style={styles.scoreLabel}>Wellness</Text>
-                      <Text style={[styles.scoreValue, { color: item.wellness_score! >= 7 ? '#10b981' : item.wellness_score! >= 5 ? '#f59e0b' : '#ef4444' }]}>
-                        {item.wellness_score?.toFixed(1)}
-                      </Text>
-                    </View>
-                    <View style={styles.scoreBox}>
-                      <Text style={styles.scoreLabel}>Prontidão</Text>
-                      <Text style={[styles.scoreValue, { color: item.readiness_score! >= 7 ? '#10b981' : item.readiness_score! >= 5 ? '#f59e0b' : '#ef4444' }]}>
-                        {item.readiness_score?.toFixed(1)}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.dataGrid}>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Fadiga</Text>
-                      <Text style={styles.dataValue}>{item.fatigue}/10</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Sono</Text>
-                      <Text style={styles.dataValue}>{item.sleep_hours}h</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Humor</Text>
-                      <Text style={styles.dataValue}>{item.mood}/10</Text>
-                    </View>
-                    <View style={styles.dataItem}>
-                      <Text style={styles.dataLabel}>Hidratação</Text>
-                      <Text style={styles.dataValue}>{item.hydration}/10</Text>
-                    </View>
-                  </View>
-                </View>
-              ))
+                ))}
+              </>
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="fitness-outline" size={48} color="#d1d5db" />
-                <Text style={styles.emptyText}>Nenhum questionário registrado</Text>
+                <Text style={styles.emptyText}>{t('wellness.noData') || 'Nenhum questionário registrado'}</Text>
               </View>
             )}
           </View>
