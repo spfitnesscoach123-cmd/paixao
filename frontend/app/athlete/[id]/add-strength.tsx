@@ -666,7 +666,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.input}
                     value={rsi}
-                    onChangeText={setRsi}
+                    onChangeText={(text) => setRsi(formatDecimalInput(text))}
                     placeholder="2.0"
                     placeholderTextColor={colors.text.tertiary}
                     keyboardType="decimal-pad"
