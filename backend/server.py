@@ -3488,6 +3488,208 @@ def get_risk_label(lang: str, risk_level: str) -> str:
     }
     return get_translation(lang, risk_map.get(risk_level, "risk_moderate"))
 
+# ============= REPORT PREVIEW ENDPOINTS =============
+
+@api_router.get("/reports/athlete/{athlete_id}/preview")
+async def get_athlete_report_preview(
+    athlete_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a preview of athlete report data (for showing before download)"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).to_list(1000)
+    
+    # Get wellness data
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).to_list(1000)
+    
+    # Get body composition
+    body_compositions = await db.body_compositions.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1)
+    
+    # Calculate summaries
+    gps_summary = None
+    if gps_records:
+        gps_summary = {
+            "avg_distance": sum(r.get("total_distance", 0) for r in gps_records) / len(gps_records),
+            "max_speed": max((r.get("max_speed", 0) or 0) for r in gps_records),
+            "total_sprints": sum(r.get("number_of_sprints", 0) for r in gps_records),
+            "avg_hsr": sum((r.get("high_speed_running", 0) or 0) for r in gps_records) / len(gps_records),
+        }
+    
+    wellness_summary = None
+    if wellness_records:
+        wellness_summary = {
+            "avg_readiness": sum(r.get("readiness_score", 0) or r.get("wellness_score", 5) for r in wellness_records) / len(wellness_records),
+            "avg_sleep_hours": sum(r.get("sleep_hours", 7) for r in wellness_records) / len(wellness_records),
+            "avg_fatigue": sum(r.get("fatigue", 5) for r in wellness_records) / len(wellness_records),
+            "avg_stress": sum(r.get("stress", 5) for r in wellness_records) / len(wellness_records),
+        }
+    
+    body_composition = None
+    if body_compositions:
+        bc = body_compositions[0]
+        body_composition = {
+            "date": bc.get("date"),
+            "body_fat_percentage": bc.get("body_fat_percentage", 0),
+            "lean_mass_kg": bc.get("lean_mass_kg", 0),
+            "fat_mass_kg": bc.get("fat_mass_kg", 0),
+            "bmi": bc.get("bmi", 0),
+            "bmi_classification": bc.get("bmi_classification", ""),
+        }
+    
+    # Determine period
+    all_dates = []
+    all_dates.extend([r.get("date") for r in gps_records if r.get("date")])
+    all_dates.extend([r.get("date") for r in wellness_records if r.get("date")])
+    
+    period = None
+    if all_dates:
+        sorted_dates = sorted([d for d in all_dates if d])
+        if len(sorted_dates) >= 2:
+            period = f"{sorted_dates[0]} - {sorted_dates[-1]}"
+        elif sorted_dates:
+            period = sorted_dates[0]
+    
+    return {
+        "summary": {
+            "athlete_name": athlete.get("name"),
+            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+            "total_sessions": len(gps_records),
+            "total_wellness_records": len(wellness_records),
+            "period": period,
+        },
+        "gps_summary": gps_summary,
+        "wellness_summary": wellness_summary,
+        "body_composition": body_composition,
+    }
+
+@api_router.get("/reports/athlete/{athlete_id}/csv-preview")
+async def get_athlete_csv_preview(
+    athlete_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a preview of CSV data (headers and sample rows)"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get GPS data
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(100)
+    
+    headers = [
+        "Date",
+        "Session",
+        "Total Distance (m)",
+        "HID (m)",
+        "HSR (m)",
+        "Sprint (m)",
+        "Sprints",
+        "Acc",
+        "Dec",
+        "Max Speed (km/h)"
+    ]
+    
+    if lang == "pt":
+        headers = [
+            "Data",
+            "Sessão",
+            "Distância Total (m)",
+            "HID (m)",
+            "HSR (m)",
+            "Sprint (m)",
+            "Sprints",
+            "Acc",
+            "Dec",
+            "Vel. Max (km/h)"
+        ]
+    
+    sample_rows = []
+    for record in gps_records[:5]:  # Show first 5 rows
+        sample_rows.append([
+            record.get("date", ""),
+            record.get("session_name", record.get("period_name", "")),
+            str(int(record.get("total_distance", 0))),
+            str(int(record.get("high_intensity_distance", 0))),
+            str(int(record.get("high_speed_running", 0) or 0)),
+            str(int(record.get("sprint_distance", 0))),
+            str(record.get("number_of_sprints", 0)),
+            str(record.get("number_of_accelerations", 0)),
+            str(record.get("number_of_decelerations", 0)),
+            f"{record.get('max_speed', 0):.1f}" if record.get("max_speed") else "0",
+        ])
+    
+    return {
+        "summary": {
+            "athlete_name": athlete.get("name"),
+            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+        },
+        "csv_preview": {
+            "headers": headers,
+            "sample_rows": sample_rows,
+            "total_rows": len(gps_records),
+        }
+    }
+
+@api_router.get("/reports/body-composition/{composition_id}/preview")
+async def get_body_composition_preview(
+    composition_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a preview of body composition report data"""
+    # Find the composition
+    composition = await db.body_compositions.find_one({
+        "_id": ObjectId(composition_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not composition:
+        raise HTTPException(status_code=404, detail="Body composition not found")
+    
+    # Get athlete name
+    athlete = await db.athletes.find_one({"_id": ObjectId(composition.get("athlete_id"))})
+    athlete_name = athlete.get("name") if athlete else "Unknown"
+    
+    return {
+        "summary": {
+            "athlete_name": athlete_name,
+            "generated_at": datetime.utcnow().strftime("%Y-%m-%d %H:%M"),
+        },
+        "body_composition": {
+            "date": composition.get("date"),
+            "body_fat_percentage": composition.get("body_fat_percentage", 0),
+            "lean_mass_kg": composition.get("lean_mass_kg", 0),
+            "fat_mass_kg": composition.get("fat_mass_kg", 0),
+            "bmi": composition.get("bmi", 0),
+            "bmi_classification": composition.get("bmi_classification", ""),
+        }
+    }
+
 @api_router.get("/reports/athlete/{athlete_id}/pdf")
 async def generate_athlete_pdf_report(
     athlete_id: str,
