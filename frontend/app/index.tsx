@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();

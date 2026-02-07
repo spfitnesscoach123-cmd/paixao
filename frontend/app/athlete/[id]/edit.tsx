@@ -19,7 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../../services/api';
 import { Athlete } from '../../../types';
-import { colors } from '../../../constants/theme';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function EditAthlete() {
   const { id } = useLocalSearchParams<{ id: string }>();

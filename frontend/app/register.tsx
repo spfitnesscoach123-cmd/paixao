@@ -16,7 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function Register() {
   const [name, setName] = useState('');

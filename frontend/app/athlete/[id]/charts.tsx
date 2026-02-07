@@ -9,7 +9,7 @@ import { Athlete, GPSData, WellnessQuestionnaire } from '../../../types';
 import { GPSChart } from '../../../components/charts/GPSChart';
 import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
-import { colors } from '../../../constants/theme';
+import { useTheme } from '../../../contexts/ThemeContext';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function AthleteCharts() {
