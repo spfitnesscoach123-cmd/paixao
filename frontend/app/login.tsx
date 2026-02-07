@@ -184,10 +184,12 @@ export default function Login() {
               <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
             </TouchableOpacity>
 
-            <Pressable
+            {/* Login Button - using TouchableOpacity for better web compatibility */}
+            <TouchableOpacity
               style={styles.button}
               onPress={handleLogin}
               disabled={isLoading}
+              activeOpacity={0.8}
               testID="login-button"
               accessibilityRole="button"
             >
@@ -203,7 +205,7 @@ export default function Login() {
                   <Text style={styles.buttonText}>{t('auth.login')}</Text>
                 )}
               </LinearGradient>
-            </Pressable>
+            </TouchableOpacity>
 
             {/* Biometric Login Button */}
             {isBiometricSupported && hasSavedCredentials && (
