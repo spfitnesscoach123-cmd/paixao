@@ -603,14 +603,32 @@ export default function AthleteDetails() {
       case 'assessments':
         return (
           <View style={styles.tabContent}>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => router.push(`/athlete/${id}/add-assessment`)}
-            >
-              <Ionicons name="add" size={24} color="#ffffff" />
-              <Text style={styles.addButtonText}>Nova Avaliação</Text>
-            </TouchableOpacity>
+            {/* Action buttons */}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => router.push(`/athlete/${id}/add-strength`)}
+              >
+                <Ionicons name="barbell" size={24} color={colors.accent.primary} />
+                <Text style={styles.actionButtonText}>{t('assessments.addStrength') || 'Avaliação de Força'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={() => router.push(`/athlete/${id}/add-assessment`)}
+              >
+                <Ionicons name="add-circle" size={24} color={colors.accent.secondary} />
+                <Text style={styles.actionButtonText}>{t('assessments.addOther') || 'Outra Avaliação'}</Text>
+              </TouchableOpacity>
+            </View>
 
+            {/* Strength Analysis Section */}
+            <View style={styles.strengthAnalysisSection}>
+              <StrengthAnalysisCharts athleteId={id} />
+            </View>
+
+            {/* Assessment History */}
+            <Text style={styles.sectionTitle}>{t('assessments.history') || 'Histórico de Avaliações'}</Text>
+            
             {assessmentsLoading ? (
               <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
             ) : assessments && assessments.length > 0 ? (
@@ -625,14 +643,16 @@ export default function AthleteDetails() {
                     <Text style={styles.dataDate}>{item.date}</Text>
                     <View style={styles.typeBadge}>
                       <Text style={styles.typeText}>
-                        {item.assessment_type === 'strength' ? 'Força' : item.assessment_type === 'aerobic' ? 'Aeróbico' : 'Composição'}
+                        {item.assessment_type === 'strength' ? (t('assessments.strength') || 'Força') : 
+                         item.assessment_type === 'aerobic' ? (t('assessments.aerobic') || 'Aeróbico') : 
+                         (t('assessments.bodyComp') || 'Composição')}
                       </Text>
                     </View>
                   </View>
                   <View style={styles.metricsContainer}>
                     {Object.entries(item.metrics).map(([key, value]) => (
                       <View key={key} style={styles.metricItem}>
-                        <Text style={styles.metricKey}>{key}:</Text>
+                        <Text style={styles.metricKey}>{key.replace(/_/g, ' ')}:</Text>
                         <Text style={styles.metricValue}>{String(value)}</Text>
                       </View>
                     ))}
@@ -645,7 +665,7 @@ export default function AthleteDetails() {
             ) : (
               <View style={styles.emptyState}>
                 <Ionicons name="barbell-outline" size={48} color="#d1d5db" />
-                <Text style={styles.emptyText}>Nenhuma avaliação registrada</Text>
+                <Text style={styles.emptyText}>{t('assessments.noData') || 'Nenhuma avaliação registrada'}</Text>
               </View>
             )}
           </View>
