@@ -475,6 +475,16 @@ export default function AddStrengthAssessment() {
   const handleRemoveSet = (index: number) => {
     if (vbtSets.length > 1) {
       setVbtSets(vbtSets.filter((_, i) => i !== index));
+      // Clean up removed set's inputs
+      setVbtInputs(prev => {
+        const newInputs = { ...prev };
+        Object.keys(newInputs).forEach(key => {
+          if (key.startsWith(`${index}-`)) {
+            delete newInputs[key];
+          }
+        });
+        return newInputs;
+      });
     }
   };
 
