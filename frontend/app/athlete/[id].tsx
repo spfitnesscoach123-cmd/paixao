@@ -605,40 +605,40 @@ export default function AthleteDetails() {
       case 'assessments':
         return (
           <View style={styles.tabContent}>
-            {/* Action buttons - Força, Composição Corporal, VBT */}
+            {/* Action buttons - Força (com VBT integrado), Composição Corporal */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
-                style={styles.actionButton}
+                style={styles.actionButtonLarge}
                 onPress={() => router.push(`/athlete/${id}/add-strength`)}
               >
-                <Ionicons name="barbell" size={24} color={colors.accent.primary} />
-                <Text style={styles.actionButtonText}>{t('assessments.addStrength') || 'Avaliação de Força'}</Text>
+                <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.actionButtonGradient}>
+                  <View style={styles.actionButtonIconRow}>
+                    <Ionicons name="barbell" size={24} color="#ffffff" />
+                    <Ionicons name="speedometer" size={20} color="rgba(255,255,255,0.8)" />
+                  </View>
+                  <Text style={styles.actionButtonLargeText}>
+                    {locale === 'pt' ? 'Força & VBT' : 'Strength & VBT'}
+                  </Text>
+                  <Text style={styles.actionButtonSubtext}>
+                    {locale === 'pt' ? 'Avaliação de força + Velocity Based Training' : 'Strength assessment + Velocity Based Training'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.actionButton}
+                style={styles.actionButtonLarge}
                 onPress={() => router.push(`/athlete/${id}/add-body-composition`)}
               >
-                <Ionicons name="body" size={24} color={colors.accent.secondary} />
-                <Text style={styles.actionButtonText}>{t('assessments.bodyComposition') || 'Composição Corporal'}</Text>
+                <LinearGradient colors={['#10b981', '#059669']} style={styles.actionButtonGradient}>
+                  <Ionicons name="body" size={24} color="#ffffff" />
+                  <Text style={styles.actionButtonLargeText}>
+                    {locale === 'pt' ? 'Composição Corporal' : 'Body Composition'}
+                  </Text>
+                  <Text style={styles.actionButtonSubtext}>
+                    {locale === 'pt' ? 'Protocolos científicos de dobras cutâneas' : 'Scientific skinfold protocols'}
+                  </Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
-            
-            {/* VBT Button */}
-            <TouchableOpacity
-              style={styles.vbtButton}
-              onPress={() => router.push(`/athlete/${id}/vbt`)}
-            >
-              <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.vbtButtonGradient}>
-                <Ionicons name="speedometer" size={24} color="#ffffff" />
-                <View style={styles.vbtButtonContent}>
-                  <Text style={styles.vbtButtonTitle}>VBT - Velocity Based Training</Text>
-                  <Text style={styles.vbtButtonSubtitle}>
-                    {locale === 'pt' ? 'Análise de velocidade e potência' : 'Velocity and power analysis'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={24} color="#ffffff" />
-              </LinearGradient>
-            </TouchableOpacity>
 
             {/* Strength Analysis Section */}
             <View style={styles.strengthAnalysisSection}>
