@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function PrivacyPolicy() {
   const router = useRouter();

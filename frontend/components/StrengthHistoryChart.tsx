@@ -4,7 +4,7 @@ import Svg, { Line, Circle, Polyline, G, Text as SvgText, Rect, Defs, LinearGrad
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
-import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface Assessment {

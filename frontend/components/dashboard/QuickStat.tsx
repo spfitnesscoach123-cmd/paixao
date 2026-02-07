@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface QuickStatProps {
   label: string;
