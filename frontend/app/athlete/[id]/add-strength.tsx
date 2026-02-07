@@ -462,6 +462,7 @@ export default function AddStrengthAssessment() {
       );
       // Reset form
       setVbtSets([{ reps: 5, mean_velocity: 0, peak_velocity: 0, load_kg: 0, power_watts: 0 }]);
+      setVbtInputs({}); // Clear raw inputs
     },
     onError: (error: any) => {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to save');
