@@ -710,6 +710,61 @@ const styles = StyleSheet.create({
   bodyModelContainer: {
     alignItems: 'center',
   },
+  viewToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 8,
+    padding: 2,
+    marginBottom: 12,
+  },
+  viewButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+  },
+  viewButtonActive: {
+    backgroundColor: colors.accent.primary,
+  },
+  viewButtonText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  viewButtonTextActive: {
+    color: '#ffffff',
+  },
+  regionDetails: {
+    width: '100%',
+    marginTop: 12,
+    paddingHorizontal: 8,
+  },
+  regionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  regionLabel: {
+    width: 80,
+    fontSize: 10,
+    color: colors.text.secondary,
+  },
+  regionBar: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 8,
+    overflow: 'hidden',
+  },
+  regionBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  regionValue: {
+    width: 40,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
   bodyLegend: {
     flexDirection: 'row',
     justifyContent: 'center',
