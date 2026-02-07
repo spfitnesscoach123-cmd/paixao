@@ -797,7 +797,7 @@ export default function AddStrengthAssessment() {
                 {vbtAnalysis.velocity_loss_analysis.length > 0 && (
                   <View style={styles.chartCard}>
                     <Text style={styles.chartTitle}>{labels.velocityLoss}</Text>
-                    <VelocityLossChart data={vbtAnalysis.velocity_loss_analysis} />
+                    <VelocityLossChart data={vbtAnalysis.velocity_loss_analysis} locale={locale} />
                   </View>
                 )}
                 
