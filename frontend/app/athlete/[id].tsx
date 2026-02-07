@@ -19,11 +19,13 @@ import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, Comprehens
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import { AnalysisTab } from '../../components/AnalysisTab';
 import { ExportPDFButton } from '../../components/ExportPDFButton';
+import { ExportButtons } from '../../components/ExportButtons';
 import { GPSDateFilter } from '../../components/GPSDateFilter';
 import { WellnessCharts } from '../../components/WellnessCharts';
 import { StrengthAnalysisCharts } from '../../components/StrengthAnalysisCharts';
 import { StrengthHistoryChart } from '../../components/StrengthHistoryChart';
 import { BodyCompositionCharts } from '../../components/BodyCompositionCharts';
+import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 
