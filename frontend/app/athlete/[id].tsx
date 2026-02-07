@@ -837,6 +837,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 16,
   },
+  bodyCompositionSection: {
+    marginTop: 16,
+    marginBottom: 16,
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
