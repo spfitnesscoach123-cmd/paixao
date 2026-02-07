@@ -52,9 +52,9 @@ export default function ProfileScreen() {
   const currentLanguage = languages.find(l => l.code === locale);
 
   return (
-    <View style={[styles.container, { backgroundColor: staticColors.dark.primary }]}>
+    <View style={[styles.container, { backgroundColor: colors.dark.primary }]}>
       <LinearGradient
-        colors={staticColors.gradients.primary}
+        colors={colors.gradients.primary}
         style={styles.header}
       >
         <View style={styles.avatarGlow}>
@@ -66,44 +66,44 @@ export default function ProfileScreen() {
         <Text style={styles.email}>{user?.email}</Text>
       </LinearGradient>
 
-      <ScrollView style={[styles.content, { backgroundColor: staticColors.dark.primary }]}>
-        <View style={[styles.section, { backgroundColor: staticColors.dark.card }]}>
-          <Text style={[styles.sectionTitle, { color: staticColors.text.primary }]}>{t('settings.account')}</Text>
+      <ScrollView style={[styles.content, { backgroundColor: colors.dark.primary }]}>
+        <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.account')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
                 <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
               </View>
-              <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('athletes.editProfile')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('athletes.editProfile')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-                <Ionicons name="language-outline" size={22} color={staticColors.accent.tertiary} />
+                <Ionicons name="language-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <View>
-                <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>{t('settings.language')}</Text>
-                <Text style={[styles.menuItemSubtext, { color: staticColors.text.tertiary }]}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
+                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.language')}</Text>
+                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>{currentLanguage?.flag} {currentLanguage?.nativeName}</Text>
               </View>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={staticColors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
           {/* Theme Toggle */}
-          <View style={[styles.menuItem, { backgroundColor: staticColors.dark.card }]}>
+          <View style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
                 <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? colors.accent.primary : '#f59e0b'} />
               </View>
               <View>
-                <Text style={[styles.menuItemText, { color: staticColors.text.primary }]}>
+                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>
                   {t('settings.theme') || (locale === 'pt' ? 'Tema' : 'Theme')}
                 </Text>
-                <Text style={[styles.menuItemSubtext, { color: staticColors.text.tertiary }]}>
+                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>
                   {isDark 
                     ? (locale === 'pt' ? 'Modo Escuro' : 'Dark Mode')
                     : (locale === 'pt' ? 'Modo Claro' : 'Light Mode')
@@ -114,7 +114,7 @@ export default function ProfileScreen() {
             <Switch
               value={!isDark}
               onValueChange={toggleTheme}
-              trackColor={{ false: staticColors.accent.secondary, true: '#f59e0b' }}
+              trackColor={{ false: colors.accent.secondary, true: '#f59e0b' }}
               thumbColor={isDark ? colors.accent.primary : '#ffffff'}
             />
           </View>
