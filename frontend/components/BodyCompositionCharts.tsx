@@ -270,18 +270,29 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
               />
             </G>
             
-            {/* Fat percentage labels */}
+            {/* Fat percentage labels with background for better visibility */}
             <G>
-              <SvgText x="15" y="140" fontSize="9" fill={getColor(regionValues.upperArm)} fontWeight="bold">
+              {/* Arms label */}
+              <Rect x="2" y="130" width="26" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
+              <SvgText x="15" y="142" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
                 {regionValues.upperArm.toFixed(0)}%
               </SvgText>
-              <SvgText x="100" y="145" fontSize="10" fill={getColor(regionValues.trunkFront)} fontWeight="bold" textAnchor="middle">
+              
+              {/* Trunk label */}
+              <Rect x="78" y="135" width="44" height="18" rx="4" fill="rgba(0,0,0,0.8)" />
+              <SvgText x="100" y="148" fontSize="11" fill="#ffffff" fontWeight="bold" textAnchor="middle">
                 {regionValues.trunkFront.toFixed(0)}%
               </SvgText>
-              <SvgText x="100" y="205" fontSize="9" fill={getColor(regionValues.hipWaist)} fontWeight="bold" textAnchor="middle">
+              
+              {/* Hip label */}
+              <Rect x="78" y="195" width="44" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
+              <SvgText x="100" y="207" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
                 {regionValues.hipWaist.toFixed(0)}%
               </SvgText>
-              <SvgText x="100" y="260" fontSize="9" fill={getColor(regionValues.lowerBody)} fontWeight="bold" textAnchor="middle">
+              
+              {/* Legs label */}
+              <Rect x="78" y="250" width="44" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
+              <SvgText x="100" y="262" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
                 {regionValues.lowerBody.toFixed(0)}%
               </SvgText>
             </G>
