@@ -23,6 +23,7 @@ import { GPSDateFilter } from '../../components/GPSDateFilter';
 import { WellnessCharts } from '../../components/WellnessCharts';
 import { StrengthAnalysisCharts } from '../../components/StrengthAnalysisCharts';
 import { StrengthHistoryChart } from '../../components/StrengthHistoryChart';
+import { BodyCompositionCharts } from '../../components/BodyCompositionCharts';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 
