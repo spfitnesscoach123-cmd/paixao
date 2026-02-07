@@ -78,6 +78,29 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - ACWR Legend with classification
 - Risk distribution chart
 - Athlete list with ACWR badges
+- Position group averages section
+
+### ✅ Bug Fixes (Feb 7, 2026 - Latest Session)
+
+| Issue | Fix | Status |
+|-------|-----|--------|
+| Dashboard session count incorrect | Changed to count unique sessions by `date + session_name` | ✅ Fixed |
+| Position groups showing individuals | Implemented GROUP AVERAGES for each position | ✅ Fixed |
+| Training zones using heart rate | Already using velocity-based zones (% Vmax) | ✅ Verified |
+| Wellness colors inverted | Implemented `getValueColor()` with inverted logic for fatigue/stress/pain | ✅ Fixed |
+| Decimal input for m/s fields | Added `formatDecimalInput()` to convert comma to dot | ✅ Fixed |
+| QTRGauge component cut off | Fixed height/viewBox calculations (containerHeight = size * 0.85) | ✅ Fixed |
+| injury_risk None type error | Changed to proper boolean validation | ✅ Fixed |
+
+**Position Summary now includes:**
+- `count` - Number of athletes
+- `avg_acwr` - Group average ACWR
+- `avg_wellness` - Group average wellness
+- `avg_fatigue` - Group average fatigue
+- `avg_distance` - Group average distance (meters)
+- `avg_sprints` - Group average sprints
+- `avg_max_speed` - Group average max speed (km/h)
+- `high_risk_count` - Athletes at high risk
 
 ## Prioritized Backlog
 
@@ -88,15 +111,15 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 ### P2 - Planned
 - [ ] Push Notifications
 - [ ] Full OAuth wearable integration
+- [ ] PDF/CSV report preview mechanism
 
 ### P3 - Future
 - [ ] Gamification/Leaderboards
 - [ ] Video analysis integration
 
 ## Test Credentials
-- **Email**: test@test.com
-- **Password**: password
-- **Athlete ID**: 69862b75fc9efff29476e3ce
+- **Email**: testuser@test.com
+- **Password**: Test123!
 
 ## Last Updated
 February 7, 2026
