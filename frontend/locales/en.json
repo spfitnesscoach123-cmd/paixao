@@ -344,7 +344,10 @@
     "legal": "Legal",
     "about": "About",
     "version": "Version",
-    "logout": "Logout"
+    "logout": "Logout",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode"
   },
   "features": {
     "aiAnalysis": "AI Analysis",
