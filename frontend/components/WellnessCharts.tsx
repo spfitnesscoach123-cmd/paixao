@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Line, Circle, Polyline, Rect, G, Text as SvgText } from 'react-native-svg';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { QTRGauge } from './QTRGauge';
 

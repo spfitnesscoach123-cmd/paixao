@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Modal, TextInput, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { format, subDays, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns';
 import { ptBR, enUS, es, fr } from 'date-fns/locale';

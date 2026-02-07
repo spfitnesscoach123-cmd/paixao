@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import Svg, { Path, Circle, G, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { useTheme } from '../contexts/ThemeContext';
+import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
 interface QTRGaugeProps {
