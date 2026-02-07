@@ -252,7 +252,7 @@ export default function Login() {
   );
 }
 
-const styles = StyleSheet.create({
+const createLoginStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
