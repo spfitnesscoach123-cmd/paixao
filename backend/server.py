@@ -2437,10 +2437,10 @@ Format your response in a structured and professional manner.""",
                 "recommendation": "Maintain current monitoring routine"
             },
             "zones": {
-                "recovery": "Up to 5km, light pace, HR < 70% max",
-                "aerobic": "5-8km, moderate pace, HR 70-85% max",
-                "anaerobic": "High intensity, short sprints, HR 85-95% max",
-                "maximum": "Maximum effort, sprints, HR > 95% max"
+                "recovery": "Zone 1: <60% v.max (Recovery, light jogging)",
+                "aerobic": "Zone 2: 60-75% v.max (Aerobic base, steady state)",
+                "anaerobic": "Zone 3: 75-90% v.max (Tempo runs, threshold)",
+                "maximum": "Zone 4: >90% v.max (Sprints, max speed)"
             }
         },
         "pt": {
