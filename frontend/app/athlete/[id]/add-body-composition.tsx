@@ -221,6 +221,7 @@ export default function AddBodyComposition() {
       return response.data;
     },
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['body-composition', athleteId] });
       queryClient.invalidateQueries({ queryKey: ['body-compositions', athleteId] });
       queryClient.invalidateQueries({ queryKey: ['body-composition-analysis', athleteId] });
       

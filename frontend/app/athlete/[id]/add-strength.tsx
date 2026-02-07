@@ -478,10 +478,30 @@ export default function AddStrengthAssessment() {
     }
   };
 
+  // State to track raw input values for VBT sets (allows typing decimals)
+  const [vbtInputs, setVbtInputs] = useState<{ [key: string]: string }>({});
+
   const handleSetChange = (index: number, field: keyof VBTSet, value: string) => {
-    const newSets = [...vbtSets];
-    newSets[index] = { ...newSets[index], [field]: parseFloat(value) || 0 };
-    setVbtSets(newSets);
+    // Store raw input to allow partial decimal entry (e.g., "1." or "1,")
+    const inputKey = `${index}-${field}`;
+    setVbtInputs(prev => ({ ...prev, [inputKey]: value }));
+    
+    // Only update numeric state when we have a valid number
+    const numericValue = parseFloat(value.replace(',', '.'));
+    if (!isNaN(numericValue)) {
+      const newSets = [...vbtSets];
+      newSets[index] = { ...newSets[index], [field]: numericValue };
+      setVbtSets(newSets);
+    }
+  };
+
+  // Get display value for VBT input (raw input or formatted number)
+  const getVbtInputValue = (index: number, field: keyof VBTSet, numericValue: number) => {
+    const inputKey = `${index}-${field}`;
+    if (vbtInputs[inputKey] !== undefined) {
+      return vbtInputs[inputKey];
+    }
+    return numericValue ? String(numericValue) : '';
   };
 
   const handleSubmitVBT = () => {
