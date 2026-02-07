@@ -2388,6 +2388,282 @@ Forneça um insight profissional breve (2-3 frases) sobre o perfil de força des
         }
     )
 
+
+# ============= TEAM DASHBOARD =============
+
+class TeamDashboardAthlete(BaseModel):
+    id: str
+    name: str
+    position: str
+    acwr: Optional[float] = None
+    risk_level: str = "unknown"
+    fatigue_score: Optional[float] = None
+    last_gps_date: Optional[str] = None
+    last_wellness_date: Optional[str] = None
+    wellness_score: Optional[float] = None
+    total_sessions_7d: int = 0
+    avg_distance_7d: float = 0
+    injury_risk: bool = False
+    peripheral_fatigue: bool = False
+
+class TeamDashboardStats(BaseModel):
+    total_athletes: int
+    athletes_high_risk: int
+    athletes_optimal: int
+    athletes_fatigued: int
+    team_avg_acwr: float
+    team_avg_wellness: float
+    team_avg_fatigue: float
+    sessions_this_week: int
+    total_distance_this_week: float
+
+class TeamDashboardResponse(BaseModel):
+    stats: TeamDashboardStats
+    athletes: List[TeamDashboardAthlete]
+    risk_distribution: Dict[str, int]
+    position_summary: Dict[str, Dict[str, Any]]
+    alerts: List[str]
+
+@api_router.get("/dashboard/team", response_model=TeamDashboardResponse)
+async def get_team_dashboard(
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get aggregated team statistics and individual athlete status for team-wide overview"""
+    
+    user_id = current_user["_id"]
+    
+    # Get all athletes for this coach
+    athletes_cursor = db.athletes.find({"coach_id": user_id})
+    athletes = await athletes_cursor.to_list(100)
+    
+    if not athletes:
+        return TeamDashboardResponse(
+            stats=TeamDashboardStats(
+                total_athletes=0,
+                athletes_high_risk=0,
+                athletes_optimal=0,
+                athletes_fatigued=0,
+                team_avg_acwr=0,
+                team_avg_wellness=0,
+                team_avg_fatigue=0,
+                sessions_this_week=0,
+                total_distance_this_week=0
+            ),
+            athletes=[],
+            risk_distribution={"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0},
+            position_summary={},
+            alerts=[]
+        )
+    
+    # Date ranges
+    today = datetime.utcnow()
+    seven_days_ago = today - timedelta(days=7)
+    twenty_eight_days_ago = today - timedelta(days=28)
+    
+    athlete_data = []
+    total_acwr = 0
+    acwr_count = 0
+    total_wellness = 0
+    wellness_count = 0
+    total_fatigue = 0
+    fatigue_count = 0
+    total_sessions = 0
+    total_distance = 0
+    
+    risk_distribution = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
+    position_summary: Dict[str, Dict[str, Any]] = {}
+    alerts = []
+    
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        position = athlete.get("position", "Unknown")
+        
+        # Initialize position summary
+        if position not in position_summary:
+            position_summary[position] = {
+                "count": 0,
+                "avg_acwr": 0,
+                "avg_wellness": 0,
+                "high_risk_count": 0
+            }
+        position_summary[position]["count"] += 1
+        
+        # Get recent GPS data
+        gps_data = await db.gps_data.find({
+            "athlete_id": athlete_id,
+            "coach_id": user_id
+        }).sort("date", -1).to_list(100)
+        
+        # Calculate ACWR
+        acwr = None
+        risk_level = "unknown"
+        sessions_7d = 0
+        distance_7d = 0
+        last_gps_date = None
+        
+        if gps_data:
+            last_gps_date = gps_data[0].get("date")
+            
+            acute_load = 0
+            chronic_load = 0
+            
+            for record in gps_data:
+                try:
+                    record_date = datetime.strptime(record["date"], "%Y-%m-%d")
+                except:
+                    continue
+                    
+                dist = record.get("total_distance", 0)
+                
+                if record_date >= seven_days_ago:
+                    acute_load += dist
+                    sessions_7d += 1
+                    distance_7d += dist
+                    total_sessions += 1
+                    total_distance += dist
+                    
+                if record_date >= twenty_eight_days_ago:
+                    chronic_load += dist
+            
+            # Calculate ACWR
+            acute_weekly = acute_load / 7
+            chronic_weekly = chronic_load / 28 if chronic_load > 0 else 1
+            
+            if chronic_weekly > 0:
+                acwr = round(acute_weekly / chronic_weekly, 2)
+                total_acwr += acwr
+                acwr_count += 1
+                
+                # Determine risk level
+                if acwr < 0.8:
+                    risk_level = "low"
+                elif acwr <= 1.3:
+                    risk_level = "optimal"
+                elif acwr <= 1.5:
+                    risk_level = "moderate"
+                else:
+                    risk_level = "high"
+                
+                risk_distribution[risk_level] += 1
+                
+                if risk_level == "high":
+                    position_summary[position]["high_risk_count"] += 1
+                    alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
+                    alerts.append(alert_msg)
+        else:
+            risk_distribution["unknown"] += 1
+        
+        # Get recent wellness data
+        wellness_data = await db.wellness.find({
+            "athlete_id": athlete_id,
+            "coach_id": user_id
+        }).sort("date", -1).to_list(7)
+        
+        wellness_score = None
+        fatigue_score = None
+        last_wellness_date = None
+        
+        if wellness_data:
+            latest_wellness = wellness_data[0]
+            last_wellness_date = latest_wellness.get("date")
+            wellness_score = latest_wellness.get("wellness_score")
+            fatigue = latest_wellness.get("fatigue", 5)
+            
+            # Convert fatigue (1-10 where 10=very fatigued) to fatigue score percentage
+            fatigue_score = fatigue * 10  # 0-100%
+            
+            if wellness_score:
+                total_wellness += wellness_score
+                wellness_count += 1
+            
+            total_fatigue += fatigue_score
+            fatigue_count += 1
+            
+            if fatigue_score > 70:
+                alert_msg = f"🔴 {athlete['name']}: Fadiga alta ({fatigue_score}%)" if lang == "pt" else f"🔴 {athlete['name']}: High fatigue ({fatigue_score}%)"
+                alerts.append(alert_msg)
+        
+        # Check for peripheral fatigue from strength assessments
+        peripheral_fatigue = False
+        strength_assessments = await db.assessments.find({
+            "athlete_id": athlete_id,
+            "coach_id": user_id,
+            "assessment_type": "strength"
+        }).sort("date", -1).to_list(10)
+        
+        if len(strength_assessments) >= 2:
+            latest = strength_assessments[0].get("metrics", {})
+            historical_peak_power = max([a.get("metrics", {}).get("peak_power", 0) for a in strength_assessments])
+            current_peak_power = latest.get("peak_power", 0)
+            
+            if historical_peak_power > 0:
+                power_drop = (historical_peak_power - current_peak_power) / historical_peak_power * 100
+                if power_drop > 20:
+                    peripheral_fatigue = True
+                    if power_drop > 30:
+                        alert_msg = f"⚡ {athlete['name']}: Queda de potência de {power_drop:.0f}%" if lang == "pt" else f"⚡ {athlete['name']}: Power drop of {power_drop:.0f}%"
+                        alerts.append(alert_msg)
+        
+        athlete_data.append(TeamDashboardAthlete(
+            id=athlete_id,
+            name=athlete["name"],
+            position=position,
+            acwr=acwr,
+            risk_level=risk_level,
+            fatigue_score=fatigue_score,
+            last_gps_date=last_gps_date,
+            last_wellness_date=last_wellness_date,
+            wellness_score=wellness_score,
+            total_sessions_7d=sessions_7d,
+            avg_distance_7d=round(distance_7d / sessions_7d, 0) if sessions_7d > 0 else 0,
+            injury_risk=risk_level == "high" or (fatigue_score and fatigue_score > 70),
+            peripheral_fatigue=peripheral_fatigue
+        ))
+        
+        # Update position averages
+        if acwr:
+            if "total_acwr" not in position_summary[position]:
+                position_summary[position]["total_acwr"] = 0
+                position_summary[position]["acwr_count"] = 0
+            position_summary[position]["total_acwr"] += acwr
+            position_summary[position]["acwr_count"] += 1
+    
+    # Calculate averages for positions
+    for pos in position_summary:
+        if "acwr_count" in position_summary[pos] and position_summary[pos]["acwr_count"] > 0:
+            position_summary[pos]["avg_acwr"] = round(
+                position_summary[pos]["total_acwr"] / position_summary[pos]["acwr_count"], 2
+            )
+            del position_summary[pos]["total_acwr"]
+            del position_summary[pos]["acwr_count"]
+    
+    # Sort alerts by severity (⚠️ warnings last, 🔴 critical first)
+    alerts.sort(key=lambda x: (0 if "🔴" in x else (1 if "⚡" in x else 2)))
+    
+    # Sort athletes by risk (high risk first)
+    risk_order = {"high": 0, "moderate": 1, "optimal": 2, "low": 3, "unknown": 4}
+    athlete_data.sort(key=lambda x: risk_order.get(x.risk_level, 4))
+    
+    return TeamDashboardResponse(
+        stats=TeamDashboardStats(
+            total_athletes=len(athletes),
+            athletes_high_risk=risk_distribution["high"],
+            athletes_optimal=risk_distribution["optimal"],
+            athletes_fatigued=sum(1 for a in athlete_data if a.fatigue_score and a.fatigue_score > 70),
+            team_avg_acwr=round(total_acwr / acwr_count, 2) if acwr_count > 0 else 0,
+            team_avg_wellness=round(total_wellness / wellness_count, 1) if wellness_count > 0 else 0,
+            team_avg_fatigue=round(total_fatigue / fatigue_count, 1) if fatigue_count > 0 else 0,
+            sessions_this_week=total_sessions,
+            total_distance_this_week=round(total_distance, 0)
+        ),
+        athletes=athlete_data,
+        risk_distribution=risk_distribution,
+        position_summary=position_summary,
+        alerts=alerts[:10]  # Limit to 10 most important alerts
+    )
+
+
 # ============= PDF REPORT GENERATION =============
 
 # Translations for PDF reports
