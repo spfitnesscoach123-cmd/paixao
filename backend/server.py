@@ -632,9 +632,26 @@ async def get_athlete_wellness(
         "coach_id": current_user["_id"]
     }).sort("date", -1).to_list(1000)
     
+    result = []
     for record in wellness_records:
         record["_id"] = str(record["_id"])
-    return [WellnessQuestionnaire(**record) for record in wellness_records]
+        # Handle legacy data with missing fields
+        if record.get("hydration") is None:
+            record["hydration"] = 5
+        if "wellness_score" not in record or record.get("wellness_score") is None:
+            # Calculate wellness score if missing
+            record["wellness_score"] = (
+                (10 - record.get("fatigue", 5)) * 0.2 +
+                record.get("sleep_quality", 5) * 0.2 +
+                (record.get("sleep_hours", 7) / 8) * 10 * 0.15 +
+                record.get("mood", 5) * 0.15 +
+                (10 - record.get("muscle_soreness", 5)) * 0.15 +
+                (10 - record.get("stress", 5)) * 0.15
+            )
+        if "readiness_score" not in record or record.get("readiness_score") is None:
+            record["readiness_score"] = record.get("wellness_score", 5) * 0.8 + (10 - record.get("fatigue", 5)) * 0.2
+        result.append(WellnessQuestionnaire(**record))
+    return result
 
 # ============= PUBLIC WELLNESS ROUTES (for athletes without login) =============
 
