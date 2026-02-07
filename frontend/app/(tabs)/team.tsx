@@ -57,6 +57,7 @@ export default function TeamDashboard() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -93,6 +94,8 @@ export default function TeamDashboard() {
     };
     return labels[risk]?.[locale === 'pt' ? 'pt' : 'en'] || risk;
   };
+
+  const styles = createStyles(colors);
 
   // Mini Donut Chart Component
   const RiskDonut = ({ distribution }: { distribution: { [key: string]: number } }) => {
@@ -373,7 +376,7 @@ export default function TeamDashboard() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
