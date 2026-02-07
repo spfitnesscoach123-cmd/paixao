@@ -58,6 +58,13 @@ export default function AthleteDetails() {
   const [refreshing, setRefreshing] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<SelectedPeriod | null>(null);
+  
+  // GPS Date Filter state
+  const [gpsDateFilter, setGpsDateFilter] = useState<{ start: string | null; end: string | null; activeKey: string }>({
+    start: null,
+    end: null,
+    activeKey: 'all'
+  });
 
   const { data: athlete, isLoading: athleteLoading } = useQuery({
     queryKey: ['athlete', id],
