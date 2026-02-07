@@ -56,6 +56,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       optimal: 'Ótimo',
       moderate: 'Moderado',
       high: 'Alto',
+      noData: 'Sem dados',
     },
     en: {
       bodyComposition: 'Body Composition',
@@ -76,6 +77,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       optimal: 'Optimal',
       moderate: 'Moderate',
       high: 'High',
+      noData: 'No data',
     }
   };
   
