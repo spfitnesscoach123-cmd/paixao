@@ -232,15 +232,29 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>{t('wellness.avgFatigue') || 'Fadiga Média'}</Text>
-                <Text style={[styles.summaryValue, { color: '#ef4444' }]}>
-                  {(sortedData.slice(-7).reduce((sum, d) => sum + d.fatigue, 0) / Math.min(7, sortedData.length)).toFixed(1)}/10
-                </Text>
+                {(() => {
+                  const avgFatigue = sortedData.slice(-7).reduce((sum, d) => sum + d.fatigue, 0) / Math.min(7, sortedData.length);
+                  // For fatigue: low value = good (green), high value = bad (red)
+                  const fatigueColor = getValueColor(avgFatigue, true);
+                  return (
+                    <Text style={[styles.summaryValue, { color: fatigueColor }]}>
+                      {avgFatigue.toFixed(1)}/10
+                    </Text>
+                  );
+                })()}
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>{t('wellness.avgMood') || 'Humor Médio'}</Text>
-                <Text style={[styles.summaryValue, { color: '#10b981' }]}>
-                  {(sortedData.slice(-7).reduce((sum, d) => sum + d.mood, 0) / Math.min(7, sortedData.length)).toFixed(1)}/10
-                </Text>
+                {(() => {
+                  const avgMood = sortedData.slice(-7).reduce((sum, d) => sum + d.mood, 0) / Math.min(7, sortedData.length);
+                  // For mood: high value = good (green), low value = bad (red)
+                  const moodColor = getValueColor(avgMood, false);
+                  return (
+                    <Text style={[styles.summaryValue, { color: moodColor }]}>
+                      {avgMood.toFixed(1)}/10
+                    </Text>
+                  );
+                })()}
               </View>
               <View style={styles.summaryItem}>
                 <Text style={styles.summaryLabel}>{t('wellness.questionnaires') || 'Questionários'}</Text>
