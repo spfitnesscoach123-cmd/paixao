@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../contexts/ThemeContext';
+import { colors } from '../../constants/theme';
 
 interface QuickStatProps {
   label: string;
@@ -12,18 +12,16 @@ interface QuickStatProps {
 }
 
 export const QuickStat: React.FC<QuickStatProps> = ({ label, value, icon, color, trend }) => {
-  const { colors } = useTheme();
-  
   return (
-    <View style={[styles.container, { backgroundColor: colors.dark.card, borderColor: colors.border.default }]}>
+    <View style={styles.container}>
       <View style={[styles.iconCircle, { backgroundColor: color + '20', borderColor: color + '40' }]}>
         <Ionicons name={icon} size={22} color={color} />
       </View>
       
       <View style={styles.content}>
-        <Text style={[styles.label, { color: colors.text.secondary }]}>{label}</Text>
+        <Text style={styles.label}>{label}</Text>
         <View style={styles.valueRow}>
-          <Text style={[styles.value, { color: colors.text.primary }]}>{value}</Text>
+          <Text style={styles.value}>{value}</Text>
           {trend && (
             <View style={[styles.trendBadge, { backgroundColor: trend === 'up' ? colors.accent.tertiary : colors.status.error }]}>
               <Ionicons 
@@ -43,10 +41,12 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
     padding: 14,
     gap: 12,
     borderWidth: 1,
+    borderColor: colors.border.default,
   },
   iconCircle: {
     width: 48,
@@ -61,6 +61,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
+    color: colors.text.secondary,
     marginBottom: 4,
     fontWeight: '600',
   },
@@ -72,6 +73,7 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: colors.text.primary,
   },
   trendBadge: {
     width: 20,
