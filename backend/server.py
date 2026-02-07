@@ -3090,6 +3090,10 @@ async def get_team_dashboard(
             acute_load = 0
             chronic_load = 0
             
+            # Track unique sessions by date+session_name
+            unique_sessions_7d = set()
+            unique_sessions_total = set()
+            
             for record in gps_data:
                 try:
                     record_date = datetime.strptime(record["date"], "%Y-%m-%d")
@@ -3097,16 +3101,21 @@ async def get_team_dashboard(
                     continue
                     
                 dist = record.get("total_distance", 0)
+                session_key = f"{record.get('date')}_{record.get('session_name', 'default')}"
                 
                 if record_date >= seven_days_ago:
                     acute_load += dist
-                    sessions_7d += 1
                     distance_7d += dist
-                    total_sessions += 1
-                    total_distance += dist
+                    unique_sessions_7d.add(session_key)
+                    unique_sessions_total.add(session_key)
                     
                 if record_date >= twenty_eight_days_ago:
                     chronic_load += dist
+            
+            # Count unique sessions (1 CSV = 1 session)
+            sessions_7d = len(unique_sessions_7d)
+            total_sessions += len(unique_sessions_total)
+            total_distance += distance_7d
             
             # Calculate ACWR
             acute_weekly = acute_load / 7
