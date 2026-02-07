@@ -1904,6 +1904,235 @@ async def get_comprehensive_analysis(
     
     return result
 
+# ============= STRENGTH ANALYSIS =============
+
+class StrengthMetric(BaseModel):
+    name: str
+    value: float
+    unit: str
+    classification: str  # "excellent", "good", "average", "below_average", "poor"
+    percentile: float  # Position compared to normative data
+    variation_from_peak: Optional[float] = None  # % change from personal best
+
+class StrengthAnalysisResult(BaseModel):
+    athlete_id: str
+    assessment_date: str
+    metrics: List[StrengthMetric]
+    fatigue_index: float
+    fatigue_alert: bool
+    peripheral_fatigue_detected: bool
+    overall_strength_classification: str
+    ai_insights: Optional[str] = None
+    recommendations: List[str]
+    historical_trend: Optional[Dict[str, Any]] = None
+
+# Normative data for football players (based on literature)
+STRENGTH_NORMATIVES = {
+    "mean_power": {"excellent": 2500, "good": 2200, "average": 1900, "below_average": 1600, "unit": "W"},
+    "peak_power": {"excellent": 4000, "good": 3500, "average": 3000, "below_average": 2500, "unit": "W"},
+    "mean_speed": {"excellent": 1.5, "good": 1.3, "average": 1.1, "below_average": 0.9, "unit": "m/s"},
+    "peak_speed": {"excellent": 3.0, "good": 2.6, "average": 2.2, "below_average": 1.8, "unit": "m/s"},
+    "rsi": {"excellent": 2.5, "good": 2.0, "average": 1.5, "below_average": 1.0, "unit": ""},
+    "fatigue_index": {"low": 30, "moderate": 50, "high": 70, "critical": 85, "unit": "%"}
+}
+
+@api_router.get("/analysis/strength/{athlete_id}", response_model=StrengthAnalysisResult)
+async def get_strength_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """Analyze strength assessment data with normative comparisons and fatigue detection"""
+    
+    t = lambda key: get_analysis_text(lang, key)
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get all strength assessments for this athlete
+    assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "assessment_type": "strength"
+    }).sort("date", -1).to_list(100)
+    
+    if not assessments:
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
+    
+    latest = assessments[0]
+    metrics_data = latest.get("metrics", {})
+    
+    # Calculate historical peaks
+    historical_peaks = {}
+    for a in assessments:
+        m = a.get("metrics", {})
+        for key in ["mean_power", "peak_power", "mean_speed", "peak_speed", "rsi"]:
+            if key in m and m[key] is not None:
+                if key not in historical_peaks or m[key] > historical_peaks[key]:
+                    historical_peaks[key] = m[key]
+    
+    # Analyze each metric
+    analyzed_metrics = []
+    normatives = STRENGTH_NORMATIVES
+    
+    def classify_metric(value, metric_name):
+        if metric_name not in normatives:
+            return "average", 50.0
+        
+        norm = normatives[metric_name]
+        if value >= norm["excellent"]:
+            return "excellent", 95.0
+        elif value >= norm["good"]:
+            return "good", 75.0
+        elif value >= norm["average"]:
+            return "average", 50.0
+        elif value >= norm["below_average"]:
+            return "below_average", 25.0
+        else:
+            return "poor", 10.0
+    
+    # Process each metric
+    for metric_key, display_name in [
+        ("mean_power", "Mean Power"),
+        ("peak_power", "Peak Power"),
+        ("mean_speed", "Mean Speed"),
+        ("peak_speed", "Peak Speed"),
+        ("rsi", "RSI")
+    ]:
+        value = metrics_data.get(metric_key)
+        if value is not None:
+            classification, percentile = classify_metric(value, metric_key)
+            
+            # Calculate variation from personal peak
+            variation = None
+            if metric_key in historical_peaks and historical_peaks[metric_key] > 0:
+                variation = ((value - historical_peaks[metric_key]) / historical_peaks[metric_key]) * 100
+            
+            analyzed_metrics.append(StrengthMetric(
+                name=display_name,
+                value=value,
+                unit=normatives.get(metric_key, {}).get("unit", ""),
+                classification=classification,
+                percentile=percentile,
+                variation_from_peak=round(variation, 1) if variation else None
+            ))
+    
+    # Calculate fatigue index
+    fatigue_index = metrics_data.get("fatigue_index", 0)
+    fatigue_alert = fatigue_index > 70
+    
+    # Detect peripheral fatigue
+    # Peripheral fatigue = RSI decrease + Peak Power decrease
+    rsi_current = metrics_data.get("rsi", 0)
+    peak_power_current = metrics_data.get("peak_power", 0)
+    rsi_peak = historical_peaks.get("rsi", rsi_current)
+    peak_power_peak = historical_peaks.get("peak_power", peak_power_current)
+    
+    rsi_drop = (rsi_peak - rsi_current) / rsi_peak * 100 if rsi_peak > 0 else 0
+    power_drop = (peak_power_peak - peak_power_current) / peak_power_peak * 100 if peak_power_peak > 0 else 0
+    
+    peripheral_fatigue = (rsi_drop > 10 and power_drop > 10) or fatigue_index > 70
+    
+    # Overall classification
+    avg_percentile = sum(m.percentile for m in analyzed_metrics) / len(analyzed_metrics) if analyzed_metrics else 50
+    if avg_percentile >= 80:
+        overall_class = "excellent"
+    elif avg_percentile >= 60:
+        overall_class = "good"
+    elif avg_percentile >= 40:
+        overall_class = "average"
+    else:
+        overall_class = "below_average"
+    
+    # Generate recommendations
+    recommendations = []
+    
+    if peripheral_fatigue:
+        if lang == "pt":
+            recommendations.append("⚠️ FADIGA PERIFÉRICA DETECTADA: Redução significativa no RSI e Pico de Potência indica acúmulo de fadiga muscular.")
+            recommendations.append("Recomenda-se período de recuperação ativa e redução do volume de treino.")
+            recommendations.append("Risco aumentado de lesão se os esforços intensos persistirem.")
+        else:
+            recommendations.append("⚠️ PERIPHERAL FATIGUE DETECTED: Significant RSI and Peak Power reduction indicates accumulated muscle fatigue.")
+            recommendations.append("Active recovery period and reduced training volume recommended.")
+            recommendations.append("Increased injury risk if intense efforts persist.")
+    
+    if fatigue_alert:
+        if lang == "pt":
+            recommendations.append(f"Índice de Fadiga em {fatigue_index}% - acima do limiar de 70%. Monitorar recuperação.")
+        else:
+            recommendations.append(f"Fatigue Index at {fatigue_index}% - above 70% threshold. Monitor recovery.")
+    
+    if not recommendations:
+        if lang == "pt":
+            recommendations.append("Níveis de força dentro dos parâmetros normais. Manter rotina de treino.")
+        else:
+            recommendations.append("Strength levels within normal parameters. Maintain training routine.")
+    
+    # Generate AI insights
+    ai_insights = None
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY')
+        if emergent_key and len(assessed_metrics) > 0:
+            system_msg = "You are a sports science expert specializing in strength and conditioning for football players." if lang == "en" else "Você é um especialista em ciência do esporte, especializado em força e condicionamento para jogadores de futebol."
+            
+            metrics_summary = "\n".join([f"- {m.name}: {m.value}{m.unit} ({m.classification}, {m.percentile}th percentile)" for m in analyzed_metrics])
+            
+            prompt = f"""Analyze this football player's strength assessment:
+{metrics_summary}
+Fatigue Index: {fatigue_index}%
+Peripheral Fatigue: {'Yes' if peripheral_fatigue else 'No'}
+RSI Drop from Peak: {rsi_drop:.1f}%
+Peak Power Drop from Peak: {power_drop:.1f}%
+
+Provide a brief (2-3 sentences) professional insight about this athlete's strength profile and any concerns."""
+            
+            if lang == "pt":
+                prompt = f"""Analise esta avaliação de força de um jogador de futebol:
+{metrics_summary}
+Índice de Fadiga: {fatigue_index}%
+Fadiga Periférica: {'Sim' if peripheral_fatigue else 'Não'}
+Queda do RSI do Pico: {rsi_drop:.1f}%
+Queda do Pico de Potência do Pico: {power_drop:.1f}%
+
+Forneça um insight profissional breve (2-3 frases) sobre o perfil de força deste atleta e quaisquer preocupações."""
+            
+            chat = LlmChat(
+                api_key=emergent_key,
+                session_id=f"strength_{athlete_id}_{datetime.utcnow().timestamp()}",
+                system_message=system_msg
+            ).with_model("openai", "gpt-4o")
+            
+            response = await chat.send_message(UserMessage(text=prompt))
+            ai_insights = response
+    except Exception as e:
+        logger.error(f"AI strength analysis error: {str(e)}")
+    
+    return StrengthAnalysisResult(
+        athlete_id=athlete_id,
+        assessment_date=latest.get("date", ""),
+        metrics=analyzed_metrics,
+        fatigue_index=fatigue_index,
+        fatigue_alert=fatigue_alert,
+        peripheral_fatigue_detected=peripheral_fatigue,
+        overall_strength_classification=overall_class,
+        ai_insights=ai_insights,
+        recommendations=recommendations,
+        historical_trend={
+            "rsi_peak": rsi_peak,
+            "rsi_current": rsi_current,
+            "rsi_drop_percent": round(rsi_drop, 1),
+            "peak_power_peak": peak_power_peak,
+            "peak_power_current": peak_power_current,
+            "power_drop_percent": round(power_drop, 1)
+        }
+    )
+
 # ============= PDF REPORT GENERATION =============
 
 # Translations for PDF reports
