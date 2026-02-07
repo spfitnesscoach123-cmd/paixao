@@ -1235,6 +1235,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.secondary,
     borderWidth: 1,
     borderColor: colors.border.default,
+    alignItems: 'center',
+    minWidth: '30%',
   },
   providerButtonActive: {
     backgroundColor: colors.accent.primary,
@@ -1243,9 +1245,33 @@ const styles = StyleSheet.create({
   providerText: {
     fontSize: 12,
     color: colors.text.secondary,
+    fontWeight: '600',
   },
   providerTextActive: {
     color: '#ffffff',
+  },
+  providerMethodText: {
+    fontSize: 9,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  providerMethodTextActive: {
+    color: 'rgba(255, 255, 255, 0.7)',
+  },
+  inputMethodInfo: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 12,
+    gap: 8,
+  },
+  inputMethodInfoText: {
+    flex: 1,
+    fontSize: 11,
+    color: colors.text.secondary,
+    lineHeight: 16,
   },
   setHeader: {
     flexDirection: 'row',
