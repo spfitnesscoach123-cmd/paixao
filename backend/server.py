@@ -223,11 +223,13 @@ class SubscriptionStatus(str, Enum):
     EXPIRED = "expired"
     CANCELLED = "cancelled"
 
-# Plan limits configuration
+# Plan limits configuration with regional pricing
 PLAN_LIMITS = {
     "free_trial": {
         "name": "Trial Grátis",
-        "price": 0,
+        "name_en": "Free Trial",
+        "price_brl": 0,
+        "price_usd": 0,
         "max_athletes": 999,  # Unlimited during trial
         "history_months": 12,
         "features": ["all"],  # All features during trial
@@ -239,10 +241,14 @@ PLAN_LIMITS = {
         "fatigue_alerts": True,
         "multi_user": False,
         "max_users": 1,
+        "description_pt": "Experimente todas as funcionalidades por 7 dias grátis",
+        "description_en": "Try all features free for 7 days",
     },
     "essencial": {
         "name": "Essencial",
-        "price": 39.90,
+        "name_en": "Essential",
+        "price_brl": 39.90,
+        "price_usd": 7.99,
         "max_athletes": 25,
         "history_months": 3,
         "features": ["basic_reports", "weekly_view", "quick_registration"],
@@ -254,13 +260,45 @@ PLAN_LIMITS = {
         "fatigue_alerts": False,
         "multi_user": False,
         "max_users": 1,
+        "description_pt": "Ideal para treinadores individuais ou pequenas equipes iniciando no monitoramento de atletas",
+        "description_en": "Ideal for individual coaches or small teams starting athlete monitoring",
+        "features_list_pt": [
+            "Até 25 atletas cadastrados",
+            "Registro rápido de GPS e Wellness",
+            "Visualização semanal de carga",
+            "Histórico de 3 meses",
+            "Relatórios básicos de desempenho"
+        ],
+        "features_list_en": [
+            "Up to 25 registered athletes",
+            "Quick GPS and Wellness registration",
+            "Weekly load visualization",
+            "3 months history",
+            "Basic performance reports"
+        ],
+        "limitations_pt": [
+            "Sem análise ACWR detalhada",
+            "Sem comparação entre atletas",
+            "Sem alertas de fadiga",
+            "Sem exportação PDF/CSV",
+            "Sem insights de IA"
+        ],
+        "limitations_en": [
+            "No detailed ACWR analysis",
+            "No athlete comparison",
+            "No fatigue alerts",
+            "No PDF/CSV export",
+            "No AI insights"
+        ]
     },
     "profissional": {
         "name": "Profissional",
-        "price": 89.90,
+        "name_en": "Professional",
+        "price_brl": 89.90,
+        "price_usd": 17.99,
         "max_athletes": 50,
         "history_months": -1,  # Unlimited
-        "features": ["basic_reports", "weekly_view", "monthly_reports", "athlete_comparison", "context_alerts"],
+        "features": ["basic_reports", "weekly_view", "monthly_reports", "athlete_comparison", "context_alerts", "export_pdf", "export_csv", "advanced_analytics", "fatigue_alerts"],
         "trial_days": 7,
         "export_pdf": True,
         "export_csv": True,
@@ -269,10 +307,45 @@ PLAN_LIMITS = {
         "fatigue_alerts": True,
         "multi_user": False,
         "max_users": 1,
+        "description_pt": "Para preparadores físicos e clubes que precisam de análises avançadas e comparações",
+        "description_en": "For fitness coaches and clubs needing advanced analytics and comparisons",
+        "features_list_pt": [
+            "Até 50 atletas cadastrados",
+            "Tudo do plano Essencial",
+            "ACWR detalhado por métrica",
+            "Comparação entre atletas",
+            "Alertas contextuais de risco",
+            "Relatórios mensais completos",
+            "Exportação PDF e CSV",
+            "Histórico ilimitado"
+        ],
+        "features_list_en": [
+            "Up to 50 registered athletes",
+            "Everything in Essential plan",
+            "Detailed ACWR by metric",
+            "Athlete comparison",
+            "Contextual risk alerts",
+            "Complete monthly reports",
+            "PDF and CSV export",
+            "Unlimited history"
+        ],
+        "limitations_pt": [
+            "Sem insights de IA",
+            "Sem múltiplos usuários",
+            "Sem suporte prioritário"
+        ],
+        "limitations_en": [
+            "No AI insights",
+            "No multiple users",
+            "No priority support"
+        ],
+        "popular": True
     },
     "elite": {
         "name": "Elite",
-        "price": 159.90,
+        "name_en": "Elite",
+        "price_brl": 159.90,
+        "price_usd": 29.99,
         "max_athletes": -1,  # Unlimited
         "history_months": -1,  # Unlimited
         "features": ["all"],
@@ -286,6 +359,30 @@ PLAN_LIMITS = {
         "max_users": 2,
         "priority_support": True,
         "custom_branding": True,
+        "description_pt": "Solução completa para clubes profissionais e departamentos de performance",
+        "description_en": "Complete solution for professional clubs and performance departments",
+        "features_list_pt": [
+            "Atletas ilimitados",
+            "Tudo do plano Profissional",
+            "Insights gerados por IA",
+            "Detecção de fadiga periférica",
+            "Até 2 usuários simultâneos",
+            "Suporte prioritário",
+            "Relatórios personalizados",
+            "API de integração (em breve)"
+        ],
+        "features_list_en": [
+            "Unlimited athletes",
+            "Everything in Professional plan",
+            "AI-generated insights",
+            "Peripheral fatigue detection",
+            "Up to 2 simultaneous users",
+            "Priority support",
+            "Custom reports",
+            "Integration API (coming soon)"
+        ],
+        "limitations_pt": [],
+        "limitations_en": []
     },
 }
 
