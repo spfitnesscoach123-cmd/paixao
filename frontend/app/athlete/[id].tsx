@@ -55,7 +55,7 @@ export default function AthleteDetails() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [activeTab, setActiveTab] = useState<TabType>('info');
   const [refreshing, setRefreshing] = useState(false);
   const [expandedSessions, setExpandedSessions] = useState<string[]>([]);
