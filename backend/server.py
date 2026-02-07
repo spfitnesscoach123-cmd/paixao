@@ -961,14 +961,17 @@ class PublicWellnessSubmit(BaseModel):
 
 @api_router.post("/wellness/generate-link")
 async def generate_wellness_link(
-    expires_days: int = 7,
+    expires_hours: float = 24,
     current_user: dict = Depends(get_current_user)
 ):
-    """Generate a shareable link for athletes to submit wellness questionnaires"""
+    """Generate a shareable link for athletes to submit wellness questionnaires
+    
+    expires_hours: Duration in hours (0.5 = 30min, 2, 8, 24)
+    """
     import secrets
     
     link_token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(days=expires_days)
+    expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
     
     wellness_link = WellnessLink(
         coach_id=current_user["_id"],
