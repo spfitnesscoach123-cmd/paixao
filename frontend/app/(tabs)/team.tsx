@@ -273,6 +273,24 @@ export default function TeamDashboard() {
                 <Text style={styles.statLabel}>{locale === 'pt' ? 'Sessões/Semana' : 'Sessions/Week'}</Text>
               </LinearGradient>
             </View>
+            
+            {/* New: Strength/Power Card */}
+            <View style={styles.statCard}>
+              <LinearGradient colors={['rgba(99, 102, 241, 0.15)', 'rgba(99, 102, 241, 0.05)']} style={styles.statCardGradient}>
+                <Ionicons name="barbell" size={24} color="#6366f1" />
+                <Text style={styles.statValue}>{data.stats.team_avg_power || '-'}W</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Potência Média' : 'Avg Power'}</Text>
+              </LinearGradient>
+            </View>
+            
+            {/* New: Body Composition Card */}
+            <View style={styles.statCard}>
+              <LinearGradient colors={['rgba(236, 72, 153, 0.15)', 'rgba(236, 72, 153, 0.05)']} style={styles.statCardGradient}>
+                <Ionicons name="body" size={24} color="#ec4899" />
+                <Text style={styles.statValue}>{data.stats.team_avg_body_fat ? `${data.stats.team_avg_body_fat.toFixed(1)}%` : '-'}</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? '% Gordura Média' : 'Avg Body Fat'}</Text>
+              </LinearGradient>
+            </View>
           </View>
 
           {/* Risk Distribution */}
