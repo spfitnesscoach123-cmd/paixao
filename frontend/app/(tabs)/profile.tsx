@@ -16,7 +16,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { colors as staticColors } from '../../constants/theme';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -24,6 +23,8 @@ export default function ProfileScreen() {
   const { colors, theme, toggleTheme, isDark } = useTheme();
   const router = useRouter();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  
+  const styles = createProfileStyles(colors);
 
   const handleLogout = () => {
     Alert.alert(
