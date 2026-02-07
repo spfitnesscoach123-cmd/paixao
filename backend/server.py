@@ -2971,6 +2971,8 @@ class TeamDashboardStats(BaseModel):
     team_avg_fatigue: float
     sessions_this_week: int
     total_distance_this_week: float
+    team_avg_power: Optional[float] = None
+    team_avg_body_fat: Optional[float] = None
 
 class TeamDashboardResponse(BaseModel):
     stats: TeamDashboardStats
