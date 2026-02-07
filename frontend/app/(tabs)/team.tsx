@@ -373,20 +373,22 @@ export default function TeamDashboard() {
             ))}
           </View>
 
-          {/* Position Summary */}
+          {/* Position Summary - Group Averages */}
           {Object.keys(data.position_summary).length > 0 && (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>
-                {locale === 'pt' ? 'Resumo por Posição' : 'Position Summary'}
+                {locale === 'pt' ? 'Médias por Posição' : 'Position Group Averages'}
+              </Text>
+              <Text style={styles.cardSubtitle}>
+                {locale === 'pt' ? 'Métricas médias de cada grupo posicional' : 'Average metrics for each position group'}
               </Text>
               {Object.entries(data.position_summary).map(([position, stats]) => (
-                <View key={position} style={styles.positionRow}>
-                  <View style={styles.positionInfo}>
-                    <Text style={styles.positionName}>{position}</Text>
-                    <Text style={styles.positionCount}>{stats.count} {locale === 'pt' ? 'atletas' : 'athletes'}</Text>
-                  </View>
-                  <View style={styles.positionStats}>
-                    <Text style={styles.positionStat}>ACWR: {stats.avg_acwr || '-'}</Text>
+                <View key={position} style={styles.positionCard}>
+                  <View style={styles.positionHeader}>
+                    <View style={styles.positionInfo}>
+                      <Text style={styles.positionName}>{position}</Text>
+                      <Text style={styles.positionCount}>{stats.count} {locale === 'pt' ? 'atletas' : 'athletes'}</Text>
+                    </View>
                     {stats.high_risk_count > 0 && (
                       <View style={styles.positionAlert}>
                         <Text style={styles.positionAlertText}>
@@ -394,6 +396,24 @@ export default function TeamDashboard() {
                         </Text>
                       </View>
                     )}
+                  </View>
+                  <View style={styles.positionMetrics}>
+                    <View style={styles.positionMetric}>
+                      <Text style={styles.positionMetricValue}>{stats.avg_acwr || '-'}</Text>
+                      <Text style={styles.positionMetricLabel}>ACWR</Text>
+                    </View>
+                    <View style={styles.positionMetric}>
+                      <Text style={styles.positionMetricValue}>{stats.avg_distance ? `${(stats.avg_distance / 1000).toFixed(1)}km` : '-'}</Text>
+                      <Text style={styles.positionMetricLabel}>{locale === 'pt' ? 'Dist. Média' : 'Avg Dist.'}</Text>
+                    </View>
+                    <View style={styles.positionMetric}>
+                      <Text style={styles.positionMetricValue}>{stats.avg_sprints || '-'}</Text>
+                      <Text style={styles.positionMetricLabel}>Sprints</Text>
+                    </View>
+                    <View style={styles.positionMetric}>
+                      <Text style={styles.positionMetricValue}>{stats.avg_max_speed ? `${stats.avg_max_speed}` : '-'}</Text>
+                      <Text style={styles.positionMetricLabel}>Vmax (km/h)</Text>
+                    </View>
                   </View>
                 </View>
               ))}
