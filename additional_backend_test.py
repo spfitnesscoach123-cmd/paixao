@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://acwr-analytics.preview.emergentagent.com/api"
+BASE_URL = "https://team-stats-9.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "coach_test@test.com"
 TEST_USER_PASSWORD = "test123456"
 TEST_USER_NAME = "Coach Test"
