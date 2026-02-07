@@ -3166,6 +3166,23 @@ async def get_team_dashboard(
                         alert_msg = f"⚡ {athlete['name']}: Queda de potência de {power_drop:.0f}%" if lang == "pt" else f"⚡ {athlete['name']}: Power drop of {power_drop:.0f}%"
                         alerts.append(alert_msg)
         
+        # Get latest strength data for team averages
+        if strength_assessments:
+            latest_strength = strength_assessments[0].get("metrics", {})
+            mean_power = latest_strength.get("mean_power")
+            if mean_power:
+                total_power += mean_power
+                power_count += 1
+        
+        # Get latest body composition for team averages
+        latest_body_comp = await db.body_composition_assessments.find_one(
+            {"athlete_id": athlete_id},
+            sort=[("date", -1)]
+        )
+        if latest_body_comp and latest_body_comp.get("body_fat_percentage"):
+            total_body_fat += latest_body_comp["body_fat_percentage"]
+            body_fat_count += 1
+        
         athlete_data.append(TeamDashboardAthlete(
             id=athlete_id,
             name=athlete["name"],
