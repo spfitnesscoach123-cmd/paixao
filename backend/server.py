@@ -176,10 +176,11 @@ class WellnessQuestionnaire(BaseModel):
     sleep_quality: int
     sleep_hours: float
     muscle_soreness: int
-    hydration: int
-    wellness_score: float  # Calculated score
-    readiness_score: float  # Calculated score
+    hydration: Optional[int] = 5  # Default to 5 if missing
+    wellness_score: Optional[float] = None  # Calculated score
+    readiness_score: Optional[float] = None  # Calculated score
     notes: Optional[str] = None
+    submitted_via: Optional[str] = None  # Track submission source
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     class Config:
