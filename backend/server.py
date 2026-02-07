@@ -3061,13 +3061,28 @@ async def get_team_dashboard(
         athlete_id = str(athlete["_id"])
         position = athlete.get("position", "Unknown")
         
-        # Initialize position summary
+        # Initialize position summary with all metrics for group averaging
         if position not in position_summary:
             position_summary[position] = {
                 "count": 0,
                 "avg_acwr": 0,
                 "avg_wellness": 0,
-                "high_risk_count": 0
+                "avg_fatigue": 0,
+                "avg_distance": 0,
+                "avg_sprints": 0,
+                "avg_max_speed": 0,
+                "high_risk_count": 0,
+                # Accumulators for calculating averages
+                "_total_acwr": 0,
+                "_total_wellness": 0,
+                "_total_fatigue": 0,
+                "_total_distance": 0,
+                "_total_sprints": 0,
+                "_total_max_speed": 0,
+                "_acwr_count": 0,
+                "_wellness_count": 0,
+                "_fatigue_count": 0,
+                "_gps_count": 0
             }
         position_summary[position]["count"] += 1
         
