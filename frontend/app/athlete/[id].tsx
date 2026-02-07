@@ -788,6 +788,10 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     paddingLeft: 4,
   },
+  strengthAnalysisSection: {
+    marginTop: 16,
+    marginBottom: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
