@@ -81,8 +81,9 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
   
   const t2 = translations[locale === 'pt' ? 'pt' : 'en'];
   
-  // Body 3D Model Component
+  // Body 3D Model Component with Enhanced Visual Effects
   const BodyModel = () => {
+    const [viewAngle, setViewAngle] = useState<'front' | 'side'>('front');
     const distribution = data.fat_distribution || {};
     
     // Calculate intensity for each region (0-1)
@@ -95,114 +96,315 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       return '#ef4444'; // Red - high
     };
     
+    const getColorLight = (value: number = 0) => {
+      const intensity = getIntensity(value);
+      if (intensity < 0.3) return '#34d399'; // Light green
+      if (intensity < 0.5) return '#fbbf24'; // Light yellow
+      return '#f87171'; // Light red
+    };
+    
+    const getColorDark = (value: number = 0) => {
+      const intensity = getIntensity(value);
+      if (intensity < 0.3) return '#059669'; // Dark green
+      if (intensity < 0.5) return '#d97706'; // Dark yellow
+      return '#dc2626'; // Dark red
+    };
+    
     const getOpacity = (value: number = 0) => {
-      return 0.4 + (getIntensity(value) * 0.5);
+      return 0.6 + (getIntensity(value) * 0.35);
+    };
+    
+    // Region percentage values
+    const regionValues = {
+      upperArm: distribution.upper_arm || 0,
+      trunkFront: distribution.trunk_front || 0,
+      hipWaist: distribution.hip_waist || 0,
+      lowerBody: distribution.lower_body || 0,
     };
     
     return (
       <View style={styles.bodyModelContainer}>
-        <Svg width={180} height={280} viewBox="0 0 180 280">
-          {/* Head */}
-          <Circle cx="90" cy="28" r="22" fill={colors.dark.secondary} stroke={colors.accent.primary} strokeWidth="2" />
-          
-          {/* Neck */}
-          <Rect x="82" y="48" width="16" height="15" fill={colors.dark.secondary} />
-          
-          {/* Shoulders/Upper Body - Trunk Front */}
-          <Path
-            d="M50 65 L130 65 L140 90 L40 90 Z"
-            fill={getColor(distribution.trunk_front)}
-            opacity={getOpacity(distribution.trunk_front)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Chest/Torso - Trunk Front */}
-          <Path
-            d="M40 90 L140 90 L135 155 L45 155 Z"
-            fill={getColor(distribution.trunk_front)}
-            opacity={getOpacity(distribution.trunk_front)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Left Arm */}
-          <Path
-            d="M40 70 L25 70 L15 140 L30 140 L40 90"
-            fill={getColor(distribution.upper_arm)}
-            opacity={getOpacity(distribution.upper_arm)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Right Arm */}
-          <Path
-            d="M140 70 L155 70 L165 140 L150 140 L140 90"
-            fill={getColor(distribution.upper_arm)}
-            opacity={getOpacity(distribution.upper_arm)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Waist/Hip Area */}
-          <Path
-            d="M45 155 L135 155 L130 185 L50 185 Z"
-            fill={getColor(distribution.hip_waist)}
-            opacity={getOpacity(distribution.hip_waist)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Left Thigh */}
-          <Path
-            d="M50 185 L80 185 L75 250 L45 250 Z"
-            fill={getColor(distribution.lower_body)}
-            opacity={getOpacity(distribution.lower_body)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Right Thigh */}
-          <Path
-            d="M100 185 L130 185 L135 250 L105 250 Z"
-            fill={getColor(distribution.lower_body)}
-            opacity={getOpacity(distribution.lower_body)}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Left Calf */}
-          <Path
-            d="M45 250 L75 250 L70 275 L50 275 Z"
-            fill={getColor(distribution.lower_body)}
-            opacity={getOpacity(distribution.lower_body) * 0.8}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-          
-          {/* Right Calf */}
-          <Path
-            d="M105 250 L135 250 L130 275 L110 275 Z"
-            fill={getColor(distribution.lower_body)}
-            opacity={getOpacity(distribution.lower_body) * 0.8}
-            stroke={colors.border.default}
-            strokeWidth="1"
-          />
-        </Svg>
+        {/* View Toggle */}
+        <View style={styles.viewToggle}>
+          <TouchableOpacity
+            style={[styles.viewButton, viewAngle === 'front' && styles.viewButtonActive]}
+            onPress={() => setViewAngle('front')}
+          >
+            <Text style={[styles.viewButtonText, viewAngle === 'front' && styles.viewButtonTextActive]}>
+              {locale === 'pt' ? 'Frontal' : 'Front'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewButton, viewAngle === 'side' && styles.viewButtonActive]}
+            onPress={() => setViewAngle('side')}
+          >
+            <Text style={[styles.viewButtonText, viewAngle === 'side' && styles.viewButtonTextActive]}>
+              {locale === 'pt' ? 'Lateral' : 'Side'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {viewAngle === 'front' ? (
+          <Svg width={200} height={300} viewBox="0 0 200 300">
+            <Defs>
+              {/* Skin gradient */}
+              <LinearGradient id="skinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor="#2d3748" stopOpacity="1" />
+                <Stop offset="100%" stopColor="#1a202c" stopOpacity="1" />
+              </LinearGradient>
+              
+              {/* Fat region gradients */}
+              <RadialGradient id="armsFat" cx="50%" cy="30%" r="70%">
+                <Stop offset="0%" stopColor={getColorLight(regionValues.upperArm)} stopOpacity={getOpacity(regionValues.upperArm)} />
+                <Stop offset="100%" stopColor={getColorDark(regionValues.upperArm)} stopOpacity={getOpacity(regionValues.upperArm) - 0.2} />
+              </RadialGradient>
+              <RadialGradient id="torsoFat" cx="50%" cy="40%" r="70%">
+                <Stop offset="0%" stopColor={getColorLight(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront)} />
+                <Stop offset="100%" stopColor={getColorDark(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront) - 0.2} />
+              </RadialGradient>
+              <RadialGradient id="hipFat" cx="50%" cy="40%" r="70%">
+                <Stop offset="0%" stopColor={getColorLight(regionValues.hipWaist)} stopOpacity={getOpacity(regionValues.hipWaist)} />
+                <Stop offset="100%" stopColor={getColorDark(regionValues.hipWaist)} stopOpacity={getOpacity(regionValues.hipWaist) - 0.2} />
+              </RadialGradient>
+              <RadialGradient id="legsFat" cx="50%" cy="30%" r="70%">
+                <Stop offset="0%" stopColor={getColorLight(regionValues.lowerBody)} stopOpacity={getOpacity(regionValues.lowerBody)} />
+                <Stop offset="100%" stopColor={getColorDark(regionValues.lowerBody)} stopOpacity={getOpacity(regionValues.lowerBody) - 0.2} />
+              </RadialGradient>
+              
+              {/* Highlight gradient for 3D effect */}
+              <LinearGradient id="bodyHighlight" x1="30%" y1="0%" x2="70%" y2="100%">
+                <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
+                <Stop offset="50%" stopColor="#ffffff" stopOpacity="0" />
+                <Stop offset="100%" stopColor="#000000" stopOpacity="0.1" />
+              </LinearGradient>
+            </Defs>
+            
+            {/* Body outline/silhouette */}
+            <G>
+              {/* Head with 3D effect */}
+              <Ellipse cx="100" cy="32" rx="24" ry="26" fill="url(#skinGradient)" />
+              <Ellipse cx="100" cy="32" rx="24" ry="26" fill="url(#bodyHighlight)" />
+              <Circle cx="93" cy="28" r="2" fill="#374151" opacity="0.5" />
+              <Circle cx="107" cy="28" r="2" fill="#374151" opacity="0.5" />
+              
+              {/* Neck */}
+              <Rect x="90" y="55" width="20" height="18" rx="4" fill="url(#skinGradient)" />
+              
+              {/* Shoulders and upper torso */}
+              <Path
+                d="M48 75 Q65 70 100 70 Q135 70 152 75 L160 95 Q145 100 100 100 Q55 100 40 95 Z"
+                fill="url(#torsoFat)"
+              />
+              <Path
+                d="M48 75 Q65 70 100 70 Q135 70 152 75 L160 95 Q145 100 100 100 Q55 100 40 95 Z"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Main torso */}
+              <Path
+                d="M40 95 L160 95 Q165 140 155 175 Q145 190 100 190 Q55 190 45 175 Q35 140 40 95 Z"
+                fill="url(#torsoFat)"
+              />
+              <Path
+                d="M40 95 L160 95 Q165 140 155 175 Q145 190 100 190 Q55 190 45 175 Q35 140 40 95 Z"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Left arm */}
+              <Path
+                d="M48 75 L28 80 Q15 95 12 130 Q10 155 15 160 L25 160 Q35 155 40 120 L40 95"
+                fill="url(#armsFat)"
+              />
+              <Path
+                d="M48 75 L28 80 Q15 95 12 130 Q10 155 15 160 L25 160 Q35 155 40 120 L40 95"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Right arm */}
+              <Path
+                d="M152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95"
+                fill="url(#armsFat)"
+              />
+              <Path
+                d="M152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Hip/Waist area */}
+              <Path
+                d="M45 175 Q35 195 55 215 L85 215 L85 190 Q55 190 45 175"
+                fill="url(#hipFat)"
+              />
+              <Path
+                d="M155 175 Q165 195 145 215 L115 215 L115 190 Q145 190 155 175"
+                fill="url(#hipFat)"
+              />
+              
+              {/* Left thigh */}
+              <Path
+                d="M55 215 L85 215 L85 270 Q75 280 65 280 Q50 280 50 270 Q45 240 55 215"
+                fill="url(#legsFat)"
+              />
+              <Path
+                d="M55 215 L85 215 L85 270 Q75 280 65 280 Q50 280 50 270 Q45 240 55 215"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Right thigh */}
+              <Path
+                d="M145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 Q155 240 145 215"
+                fill="url(#legsFat)"
+              />
+              <Path
+                d="M145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 Q155 240 145 215"
+                fill="url(#bodyHighlight)"
+              />
+              
+              {/* Body outline for definition */}
+              <Path
+                d="M48 75 Q65 70 100 70 Q135 70 152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95 Q165 140 155 175 Q165 195 145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 L150 280 Q140 290 100 290 Q60 290 50 280 L50 270 Q50 280 65 280 Q75 280 85 270 L85 215 L55 215 Q35 195 45 175 Q35 140 40 95 L40 120 Q35 155 25 160 L15 160 Q10 155 12 130 Q15 95 28 80 L48 75 Z"
+                fill="none"
+                stroke={colors.accent.primary}
+                strokeWidth="1.5"
+                opacity="0.6"
+              />
+            </G>
+            
+            {/* Fat percentage labels */}
+            <G>
+              <SvgText x="15" y="140" fontSize="9" fill={getColor(regionValues.upperArm)} fontWeight="bold">
+                {regionValues.upperArm.toFixed(0)}%
+              </SvgText>
+              <SvgText x="100" y="145" fontSize="10" fill={getColor(regionValues.trunkFront)} fontWeight="bold" textAnchor="middle">
+                {regionValues.trunkFront.toFixed(0)}%
+              </SvgText>
+              <SvgText x="100" y="205" fontSize="9" fill={getColor(regionValues.hipWaist)} fontWeight="bold" textAnchor="middle">
+                {regionValues.hipWaist.toFixed(0)}%
+              </SvgText>
+              <SvgText x="100" y="260" fontSize="9" fill={getColor(regionValues.lowerBody)} fontWeight="bold" textAnchor="middle">
+                {regionValues.lowerBody.toFixed(0)}%
+              </SvgText>
+            </G>
+          </Svg>
+        ) : (
+          /* Side View */
+          <Svg width={200} height={300} viewBox="0 0 200 300">
+            <Defs>
+              <LinearGradient id="skinGradientSide" x1="0%" y1="0%" x2="100%" y2="100%">
+                <Stop offset="0%" stopColor="#2d3748" stopOpacity="1" />
+                <Stop offset="100%" stopColor="#1a202c" stopOpacity="1" />
+              </LinearGradient>
+              <RadialGradient id="backFat" cx="30%" cy="40%" r="70%">
+                <Stop offset="0%" stopColor={getColorLight(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront)} />
+                <Stop offset="100%" stopColor={getColorDark(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront) - 0.2} />
+              </RadialGradient>
+            </Defs>
+            
+            {/* Side view body */}
+            <G>
+              {/* Head */}
+              <Ellipse cx="100" cy="32" rx="20" ry="26" fill="url(#skinGradientSide)" />
+              
+              {/* Neck */}
+              <Rect x="92" y="55" width="16" height="18" rx="3" fill="url(#skinGradientSide)" />
+              
+              {/* Back profile with fat distribution visualization */}
+              <Path
+                d="M80 75 Q70 80 65 100 Q55 120 55 160 Q55 190 65 210 L65 270 Q65 280 75 285 L85 285 Q90 280 90 270 L90 210 Q100 190 100 160 Q100 120 95 100 Q92 80 80 75"
+                fill="url(#backFat)"
+              />
+              
+              {/* Front profile */}
+              <Path
+                d="M120 75 Q130 80 135 100 Q145 120 145 160 Q145 190 135 210 L135 270 Q135 280 125 285 L115 285 Q110 280 110 270 L110 210 Q100 190 100 160 Q100 120 105 100 Q108 80 120 75"
+                fill="url(#backFat)"
+              />
+              
+              {/* Arm (side view) */}
+              <Path
+                d="M130 80 Q145 85 150 110 Q155 145 150 160 L145 160 Q140 145 140 110 Q140 90 130 80"
+                fill="url(#skinGradientSide)"
+              />
+              
+              {/* Body outline */}
+              <Path
+                d="M80 75 Q70 80 65 100 Q55 120 55 160 Q55 190 65 210 L65 270 Q65 280 75 285 L125 285 Q135 280 135 270 L135 210 Q145 190 145 160 Q145 120 135 100 Q130 80 120 75"
+                fill="none"
+                stroke={colors.accent.primary}
+                strokeWidth="1.5"
+                opacity="0.6"
+              />
+              
+              {/* Belly protrusion indicator based on fat % */}
+              {regionValues.trunkFront > 15 && (
+                <Path
+                  d={`M135 130 Q${145 + regionValues.trunkFront * 0.5} 150 135 170`}
+                  fill="none"
+                  stroke={getColor(regionValues.trunkFront)}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  opacity="0.8"
+                />
+              )}
+            </G>
+            
+            {/* Labels for side view */}
+            <G>
+              <SvgText x="100" y="145" fontSize="10" fill={getColor(regionValues.trunkFront)} fontWeight="bold" textAnchor="middle">
+                {regionValues.trunkFront.toFixed(0)}%
+              </SvgText>
+              <SvgText x="75" y="250" fontSize="9" fill={getColor(regionValues.lowerBody)} fontWeight="bold" textAnchor="middle">
+                {regionValues.lowerBody.toFixed(0)}%
+              </SvgText>
+            </G>
+          </Svg>
+        )}
         
         {/* Legend */}
         <View style={styles.bodyLegend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#10b981' }]} />
-            <Text style={styles.legendText}>{t2.optimal}</Text>
+            <Text style={styles.legendText}>{t2.optimal} (&lt;12%)</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#f59e0b' }]} />
-            <Text style={styles.legendText}>{t2.moderate}</Text>
+            <Text style={styles.legendText}>{t2.moderate} (12-20%)</Text>
           </View>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} />
-            <Text style={styles.legendText}>{t2.high}</Text>
+            <Text style={styles.legendText}>{t2.high} (&gt;20%)</Text>
+          </View>
+        </View>
+        
+        {/* Region Details */}
+        <View style={styles.regionDetails}>
+          <View style={styles.regionRow}>
+            <Text style={styles.regionLabel}>{t2.upperArm}</Text>
+            <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
+              <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.upperArm * 2, 100)}%`, backgroundColor: getColor(regionValues.upperArm) }]} />
+            </View>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.upperArm) }]}>{regionValues.upperArm.toFixed(1)}%</Text>
+          </View>
+          <View style={styles.regionRow}>
+            <Text style={styles.regionLabel}>{t2.trunkFront}</Text>
+            <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
+              <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.trunkFront * 2, 100)}%`, backgroundColor: getColor(regionValues.trunkFront) }]} />
+            </View>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.trunkFront) }]}>{regionValues.trunkFront.toFixed(1)}%</Text>
+          </View>
+          <View style={styles.regionRow}>
+            <Text style={styles.regionLabel}>{t2.hipWaist}</Text>
+            <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
+              <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.hipWaist * 2, 100)}%`, backgroundColor: getColor(regionValues.hipWaist) }]} />
+            </View>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.hipWaist) }]}>{regionValues.hipWaist.toFixed(1)}%</Text>
+          </View>
+          <View style={styles.regionRow}>
+            <Text style={styles.regionLabel}>{t2.lowerBody}</Text>
+            <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
+              <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.lowerBody * 2, 100)}%`, backgroundColor: getColor(regionValues.lowerBody) }]} />
+            </View>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.lowerBody) }]}>{regionValues.lowerBody.toFixed(1)}%</Text>
           </View>
         </View>
       </View>
