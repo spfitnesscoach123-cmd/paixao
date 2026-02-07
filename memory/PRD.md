@@ -102,24 +102,39 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - `avg_max_speed` - Group average max speed (km/h)
 - `high_risk_count` - Athletes at high risk
 
+### ✅ Bug Fixes (Feb 8, 2026 - Latest Session)
+
+| Issue | Fix | Status |
+|-------|-----|--------|
+| VBT decimal input (m/s) not working | Implemented `vbtInputs` state for raw input tracking with `getVbtInputValue()` helper | ✅ Fixed |
+| Body Composition Donut chart incorrect | Fixed SVG strokeDasharray/strokeDashoffset calculation, added zero-check | ✅ Fixed |
+| PDF/CSV Preview not available | Created `ReportPreviewModal.tsx` component and backend preview endpoints | ✅ Fixed |
+| Query invalidation key mismatch | Added `body-composition` key to invalidation in `add-body-composition.tsx` | ✅ Fixed |
+
+**New Components/Endpoints:**
+- `ReportPreviewModal.tsx` - Modal for previewing reports before download
+- `GET /api/reports/athlete/{id}/preview` - Athlete report preview data
+- `GET /api/reports/athlete/{id}/csv-preview` - CSV preview with sample rows
+- `GET /api/reports/body-composition/{id}/preview` - Body composition preview
+
 ## Prioritized Backlog
 
 ### P1 - Next
 - [ ] Full i18n audit
 - [ ] Global theme (Light/Dark)
+- [ ] Dynamic session comparison logic
 
 ### P2 - Planned
 - [ ] Push Notifications
 - [ ] Full OAuth wearable integration
-- [ ] PDF/CSV report preview mechanism
 
 ### P3 - Future
 - [ ] Gamification/Leaderboards
 - [ ] Video analysis integration
 
 ## Test Credentials
-- **Email**: testuser@test.com
-- **Password**: Test123!
+- **Email**: preview_test@test.com
+- **Password**: test123
 
 ## Last Updated
-February 7, 2026
+February 8, 2026
