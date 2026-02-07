@@ -17,7 +17,7 @@ index 0000000..8ec031c
 +import requests
 +import os
 +
-+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://athletemetrics.preview.emergentagent.com')
++BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://fitness-dashboard-33.preview.emergentagent.com')
 +
 +# Test credentials
 +TEST_EMAIL = "test@test.com"
@@ -387,7 +387,7 @@ index 38cde48..6164300 100644
 -+import os
 -+from datetime import datetime
 -+
--+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://athletemetrics.preview.emergentagent.com')
+-+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://fitness-dashboard-33.preview.emergentagent.com')
 -+
 -+# Test credentials
 -+TEST_EMAIL = "test@test.com"
@@ -810,7 +810,7 @@ index 38cde48..6164300 100644
 --+import requests
 --+import os
 --+
---+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://athletemetrics.preview.emergentagent.com')
+--+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://fitness-dashboard-33.preview.emergentagent.com')
 --+
 --+class TestTeamDashboard:
 --+    """Team Dashboard endpoint tests"""
@@ -1137,7 +1137,7 @@ index 38cde48..6164300 100644
 ---+import requests
 ---+import os
 ---+
----+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://athletemetrics.preview.emergentagent.com').rstrip('/')
+---+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://fitness-dashboard-33.preview.emergentagent.com').rstrip('/')
 ---+
 ---+class TestSubscriptionPlans:
 ---+    """Test subscription plans endpoint with regional pricing"""
