@@ -8,12 +8,14 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Picker } from '@react-native-picker/picker';
+import Svg, { Path, Circle, Rect, G, Text as SvgText } from 'react-native-svg';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -33,16 +35,132 @@ interface ProtocolsResponse {
   [key: string]: Protocol;
 }
 
-const SKINFOLD_LABELS: { [key: string]: { pt: string; en: string } } = {
-  triceps: { pt: 'Tríceps', en: 'Triceps' },
-  subscapular: { pt: 'Subescapular', en: 'Subscapular' },
-  suprailiac: { pt: 'Suprailíaca', en: 'Suprailiac' },
-  abdominal: { pt: 'Abdominal', en: 'Abdominal' },
-  chest: { pt: 'Peitoral', en: 'Chest' },
-  midaxillary: { pt: 'Axilar Média', en: 'Midaxillary' },
-  thigh: { pt: 'Coxa', en: 'Thigh' },
-  calf: { pt: 'Panturrilha', en: 'Calf' },
-  biceps: { pt: 'Bíceps', en: 'Biceps' },
+const SKINFOLD_LABELS: { [key: string]: { pt: string; en: string; bodyPart: string } } = {
+  triceps: { pt: 'Tríceps', en: 'Triceps', bodyPart: 'arm' },
+  biceps: { pt: 'Bíceps', en: 'Biceps', bodyPart: 'arm' },
+  subscapular: { pt: 'Subescapular', en: 'Subscapular', bodyPart: 'back' },
+  suprailiac: { pt: 'Suprailíaca', en: 'Suprailiac', bodyPart: 'waist' },
+  abdominal: { pt: 'Abdominal', en: 'Abdominal', bodyPart: 'trunk' },
+  chest: { pt: 'Peitoral', en: 'Chest', bodyPart: 'trunk' },
+  midaxillary: { pt: 'Axilar Média', en: 'Midaxillary', bodyPart: 'trunk' },
+  thigh: { pt: 'Coxa', en: 'Thigh', bodyPart: 'leg' },
+  calf: { pt: 'Panturrilha', en: 'Calf', bodyPart: 'leg' },
+};
+
+// Body Model SVG Component showing measurement points
+const BodyMeasurementModel = ({ requiredSites, skinfolds }: { requiredSites: string[], skinfolds: { [key: string]: string } }) => {
+  const getSitePosition = (site: string) => {
+    const positions: { [key: string]: { x: number; y: number } } = {
+      triceps: { x: 25, y: 95 },
+      biceps: { x: 155, y: 95 },
+      chest: { x: 70, y: 85 },
+      subscapular: { x: 110, y: 90 },
+      midaxillary: { x: 55, y: 105 },
+      abdominal: { x: 90, y: 130 },
+      suprailiac: { x: 65, y: 145 },
+      thigh: { x: 75, y: 195 },
+      calf: { x: 75, y: 250 },
+    };
+    return positions[site] || { x: 90, y: 100 };
+  };
+
+  const getColor = (site: string) => {
+    if (!requiredSites.includes(site)) return colors.dark.secondary;
+    if (skinfolds[site] && parseFloat(skinfolds[site]) > 0) return '#10b981';
+    return colors.accent.primary;
+  };
+
+  return (
+    <Svg width={180} height={280} viewBox="0 0 180 280">
+      {/* Head */}
+      <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+      
+      {/* Neck */}
+      <Rect x="82" y="43" width="16" height="12" fill={colors.dark.secondary} />
+      
+      {/* Torso */}
+      <Path
+        d="M50 55 L130 55 L140 80 L145 130 L130 160 L50 160 L35 130 L40 80 Z"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Left Arm */}
+      <Path
+        d="M35 60 L15 60 L5 130 L20 130 L35 80"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Right Arm */}
+      <Path
+        d="M145 60 L165 60 L175 130 L160 130 L145 80"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Pelvis */}
+      <Path
+        d="M50 160 L130 160 L120 180 L60 180 Z"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Left Leg */}
+      <Path
+        d="M60 180 L80 180 L75 260 L55 260 Z"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Right Leg */}
+      <Path
+        d="M100 180 L120 180 L125 260 L105 260 Z"
+        fill={colors.dark.secondary}
+        stroke={colors.border.default}
+        strokeWidth="1"
+      />
+      
+      {/* Measurement Points */}
+      {Object.keys(SKINFOLD_LABELS).map((site) => {
+        const pos = getSitePosition(site);
+        const isRequired = requiredSites.includes(site);
+        const isFilled = skinfolds[site] && parseFloat(skinfolds[site]) > 0;
+        
+        if (!isRequired) return null;
+        
+        return (
+          <G key={site}>
+            <Circle
+              cx={pos.x}
+              cy={pos.y}
+              r={8}
+              fill={isFilled ? '#10b981' : colors.accent.primary}
+              stroke="#ffffff"
+              strokeWidth="2"
+            />
+            {isFilled && (
+              <SvgText
+                x={pos.x}
+                y={pos.y + 4}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize="8"
+                fontWeight="bold"
+              >
+                ✓
+              </SvgText>
+            )}
+          </G>
+        );
+      })}
+    </Svg>
+  );
 };
 
 export default function AddBodyComposition() {
@@ -51,7 +169,8 @@ export default function AddBodyComposition() {
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
   
-  const [protocol, setProtocol] = useState('pollock_jackson_7');
+  const [protocol, setProtocol] = useState('');
+  const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [gender, setGender] = useState('male');
   const [weight, setWeight] = useState('');
   const [height, setHeight] = useState('');
@@ -60,7 +179,7 @@ export default function AddBodyComposition() {
   const [notes, setNotes] = useState('');
   
   // Fetch available protocols
-  const { data: protocols } = useQuery({
+  const { data: protocols, isLoading: protocolsLoading } = useQuery({
     queryKey: ['body-composition-protocols'],
     queryFn: async () => {
       const response = await api.get<ProtocolsResponse>(`/body-composition/protocols?lang=${locale}`);
@@ -68,9 +187,16 @@ export default function AddBodyComposition() {
     },
   });
   
+  // Set default protocol when data loads
+  useEffect(() => {
+    if (protocols && !protocol) {
+      setProtocol('guedes');
+    }
+  }, [protocols]);
+  
   // Get required sites for current protocol and gender
   const getRequiredSites = (): string[] => {
-    if (!protocols || !protocols[protocol]) return [];
+    if (!protocols || !protocol || !protocols[protocol]) return [];
     const proto = protocols[protocol];
     if (gender === 'male' && proto.sites_male) {
       return proto.sites_male;
@@ -83,18 +209,27 @@ export default function AddBodyComposition() {
   
   const requiredSites = getRequiredSites();
   
+  // Reset skinfolds when protocol changes
+  useEffect(() => {
+    setSkinfolds({});
+  }, [protocol, gender]);
+  
   // Create body composition mutation
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
       const response = await api.post('/body-composition', data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['body-compositions', athleteId] });
       queryClient.invalidateQueries({ queryKey: ['body-composition-analysis', athleteId] });
+      
+      // Show results
       Alert.alert(
-        locale === 'pt' ? 'Sucesso' : 'Success',
-        locale === 'pt' ? 'Avaliação de composição corporal salva!' : 'Body composition assessment saved!',
+        locale === 'pt' ? 'Resultado da Avaliação' : 'Assessment Result',
+        locale === 'pt' 
+          ? `% Gordura: ${result.body_fat_percentage.toFixed(1)}%\nMassa Magra: ${result.lean_mass_kg.toFixed(1)} kg\nMassa Gorda: ${result.fat_mass_kg.toFixed(1)} kg\nIMC: ${result.bmi.toFixed(1)}`
+          : `Body Fat: ${result.body_fat_percentage.toFixed(1)}%\nLean Mass: ${result.lean_mass_kg.toFixed(1)} kg\nFat Mass: ${result.fat_mass_kg.toFixed(1)} kg\nBMI: ${result.bmi.toFixed(1)}`,
         [{ text: 'OK', onPress: () => router.back() }]
       );
     },
@@ -107,7 +242,14 @@ export default function AddBodyComposition() {
   });
   
   const handleSubmit = () => {
-    // Validate required fields
+    if (!protocol) {
+      Alert.alert(
+        locale === 'pt' ? 'Selecione um protocolo' : 'Select a protocol',
+        locale === 'pt' ? 'Escolha o protocolo de avaliação' : 'Choose the assessment protocol'
+      );
+      return;
+    }
+    
     if (!weight || !height || !age) {
       Alert.alert(
         locale === 'pt' ? 'Campos obrigatórios' : 'Required fields',
@@ -116,7 +258,6 @@ export default function AddBodyComposition() {
       return;
     }
     
-    // Check if all required skinfolds are filled
     const missingFields = requiredSites.filter(site => !skinfolds[site] || parseFloat(skinfolds[site]) <= 0);
     if (missingFields.length > 0) {
       Alert.alert(
@@ -145,29 +286,7 @@ export default function AddBodyComposition() {
     createMutation.mutate(data);
   };
   
-  const renderSkinfoldInput = (site: string) => {
-    const label = SKINFOLD_LABELS[site]?.[locale === 'pt' ? 'pt' : 'en'] || site;
-    const isRequired = requiredSites.includes(site);
-    
-    return (
-      <View key={site} style={styles.inputRow}>
-        <View style={styles.labelContainer}>
-          <Text style={styles.inputLabel}>
-            {label} {isRequired && <Text style={styles.requiredStar}>*</Text>}
-          </Text>
-          <Text style={styles.inputUnit}>(mm)</Text>
-        </View>
-        <TextInput
-          style={[styles.input, styles.smallInput, !isRequired && styles.optionalInput]}
-          value={skinfolds[site] || ''}
-          onChangeText={(text) => setSkinfolds(prev => ({ ...prev, [site]: text }))}
-          keyboardType="decimal-pad"
-          placeholder="0.0"
-          placeholderTextColor={colors.text.tertiary}
-        />
-      </View>
-    );
-  };
+  const selectedProtocol = protocols?.[protocol];
   
   return (
     <View style={styles.container}>
@@ -189,28 +308,35 @@ export default function AddBodyComposition() {
         {/* Protocol Selection */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Protocolo de Avaliação' : 'Assessment Protocol'}
+            {locale === 'pt' ? '1. Protocolo de Avaliação' : '1. Assessment Protocol'}
           </Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={protocol}
-              onValueChange={(value) => setProtocol(value)}
-              style={styles.picker}
-              dropdownIconColor={colors.text.primary}
-            >
-              {protocols && Object.entries(protocols).map(([key, proto]) => (
-                <Picker.Item
-                  key={key}
-                  label={locale === 'pt' ? proto.name : proto.name_en}
-                  value={key}
-                  color={colors.text.primary}
-                />
-              ))}
-            </Picker>
-          </View>
-          {protocols && protocols[protocol] && (
+          
+          <TouchableOpacity 
+            style={styles.protocolSelector}
+            onPress={() => setShowProtocolModal(true)}
+          >
+            <View style={styles.protocolSelectorContent}>
+              <Ionicons name="document-text" size={24} color={colors.accent.primary} />
+              <View style={styles.protocolSelectorText}>
+                <Text style={styles.protocolSelectorLabel}>
+                  {selectedProtocol 
+                    ? (locale === 'pt' ? selectedProtocol.name : selectedProtocol.name_en)
+                    : (locale === 'pt' ? 'Selecione o protocolo' : 'Select protocol')
+                  }
+                </Text>
+                {selectedProtocol && (
+                  <Text style={styles.protocolSelectorDesc}>
+                    {selectedProtocol.sites_count} {locale === 'pt' ? 'dobras cutâneas' : 'skinfolds'}
+                  </Text>
+                )}
+              </View>
+            </View>
+            <Ionicons name="chevron-down" size={24} color={colors.text.secondary} />
+          </TouchableOpacity>
+          
+          {selectedProtocol && (
             <Text style={styles.protocolDescription}>
-              {locale === 'pt' ? protocols[protocol].description_pt : protocols[protocol].description_en}
+              {locale === 'pt' ? selectedProtocol.description_pt : selectedProtocol.description_en}
             </Text>
           )}
         </View>
@@ -218,116 +344,118 @@ export default function AddBodyComposition() {
         {/* Basic Info */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Dados Básicos' : 'Basic Data'}
+            {locale === 'pt' ? '2. Dados Básicos' : '2. Basic Data'}
           </Text>
           
-          <View style={styles.inputRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.inputLabel}>
-                {locale === 'pt' ? 'Sexo' : 'Gender'} <Text style={styles.requiredStar}>*</Text>
+          {/* Gender Selection */}
+          <Text style={styles.fieldLabel}>{locale === 'pt' ? 'Sexo' : 'Gender'}</Text>
+          <View style={styles.genderButtons}>
+            <TouchableOpacity
+              style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
+              onPress={() => setGender('male')}
+            >
+              <Ionicons name="male" size={24} color={gender === 'male' ? '#ffffff' : colors.text.secondary} />
+              <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]}>
+                {locale === 'pt' ? 'Masculino' : 'Male'}
               </Text>
-            </View>
-            <View style={styles.genderButtons}>
-              <TouchableOpacity
-                style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]}
-                onPress={() => setGender('male')}
-              >
-                <Ionicons name="male" size={20} color={gender === 'male' ? '#ffffff' : colors.text.secondary} />
-                <Text style={[styles.genderText, gender === 'male' && styles.genderTextActive]}>
-                  {locale === 'pt' ? 'Masculino' : 'Male'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
-                onPress={() => setGender('female')}
-              >
-                <Ionicons name="female" size={20} color={gender === 'female' ? '#ffffff' : colors.text.secondary} />
-                <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]}>
-                  {locale === 'pt' ? 'Feminino' : 'Female'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]}
+              onPress={() => setGender('female')}
+            >
+              <Ionicons name="female" size={24} color={gender === 'female' ? '#ffffff' : colors.text.secondary} />
+              <Text style={[styles.genderText, gender === 'female' && styles.genderTextActive]}>
+                {locale === 'pt' ? 'Feminino' : 'Female'}
+              </Text>
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.inputRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.inputLabel}>
-                {locale === 'pt' ? 'Peso' : 'Weight'} <Text style={styles.requiredStar}>*</Text>
-              </Text>
-              <Text style={styles.inputUnit}>(kg)</Text>
+          {/* Weight, Height, Age */}
+          <View style={styles.inputsRow}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>{locale === 'pt' ? 'Peso (kg)' : 'Weight (kg)'}</Text>
+              <TextInput
+                style={styles.input}
+                value={weight}
+                onChangeText={setWeight}
+                keyboardType="decimal-pad"
+                placeholder="75.5"
+                placeholderTextColor={colors.text.tertiary}
+              />
             </View>
-            <TextInput
-              style={[styles.input, styles.smallInput]}
-              value={weight}
-              onChangeText={setWeight}
-              keyboardType="decimal-pad"
-              placeholder="75.5"
-              placeholderTextColor={colors.text.tertiary}
-            />
-          </View>
-          
-          <View style={styles.inputRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.inputLabel}>
-                {locale === 'pt' ? 'Altura' : 'Height'} <Text style={styles.requiredStar}>*</Text>
-              </Text>
-              <Text style={styles.inputUnit}>(cm)</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
+              <TextInput
+                style={styles.input}
+                value={height}
+                onChangeText={setHeight}
+                keyboardType="decimal-pad"
+                placeholder="178"
+                placeholderTextColor={colors.text.tertiary}
+              />
             </View>
-            <TextInput
-              style={[styles.input, styles.smallInput]}
-              value={height}
-              onChangeText={setHeight}
-              keyboardType="decimal-pad"
-              placeholder="178"
-              placeholderTextColor={colors.text.tertiary}
-            />
-          </View>
-          
-          <View style={styles.inputRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.inputLabel}>
-                {locale === 'pt' ? 'Idade' : 'Age'} <Text style={styles.requiredStar}>*</Text>
-              </Text>
-              <Text style={styles.inputUnit}>({locale === 'pt' ? 'anos' : 'years'})</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>{locale === 'pt' ? 'Idade' : 'Age'}</Text>
+              <TextInput
+                style={styles.input}
+                value={age}
+                onChangeText={setAge}
+                keyboardType="number-pad"
+                placeholder="25"
+                placeholderTextColor={colors.text.tertiary}
+              />
             </View>
-            <TextInput
-              style={[styles.input, styles.smallInput]}
-              value={age}
-              onChangeText={setAge}
-              keyboardType="number-pad"
-              placeholder="25"
-              placeholderTextColor={colors.text.tertiary}
-            />
           </View>
         </View>
         
-        {/* Skinfold Measurements */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Dobras Cutâneas' : 'Skinfold Measurements'}
-          </Text>
-          <Text style={styles.sectionSubtitle}>
-            {locale === 'pt' 
-              ? `Protocolo ${protocols?.[protocol]?.name || protocol} requer ${requiredSites.length} dobras`
-              : `${protocols?.[protocol]?.name_en || protocol} protocol requires ${requiredSites.length} skinfolds`
-            }
-          </Text>
-          
-          {/* Required sites first */}
-          {requiredSites.map(site => renderSkinfoldInput(site))}
-          
-          {/* Optional sites */}
-          {protocol === 'pollock_jackson_9' && (
-            <>
-              {['biceps', 'calf'].filter(s => !requiredSites.includes(s)).map(site => renderSkinfoldInput(site))}
-            </>
-          )}
-        </View>
+        {/* Skinfold Measurements with Body Model */}
+        {protocol && requiredSites.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>
+              {locale === 'pt' ? '3. Dobras Cutâneas (mm)' : '3. Skinfold Measurements (mm)'}
+            </Text>
+            
+            <View style={styles.measurementContainer}>
+              {/* Body Model */}
+              <View style={styles.bodyModelWrapper}>
+                <BodyMeasurementModel requiredSites={requiredSites} skinfolds={skinfolds} />
+                <Text style={styles.bodyModelHint}>
+                  {locale === 'pt' ? 'Pontos de medição' : 'Measurement points'}
+                </Text>
+              </View>
+              
+              {/* Skinfold Inputs */}
+              <View style={styles.skinfoldInputs}>
+                {requiredSites.map((site) => (
+                  <View key={site} style={styles.skinfoldRow}>
+                    <View style={styles.skinfoldLabelContainer}>
+                      <View style={[
+                        styles.skinfoldDot,
+                        { backgroundColor: skinfolds[site] && parseFloat(skinfolds[site]) > 0 ? '#10b981' : colors.accent.primary }
+                      ]} />
+                      <Text style={styles.skinfoldLabel}>
+                        {SKINFOLD_LABELS[site]?.[locale === 'pt' ? 'pt' : 'en'] || site}
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={styles.skinfoldInput}
+                      value={skinfolds[site] || ''}
+                      onChangeText={(text) => setSkinfolds(prev => ({ ...prev, [site]: text }))}
+                      keyboardType="decimal-pad"
+                      placeholder="0.0"
+                      placeholderTextColor={colors.text.tertiary}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        )}
         
         {/* Notes */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Observações' : 'Notes'}
+            {locale === 'pt' ? '4. Observações' : '4. Notes'}
           </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -346,14 +474,14 @@ export default function AddBodyComposition() {
           onPress={handleSubmit}
           disabled={createMutation.isPending}
         >
-          <LinearGradient colors={colors.gradients.accent} style={styles.submitGradient}>
+          <LinearGradient colors={['#10b981', '#059669']} style={styles.submitGradient}>
             {createMutation.isPending ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
               <>
-                <Ionicons name="save-outline" size={24} color="#ffffff" />
+                <Ionicons name="calculator" size={24} color="#ffffff" />
                 <Text style={styles.submitText}>
-                  {locale === 'pt' ? 'Salvar Avaliação' : 'Save Assessment'}
+                  {locale === 'pt' ? 'Calcular e Salvar' : 'Calculate and Save'}
                 </Text>
               </>
             )}
@@ -362,6 +490,53 @@ export default function AddBodyComposition() {
         
         <View style={{ height: 40 }} />
       </ScrollView>
+      
+      {/* Protocol Selection Modal */}
+      <Modal
+        visible={showProtocolModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowProtocolModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {locale === 'pt' ? 'Selecionar Protocolo' : 'Select Protocol'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowProtocolModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {protocols && Object.entries(protocols).map(([key, proto]) => (
+              <TouchableOpacity
+                key={key}
+                style={[
+                  styles.protocolOption,
+                  protocol === key && styles.protocolOptionActive
+                ]}
+                onPress={() => {
+                  setProtocol(key);
+                  setShowProtocolModal(false);
+                }}
+              >
+                <View style={styles.protocolOptionContent}>
+                  <Text style={styles.protocolOptionName}>
+                    {locale === 'pt' ? proto.name : proto.name_en}
+                  </Text>
+                  <Text style={styles.protocolOptionDesc}>
+                    {proto.sites_count} {locale === 'pt' ? 'dobras' : 'skinfolds'} - {locale === 'pt' ? proto.description_pt : proto.description_en}
+                  </Text>
+                </View>
+                {protocol === key && (
+                  <Ionicons name="checkmark-circle" size={24} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -415,93 +590,65 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  sectionSubtitle: {
-    fontSize: 12,
-    color: colors.text.secondary,
+    color: colors.accent.primary,
     marginBottom: 16,
   },
-  pickerContainer: {
+  protocolSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: colors.dark.secondary,
     borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: colors.border.default,
-    marginTop: 12,
-    overflow: 'hidden',
   },
-  picker: {
+  protocolSelectorContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  protocolSelectorText: {
+    flex: 1,
+  },
+  protocolSelectorLabel: {
+    fontSize: 16,
+    fontWeight: '600',
     color: colors.text.primary,
-    height: 50,
+  },
+  protocolSelectorDesc: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginTop: 2,
   },
   protocolDescription: {
     fontSize: 12,
     color: colors.text.secondary,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  labelContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: colors.text.primary,
-    fontWeight: '600',
-  },
-  inputUnit: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-  },
-  requiredStar: {
-    color: colors.status.error,
-  },
-  input: {
-    backgroundColor: colors.dark.secondary,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.text.primary,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  smallInput: {
-    width: 100,
-    textAlign: 'center',
-  },
-  optionalInput: {
-    opacity: 0.7,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
     marginTop: 12,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 8,
   },
   genderButtons: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
+    marginBottom: 20,
   },
   genderButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
     backgroundColor: colors.dark.secondary,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: colors.border.default,
   },
   genderButtonActive: {
@@ -509,18 +656,103 @@ const styles = StyleSheet.create({
     borderColor: colors.accent.primary,
   },
   genderText: {
-    fontSize: 14,
+    fontSize: 16,
     color: colors.text.secondary,
     fontWeight: '600',
   },
   genderTextActive: {
     color: '#ffffff',
   },
+  inputsRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  inputGroup: {
+    flex: 1,
+  },
+  inputLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: colors.text.primary,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    textAlign: 'center',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+    textAlign: 'left',
+  },
+  measurementContainer: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  bodyModelWrapper: {
+    alignItems: 'center',
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  bodyModelHint: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 4,
+  },
+  skinfoldInputs: {
+    flex: 1,
+    gap: 10,
+  },
+  skinfoldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  skinfoldLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  skinfoldDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  skinfoldLabel: {
+    fontSize: 14,
+    color: colors.text.primary,
+    fontWeight: '500',
+  },
+  skinfoldInput: {
+    width: 70,
+    backgroundColor: colors.dark.card,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    color: colors.text.primary,
+    fontSize: 14,
+    textAlign: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
   submitButton: {
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 8,
-    shadowColor: colors.accent.primary,
+    shadowColor: '#10b981',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.5,
     shadowRadius: 16,
@@ -530,12 +762,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 18,
     gap: 12,
   },
   submitText: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.dark.secondary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  protocolOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 10,
+    backgroundColor: colors.dark.card,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  protocolOptionActive: {
+    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+  },
+  protocolOptionContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  protocolOptionName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  protocolOptionDesc: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    lineHeight: 16,
   },
 });
