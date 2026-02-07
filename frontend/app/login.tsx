@@ -184,15 +184,12 @@ export default function Login() {
               <Text style={styles.forgotPasswordText}>{t('auth.forgotPassword')}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <Pressable
               style={styles.button}
               onPress={handleLogin}
               disabled={isLoading}
-              activeOpacity={0.8}
               testID="login-button"
               accessibilityRole="button"
-              // @ts-ignore - Web-specific onClick handler for Playwright compatibility
-              onClick={Platform.OS === 'web' ? handleLogin : undefined}
             >
               <LinearGradient
                 colors={colors.gradients.primary}
@@ -206,7 +203,7 @@ export default function Login() {
                   <Text style={styles.buttonText}>{t('auth.login')}</Text>
                 )}
               </LinearGradient>
-            </TouchableOpacity>
+            </Pressable>
 
             {/* Biometric Login Button */}
             {isBiometricSupported && hasSavedCredentials && (
