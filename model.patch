@@ -12,7 +12,7 @@ index 0000000..fdf3f67
 +import requests
 +import os
 +
-+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://team-stats-9.preview.emergentagent.com')
++BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://peak-perform-4.preview.emergentagent.com')
 +
 +class TestTeamDashboard:
 +    """Team Dashboard endpoint tests"""
@@ -339,7 +339,7 @@ index 6857b37..0a19814 100644
 -+import requests
 -+import os
 -+
--+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://team-stats-9.preview.emergentagent.com').rstrip('/')
+-+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://peak-perform-4.preview.emergentagent.com').rstrip('/')
 -+
 -+class TestSubscriptionPlans:
 -+    """Test subscription plans endpoint with regional pricing"""
