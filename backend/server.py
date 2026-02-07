@@ -16,6 +16,7 @@ import jwt
 from bson import ObjectId
 import uuid
 from io import BytesIO
+import io
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
