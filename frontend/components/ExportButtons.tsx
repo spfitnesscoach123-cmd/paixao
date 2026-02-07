@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import api from '../services/api';
 import { colors } from '../constants/theme';
+import { ReportPreviewModal } from './ReportPreviewModal';
 
 interface ExportButtonsProps {
   athleteId: string;
@@ -22,21 +23,22 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
   showBodyCompReport = false
 }) => {
   const [loading, setLoading] = useState<string | null>(null);
+  const [previewModal, setPreviewModal] = useState<{
+    visible: boolean;
+    type: 'pdf' | 'csv' | 'body-comp-pdf';
+  }>({ visible: false, type: 'pdf' });
 
-  const handleExport = async (type: 'csv' | 'pdf' | 'body-comp-pdf', dataType: string = 'all') => {
+  const handleDirectExport = async (type: 'csv' | 'pdf' | 'body-comp-pdf', dataType: string = 'all') => {
     setLoading(type);
     try {
       let endpoint = '';
-      let filename = '';
       
       switch (type) {
         case 'csv':
           endpoint = `/reports/athlete/${athleteId}/csv?data_type=${dataType}&lang=${locale}`;
-          filename = `${athleteName.replace(/\s+/g, '_')}_${dataType}_export.csv`;
           break;
         case 'pdf':
           endpoint = `/reports/athlete/${athleteId}/pdf?lang=${locale}`;
-          filename = `${athleteName.replace(/\s+/g, '_')}_report.pdf`;
           break;
         case 'body-comp-pdf':
           if (!bodyCompositionId) {
@@ -48,7 +50,6 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
             return;
           }
           endpoint = `/reports/body-composition/${bodyCompositionId}/pdf?lang=${locale}`;
-          filename = `${athleteName.replace(/\s+/g, '_')}_body_composition.pdf`;
           break;
       }
       
@@ -78,6 +79,10 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
     }
   };
 
+  const openPreview = (type: 'pdf' | 'csv' | 'body-comp-pdf') => {
+    setPreviewModal({ visible: true, type });
+  };
+
   const labels = {
     exportData: locale === 'pt' ? 'Exportar Dados' : 'Export Data',
     csv: locale === 'pt' ? 'CSV (Planilha)' : 'CSV (Spreadsheet)',
@@ -87,6 +92,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
     gps: locale === 'pt' ? 'GPS' : 'GPS',
     wellness: 'Wellness',
     strength: locale === 'pt' ? 'Força' : 'Strength',
+    preview: locale === 'pt' ? 'Visualizar antes de baixar' : 'Preview before download',
   };
 
   return (
@@ -96,11 +102,16 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         {' '}{labels.exportData}
       </Text>
       
+      <Text style={styles.previewHint}>
+        <Ionicons name="eye-outline" size={12} color={colors.text.tertiary} />
+        {' '}{labels.preview}
+      </Text>
+      
       <View style={styles.buttonsGrid}>
-        {/* CSV Export Button */}
+        {/* CSV Export Button with Preview */}
         <TouchableOpacity 
           style={styles.exportButton}
-          onPress={() => handleExport('csv', 'all')}
+          onPress={() => openPreview('csv')}
           disabled={loading !== null}
         >
           <LinearGradient 
@@ -111,6 +122,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
+                <Ionicons name="eye" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: -4 }} />
                 <Ionicons name="document-text" size={20} color="#fff" />
                 <Text style={styles.exportButtonText}>{labels.csv}</Text>
               </>
@@ -118,10 +130,10 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
           </LinearGradient>
         </TouchableOpacity>
         
-        {/* PDF Report Button */}
+        {/* PDF Report Button with Preview */}
         <TouchableOpacity 
           style={styles.exportButton}
-          onPress={() => handleExport('pdf')}
+          onPress={() => openPreview('pdf')}
           disabled={loading !== null}
         >
           <LinearGradient 
@@ -132,6 +144,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <>
+                <Ionicons name="eye" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: -4 }} />
                 <Ionicons name="document" size={20} color="#fff" />
                 <Text style={styles.exportButtonText}>{labels.pdf}</Text>
               </>
@@ -143,7 +156,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         {showBodyCompReport && (
           <TouchableOpacity 
             style={[styles.exportButton, styles.exportButtonWide]}
-            onPress={() => handleExport('body-comp-pdf')}
+            onPress={() => openPreview('body-comp-pdf')}
             disabled={loading !== null}
           >
             <LinearGradient 
@@ -154,6 +167,7 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
                 <>
+                  <Ionicons name="eye" size={16} color="rgba(255,255,255,0.7)" style={{ marginRight: -4 }} />
                   <Ionicons name="body" size={20} color="#fff" />
                   <Text style={styles.exportButtonText}>{labels.bodyCompPdf}</Text>
                 </>
@@ -163,14 +177,14 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
         )}
       </View>
       
-      {/* CSV Data Type Options */}
+      {/* CSV Data Type Options (Direct download) */}
       <View style={styles.csvOptions}>
-        <Text style={styles.csvOptionsLabel}>CSV:</Text>
+        <Text style={styles.csvOptionsLabel}>{locale === 'pt' ? 'Download direto CSV:' : 'Direct CSV download:'}</Text>
         {['all', 'gps', 'wellness', 'strength'].map((type) => (
           <TouchableOpacity
             key={type}
             style={styles.csvOption}
-            onPress={() => handleExport('csv', type)}
+            onPress={() => handleDirectExport('csv', type)}
             disabled={loading !== null}
           >
             <Text style={styles.csvOptionText}>
@@ -179,6 +193,17 @@ export const ExportButtons: React.FC<ExportButtonsProps> = ({
           </TouchableOpacity>
         ))}
       </View>
+
+      {/* Preview Modal */}
+      <ReportPreviewModal
+        visible={previewModal.visible}
+        onClose={() => setPreviewModal({ ...previewModal, visible: false })}
+        reportType={previewModal.type}
+        athleteId={athleteId}
+        athleteName={athleteName}
+        bodyCompositionId={bodyCompositionId}
+        locale={locale}
+      />
     </View>
   );
 };
@@ -196,7 +221,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.text.secondary,
+    marginBottom: 4,
+  },
+  previewHint: {
+    fontSize: 11,
+    color: colors.text.tertiary,
     marginBottom: 12,
+    fontStyle: 'italic',
   },
   buttonsGrid: {
     flexDirection: 'row',
