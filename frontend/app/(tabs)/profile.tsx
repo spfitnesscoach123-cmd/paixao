@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarGlow: {
-    shadowColor: colors.accent.primary,
+    shadowColor: staticColors.accent.primary,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 30,
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.accent.primary,
+    color: staticColors.accent.primary,
     marginBottom: 12,
     marginLeft: 4,
     letterSpacing: 1,
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
     borderColor: staticColors.border.default,
   },
   languageItemActive: {
-    borderColor: colors.accent.primary,
+    borderColor: staticColors.accent.primary,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
   },
   languageFlag: {
