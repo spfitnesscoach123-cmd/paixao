@@ -975,6 +975,35 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.accent.primary,
   },
+  actionButtonLarge: {
+    flex: 1,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  actionButtonGradient: {
+    padding: 16,
+    alignItems: 'center',
+    gap: 8,
+    minHeight: 120,
+    justifyContent: 'center',
+  },
+  actionButtonIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionButtonLargeText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  actionButtonSubtext: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    lineHeight: 14,
+  },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
