@@ -659,6 +659,19 @@ export default function AthleteDetails() {
             {/* Strength History Chart */}
             <StrengthHistoryChart athleteId={id} />
 
+            {/* Body Composition Section */}
+            {bodyCompositionData && bodyCompositionData.length > 0 && (
+              <View style={styles.bodyCompositionSection}>
+                <Text style={styles.sectionTitle}>
+                  {locale === 'pt' ? 'Composição Corporal' : 'Body Composition'}
+                </Text>
+                <BodyCompositionCharts 
+                  data={bodyCompositionData[0]} 
+                  history={bodyCompositionData}
+                />
+              </View>
+            )}
+
             {/* Assessment History */}
             <Text style={styles.sectionTitle}>{t('assessments.history') || 'Histórico de Avaliações'}</Text>
             
