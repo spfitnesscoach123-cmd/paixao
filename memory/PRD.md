@@ -8,7 +8,7 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - **Frontend**: React Native (Expo) + TypeScript
 - **AI Integration**: OpenAI via Emergent LLM Key
 
-## What's Been Implemented
+## What's Been Implemented (Feb 7, 2026)
 
 ### ✅ Core Features
 - User authentication (login/register)
@@ -17,52 +17,17 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - Wellness questionnaires + QTR gauge
 - Strength assessments with auto fatigue calculation
 - Subscription system (3 tiers)
-- Team dashboard
+- Team dashboard with power/body fat averages
 - i18n support (PT/EN)
 
-### ✅ Body Composition (Feb 2026)
-**Protocols:**
-- Guedes (1985) - 3 skinfolds (Brazilian) - FORMULA FIXED to use log10
-- Pollock & Jackson 7 - 7 skinfolds
-- Pollock & Jackson 9 - 9 skinfolds
-- Faulkner 4 - 4 skinfolds (athletes)
-
-**Calculated Metrics:**
-- Body Fat % (Siri equation)
-- Lean/Fat/Bone Mass (kg)
-- BMI + Classification
-- Fat Distribution for 3D visualization
-
-**Frontend:**
-- Dynamic form with protocol selector
-- SVG body diagram showing measurement points
-- Protocol-specific skinfold fields
-
-**Endpoints:**
-- `GET /api/body-composition/protocols`
-- `POST /api/body-composition`
-- `GET /api/body-composition/athlete/{id}`
-- `GET /api/analysis/body-composition/{id}`
-
-### ✅ 3D Body Model Visualization (Feb 7, 2026)
-**Features:**
-- Enhanced SVG 3D model with gradients and highlights
-- Front view and Side view toggle
-- Color-coded fat distribution (green/yellow/red)
-- Interactive region details with progress bars
-- Fat percentage labels on body regions
-
-**Components:**
-- `BodyCompositionCharts.tsx` - Complete visualization component
-
-### ✅ VBT Integration in Strength Page (Feb 7, 2026)
+### ✅ VBT Integration in Strength Page
 **Features:**
 - Integrated VBT into add-strength.tsx with tabs (Traditional Strength / VBT)
 - Exercise selector with 12 preset exercises
-- Device/Provider selection (GymAware, PUSH Band, Vitruve, etc.)
-- Multi-set data entry (load, velocity, power)
+- Device/Provider selection with input method info (GymAware, PUSH Band, Vitruve, etc.)
+- Multi-set data entry with decimal support (formatDecimalInput helper)
 - Load-Velocity Profile chart with regression line and 1RM estimation
-- Velocity Loss per Set bar chart
+- Velocity Loss per Set bar chart with **>30% fatigue alert**
 - AI-powered recommendations
 
 **Endpoints:**
@@ -70,24 +35,46 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - `POST /api/vbt/data`
 - `GET /api/vbt/analysis/{athlete_id}`
 
-### ✅ Reports & Export (Feb 2026)
-**CSV Export:**
-- `GET /api/reports/athlete/{id}/csv?data_type=all|gps|wellness|strength|body_composition`
-- `GET /api/reports/team/csv`
+### ✅ Body Composition
+**Protocols:**
+- Guedes (1985) - 3 skinfolds (Brazilian) - FORMULA FIXED to use log10
+- Pollock & Jackson 7 - 7 skinfolds
+- Pollock & Jackson 9 - 9 skinfolds
+- Faulkner 4 - 4 skinfolds (athletes)
 
-**PDF Reports:**
-- `GET /api/reports/athlete/{id}/pdf` - Complete athlete report
-- `GET /api/reports/body-composition/{id}/pdf` - Body composition report
+**Features:**
+- Dynamic form with protocol selector
+- SVG body diagram showing measurement points
+- Protocol-specific skinfold fields
 
-### ✅ Wearables (Basic - Feb 2026)
-- Manual .FIT file upload endpoint
-- `POST /api/wearables/upload` - Placeholder for full integration
+### ✅ 3D Body Model Visualization
+**Features:**
+- Enhanced SVG 3D model with gradients and highlights
+- Front view and Side view toggle
+- **Improved value visibility**: White text on black background labels
+- Color-coded fat distribution (green/yellow/red)
+- Interactive region details with progress bars
+
+### ✅ Team Dashboard Enhancements
+**New Stats Cards:**
+- **Avg Power (W)**: Team average strength from assessments
+- **Body Fat %**: Team average body composition
+
+**Alerts:**
+- Power drop alerts (>30%)
+- High ACWR alerts
+- Fatigue alerts
+
+### ✅ Responsiveness Improvements
+- Charts use responsive dimensions based on screen width
+- `Dimensions.get('window')` for adaptive layouts
+- Mobile-first design approach
 
 ## Prioritized Backlog
 
-### P1 - In Progress
+### P1 - Next
 - [ ] Full i18n audit - translate remaining hardcoded strings
-- [ ] Global theme implementation (Light/Dark mode) - POSTPONED
+- [ ] Global theme implementation (Light/Dark mode)
 
 ### P2 - Planned
 - [ ] Push Notifications for critical alerts
@@ -101,16 +88,27 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ## Key Technical Notes
 
-### Body Composition Formulas
-- **Guedes (1985)**: Uses log10 transformation for body density
-  - Male: BD = 1.1714 - 0.0671 × log10(sum_3)
-  - Female: BD = 1.1665 - 0.0706 × log10(sum_3)
-- **Siri Equation**: %BF = (495 / BD) - 450
+### VBT Device Input Methods
+| Device | Input Method |
+|--------|-------------|
+| GymAware | API/Bluetooth |
+| PUSH Band | App Sync |
+| Vitruve | App Sync |
+| Beast Sensor | Bluetooth |
+| Tendo Unit | USB/CSV |
+| Manual | Manual Entry |
 
-### VBT Load-Velocity Profile
-- Linear regression: V = V0 + slope × Load
-- MVT (Minimum Velocity Threshold): 0.3 m/s for most exercises
-- Estimated 1RM calculated at MVT intercept
+### Decimal Input Fix
+```typescript
+const formatDecimalInput = (value: string): string => {
+  return value.replace(',', '.');
+};
+```
+
+### VBT Fatigue Detection
+- Velocity loss >30% triggers fatigue alert
+- Alert displayed as banner with warning message
+- Recommendation to reduce volume or load
 
 ## Test Credentials
 - **Email**: test@test.com
