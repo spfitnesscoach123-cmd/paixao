@@ -633,7 +633,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.input}
                     value={meanSpeed}
-                    onChangeText={setMeanSpeed}
+                    onChangeText={(text) => setMeanSpeed(formatDecimalInput(text))}
                     placeholder="1.3"
                     placeholderTextColor={colors.text.tertiary}
                     keyboardType="decimal-pad"
@@ -645,7 +645,7 @@ export default function AddStrengthAssessment() {
                   <TextInput
                     style={styles.input}
                     value={peakSpeed}
-                    onChangeText={setPeakSpeed}
+                    onChangeText={(text) => setPeakSpeed(formatDecimalInput(text))}
                     placeholder="2.6"
                     placeholderTextColor={colors.text.tertiary}
                     keyboardType="decimal-pad"
