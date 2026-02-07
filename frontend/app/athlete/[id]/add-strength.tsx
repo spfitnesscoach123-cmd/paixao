@@ -825,7 +825,7 @@ export default function AddStrengthAssessment() {
                 {' '}{locale === 'pt' ? 'Adicionar Dados VBT' : 'Add VBT Data'}
               </Text>
               
-              {/* Device Selection */}
+              {/* Device Selection with Input Method Info */}
               <Text style={styles.label}>{labels.device}</Text>
               <View style={styles.providerGrid}>
                 {PROVIDERS.map((p) => (
@@ -837,12 +837,30 @@ export default function AddStrengthAssessment() {
                     <Text style={[styles.providerText, provider === p.id && styles.providerTextActive]}>
                       {p.name}
                     </Text>
+                    <Text style={[styles.providerMethodText, provider === p.id && styles.providerMethodTextActive]}>
+                      {p.inputMethod}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
               
-              {/* Sets Input */}
-              <Text style={[styles.label, { marginTop: 16 }]}>Sets</Text>
+              {/* Input Method Info */}
+              {provider !== 'manual' && (
+                <View style={styles.inputMethodInfo}>
+                  <Ionicons name="information-circle" size={16} color={colors.accent.primary} />
+                  <Text style={styles.inputMethodInfoText}>
+                    {locale === 'pt' 
+                      ? `${PROVIDERS.find(p => p.id === provider)?.name}: Sincronize via ${PROVIDERS.find(p => p.id === provider)?.inputMethod}. Para entrada manual, selecione "Manual".`
+                      : `${PROVIDERS.find(p => p.id === provider)?.name}: Sync via ${PROVIDERS.find(p => p.id === provider)?.inputMethod}. For manual entry, select "Manual".`
+                    }
+                  </Text>
+                </View>
+              )}
+              
+              {/* Sets Input - Manual Entry */}
+              <Text style={[styles.label, { marginTop: 16 }]}>
+                Sets {provider === 'manual' && (locale === 'pt' ? '(entrada manual)' : '(manual entry)')}
+              </Text>
               <View style={styles.setHeader}>
                 <Text style={styles.setHeaderText}>#</Text>
                 <Text style={styles.setHeaderText}>{locale === 'pt' ? 'Carga' : 'Load'}</Text>
@@ -857,7 +875,7 @@ export default function AddStrengthAssessment() {
                     style={styles.setInput}
                     placeholder="kg"
                     value={set.load_kg ? String(set.load_kg) : ''}
-                    onChangeText={(v) => handleSetChange(i, 'load_kg', v)}
+                    onChangeText={(v) => handleSetChange(i, 'load_kg', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
                   />
@@ -865,7 +883,7 @@ export default function AddStrengthAssessment() {
                     style={styles.setInput}
                     placeholder="m/s"
                     value={set.mean_velocity ? String(set.mean_velocity) : ''}
-                    onChangeText={(v) => handleSetChange(i, 'mean_velocity', v)}
+                    onChangeText={(v) => handleSetChange(i, 'mean_velocity', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
                   />
@@ -873,7 +891,7 @@ export default function AddStrengthAssessment() {
                     style={styles.setInput}
                     placeholder="W"
                     value={set.power_watts ? String(set.power_watts) : ''}
-                    onChangeText={(v) => handleSetChange(i, 'power_watts', v)}
+                    onChangeText={(v) => handleSetChange(i, 'power_watts', formatDecimalInput(v))}
                     keyboardType="decimal-pad"
                     placeholderTextColor={colors.text.tertiary}
                   />
