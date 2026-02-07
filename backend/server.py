@@ -3632,6 +3632,417 @@ async def generate_athlete_pdf_report(
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+# ============= CSV EXPORT ENDPOINTS =============
+
+@api_router.get("/reports/athlete/{athlete_id}/csv")
+async def export_athlete_csv(
+    athlete_id: str,
+    data_type: str = "all",  # all, gps, wellness, strength, body_composition
+    current_user: dict = Depends(get_current_user)
+):
+    """Export athlete data as CSV"""
+    import csv
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    buffer = BytesIO()
+    writer_wrapper = io.TextIOWrapper(buffer, encoding='utf-8', newline='')
+    writer = csv.writer(writer_wrapper)
+    
+    athlete_name = athlete.get('name', 'athlete')
+    
+    if data_type in ["all", "gps"]:
+        # GPS Data
+        writer.writerow(["=== GPS DATA ==="])
+        writer.writerow(["Date", "Total Distance (m)", "High Intensity Distance (m)", "Sprints", "Max Speed (km/h)", "Period"])
+        
+        gps_records = await db.gps_data.find({
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        }).sort("date", -1).to_list(1000)
+        
+        for record in gps_records:
+            writer.writerow([
+                record.get("date", ""),
+                record.get("total_distance", 0),
+                record.get("high_intensity_distance", 0),
+                record.get("number_of_sprints", 0),
+                record.get("max_speed", 0),
+                record.get("period_name", "")
+            ])
+        writer.writerow([])
+    
+    if data_type in ["all", "wellness"]:
+        # Wellness Data
+        writer.writerow(["=== WELLNESS DATA ==="])
+        writer.writerow(["Date", "Fatigue (1-10)", "Sleep Quality (1-10)", "Muscle Soreness (1-10)", "Stress Level (1-10)", "Mood (1-10)", "QTR Score"])
+        
+        wellness_records = await db.wellness.find({
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        }).sort("date", -1).to_list(1000)
+        
+        for record in wellness_records:
+            writer.writerow([
+                record.get("date", ""),
+                record.get("fatigue", ""),
+                record.get("sleep_quality", ""),
+                record.get("muscle_soreness", ""),
+                record.get("stress_level", ""),
+                record.get("mood", ""),
+                record.get("qtr_score", "")
+            ])
+        writer.writerow([])
+    
+    if data_type in ["all", "strength"]:
+        # Strength Assessments
+        writer.writerow(["=== STRENGTH ASSESSMENTS ==="])
+        writer.writerow(["Date", "Assessment Type", "Peak Power (W)", "RSI", "Speed (m/s)", "Notes"])
+        
+        strength_records = await db.assessments.find({
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"],
+            "assessment_type": "strength"
+        }).sort("date", -1).to_list(1000)
+        
+        for record in strength_records:
+            metrics = record.get("metrics", {})
+            writer.writerow([
+                record.get("date", ""),
+                record.get("assessment_type", ""),
+                metrics.get("peak_power", ""),
+                metrics.get("rsi", ""),
+                metrics.get("speed", ""),
+                record.get("notes", "")
+            ])
+        writer.writerow([])
+    
+    if data_type in ["all", "body_composition"]:
+        # Body Composition
+        writer.writerow(["=== BODY COMPOSITION ==="])
+        writer.writerow(["Date", "Protocol", "Weight (kg)", "Height (cm)", "Body Fat %", "Lean Mass (kg)", "Fat Mass (kg)", "Bone Mass (kg)", "BMI", "BMI Classification"])
+        
+        body_comp_records = await db.body_compositions.find({
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        }).sort("date", -1).to_list(1000)
+        
+        for record in body_comp_records:
+            writer.writerow([
+                record.get("date", ""),
+                record.get("protocol", ""),
+                record.get("weight", ""),
+                record.get("height", ""),
+                record.get("body_fat_percentage", ""),
+                record.get("lean_mass_kg", ""),
+                record.get("fat_mass_kg", ""),
+                record.get("bone_mass_kg", ""),
+                record.get("bmi", ""),
+                record.get("bmi_classification", "")
+            ])
+    
+    writer_wrapper.flush()
+    buffer.seek(0)
+    
+    filename = f"export_{athlete_name.replace(' ', '_')}_{data_type}_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/reports/body-composition/{athlete_id}/pdf")
+async def generate_body_composition_pdf(
+    athlete_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a PDF report for body composition assessments"""
+    from reportlab.lib import colors as rl_colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch, cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    
+    # Translations
+    tr = {
+        "pt": {
+            "title": "Relatório de Composição Corporal",
+            "generated": "Gerado em",
+            "athlete": "Atleta",
+            "latest": "Avaliação Mais Recente",
+            "date": "Data",
+            "protocol": "Protocolo",
+            "weight": "Peso",
+            "height": "Altura",
+            "body_fat": "% Gordura Corporal",
+            "lean_mass": "Massa Magra",
+            "fat_mass": "Massa de Gordura",
+            "bone_mass": "Massa Óssea",
+            "bmi": "IMC",
+            "classification": "Classificação",
+            "history": "Histórico de Avaliações",
+            "evolution": "Evolução",
+            "no_data": "Sem dados disponíveis",
+            "fat_distribution": "Distribuição de Gordura",
+            "upper_arm": "Braços",
+            "trunk_front": "Tronco Frontal",
+            "trunk_back": "Tronco Dorsal",
+            "hip_waist": "Quadril/Cintura",
+            "lower_body": "Membros Inf.",
+        },
+        "en": {
+            "title": "Body Composition Report",
+            "generated": "Generated on",
+            "athlete": "Athlete",
+            "latest": "Latest Assessment",
+            "date": "Date",
+            "protocol": "Protocol",
+            "weight": "Weight",
+            "height": "Height",
+            "body_fat": "Body Fat %",
+            "lean_mass": "Lean Mass",
+            "fat_mass": "Fat Mass",
+            "bone_mass": "Bone Mass",
+            "bmi": "BMI",
+            "classification": "Classification",
+            "history": "Assessment History",
+            "evolution": "Evolution",
+            "no_data": "No data available",
+            "fat_distribution": "Fat Distribution",
+            "upper_arm": "Arms",
+            "trunk_front": "Front Trunk",
+            "trunk_back": "Back Trunk",
+            "hip_waist": "Hip/Waist",
+            "lower_body": "Lower Body",
+        }
+    }
+    t = tr.get(lang, tr["en"])
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get body composition records
+    records = await db.body_compositions.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(100)
+    
+    if not records:
+        raise HTTPException(status_code=400, detail="No body composition data available")
+    
+    # Create PDF
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=1.5*cm,
+        leftMargin=1.5*cm,
+        topMargin=2*cm,
+        bottomMargin=2*cm
+    )
+    
+    # Styles
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=22,
+        spaceAfter=20,
+        alignment=TA_CENTER,
+        textColor=rl_colors.HexColor('#10b981')
+    )
+    heading_style = ParagraphStyle(
+        'Heading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        spaceBefore=15,
+        spaceAfter=10,
+        textColor=rl_colors.HexColor('#3b82f6')
+    )
+    normal_style = ParagraphStyle(
+        'Normal',
+        parent=styles['Normal'],
+        fontSize=10,
+        spaceAfter=6
+    )
+    
+    story = []
+    
+    # Title
+    story.append(Paragraph(f"📊 {t['title']}", title_style))
+    story.append(Paragraph(f"{t['generated']}: {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}", normal_style))
+    story.append(Paragraph(f"{t['athlete']}: <b>{athlete.get('name', 'N/A')}</b>", normal_style))
+    story.append(Spacer(1, 20))
+    
+    # Latest Assessment
+    latest = records[0]
+    story.append(Paragraph(f"🎯 {t['latest']}", heading_style))
+    
+    latest_data = [
+        [t['date'], latest.get('date', 'N/A')],
+        [t['protocol'], latest.get('protocol', 'N/A').replace('_', ' ').title()],
+        [t['weight'], f"{latest.get('weight', 0):.1f} kg"],
+        [t['height'], f"{latest.get('height', 0):.0f} cm"],
+        [t['body_fat'], f"{latest.get('body_fat_percentage', 0):.1f}%"],
+        [t['lean_mass'], f"{latest.get('lean_mass_kg', 0):.1f} kg"],
+        [t['fat_mass'], f"{latest.get('fat_mass_kg', 0):.1f} kg"],
+        [t['bone_mass'], f"{latest.get('bone_mass_kg', 0):.1f} kg"],
+        [t['bmi'], f"{latest.get('bmi', 0):.1f}"],
+        [t['classification'], latest.get('bmi_classification', 'N/A').replace('_', ' ').title()],
+    ]
+    
+    latest_table = Table(latest_data, colWidths=[6*cm, 8*cm])
+    latest_table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('ALIGN', (0, 0), (0, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (1, -1), 'LEFT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#e5e7eb')),
+        ('BACKGROUND', (0, 0), (0, -1), rl_colors.HexColor('#f3f4f6')),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    story.append(latest_table)
+    story.append(Spacer(1, 20))
+    
+    # Fat Distribution
+    fat_dist = latest.get('fat_distribution', {})
+    if fat_dist:
+        story.append(Paragraph(f"🔥 {t['fat_distribution']}", heading_style))
+        dist_data = [
+            [t['upper_arm'], f"{fat_dist.get('upper_arm', 0):.1f}%"],
+            [t['trunk_front'], f"{fat_dist.get('trunk_front', 0):.1f}%"],
+            [t['trunk_back'], f"{fat_dist.get('trunk_back', 0):.1f}%"],
+            [t['hip_waist'], f"{fat_dist.get('hip_waist', 0):.1f}%"],
+            [t['lower_body'], f"{fat_dist.get('lower_body', 0):.1f}%"],
+        ]
+        dist_table = Table(dist_data, colWidths=[6*cm, 4*cm])
+        dist_table.setStyle(TableStyle([
+            ('FONTSIZE', (0, 0), (-1, -1), 10),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#e5e7eb')),
+            ('BACKGROUND', (0, 0), (0, -1), rl_colors.HexColor('#fef3c7')),
+            ('LEFTPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(dist_table)
+        story.append(Spacer(1, 20))
+    
+    # History
+    if len(records) > 1:
+        story.append(Paragraph(f"📈 {t['history']}", heading_style))
+        
+        history_header = [t['date'], t['protocol'], t['body_fat'], t['lean_mass'], t['bmi']]
+        history_data = [history_header]
+        
+        for record in records[:10]:
+            history_data.append([
+                record.get('date', 'N/A'),
+                record.get('protocol', 'N/A').replace('_', ' ').title()[:15],
+                f"{record.get('body_fat_percentage', 0):.1f}%",
+                f"{record.get('lean_mass_kg', 0):.1f} kg",
+                f"{record.get('bmi', 0):.1f}"
+            ])
+        
+        history_table = Table(history_data, colWidths=[3*cm, 4*cm, 2.5*cm, 2.5*cm, 2*cm])
+        history_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#10b981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 9),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#d1fae5')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#ecfdf5')]),
+            ('LEFTPADDING', (0, 0), (-1, -1), 4),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+            ('TOPPADDING', (0, 0), (-1, -1), 4),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ]))
+        story.append(history_table)
+    
+    # Build PDF
+    doc.build(story)
+    buffer.seek(0)
+    
+    filename = f"body_composition_{athlete.get('name', 'athlete').replace(' ', '_')}_{datetime.utcnow().strftime('%Y%m%d')}.pdf"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@api_router.get("/reports/team/csv")
+async def export_team_csv(
+    current_user: dict = Depends(get_current_user)
+):
+    """Export team data as CSV"""
+    import csv
+    
+    # Get all athletes
+    athletes = await db.athletes.find({
+        "coach_id": current_user["_id"]
+    }).to_list(1000)
+    
+    if not athletes:
+        raise HTTPException(status_code=400, detail="No athletes found")
+    
+    buffer = BytesIO()
+    writer_wrapper = io.TextIOWrapper(buffer, encoding='utf-8', newline='')
+    writer = csv.writer(writer_wrapper)
+    
+    # Team Summary
+    writer.writerow(["=== TEAM SUMMARY ==="])
+    writer.writerow(["Athlete Name", "Position", "Birth Date", "Latest Body Fat %", "Latest BMI", "Latest Weight (kg)"])
+    
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        
+        # Get latest body composition
+        body_comp = await db.body_compositions.find_one({
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        }, sort=[("date", -1)])
+        
+        writer.writerow([
+            athlete.get("name", ""),
+            athlete.get("position", ""),
+            athlete.get("birth_date", ""),
+            body_comp.get("body_fat_percentage", "") if body_comp else "",
+            body_comp.get("bmi", "") if body_comp else "",
+            body_comp.get("weight", "") if body_comp else ""
+        ])
+    
+    writer_wrapper.flush()
+    buffer.seek(0)
+    
+    filename = f"team_export_{datetime.utcnow().strftime('%Y%m%d')}.csv"
+    
+    return StreamingResponse(
+        buffer,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 # ============= SUBSCRIPTION ENDPOINTS =============
 
 @api_router.get("/subscription/plans")
