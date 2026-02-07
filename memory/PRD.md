@@ -22,7 +22,7 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ### ✅ Body Composition (Feb 2026)
 **Protocols:**
-- Guedes (1985) - 3 skinfolds (Brazilian)
+- Guedes (1985) - 3 skinfolds (Brazilian) - FORMULA FIXED to use log10
 - Pollock & Jackson 7 - 7 skinfolds
 - Pollock & Jackson 9 - 9 skinfolds
 - Faulkner 4 - 4 skinfolds (athletes)
@@ -33,11 +33,42 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - BMI + Classification
 - Fat Distribution for 3D visualization
 
+**Frontend:**
+- Dynamic form with protocol selector
+- SVG body diagram showing measurement points
+- Protocol-specific skinfold fields
+
 **Endpoints:**
 - `GET /api/body-composition/protocols`
 - `POST /api/body-composition`
 - `GET /api/body-composition/athlete/{id}`
 - `GET /api/analysis/body-composition/{id}`
+
+### ✅ 3D Body Model Visualization (Feb 7, 2026)
+**Features:**
+- Enhanced SVG 3D model with gradients and highlights
+- Front view and Side view toggle
+- Color-coded fat distribution (green/yellow/red)
+- Interactive region details with progress bars
+- Fat percentage labels on body regions
+
+**Components:**
+- `BodyCompositionCharts.tsx` - Complete visualization component
+
+### ✅ VBT Integration in Strength Page (Feb 7, 2026)
+**Features:**
+- Integrated VBT into add-strength.tsx with tabs (Traditional Strength / VBT)
+- Exercise selector with 12 preset exercises
+- Device/Provider selection (GymAware, PUSH Band, Vitruve, etc.)
+- Multi-set data entry (load, velocity, power)
+- Load-Velocity Profile chart with regression line and 1RM estimation
+- Velocity Loss per Set bar chart
+- AI-powered recommendations
+
+**Endpoints:**
+- `GET /api/vbt/providers`
+- `POST /api/vbt/data`
+- `GET /api/vbt/analysis/{athlete_id}`
 
 ### ✅ Reports & Export (Feb 2026)
 **CSV Export:**
@@ -48,92 +79,43 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - `GET /api/reports/athlete/{id}/pdf` - Complete athlete report
 - `GET /api/reports/body-composition/{id}/pdf` - Body composition report
 
-### ✅ Wearable Integration (Feb 2026)
-**Supported Methods:**
-- FIT file import (Garmin, Polar, Suunto, Wahoo, Coros)
-- CSV import (any device)
+### ✅ Wearables (Basic - Feb 2026)
+- Manual .FIT file upload endpoint
+- `POST /api/wearables/upload` - Placeholder for full integration
 
-**Endpoints:**
-- `GET /api/wearables/supported`
-- `POST /api/wearables/import/csv`
+## Prioritized Backlog
 
-**Planned (requires developer credentials):**
-- Garmin Connect direct sync
-- Polar Flow direct sync
+### P1 - In Progress
+- [ ] Full i18n audit - translate remaining hardcoded strings
+- [ ] Global theme implementation (Light/Dark mode) - POSTPONED
 
-### ✅ VBT Integration (Feb 2026)
-**Supported Providers:**
-- GymAware
-- PUSH Band
-- Vitruve
-- Beast Sensor
-- Tendo Unit
-- Manual entry
-
-**Features:**
-- Load-Velocity Profile (LVP)
-- Estimated 1RM calculation
-- Velocity loss analysis (fatigue)
-- Trend analysis
-- AI recommendations
-
-**Endpoints:**
-- `GET /api/vbt/providers`
-- `POST /api/vbt/data`
-- `GET /api/vbt/athlete/{id}`
-- `POST /api/vbt/import/csv`
-- `GET /api/vbt/analysis/{id}?exercise=...`
-
-## Backlog
-
-### P1 - High Priority
-- [ ] **Complete Global Theme** - 30+ files need refactoring for light mode
-- [ ] **Full i18n Audit** - Replace remaining hardcoded strings
-
-### P2 - Medium Priority
-- [ ] **Push Notifications** - Critical alerts
-- [ ] **VBT Frontend UI** - Charts and forms for VBT data
-- [ ] **Wearable Import UI** - File upload interface
+### P2 - Planned
+- [ ] Push Notifications for critical alerts
+- [ ] UI for downloading PDF/CSV reports
+- [ ] Full OAuth wearable integration (Garmin Connect, Polar Flow)
 
 ### P3 - Future
-- [ ] **Direct Garmin/Polar API** - Requires developer program enrollment
-- [ ] **FIT file parser** - Parse binary FIT files directly
+- [ ] Gamification/Leaderboards
+- [ ] Advanced team analytics dashboard
+- [ ] Video analysis integration
 
-## Key API Endpoints Summary
+## Key Technical Notes
 
-### Authentication
-- `POST /api/auth/register`, `POST /api/auth/login`
+### Body Composition Formulas
+- **Guedes (1985)**: Uses log10 transformation for body density
+  - Male: BD = 1.1714 - 0.0671 × log10(sum_3)
+  - Female: BD = 1.1665 - 0.0706 × log10(sum_3)
+- **Siri Equation**: %BF = (495 / BD) - 450
 
-### Athletes
-- `GET/POST/PUT/DELETE /api/athletes/{id}`
-
-### Body Composition
-- `GET /api/body-composition/protocols`
-- `POST /api/body-composition`
-- `GET /api/analysis/body-composition/{id}`
-
-### VBT
-- `GET /api/vbt/providers`
-- `POST /api/vbt/data`
-- `GET /api/vbt/analysis/{id}?exercise=...`
-
-### Reports
-- `GET /api/reports/athlete/{id}/csv`
-- `GET /api/reports/body-composition/{id}/pdf`
-
-### Wearables
-- `GET /api/wearables/supported`
-- `POST /api/wearables/import/csv`
-
-## Database Collections
-- `users`, `athletes`, `gps_data`, `wellness`
-- `assessments`, `body_compositions`
-- `vbt_data`, `heart_rate_data` (NEW)
-- `subscriptions`
+### VBT Load-Velocity Profile
+- Linear regression: V = V0 + slope × Load
+- MVT (Minimum Velocity Threshold): 0.3 m/s for most exercises
+- Estimated 1RM calculated at MVT intercept
 
 ## Test Credentials
-- Email: `test@test.com`
-- Password: `password`
+- **Email**: test@test.com
+- **Password**: password
+- **Athlete ID**: 69862b75fc9efff29476e3ce
 
 ## Last Updated
 February 7, 2026
