@@ -3039,6 +3039,25 @@ async def get_team_dashboard(
     seven_days_ago = today - timedelta(days=7)
     twenty_eight_days_ago = today - timedelta(days=28)
     
+    # First, get ALL GPS data to count global sessions (1 CSV = 1 session for the team)
+    all_gps_data = await db.gps_data.find({"coach_id": user_id}).to_list(10000)
+    global_sessions_7d = set()
+    global_sessions_total = set()
+    
+    for record in all_gps_data:
+        try:
+            record_date = datetime.strptime(record.get("date", ""), "%Y-%m-%d")
+            session_key = f"{record.get('date')}_{record.get('session_name', 'default')}"
+            global_sessions_total.add(session_key)
+            if record_date >= seven_days_ago:
+                global_sessions_7d.add(session_key)
+        except:
+            continue
+    
+    # Total sessions count is now global (1 CSV = 1 session)
+    total_sessions = len(global_sessions_total)
+    total_sessions_7d_global = len(global_sessions_7d)
+    
     athlete_data = []
     total_acwr = 0
     acwr_count = 0
@@ -3046,7 +3065,6 @@ async def get_team_dashboard(
     wellness_count = 0
     total_fatigue = 0
     fatigue_count = 0
-    total_sessions = 0
     total_distance = 0
     total_power = 0
     power_count = 0
