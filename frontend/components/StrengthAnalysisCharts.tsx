@@ -219,10 +219,111 @@ export const StrengthAnalysisCharts: React.FC<StrengthAnalysisChartsProps> = ({ 
                   {labels.variationFromPeak}: {metric.variation_from_peak > 0 ? '+' : ''}{metric.variation_from_peak}%
                 </Text>
               )}
+              {metric.variation_from_previous !== null && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Ionicons 
+                    name={metric.variation_from_previous >= 0 ? 'arrow-up' : 'arrow-down'} 
+                    size={12} 
+                    color={metric.variation_from_previous >= 0 ? '#22c55e' : '#ef4444'} 
+                  />
+                  <Text style={[styles.metricVariation, { color: metric.variation_from_previous >= 0 ? '#22c55e' : '#ef4444' }]}>
+                    {metric.variation_from_previous > 0 ? '+' : ''}{metric.variation_from_previous}% {locale === 'pt' ? 'vs anterior' : 'vs previous'}
+                  </Text>
+                </View>
+              )}
+              {metric.previous_value !== null && (
+                <Text style={{ fontSize: 10, color: colors.text.tertiary, marginTop: 2 }}>
+                  {locale === 'pt' ? 'Anterior:' : 'Previous:'} {metric.previous_value}{metric.unit}
+                </Text>
+              )}
             </View>
           ))}
         </View>
       </View>
+
+      {/* Comparison with Previous Assessment */}
+      {data.comparison_with_previous && (
+        <View style={styles.chartCard}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Ionicons name="git-compare-outline" size={20} color={colors.accent.primary} />
+            <Text style={[styles.sectionTitle, { marginLeft: 8, marginBottom: 0 }]}>
+              {locale === 'pt' ? 'Comparação com Avaliação Anterior' : 'Comparison with Previous Assessment'}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 12 }}>
+            {locale === 'pt' ? `Anterior: ${data.previous_assessment_date}` : `Previous: ${data.previous_assessment_date}`}
+          </Text>
+          
+          {/* Comparison Bars */}
+          <View style={{ gap: 12 }}>
+            {data.metrics.filter(m => m.previous_value !== null).map((metric) => (
+              <View key={`comparison-${metric.name}`} style={{ marginBottom: 8 }}>
+                <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4 }}>{metric.name}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {/* Previous value */}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ height: 20, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                      <View 
+                        style={{ 
+                          height: '100%', 
+                          width: `${Math.min(100, (metric.previous_value || 0) / Math.max(metric.value, metric.previous_value || 1) * 100)}%`,
+                          backgroundColor: 'rgba(139, 92, 246, 0.4)',
+                          borderRadius: 4
+                        }} 
+                      />
+                    </View>
+                    <Text style={{ fontSize: 10, color: colors.text.tertiary, marginTop: 2 }}>
+                      {locale === 'pt' ? 'Anterior' : 'Previous'}: {metric.previous_value}{metric.unit}
+                    </Text>
+                  </View>
+                  
+                  {/* Arrow indicator */}
+                  <Ionicons 
+                    name={metric.variation_from_previous && metric.variation_from_previous >= 0 ? 'arrow-forward' : 'arrow-forward'}
+                    size={16}
+                    color={metric.variation_from_previous && metric.variation_from_previous >= 0 ? '#22c55e' : '#ef4444'}
+                  />
+                  
+                  {/* Current value */}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ height: 20, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden' }}>
+                      <View 
+                        style={{ 
+                          height: '100%', 
+                          width: `${Math.min(100, metric.value / Math.max(metric.value, metric.previous_value || 1) * 100)}%`,
+                          backgroundColor: getClassificationColor(metric.classification),
+                          borderRadius: 4
+                        }} 
+                      />
+                    </View>
+                    <Text style={{ fontSize: 10, color: colors.text.primary, marginTop: 2, fontWeight: '600' }}>
+                      {locale === 'pt' ? 'Atual' : 'Current'}: {metric.value}{metric.unit}
+                    </Text>
+                  </View>
+                  
+                  {/* Change percentage */}
+                  <View style={{ 
+                    backgroundColor: metric.variation_from_previous && metric.variation_from_previous >= 0 ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 8,
+                    minWidth: 60,
+                    alignItems: 'center'
+                  }}>
+                    <Text style={{ 
+                      fontSize: 12, 
+                      fontWeight: 'bold',
+                      color: metric.variation_from_previous && metric.variation_from_previous >= 0 ? '#22c55e' : '#ef4444'
+                    }}>
+                      {metric.variation_from_previous && metric.variation_from_previous > 0 ? '+' : ''}{metric.variation_from_previous?.toFixed(1)}%
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
 
       {/* Fatigue Index Gauge */}
       <View style={styles.fatigueCard}>
