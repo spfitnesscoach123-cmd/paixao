@@ -74,13 +74,19 @@
     "totalRegistered": "Total registered",
     "last7days": "last 7d",
     "perSession": "Per session",
+    "perAthlete": "Per athlete",
     "vsWeek": "vs. week",
     "topPerformer": "TOP PERFORMER",
     "average": "Average",
     "session": "session",
     "quickStats": "Quick Statistics",
     "sessionsPerAthlete": "Sessions/Athlete",
-    "activity7d": "Activity 7d"
+    "activity7d": "Activity 7d",
+    "avgDistanceWeek": "Avg Distance/Week",
+    "avgDistancePerAthlete": "Avg Distance/Athlete",
+    "wellnessTrend": "Wellness Trend",
+    "totalDistance": "Total Distance",
+    "allAthletes": "All athletes"
   },
   "athletes": {
     "title": "Athletes",
