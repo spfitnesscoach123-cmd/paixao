@@ -3088,8 +3088,8 @@ async def get_team_dashboard(
     
     for athlete in athletes:
         athlete_id = str(athlete["_id"])
-        position = athlete.get("position") or (locale_lang if locale_lang == "pt" else "Not specified")
-        if position == "Unknown" or not position:
+        position = athlete.get("position", "")
+        if not position or position == "Unknown":
             position = "Não especificado" if lang == "pt" else "Not specified"
         
         # Initialize position summary with all metrics for group averaging
