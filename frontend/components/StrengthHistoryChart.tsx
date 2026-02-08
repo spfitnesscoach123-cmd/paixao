@@ -475,6 +475,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 4,
   },
+  rsiClassification: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  rsiInsightsContainer: {
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#f59e0b',
+  },
+  rsiInsightTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  rsiInsightText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    marginTop: 4,
+    lineHeight: 16,
+  },
   chartContainer: {
     alignItems: 'center',
   },
