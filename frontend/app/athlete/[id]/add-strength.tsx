@@ -208,6 +208,39 @@ const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
         strokeWidth="3"
       />
       
+      {/* Optimal Load Point (Maximum Power) */}
+      {analysis.load_velocity_profile.optimal_load && (
+        <G>
+          <Circle
+            cx={getX(analysis.load_velocity_profile.optimal_load)}
+            cy={getY(analysis.load_velocity_profile.optimal_load)}
+            r="10"
+            fill="#f59e0b"
+            stroke="#ffffff"
+            strokeWidth="2"
+          />
+          <SvgText
+            x={getX(analysis.load_velocity_profile.optimal_load)}
+            y={getY(analysis.load_velocity_profile.optimal_load) - 18}
+            textAnchor="middle"
+            fill="#f59e0b"
+            fontSize="10"
+            fontWeight="bold"
+          >
+            {locale === 'pt' ? 'Ótimo' : 'Optimal'}
+          </SvgText>
+          <SvgText
+            x={getX(analysis.load_velocity_profile.optimal_load)}
+            y={getY(analysis.load_velocity_profile.optimal_load) - 7}
+            textAnchor="middle"
+            fill="#f59e0b"
+            fontSize="9"
+          >
+            {analysis.load_velocity_profile.optimal_load}kg
+          </SvgText>
+        </G>
+      )}
+      
       {/* Estimated 1RM Point */}
       {estimated_1rm && (
         <G>
@@ -232,6 +265,150 @@ const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
         </G>
       )}
     </Svg>
+  );
+};
+
+// Optimal Load Evolution Chart Component
+const OptimalLoadEvolutionChart = ({ data, locale }: { data: Array<{ date: string; optimal_load: number; optimal_power: number }>, locale: string }) => {
+  const chartWidth = Math.min(screenWidth - 48, 400);
+  const chartHeight = Math.min(chartWidth * 0.4, 150);
+  const padding = { top: 20, right: 20, bottom: 30, left: 45 };
+  
+  if (!data || data.length < 2) {
+    return (
+      <View style={styles.chartPlaceholder}>
+        <Text style={styles.chartPlaceholderText}>
+          {locale === 'pt' ? 'Dados insuficientes para evolução' : 'Insufficient data for evolution'}
+        </Text>
+      </View>
+    );
+  }
+  
+  const innerWidth = chartWidth - padding.left - padding.right;
+  const innerHeight = chartHeight - padding.top - padding.bottom;
+  
+  const loads = data.map(d => d.optimal_load);
+  const maxLoad = Math.max(...loads) * 1.1;
+  const minLoad = Math.min(...loads) * 0.9;
+  
+  const getX = (index: number) => padding.left + (index / (data.length - 1)) * innerWidth;
+  const getY = (load: number) => {
+    const normalized = (load - minLoad) / (maxLoad - minLoad);
+    return padding.top + innerHeight - normalized * innerHeight;
+  };
+  
+  const linePath = data.map((d, i) => `${getX(i)},${getY(d.optimal_load)}`).join(' ');
+  
+  // Calculate trend
+  const firstLoad = data[data.length - 1].optimal_load;
+  const lastLoad = data[0].optimal_load;
+  const trendPercent = ((lastLoad - firstLoad) / firstLoad * 100).toFixed(1);
+  const isPositive = lastLoad > firstLoad;
+  
+  return (
+    <View>
+      {/* Trend Summary */}
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+        paddingHorizontal: 4
+      }}>
+        <Text style={{ color: colors.text.secondary, fontSize: 12 }}>
+          {locale === 'pt' ? 'Evolução da Carga Ótima' : 'Optimal Load Evolution'}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons 
+            name={isPositive ? 'arrow-up' : 'arrow-down'} 
+            size={16} 
+            color={isPositive ? '#10b981' : '#ef4444'} 
+          />
+          <Text style={{ 
+            color: isPositive ? '#10b981' : '#ef4444', 
+            fontSize: 14, 
+            fontWeight: 'bold',
+            marginLeft: 4
+          }}>
+            {isPositive ? '+' : ''}{trendPercent}%
+          </Text>
+        </View>
+      </View>
+      
+      <Svg width={chartWidth} height={chartHeight}>
+        {/* Grid lines */}
+        {[0, 0.5, 1].map((ratio, i) => (
+          <G key={`grid-${i}`}>
+            <Line
+              x1={padding.left}
+              y1={padding.top + innerHeight * ratio}
+              x2={chartWidth - padding.right}
+              y2={padding.top + innerHeight * ratio}
+              stroke={colors.border.default}
+              strokeWidth="1"
+              strokeDasharray="4 4"
+            />
+            <SvgText
+              x={padding.left - 5}
+              y={padding.top + innerHeight * ratio + 4}
+              textAnchor="end"
+              fill={colors.text.tertiary}
+              fontSize="9"
+            >
+              {Math.round(minLoad + (maxLoad - minLoad) * (1 - ratio))}
+            </SvgText>
+          </G>
+        ))}
+        
+        {/* Line */}
+        <Polyline
+          points={linePath}
+          fill="none"
+          stroke="#f59e0b"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        
+        {/* Data points */}
+        {data.map((d, i) => (
+          <Circle
+            key={i}
+            cx={getX(i)}
+            cy={getY(d.optimal_load)}
+            r={i === 0 ? 6 : 4}
+            fill={i === 0 ? '#f59e0b' : 'rgba(245, 158, 11, 0.6)'}
+            stroke="#ffffff"
+            strokeWidth={i === 0 ? 2 : 1}
+          />
+        ))}
+        
+        {/* Date labels */}
+        {data.length <= 5 ? data.map((d, i) => (
+          <SvgText
+            key={`date-${i}`}
+            x={getX(i)}
+            y={chartHeight - 8}
+            textAnchor="middle"
+            fill={colors.text.tertiary}
+            fontSize="8"
+          >
+            {d.date.substring(5)}
+          </SvgText>
+        )) : [0, Math.floor(data.length / 2), data.length - 1].map((idx) => (
+          <SvgText
+            key={`date-${idx}`}
+            x={getX(idx)}
+            y={chartHeight - 8}
+            textAnchor="middle"
+            fill={colors.text.tertiary}
+            fontSize="8"
+          >
+            {data[idx].date.substring(5)}
+          </SvgText>
+        ))}
+      </Svg>
+    </View>
   );
 };
 
