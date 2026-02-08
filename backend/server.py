@@ -2755,7 +2755,9 @@ async def get_strength_analysis(
         raise HTTPException(status_code=400, detail=t("ai_no_data"))
     
     latest = assessments[0]
+    previous = assessments[1] if len(assessments) > 1 else None
     metrics_data = latest.get("metrics", {})
+    previous_metrics = previous.get("metrics", {}) if previous else {}
     
     # Calculate historical peaks
     historical_peaks = {}
