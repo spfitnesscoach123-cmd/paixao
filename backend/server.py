@@ -3170,7 +3170,9 @@ async def get_team_dashboard(
             # Collect RSI values from assessments for this athlete
             athlete_assessments = [a for a in all_assessments if a.get("athlete_id") == athlete_id]
             for assessment in athlete_assessments:
-                rsi = assessment.get("rsi")
+                # RSI is stored inside metrics, not at root level
+                metrics = assessment.get("metrics", {})
+                rsi = metrics.get("rsi") if isinstance(metrics, dict) else None
                 if rsi and rsi > 0:
                     all_rsi_values.append({
                         "value": rsi,
