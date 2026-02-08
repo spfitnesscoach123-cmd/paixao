@@ -2805,13 +2805,21 @@ async def get_strength_analysis(
             if metric_key in historical_peaks and historical_peaks[metric_key] > 0:
                 variation = ((value - historical_peaks[metric_key]) / historical_peaks[metric_key]) * 100
             
+            # Calculate variation from previous assessment
+            variation_from_previous = None
+            previous_value = previous_metrics.get(metric_key) if previous_metrics else None
+            if previous_value is not None and previous_value > 0:
+                variation_from_previous = ((value - previous_value) / previous_value) * 100
+            
             analyzed_metrics.append(StrengthMetric(
                 name=display_name,
                 value=value,
                 unit=normatives.get(metric_key, {}).get("unit", ""),
                 classification=classification,
                 percentile=percentile,
-                variation_from_peak=round(variation, 1) if variation else None
+                variation_from_peak=round(variation, 1) if variation else None,
+                variation_from_previous=round(variation_from_previous, 1) if variation_from_previous is not None else None,
+                previous_value=previous_value
             ))
     
     # Detect peripheral fatigue
