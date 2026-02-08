@@ -128,15 +128,19 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 | Evolução da carga ótima | Backend retorna `optimal_load_evolution` com histórico por sessão | ✅ Implemented |
 | PDF força tradicional | Seção de força tradicional adicionada com tabela separada (Supino, Agachamento, Levantamento Terra, Salto Vertical) | ✅ Implemented |
 | OptimalLoadEvolutionChart | Novo componente em `add-strength.tsx` para visualizar evolução | ✅ Implemented |
+| **Gráfico comparação força** | Atualizado para mostrar valores da última avaliação vs anterior | ✅ Implemented |
+| **PDF seção de força** | PDF agora mostra seção de força com VBT e tradicional | ✅ Fixed |
 
-**New Backend Fields (VBT Analysis):**
-- `load_velocity_profile.optimal_load` - Carga onde potência é máxima
-- `load_velocity_profile.optimal_velocity` - Velocidade na carga ótima
-- `load_velocity_profile.optimal_power` - Potência máxima (Watts)
-- `optimal_load_evolution[]` - Array com histórico de carga ótima por sessão
+**New Backend Fields (Strength Analysis):**
+- `previous_assessment_date` - Data da avaliação anterior
+- `metrics[].variation_from_previous` - % de mudança vs avaliação anterior
+- `metrics[].previous_value` - Valor da avaliação anterior
+- `comparison_with_previous` - Objeto com comparação detalhada
 
-**Translations Added:**
-- `dashboard.avgHSR` - "Avg HSR" / "HSR Médio"
+**New Frontend Features:**
+- Seção "Comparação com Avaliação Anterior" no `StrengthAnalysisCharts.tsx`
+- Barras visuais mostrando anterior vs atual com % de mudança
+- Indicadores de melhora/piora com cores (verde/vermelho)
 
 ## Prioritized Backlog
 
