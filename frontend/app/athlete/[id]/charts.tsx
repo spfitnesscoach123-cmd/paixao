@@ -18,6 +18,8 @@ export default function AthleteCharts() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { t, locale } = useLanguage();
+  const [showPreview, setShowPreview] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   
   const labels = useMemo(() => ({
     charts: locale === 'pt' ? 'Gráficos' : 'Charts',
