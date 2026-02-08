@@ -14,11 +14,14 @@ interface StrengthMetric {
   classification: string;
   percentile: number;
   variation_from_peak: number | null;
+  variation_from_previous: number | null;
+  previous_value: number | null;
 }
 
 interface StrengthAnalysisData {
   athlete_id: string;
   assessment_date: string;
+  previous_assessment_date: string | null;
   metrics: StrengthMetric[];
   fatigue_index: number;
   fatigue_alert: boolean;
@@ -33,6 +36,10 @@ interface StrengthAnalysisData {
     peak_power_peak: number;
     peak_power_current: number;
     power_drop_percent: number;
+  } | null;
+  comparison_with_previous: {
+    date: string;
+    metrics: Record<string, { current: number; previous: number; change_percent: number }>;
   } | null;
 }
 
