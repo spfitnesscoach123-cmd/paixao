@@ -3075,10 +3075,16 @@ async def get_team_dashboard(
     power_count = 0
     total_body_fat = 0
     body_fat_count = 0
+    total_hid = 0
+    hid_count = 0
+    all_rsi_values = []  # To calculate percentile and trend
     
     risk_distribution = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
     position_summary: Dict[str, Dict[str, Any]] = {}
     alerts = []
+    
+    # Get all assessments to calculate RSI
+    all_assessments = await db.assessments.find({"coach_id": user_id}).sort("date", -1).to_list(1000)
     
     for athlete in athletes:
         athlete_id = str(athlete["_id"])
