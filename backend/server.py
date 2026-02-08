@@ -5180,8 +5180,12 @@ async def get_vbt_analysis(
             "intercept": round(intercept, 2) if intercept else None,
             "estimated_1rm": round(estimated_1rm, 1) if estimated_1rm else None,
             "mvt_velocity": mvt_velocity,
-            "data_points": len(load_velocity_points)
+            "data_points": len(load_velocity_points),
+            "optimal_load": optimal_load,
+            "optimal_velocity": optimal_velocity,
+            "optimal_power": optimal_power
         },
+        "optimal_load_evolution": optimal_load_history,
         "velocity_loss_analysis": velocity_loss_data,
         "trend": trend,
         "history": [
