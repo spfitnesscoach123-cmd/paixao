@@ -2994,6 +2994,11 @@ class TeamDashboardStats(BaseModel):
     total_distance_this_week: float
     team_avg_power: Optional[float] = None
     team_avg_body_fat: Optional[float] = None
+    team_avg_hid: Optional[float] = None  # High Intensity Distance
+    team_avg_rsi: Optional[float] = None  # Reactive Strength Index
+    rsi_trend: Optional[str] = None  # up, down, stable
+    rsi_percentile: Optional[float] = None
+    avg_distance_per_session: Optional[float] = None
 
 class TeamDashboardResponse(BaseModel):
     stats: TeamDashboardStats
