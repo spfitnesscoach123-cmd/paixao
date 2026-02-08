@@ -149,6 +149,33 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - [ ] Global theme (Light/Dark)
 - [ ] Corrigir contagem de sessões em `charts.tsx` (1 CSV = 1 sessão)
 
+### ✅ Suporte Multi-Formato CSV (Fev 8, 2026)
+
+O sistema agora suporta importação automática de CSV de múltiplos provedores GPS:
+
+| Provedor | Identificadores | Status |
+|----------|-----------------|--------|
+| **Catapult** | Player Name, Drill Title, Player Load | ✅ Suportado |
+| **PlayerTek** | PlayerTek, Total Distance, HSR Distance | ✅ Suportado |
+| **STATSports** | STATSports, Apex, HML Efforts | ✅ Suportado |
+| **GPexe** | GPexe, Equivalent Distance, Metabolic Power | ✅ Suportado |
+| **Polar** | Polar, Training Load, Recovery Time | ✅ Suportado |
+| **Garmin** | Garmin, Training Effect, VO2 Max | ✅ Suportado |
+| **Genérico** | Fallback para formatos desconhecidos | ✅ Suportado |
+
+**Novos Endpoints:**
+- `POST /api/wearables/import/csv` - Importação com detecção automática
+- `GET /api/wearables/csv/supported-providers` - Lista provedores suportados
+- `POST /api/wearables/csv/preview` - Preview antes de importar
+
+**Funcionalidades:**
+- Detecção automática de formato baseada nos headers
+- Mapeamento inteligente de colunas (múltiplos nomes aceitos)
+- Conversão automática de unidades (km→m, km/h→m/s)
+- Suporte a múltiplos formatos de data
+- Preview dos dados antes da importação
+- Relatório detalhado de importação (importados/pulados/erros)
+
 ### P2 - Planned
 - [ ] Push Notifications
 - [ ] Full OAuth wearable integration
