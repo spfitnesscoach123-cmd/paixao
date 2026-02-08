@@ -193,10 +193,10 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title={t('dashboard.sessions')}
-                    value={stats.totalSessions}
-                    subtitle={`${stats.recentSessions} ${t('dashboard.last7days')}`}
-                    icon="bar-chart"
+                    title={t('dashboard.avgDistance')}
+                    value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
+                    subtitle={t('dashboard.perSession')}
+                    icon="fitness"
                     gradientColors={colors.gradients.accent}
                   />
                 </View>
@@ -205,22 +205,22 @@ export default function DataScreen() {
               <View style={styles.cardsGrid}>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title={t('dashboard.avgDistance')}
-                    value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
-                    subtitle={t('dashboard.perSession')}
-                    icon="fitness"
-                    gradientColors={colors.gradients.primary}
-                  />
-                </View>
-                <View style={styles.cardHalf}>
-                  <ImpactCard
                     title={t('dashboard.wellness')}
                     value={stats.avgWellness.toFixed(1)}
                     subtitle="/10"
                     icon="heart"
-                    gradientColors={colors.gradients.secondary}
+                    gradientColors={colors.gradients.primary}
                     trend={stats.wellnessTrend}
                     trendValue={t('dashboard.vsWeek')}
+                  />
+                </View>
+                <View style={styles.cardHalf}>
+                  <ImpactCard
+                    title={t('dashboard.totalDistance')}
+                    value={`${((stats.avgDistance * stats.totalAthletes) / 1000).toFixed(0)}km`}
+                    subtitle={t('dashboard.allAthletes')}
+                    icon="globe"
+                    gradientColors={colors.gradients.secondary}
                   />
                 </View>
               </View>
