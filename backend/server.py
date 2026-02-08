@@ -3145,9 +3145,9 @@ async def get_team_dashboard(
                 if record_date >= twenty_eight_days_ago:
                     chronic_load += dist
             
-            # Count unique sessions (1 CSV = 1 session)
+            # Count unique sessions (1 CSV = 1 session) - for athlete's own distance calculation
             sessions_7d = len(unique_sessions_7d)
-            total_sessions += len(unique_sessions_total)
+            # Note: total_sessions is now calculated globally at the start
             total_distance += distance_7d
             
             # Calculate ACWR
