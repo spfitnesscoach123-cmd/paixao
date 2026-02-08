@@ -2699,10 +2699,13 @@ class StrengthMetric(BaseModel):
     classification: str  # "excellent", "good", "average", "below_average", "poor"
     percentile: float  # Position compared to normative data
     variation_from_peak: Optional[float] = None  # % change from personal best
+    variation_from_previous: Optional[float] = None  # % change from previous assessment
+    previous_value: Optional[float] = None  # Value from previous assessment
 
 class StrengthAnalysisResult(BaseModel):
     athlete_id: str
     assessment_date: str
+    previous_assessment_date: Optional[str] = None
     metrics: List[StrengthMetric]
     fatigue_index: float
     fatigue_alert: bool
@@ -2711,6 +2714,7 @@ class StrengthAnalysisResult(BaseModel):
     ai_insights: Optional[str] = None
     recommendations: List[str]
     historical_trend: Optional[Dict[str, Any]] = None
+    comparison_with_previous: Optional[Dict[str, Any]] = None
 
 # Normative data for football players (based on literature)
 STRENGTH_NORMATIVES = {
