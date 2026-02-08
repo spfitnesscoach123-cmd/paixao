@@ -216,9 +216,9 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title={t('dashboard.totalDistance')}
-                    value={`${((stats.avgDistance * stats.totalAthletes) / 1000).toFixed(0)}km`}
-                    subtitle={t('dashboard.allAthletes')}
+                    title={t('dashboard.avgDistanceWeek')}
+                    value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
+                    subtitle={t('dashboard.perAthlete')}
                     icon="globe"
                     gradientColors={colors.gradients.secondary}
                   />
