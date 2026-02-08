@@ -272,6 +272,16 @@ export default function AthleteCharts() {
           </View>
         )}
       </ScrollView>
+
+      {/* PDF Preview Modal */}
+      <ReportPreviewModal
+        visible={showPreview}
+        onClose={() => setShowPreview(false)}
+        reportType="pdf"
+        athleteId={id || ''}
+        athleteName={athlete?.name || ''}
+        locale={locale}
+      />
     </View>
   );
 }
