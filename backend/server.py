@@ -2744,12 +2744,12 @@ async def get_strength_analysis(
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
     
-    # Get all strength assessments for this athlete
+    # Get all strength assessments for this athlete (ordered by date and created_at)
     assessments = await db.assessments.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"],
         "assessment_type": "strength"
-    }).sort("date", -1).to_list(100)
+    }).sort([("date", -1), ("created_at", -1)]).to_list(100)
     
     if not assessments:
         raise HTTPException(status_code=400, detail=t("ai_no_data"))
