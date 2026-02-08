@@ -2958,9 +2958,25 @@ Forneça um insight profissional breve (2-3 frases) sobre o perfil de força des
     except Exception as e:
         logger.error(f"AI strength analysis error: {str(e)}")
     
+    # Build comparison with previous
+    comparison_with_previous = None
+    if previous:
+        comparison_with_previous = {
+            "date": previous.get("date"),
+            "metrics": {}
+        }
+        for metric in analyzed_metrics:
+            if metric.previous_value is not None:
+                comparison_with_previous["metrics"][metric.name] = {
+                    "current": metric.value,
+                    "previous": metric.previous_value,
+                    "change_percent": metric.variation_from_previous
+                }
+    
     return StrengthAnalysisResult(
         athlete_id=athlete_id,
         assessment_date=latest.get("date", ""),
+        previous_assessment_date=previous.get("date") if previous else None,
         metrics=analyzed_metrics,
         fatigue_index=fatigue_index,
         fatigue_alert=fatigue_alert,
@@ -2975,7 +2991,8 @@ Forneça um insight profissional breve (2-3 frases) sobre o perfil de força des
             "peak_power_peak": peak_power_peak,
             "peak_power_current": peak_power_current,
             "power_drop_percent": round(power_drop, 1)
-        }
+        },
+        comparison_with_previous=comparison_with_previous
     )
 
 
