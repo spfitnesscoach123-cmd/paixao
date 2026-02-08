@@ -401,7 +401,7 @@ export default function AthleteDetails() {
             {groupedSessions.length > 0 && (
               <View style={styles.sessionSummary}>
                 <Text style={styles.sessionSummaryText}>
-                  {groupedSessions.length} {t('gps.sessions')} • {gpsData?.length || 0} {t('gps.periods')}
+                  {gpsData?.length || 0} {t('gps.records') || 'registros'}
                   {gpsDateFilter.start && ` (${t('gps.filtered') || 'filtrado'})`}
                 </Text>
               </View>
