@@ -1004,11 +1004,75 @@ export default function AddStrengthAssessment() {
                   </View>
                 </View>
                 
+                {/* Optimal Load Card */}
+                {vbtAnalysis.load_velocity_profile.optimal_load && (
+                  <View style={[styles.chartCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)', borderColor: 'rgba(245, 158, 11, 0.3)' }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                      <Ionicons name="flash" size={20} color="#f59e0b" />
+                      <Text style={[styles.chartTitle, { marginBottom: 0, marginLeft: 8, color: '#f59e0b' }]}>
+                        {locale === 'pt' ? 'Carga Ótima (Potência Máxima)' : 'Optimal Load (Max Power)'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#f59e0b' }}>
+                          {vbtAnalysis.load_velocity_profile.optimal_load}kg
+                        </Text>
+                        <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>
+                          {locale === 'pt' ? 'Carga' : 'Load'}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: 28, fontWeight: 'bold', color: colors.text.primary }}>
+                          {vbtAnalysis.load_velocity_profile.optimal_velocity}
+                        </Text>
+                        <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>m/s</Text>
+                      </View>
+                      <View style={{ alignItems: 'center' }}>
+                        <Text style={{ fontSize: 28, fontWeight: 'bold', color: '#10b981' }}>
+                          {vbtAnalysis.load_velocity_profile.optimal_power}W
+                        </Text>
+                        <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>
+                          {locale === 'pt' ? 'Potência' : 'Power'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+                
                 {/* Load-Velocity Profile Chart */}
                 <View style={styles.chartCard}>
                   <Text style={styles.chartTitle}>{labels.loadVelocity}</Text>
                   <LoadVelocityChart analysis={vbtAnalysis} />
+                  
+                  {/* Legend */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#f59e0b' }} />
+                      <Text style={{ color: colors.text.secondary, fontSize: 10 }}>
+                        {locale === 'pt' ? 'Carga Ótima' : 'Optimal Load'}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#10b981' }} />
+                      <Text style={{ color: colors.text.secondary, fontSize: 10 }}>1RM</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <View style={{ width: 12, height: 3, backgroundColor: '#ef4444' }} />
+                      <Text style={{ color: colors.text.secondary, fontSize: 10 }}>MVT</Text>
+                    </View>
+                  </View>
                 </View>
+                
+                {/* Optimal Load Evolution Chart */}
+                {vbtAnalysis.optimal_load_evolution && vbtAnalysis.optimal_load_evolution.length >= 2 && (
+                  <View style={styles.chartCard}>
+                    <OptimalLoadEvolutionChart 
+                      data={vbtAnalysis.optimal_load_evolution} 
+                      locale={locale} 
+                    />
+                  </View>
+                )}
                 
                 {/* Velocity Loss Chart */}
                 {vbtAnalysis.velocity_loss_analysis.length > 0 && (
