@@ -4215,6 +4215,61 @@ async def generate_athlete_pdf_report(
                 alert_style = ParagraphStyle('Alert', parent=normal_style, textColor=rl_colors.HexColor('#dc2626'))
                 story.append(Spacer(1, 5))
                 story.append(Paragraph(alert_text, alert_style))
+        
+        # ============= TRADITIONAL STRENGTH SECTION =============
+        has_traditional = any(len(v) > 0 for v in traditional_metrics.values())
+        if has_traditional:
+            story.append(Spacer(1, 15))
+            trad_title = "Força Tradicional" if lang == "pt" else "Traditional Strength"
+            story.append(Paragraph(f"<b>🏋️ {trad_title}</b>", normal_style))
+            story.append(Spacer(1, 8))
+            
+            trad_header = [
+                "Exercício" if lang == "pt" else "Exercise",
+                "Atual" if lang == "pt" else "Current",
+                "Máximo" if lang == "pt" else "Max",
+                "Média" if lang == "pt" else "Avg"
+            ]
+            trad_data = [trad_header]
+            
+            exercise_labels = {
+                'bench_press_1rm': ('Supino', 'Bench Press'),
+                'squat_1rm': ('Agachamento', 'Squat'),
+                'deadlift_1rm': ('Levantamento Terra', 'Deadlift'),
+                'vertical_jump': ('Salto Vertical', 'Vertical Jump')
+            }
+            
+            for key, values in traditional_metrics.items():
+                if values:
+                    label = exercise_labels[key][0] if lang == "pt" else exercise_labels[key][1]
+                    unit = "cm" if key == "vertical_jump" else "kg"
+                    current_val = values[0] if values else 0
+                    max_val = max(values) if values else 0
+                    avg_val = sum(values) / len(values) if values else 0
+                    trad_data.append([
+                        label,
+                        f"{current_val:.1f}{unit}",
+                        f"{max_val:.1f}{unit}",
+                        f"{avg_val:.1f}{unit}"
+                    ])
+            
+            if len(trad_data) > 1:
+                trad_table = Table(trad_data, colWidths=[4*cm, 3*cm, 3*cm, 3*cm])
+                trad_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#059669')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#86efac')),
+                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                    ('TOPPADDING', (0, 0), (-1, -1), 6),
+                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#ecfdf5')]),
+                ]))
+                story.append(trad_table)
     else:
         story.append(Paragraph(t('no_data'), normal_style))
     
