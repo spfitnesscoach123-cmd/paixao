@@ -4173,21 +4173,22 @@ async def generate_athlete_pdf_report(
         
         strength_data = [strength_headers]
         
-        if avg_mean_power > 0:
+        # Use current (most recent) values instead of averages
+        if current_mean_power > 0:
             strength_data.append([
                 "Mean Power",
-                f"{avg_mean_power:.0f}W",
+                f"{current_mean_power:.0f}W",
                 f"{max_peak_power:.0f}W" if max_peak_power else "-",
-                f"P{min(95, int(avg_mean_power / 5))}",  # Simplified percentile
+                f"P{min(95, int(current_mean_power / 30))}",  # Simplified percentile
                 "→"
             ])
         
-        if avg_mean_speed > 0:
+        if current_mean_speed > 0:
             strength_data.append([
                 "Mean Speed",
-                f"{avg_mean_speed:.2f} m/s",
+                f"{current_mean_speed:.2f} m/s",
                 f"{max_peak_speed:.2f} m/s" if max_peak_speed else "-",
-                f"P{min(95, int(avg_mean_speed * 30))}",  # Simplified percentile
+                f"P{min(95, int(current_mean_speed * 40))}",  # Simplified percentile
                 "→"
             ])
         
