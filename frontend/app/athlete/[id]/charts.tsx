@@ -1,9 +1,10 @@
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Linking from 'expo-linking';
 import api from '../../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire } from '../../../types';
 import { GPSChart } from '../../../components/charts/GPSChart';
@@ -11,6 +12,7 @@ import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { ReportPreviewModal } from '../../../components/ReportPreviewModal';
 
 export default function AthleteCharts() {
   const { id } = useLocalSearchParams<{ id: string }>();
