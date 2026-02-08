@@ -70,6 +70,11 @@ export default function DataScreen() {
       ? allGPSData.reduce((sum, d) => sum + d.total_distance, 0) / allGPSData.length
       : 0;
 
+    // Calculate average HSR (High Speed Running)
+    const avgHSR = allGPSData.length > 0
+      ? allGPSData.reduce((sum, d) => sum + (d.high_speed_running || d.high_intensity_distance || 0), 0) / allGPSData.length
+      : 0;
+
     const avgWellness = allWellnessData.length > 0
       ? allWellnessData.reduce((sum, w) => sum + (w.wellness_score || 0), 0) / allWellnessData.length
       : 0;
