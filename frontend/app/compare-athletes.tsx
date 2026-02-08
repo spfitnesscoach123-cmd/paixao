@@ -150,14 +150,44 @@ export default function CompareAthletes() {
       const athlete = athletes.find(a => (a.id || a._id) === selectedAthlete);
       const gpsData = filterByDate(gpsDataMap[selectedAthlete] || []);
       
-      gpsData.forEach((session, index) => {
-        const periodName = session.notes?.replace('Período: ', '') || `${t('gps.session')} ${index + 1}`;
-        if (!isNaN(session.total_distance) && !isNaN(session.high_intensity_distance)) {
+      // Group periods by session (1 CSV = 1 session)
+      // Use session_id or date + session_name as unique key
+      const sessionsMap: { [key: string]: { 
+        records: typeof gpsData, 
+        date: string, 
+        sessionName: string 
+      } } = {};
+      
+      gpsData.forEach(record => {
+        // Create session key from session_id or date + session_name
+        const sessionKey = record.session_id || `${record.date}_${record.session_name || 'default'}`;
+        
+        if (!sessionsMap[sessionKey]) {
+          sessionsMap[sessionKey] = {
+            records: [],
+            date: record.date,
+            sessionName: record.session_name || record.date,
+          };
+        }
+        sessionsMap[sessionKey].records.push(record);
+      });
+      
+      // Now create chart data for each unique session
+      Object.entries(sessionsMap).forEach(([sessionKey, session], index) => {
+        // Aggregate all periods within this session
+        const avgTotalDistance = session.records.reduce((sum, r) => sum + (r.total_distance || 0), 0) / session.records.length;
+        const avgHighIntensity = session.records.reduce((sum, r) => sum + (r.high_intensity_distance || 0), 0) / session.records.length;
+        
+        const displayName = session.sessionName.length > 20 
+          ? session.sessionName.substring(0, 20) + '...'
+          : session.sessionName;
+        
+        if (!isNaN(avgTotalDistance) && !isNaN(avgHighIntensity)) {
           data.push({
-            id: `${session.id || index}`,
-            name: periodName,
-            x: session.total_distance || 0,
-            y: session.high_intensity_distance || 0,
+            id: sessionKey,
+            name: `${session.date} - ${displayName}`,
+            x: avgTotalDistance,
+            y: avgHighIntensity,
             color: ATHLETE_COLORS[index % ATHLETE_COLORS.length],
             session: session.date,
           });
