@@ -296,11 +296,12 @@ export default function TeamDashboard() {
               </LinearGradient>
             </View>
             
+            {/* Total Distance Card */}
             <View style={styles.statCard}>
               <LinearGradient colors={['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCardGradient}>
-                <Ionicons name="calendar" size={24} color="#8b5cf6" />
-                <Text style={styles.statValue}>{data.stats.sessions_this_week}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Sessões/Semana' : 'Sessions/Week'}</Text>
+                <Ionicons name="navigate" size={24} color="#8b5cf6" />
+                <Text style={styles.statValue}>{data.stats.total_distance_this_week ? `${(data.stats.total_distance_this_week / 1000).toFixed(0)}km` : '-'}</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Distância/Semana' : 'Distance/Week'}</Text>
               </LinearGradient>
             </View>
           </View>
