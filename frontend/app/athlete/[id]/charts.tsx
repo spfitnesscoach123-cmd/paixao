@@ -303,6 +303,9 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  pdfButton: {
+    padding: 8,
+  },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
