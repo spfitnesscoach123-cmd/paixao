@@ -301,12 +301,12 @@ export default function TeamDashboard() {
               </LinearGradient>
             </View>
             
-            {/* Total Distance Card */}
+            {/* HSR Card - High Speed Running average */}
             <View style={styles.statCard}>
               <LinearGradient colors={['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCardGradient}>
-                <Ionicons name="speedometer" size={24} color="#8b5cf6" />
+                <Ionicons name="flash" size={24} color="#8b5cf6" />
                 <Text style={styles.statValue}>{data.stats.team_avg_hid ? `${(data.stats.team_avg_hid / 1000).toFixed(1)}km` : '-'}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Média HID/Semana' : 'Avg HID/Week'}</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Média HSR' : 'Avg HSR'}</Text>
               </LinearGradient>
             </View>
           </View>
@@ -327,7 +327,7 @@ export default function TeamDashboard() {
                 {data.stats.avg_distance_per_session ? `${(data.stats.avg_distance_per_session / 1000).toFixed(1)}km` : '-'}
               </Text>
               <Text style={styles.quickStatLabel}>
-                {locale === 'pt' ? 'Dist. Média/Sessão' : 'Avg Dist./Session'}
+                {locale === 'pt' ? 'Dist. Média/Sessão' : 'Avg Dist/Session'}
               </Text>
             </View>
             <View style={styles.quickStatCard}>
