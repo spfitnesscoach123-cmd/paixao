@@ -117,12 +117,33 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - `GET /api/reports/athlete/{id}/csv-preview` - CSV preview with sample rows
 - `GET /api/reports/body-composition/{id}/preview` - Body composition preview
 
+### ✅ Dashboard & VBT Enhancements (Dezembro 2025)
+
+| Feature | Implementation | Status |
+|---------|---------------|--------|
+| RSI card em branco no dashboard | Backend corrigido para buscar RSI de `metrics.rsi` em vez de `assessment.rsi` | ✅ Fixed |
+| HSR em metros | `team.tsx` já mostra em metros (team_avg_hid) | ✅ Verified |
+| Card duplicado de distância | Substituído por card de HSR Médio em `data.tsx` | ✅ Fixed |
+| Carga ótima (VBT) | Backend calcula optimal_load, optimal_velocity, optimal_power usando fórmula P=carga×velocidade | ✅ Implemented |
+| Evolução da carga ótima | Backend retorna `optimal_load_evolution` com histórico por sessão | ✅ Implemented |
+| PDF força tradicional | Seção de força tradicional adicionada com tabela separada (Supino, Agachamento, Levantamento Terra, Salto Vertical) | ✅ Implemented |
+| OptimalLoadEvolutionChart | Novo componente em `add-strength.tsx` para visualizar evolução | ✅ Implemented |
+
+**New Backend Fields (VBT Analysis):**
+- `load_velocity_profile.optimal_load` - Carga onde potência é máxima
+- `load_velocity_profile.optimal_velocity` - Velocidade na carga ótima
+- `load_velocity_profile.optimal_power` - Potência máxima (Watts)
+- `optimal_load_evolution[]` - Array com histórico de carga ótima por sessão
+
+**Translations Added:**
+- `dashboard.avgHSR` - "Avg HSR" / "HSR Médio"
+
 ## Prioritized Backlog
 
 ### P1 - Next
 - [ ] Full i18n audit
 - [ ] Global theme (Light/Dark)
-- [ ] Dynamic session comparison logic
+- [ ] Corrigir contagem de sessões em `charts.tsx` (1 CSV = 1 sessão)
 
 ### P2 - Planned
 - [ ] Push Notifications
