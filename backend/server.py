@@ -3350,6 +3350,50 @@ async def get_team_dashboard(
     risk_order = {"high": 0, "moderate": 1, "optimal": 2, "low": 3, "unknown": 4}
     athlete_data.sort(key=lambda x: risk_order.get(x.risk_level, 4))
     
+    # Calculate RSI stats
+    team_avg_rsi = None
+    rsi_trend = None
+    rsi_percentile = None
+    
+    if all_rsi_values:
+        # Sort by date to calculate trend
+        sorted_rsi = sorted(all_rsi_values, key=lambda x: x.get("date", ""))
+        rsi_values_only = [r["value"] for r in sorted_rsi]
+        team_avg_rsi = round(sum(rsi_values_only) / len(rsi_values_only), 2)
+        
+        # Calculate trend (compare last 3 vs previous 3)
+        if len(rsi_values_only) >= 6:
+            recent_avg = sum(rsi_values_only[-3:]) / 3
+            previous_avg = sum(rsi_values_only[-6:-3]) / 3
+            if recent_avg > previous_avg * 1.05:
+                rsi_trend = "up"
+            elif recent_avg < previous_avg * 0.95:
+                rsi_trend = "down"
+            else:
+                rsi_trend = "stable"
+        elif len(rsi_values_only) >= 2:
+            if rsi_values_only[-1] > rsi_values_only[-2] * 1.05:
+                rsi_trend = "up"
+            elif rsi_values_only[-1] < rsi_values_only[-2] * 0.95:
+                rsi_trend = "down"
+            else:
+                rsi_trend = "stable"
+        
+        # Calculate percentile (simple percentile based on RSI classification)
+        if team_avg_rsi < 1.0:
+            rsi_percentile = 25.0
+        elif team_avg_rsi < 2.0:
+            rsi_percentile = 50.0
+        elif team_avg_rsi < 3.0:
+            rsi_percentile = 75.0
+        else:
+            rsi_percentile = 95.0
+    
+    # Calculate average distance per session
+    avg_distance_per_session = None
+    if total_sessions_7d_global > 0 and total_distance > 0:
+        avg_distance_per_session = round(total_distance / total_sessions_7d_global, 0)
+    
     return TeamDashboardResponse(
         stats=TeamDashboardStats(
             total_athletes=len(athletes),
@@ -3359,15 +3403,20 @@ async def get_team_dashboard(
             team_avg_acwr=round(total_acwr / acwr_count, 2) if acwr_count > 0 else 0,
             team_avg_wellness=round(total_wellness / wellness_count, 1) if wellness_count > 0 else 0,
             team_avg_fatigue=round(total_fatigue / fatigue_count, 1) if fatigue_count > 0 else 0,
-            sessions_this_week=total_sessions_7d_global,  # Global count: 1 CSV = 1 session
+            sessions_this_week=total_sessions_7d_global,
             total_distance_this_week=round(total_distance, 0),
             team_avg_power=round(total_power / power_count, 0) if power_count > 0 else None,
-            team_avg_body_fat=round(total_body_fat / body_fat_count, 1) if body_fat_count > 0 else None
+            team_avg_body_fat=round(total_body_fat / body_fat_count, 1) if body_fat_count > 0 else None,
+            team_avg_hid=round(total_hid / hid_count, 0) if hid_count > 0 else None,
+            team_avg_rsi=team_avg_rsi,
+            rsi_trend=rsi_trend,
+            rsi_percentile=rsi_percentile,
+            avg_distance_per_session=avg_distance_per_session
         ),
         athletes=athlete_data,
         risk_distribution=risk_distribution,
         position_summary=position_summary,
-        alerts=alerts[:10]  # Limit to 10 most important alerts
+        alerts=alerts[:10]
     )
 
 
