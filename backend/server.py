@@ -5081,6 +5081,63 @@ async def get_vbt_analysis(
         intercept = 0
         estimated_1rm = None
     
+    # Calculate OPTIMAL LOAD (where power is maximized)
+    # Power = Load × Velocity
+    # Using the linear regression: velocity = intercept + slope × load
+    # Power = load × (intercept + slope × load) = intercept×load + slope×load²
+    # To maximize: dP/dLoad = intercept + 2×slope×load = 0
+    # optimal_load = -intercept / (2 × slope)
+    optimal_load = None
+    optimal_velocity = None
+    optimal_power = None
+    
+    if slope and slope < 0 and intercept:  # slope should be negative for valid profile
+        optimal_load = -intercept / (2 * slope)
+        if optimal_load > 0:
+            optimal_velocity = intercept + slope * optimal_load
+            optimal_power = optimal_load * optimal_velocity
+            optimal_load = round(optimal_load, 1)
+            optimal_velocity = round(optimal_velocity, 3)
+            optimal_power = round(optimal_power, 0)
+        else:
+            optimal_load = None
+    
+    # Track optimal load evolution over time
+    optimal_load_history = []
+    if len(records) >= 2:
+        for record in records[:10]:
+            record_loads = []
+            record_velocities = []
+            for set_data in record.get("sets", []):
+                if set_data.get("load_kg") and set_data.get("mean_velocity"):
+                    record_loads.append(set_data["load_kg"])
+                    record_velocities.append(set_data["mean_velocity"])
+            
+            if len(record_loads) >= 2:
+                # Calculate slope and intercept for this session
+                n = len(record_loads)
+                sum_x = sum(record_loads)
+                sum_y = sum(record_velocities)
+                sum_xy = sum(l * v for l, v in zip(record_loads, record_velocities))
+                sum_x2 = sum(l ** 2 for l in record_loads)
+                
+                denom = n * sum_x2 - sum_x ** 2
+                if denom != 0:
+                    rec_slope = (n * sum_xy - sum_x * sum_y) / denom
+                    rec_intercept = (sum_y - rec_slope * sum_x) / n
+                    
+                    if rec_slope < 0 and rec_intercept > 0:
+                        rec_optimal_load = -rec_intercept / (2 * rec_slope)
+                        if rec_optimal_load > 0:
+                            rec_optimal_velocity = rec_intercept + rec_slope * rec_optimal_load
+                            rec_optimal_power = rec_optimal_load * rec_optimal_velocity
+                            optimal_load_history.append({
+                                "date": record["date"],
+                                "optimal_load": round(rec_optimal_load, 1),
+                                "optimal_velocity": round(rec_optimal_velocity, 3),
+                                "optimal_power": round(rec_optimal_power, 0)
+                            })
+    
     # Velocity loss analysis (fatigue indicator)
     latest_record = records[0]
     velocity_loss_data = []
