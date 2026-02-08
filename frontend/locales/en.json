@@ -83,6 +83,7 @@
     "sessionsPerAthlete": "Sessions/Athlete",
     "activity7d": "Activity 7d",
     "avgDistanceWeek": "Avg Distance/Week",
+    "avgHSR": "Avg HSR",
     "avgDistancePerAthlete": "Avg Distance/Athlete",
     "wellnessTrend": "Wellness Trend",
     "totalDistance": "Total Distance",
