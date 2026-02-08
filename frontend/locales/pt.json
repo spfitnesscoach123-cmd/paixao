@@ -74,13 +74,19 @@
     "totalRegistered": "Total cadastrados",
     "last7days": "últimos 7d",
     "perSession": "Por sessão",
+    "perAthlete": "Por atleta",
     "vsWeek": "vs. semana",
     "topPerformer": "MELHOR DESEMPENHO",
     "average": "Média",
     "session": "sessão",
     "quickStats": "Estatísticas Rápidas",
     "sessionsPerAthlete": "Sessões/Atleta",
-    "activity7d": "Atividade 7d"
+    "activity7d": "Atividade 7d",
+    "avgDistanceWeek": "Média Dist./Semana",
+    "avgDistancePerAthlete": "Dist. Média/Atleta",
+    "wellnessTrend": "Tendência Wellness",
+    "totalDistance": "Distância Total",
+    "allAthletes": "Todos atletas"
   },
   "athletes": {
     "title": "Atletas",
