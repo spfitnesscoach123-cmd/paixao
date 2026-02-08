@@ -169,11 +169,34 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
             <Text style={styles.statPeak}>{labels.peak}: {stats.peakPower}W</Text>
           </View>
           
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>{labels.rsi}</Text>
-            <Text style={styles.statValue}>{stats.currentRsi.toFixed(2)}</Text>
-            <Text style={[styles.statVariation, { color: stats.rsiVariation >= 0 ? '#10b981' : '#ef4444' }]}>
-              {stats.rsiVariation >= 0 ? '↑' : '↓'} {Math.abs(stats.rsiVariation).toFixed(1)}%
+          <View style={[
+            styles.statCard, 
+            { borderColor: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' }
+          ]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={styles.statLabel}>{labels.rsi}</Text>
+              <Ionicons 
+                name={stats.rsiVariation >= 0 ? 'arrow-up' : 'arrow-down'} 
+                size={14} 
+                color={stats.rsiVariation >= 0 ? '#10b981' : '#ef4444'} 
+                style={{ marginLeft: 4 }}
+              />
+            </View>
+            <Text style={[styles.statValue, { 
+              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' 
+            }]}>
+              {stats.currentRsi.toFixed(2)}
+            </Text>
+            <Text style={[styles.rsiClassification, { 
+              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' 
+            }]}>
+              {stats.currentRsi < 1.0 
+                ? (locale === 'pt' ? 'Baixo' : 'Low')
+                : stats.currentRsi < 2.0 
+                  ? (locale === 'pt' ? 'Médio' : 'Medium')
+                  : stats.currentRsi < 3.0 
+                    ? (locale === 'pt' ? 'Bom' : 'Good')
+                    : (locale === 'pt' ? 'Excelente' : 'Excellent')}
             </Text>
             <Text style={styles.statPeak}>{labels.peak}: {stats.peakRsi.toFixed(2)}</Text>
           </View>
@@ -189,6 +212,50 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
               </Text>
             )}
           </View>
+        </View>
+      )}
+      
+      {/* RSI Insights */}
+      {stats && stats.currentRsi > 0 && (
+        <View style={styles.rsiInsightsContainer}>
+          <Text style={styles.rsiInsightTitle}>
+            <Ionicons name="bulb" size={14} color="#f59e0b" /> {locale === 'pt' ? 'Insights RSI' : 'RSI Insights'}
+          </Text>
+          {stats.currentRsi < 1.0 && (
+            <Text style={styles.rsiInsightText}>
+              {locale === 'pt' 
+                ? '• Baixa eficiência reativa. Foco em força excêntrica e técnica de aterrisagem.'
+                : '• Low reactive efficiency. Focus on eccentric strength and landing technique.'}
+            </Text>
+          )}
+          {stats.currentRsi >= 1.0 && stats.currentRsi < 2.0 && (
+            <Text style={styles.rsiInsightText}>
+              {locale === 'pt' 
+                ? '• Base razoável com margem de melhora. Trabalho de pliometria progressiva recomendado.'
+                : '• Reasonable base with room for improvement. Progressive plyometric work recommended.'}
+            </Text>
+          )}
+          {stats.currentRsi >= 2.0 && stats.currentRsi < 3.0 && (
+            <Text style={styles.rsiInsightText}>
+              {locale === 'pt' 
+                ? '• Bom aproveitamento do ciclo alongamento-encurtamento. Manter e focar em velocidade.'
+                : '• Good use of stretch-shortening cycle. Maintain and focus on speed.'}
+            </Text>
+          )}
+          {stats.currentRsi >= 3.0 && (
+            <Text style={styles.rsiInsightText}>
+              {locale === 'pt' 
+                ? '• Altíssima reatividade! Foco em velocidade, COD e potência máxima.'
+                : '• Very high reactivity! Focus on speed, COD and max power.'}
+            </Text>
+          )}
+          {stats.rsiVariation < -10 && (
+            <Text style={[styles.rsiInsightText, { color: '#ef4444' }]}>
+              {locale === 'pt' 
+                ? '⚠️ Queda detectada no RSI. Monitorar fadiga e considerar ajuste de carga.'
+                : '⚠️ RSI drop detected. Monitor fatigue and consider load adjustment.'}
+            </Text>
+          )}
         </View>
       )}
 
