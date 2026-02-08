@@ -4003,6 +4003,191 @@ async def generate_athlete_pdf_report(
     
     story.append(Spacer(1, 20))
     
+    # ============= STRENGTH / VBT SECTION =============
+    story.append(Paragraph(f"💪 {t('strength_title')}", heading_style))
+    
+    # Get strength assessments
+    strength_assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(50)
+    
+    # Get VBT data
+    vbt_records = await db.vbt_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(50)
+    
+    if strength_assessments or vbt_records:
+        # Collect all strength metrics
+        all_mean_power = []
+        all_peak_power = []
+        all_mean_speed = []
+        all_peak_speed = []
+        all_rsi = []
+        
+        for assessment in strength_assessments:
+            if assessment.get("mean_power"):
+                all_mean_power.append(assessment["mean_power"])
+            if assessment.get("peak_power"):
+                all_peak_power.append(assessment["peak_power"])
+            if assessment.get("mean_velocity"):
+                all_mean_speed.append(assessment["mean_velocity"])
+            if assessment.get("peak_velocity"):
+                all_peak_speed.append(assessment["peak_velocity"])
+            if assessment.get("rsi") and assessment["rsi"] > 0:
+                all_rsi.append({"value": assessment["rsi"], "date": assessment.get("date")})
+        
+        for vbt in vbt_records:
+            sets = vbt.get("sets", [])
+            for s in sets:
+                if s.get("power_watts"):
+                    all_mean_power.append(s["power_watts"])
+                if s.get("mean_velocity"):
+                    all_mean_speed.append(s["mean_velocity"])
+        
+        # Calculate averages and peaks
+        avg_mean_power = sum(all_mean_power) / len(all_mean_power) if all_mean_power else 0
+        max_peak_power = max(all_peak_power) if all_peak_power else 0
+        avg_mean_speed = sum(all_mean_speed) / len(all_mean_speed) if all_mean_speed else 0
+        max_peak_speed = max(all_peak_speed) if all_peak_speed else 0
+        
+        # Calculate RSI stats
+        current_rsi = all_rsi[0]["value"] if all_rsi else 0
+        avg_rsi = sum(r["value"] for r in all_rsi) / len(all_rsi) if all_rsi else 0
+        
+        # RSI trend calculation
+        rsi_trend = "stable"
+        if len(all_rsi) >= 2:
+            if all_rsi[0]["value"] > all_rsi[1]["value"] * 1.05:
+                rsi_trend = "up"
+            elif all_rsi[0]["value"] < all_rsi[1]["value"] * 0.95:
+                rsi_trend = "down"
+        
+        # RSI Classification
+        def get_rsi_classification(rsi_value, language):
+            if rsi_value < 1.0:
+                return ("low_performance", "#ef4444") if language == "en" else ("Baixo Desempenho", "#ef4444")
+            elif rsi_value < 2.0:
+                return ("medium_acceptable", "#f59e0b") if language == "en" else ("Médio / Aceitável", "#f59e0b")
+            elif rsi_value < 3.0:
+                return ("good", "#3b82f6") if language == "en" else ("Bom", "#3b82f6")
+            else:
+                return ("excellent", "#10b981") if language == "en" else ("Excelente", "#10b981")
+        
+        # RSI Percentile
+        def get_rsi_percentile(rsi_value):
+            if rsi_value < 1.0:
+                return 25
+            elif rsi_value < 2.0:
+                return 50
+            elif rsi_value < 3.0:
+                return 75
+            else:
+                return 95
+        
+        rsi_class, rsi_color = get_rsi_classification(current_rsi, lang)
+        rsi_percentile = get_rsi_percentile(current_rsi)
+        
+        # Build strength metrics table
+        strength_headers = [
+            t('metric') if lang == "en" else "Métrica",
+            t('current_avg') if lang == "en" else "Média Atual",
+            t('peak') if lang == "en" else "Pico",
+            t('percentile') if lang == "en" else "Percentil",
+            t('trend') if lang == "en" else "Tendência"
+        ]
+        
+        trend_symbol = "↑" if rsi_trend == "up" else ("↓" if rsi_trend == "down" else "→")
+        
+        strength_data = [strength_headers]
+        
+        if avg_mean_power > 0:
+            strength_data.append([
+                "Mean Power",
+                f"{avg_mean_power:.0f}W",
+                f"{max_peak_power:.0f}W" if max_peak_power else "-",
+                f"P{min(95, int(avg_mean_power / 5))}",  # Simplified percentile
+                "→"
+            ])
+        
+        if avg_mean_speed > 0:
+            strength_data.append([
+                "Mean Speed",
+                f"{avg_mean_speed:.2f} m/s",
+                f"{max_peak_speed:.2f} m/s" if max_peak_speed else "-",
+                f"P{min(95, int(avg_mean_speed * 30))}",  # Simplified percentile
+                "→"
+            ])
+        
+        if current_rsi > 0:
+            strength_data.append([
+                "RSI",
+                f"{current_rsi:.2f}",
+                f"{max(r['value'] for r in all_rsi):.2f}" if all_rsi else "-",
+                f"P{rsi_percentile}",
+                trend_symbol
+            ])
+        
+        if len(strength_data) > 1:
+            strength_table = Table(strength_data, colWidths=[3.5*cm, 3*cm, 3*cm, 2.5*cm, 2*cm])
+            strength_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#7c3aed')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#c4b5fd')),
+                ('LEFTPADDING', (0, 0), (-1, -1), 6),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+                ('TOPPADDING', (0, 0), (-1, -1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#f5f3ff')]),
+            ]))
+            story.append(strength_table)
+            story.append(Spacer(1, 15))
+        
+        # RSI Classification and Insights
+        if current_rsi > 0:
+            story.append(Paragraph(f"<b>RSI Classification:</b> {rsi_class}", normal_style))
+            
+            # RSI Insights based on value
+            insights_title = "Insights Práticos" if lang == "pt" else "Practical Insights"
+            story.append(Paragraph(f"<b>{insights_title}:</b>", normal_style))
+            
+            if current_rsi < 1.0:
+                insight1 = "• Baixa eficiência reativa / 'Pesado em campo'" if lang == "pt" else "• Low reactive efficiency / 'Heavy on field'"
+                insight2 = "• Pode indicar acúmulo de fadiga periférica" if lang == "pt" else "• May indicate peripheral fatigue accumulation"
+                insight3 = "• Recomendação: Foco em força excêntrica e técnica de aterrisagem" if lang == "pt" else "• Recommendation: Focus on eccentric strength and landing technique"
+            elif current_rsi < 2.0:
+                insight1 = "• Nível comum de atletas amadores" if lang == "pt" else "• Common level for amateur athletes"
+                insight2 = "• Base razoável, mas com margem clara de melhora" if lang == "pt" else "• Reasonable base, but clear room for improvement"
+                insight3 = "• Recomendação: Trabalho de pliometria progressiva" if lang == "pt" else "• Recommendation: Progressive plyometric work"
+            elif current_rsi < 3.0:
+                insight1 = "• Bom aproveitamento do ciclo CAE" if lang == "pt" else "• Good use of SSC (Stretch-Shortening Cycle)"
+                insight2 = "• Nível semi-profissional bem desenvolvido" if lang == "pt" else "• Well-developed semi-professional level"
+                insight3 = "• Recomendação: Manter treino e focar em velocidade/potência" if lang == "pt" else "• Recommendation: Maintain training, focus on speed/power"
+            else:
+                insight1 = "• Altíssima reatividade em campo" if lang == "pt" else "• Very high on-field reactivity"
+                insight2 = "• Muita explosividade, reações rápidas" if lang == "pt" else "• High explosiveness, quick reactions"
+                insight3 = "• Recomendação: Foco em velocidade, COD e potência" if lang == "pt" else "• Recommendation: Focus on speed, COD and power"
+            
+            story.append(Paragraph(insight1, normal_style))
+            story.append(Paragraph(insight2, normal_style))
+            story.append(Paragraph(insight3, normal_style))
+            
+            # RSI Alert for sudden drop
+            if rsi_trend == "down":
+                alert_text = "⚠️ Queda detectada no RSI - Monitorar fadiga e ajustar carga. Dias de baixa reatividade = menos saltos e ações explosivas." if lang == "pt" else "⚠️ RSI drop detected - Monitor fatigue and adjust load. Low reactivity days = fewer jumps and explosive actions."
+                alert_style = ParagraphStyle('Alert', parent=normal_style, textColor=rl_colors.HexColor('#dc2626'))
+                story.append(Spacer(1, 5))
+                story.append(Paragraph(alert_text, alert_style))
+    else:
+        story.append(Paragraph(t('no_data'), normal_style))
+    
+    story.append(Spacer(1, 20))
+    
     # Recent Sessions
     story.append(Paragraph(f"📅 {t('recent_sessions')}", heading_style))
     
