@@ -4035,24 +4035,40 @@ async def generate_athlete_pdf_report(
     }).sort("date", -1).to_list(50)
     
     if strength_assessments or vbt_records:
-        # Collect all strength metrics
+        # Collect all strength metrics from assessments (metrics are stored inside 'metrics' dict)
         all_mean_power = []
         all_peak_power = []
         all_mean_speed = []
         all_peak_speed = []
         all_rsi = []
         
+        # Traditional strength metrics
+        traditional_metrics = {
+            'bench_press_1rm': [],
+            'squat_1rm': [],
+            'deadlift_1rm': [],
+            'vertical_jump': []
+        }
+        
         for assessment in strength_assessments:
-            if assessment.get("mean_power"):
-                all_mean_power.append(assessment["mean_power"])
-            if assessment.get("peak_power"):
-                all_peak_power.append(assessment["peak_power"])
-            if assessment.get("mean_velocity"):
-                all_mean_speed.append(assessment["mean_velocity"])
-            if assessment.get("peak_velocity"):
-                all_peak_speed.append(assessment["peak_velocity"])
-            if assessment.get("rsi") and assessment["rsi"] > 0:
-                all_rsi.append({"value": assessment["rsi"], "date": assessment.get("date")})
+            metrics = assessment.get("metrics", {})
+            
+            # VBT metrics
+            if metrics.get("mean_power"):
+                all_mean_power.append(metrics["mean_power"])
+            if metrics.get("peak_power"):
+                all_peak_power.append(metrics["peak_power"])
+            if metrics.get("mean_speed"):
+                all_mean_speed.append(metrics["mean_speed"])
+            if metrics.get("peak_speed"):
+                all_peak_speed.append(metrics["peak_speed"])
+            if metrics.get("rsi") and metrics["rsi"] > 0:
+                all_rsi.append({"value": metrics["rsi"], "date": assessment.get("date")})
+            
+            # Traditional strength metrics
+            for key in traditional_metrics.keys():
+                if metrics.get(key):
+                    traditional_metrics[key].append(metrics[key])
         
         for vbt in vbt_records:
             sets = vbt.get("sets", [])
