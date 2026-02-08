@@ -299,9 +299,9 @@ export default function TeamDashboard() {
             {/* Total Distance Card */}
             <View style={styles.statCard}>
               <LinearGradient colors={['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCardGradient}>
-                <Ionicons name="navigate" size={24} color="#8b5cf6" />
-                <Text style={styles.statValue}>{data.stats.total_distance_this_week && data.stats.total_athletes ? `${((data.stats.total_distance_this_week / data.stats.total_athletes) / 1000).toFixed(1)}km` : '-'}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Média Dist./Semana' : 'Avg Dist./Week'}</Text>
+                <Ionicons name="speedometer" size={24} color="#8b5cf6" />
+                <Text style={styles.statValue}>{data.stats.team_avg_hid ? `${(data.stats.team_avg_hid / 1000).toFixed(1)}km` : '-'}</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Média HID/Semana' : 'Avg HID/Week'}</Text>
               </LinearGradient>
             </View>
           </View>
