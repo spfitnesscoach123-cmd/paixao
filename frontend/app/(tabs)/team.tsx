@@ -581,6 +581,37 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: 10,
   },
+  quickStatsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  quickStatCard: {
+    flex: 1,
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  quickStatValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginTop: 6,
+  },
+  quickStatLabel: {
+    fontSize: 10,
+    color: colors.text.secondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  quickStatPercentile: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   statCard: {
     width: '48%',
     borderRadius: 12,
