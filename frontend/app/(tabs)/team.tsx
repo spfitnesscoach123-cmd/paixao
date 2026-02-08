@@ -314,6 +314,47 @@ export default function TeamDashboard() {
             <ACWRLegend locale={locale} />
           </View>
 
+          {/* Quick Stats Row */}
+          <View style={styles.quickStatsRow}>
+            <View style={styles.quickStatCard}>
+              <Ionicons name="navigate" size={20} color="#3b82f6" />
+              <Text style={styles.quickStatValue}>
+                {data.stats.avg_distance_per_session ? `${(data.stats.avg_distance_per_session / 1000).toFixed(1)}km` : '-'}
+              </Text>
+              <Text style={styles.quickStatLabel}>
+                {locale === 'pt' ? 'Dist. Média/Sessão' : 'Avg Dist./Session'}
+              </Text>
+            </View>
+            <View style={styles.quickStatCard}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="flash" size={20} color={
+                  data.stats.team_avg_rsi 
+                    ? (data.stats.team_avg_rsi >= 3.0 ? '#10b981' : data.stats.team_avg_rsi >= 2.0 ? '#3b82f6' : data.stats.team_avg_rsi >= 1.0 ? '#f59e0b' : '#ef4444')
+                    : '#6b7280'
+                } />
+                {data.stats.rsi_trend && (
+                  <Ionicons 
+                    name={data.stats.rsi_trend === 'up' ? 'arrow-up' : data.stats.rsi_trend === 'down' ? 'arrow-down' : 'remove'} 
+                    size={14} 
+                    color={data.stats.rsi_trend === 'up' ? '#10b981' : data.stats.rsi_trend === 'down' ? '#ef4444' : '#6b7280'} 
+                    style={{ marginLeft: 4 }}
+                  />
+                )}
+              </View>
+              <Text style={styles.quickStatValue}>
+                {data.stats.team_avg_rsi ? data.stats.team_avg_rsi.toFixed(2) : '-'}
+              </Text>
+              <Text style={styles.quickStatLabel}>RSI</Text>
+              {data.stats.rsi_percentile && (
+                <Text style={[styles.quickStatPercentile, { 
+                  color: data.stats.rsi_percentile >= 75 ? '#10b981' : data.stats.rsi_percentile >= 50 ? '#f59e0b' : '#ef4444'
+                }]}>
+                  P{data.stats.rsi_percentile.toFixed(0)}
+                </Text>
+              )}
+            </View>
+          </View>
+
           {/* Risk Distribution */}
           <View style={styles.card}>
             <Text style={styles.cardTitle}>
