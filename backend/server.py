@@ -4160,10 +4160,10 @@ async def generate_athlete_pdf_report(
         rsi_class, rsi_color = get_rsi_classification(current_rsi, lang)
         rsi_percentile = get_rsi_percentile(current_rsi)
         
-        # Build strength metrics table
+        # Build strength metrics table - showing current (latest) values
         strength_headers = [
             t('metric') if lang == "en" else "Métrica",
-            t('current_avg') if lang == "en" else "Média Atual",
+            t('current') if lang == "en" else "Atual",
             t('peak') if lang == "en" else "Pico",
             t('percentile') if lang == "en" else "Percentil",
             t('trend') if lang == "en" else "Tendência"
