@@ -3145,6 +3145,7 @@ async def get_team_dashboard(
                     continue
                     
                 dist = record.get("total_distance", 0)
+                hid = record.get("high_intensity_distance", 0)
                 session_key = f"{record.get('date')}_{record.get('session_name', 'default')}"
                 
                 if record_date >= seven_days_ago:
@@ -3152,6 +3153,9 @@ async def get_team_dashboard(
                     distance_7d += dist
                     unique_sessions_7d.add(session_key)
                     unique_sessions_total.add(session_key)
+                    # Accumulate HID
+                    total_hid += hid
+                    hid_count += 1
                     
                 if record_date >= twenty_eight_days_ago:
                     chronic_load += dist
@@ -3160,6 +3164,17 @@ async def get_team_dashboard(
             sessions_7d = len(unique_sessions_7d)
             # Note: total_sessions is now calculated globally at the start
             total_distance += distance_7d
+            
+            # Collect RSI values from assessments for this athlete
+            athlete_assessments = [a for a in all_assessments if a.get("athlete_id") == athlete_id]
+            for assessment in athlete_assessments:
+                rsi = assessment.get("rsi")
+                if rsi and rsi > 0:
+                    all_rsi_values.append({
+                        "value": rsi,
+                        "date": assessment.get("date"),
+                        "athlete_id": athlete_id
+                    })
             
             # Calculate ACWR
             acute_weekly = acute_load / 7
