@@ -59,7 +59,12 @@ export default function DataScreen() {
     if (!athletes || !allGPSData || !allWellnessData) return null;
 
     const totalAthletes = athletes.length;
-    const totalSessions = allGPSData.length;
+    
+    // Count unique sessions by date + session_name (1 CSV = 1 session)
+    const uniqueSessions = new Set(
+      allGPSData.map(d => `${d.date}_${d.session_name || 'default'}`)
+    );
+    const totalSessions = uniqueSessions.size;
     
     const avgDistance = allGPSData.length > 0
       ? allGPSData.reduce((sum, d) => sum + d.total_distance, 0) / allGPSData.length
@@ -73,7 +78,13 @@ export default function DataScreen() {
     lastWeek.setDate(lastWeek.getDate() - 7);
     const lastWeekStr = lastWeek.toISOString().split('T')[0];
 
-    const recentSessions = allGPSData.filter(d => d.date >= lastWeekStr).length;
+    // Count unique sessions in last 7 days
+    const recentGPSData = allGPSData.filter(d => d.date >= lastWeekStr);
+    const uniqueRecentSessions = new Set(
+      recentGPSData.map(d => `${d.date}_${d.session_name || 'default'}`)
+    );
+    const recentSessions = uniqueRecentSessions.size;
+    
     const recentWellness = allWellnessData.filter(w => w.date >= lastWeekStr);
     const recentAvgWellness = recentWellness.length > 0
       ? recentWellness.reduce((sum, w) => sum + (w.wellness_score || 0), 0) / recentWellness.length
