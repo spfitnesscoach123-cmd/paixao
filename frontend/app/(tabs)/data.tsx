@@ -109,6 +109,7 @@ export default function DataScreen() {
       totalAthletes,
       totalSessions,
       avgDistance,
+      avgHSR,
       avgWellness,
       recentSessions,
       recentAvgWellness,
