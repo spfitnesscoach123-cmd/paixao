@@ -3499,6 +3499,12 @@ PDF_TRANSLATIONS = {
         "risk_moderate": "Moderado",
         "risk_high": "Alto Risco",
         "page": "Página",
+        "strength_title": "Análise de Força e Potência",
+        "metric": "Métrica",
+        "current_avg": "Média Atual",
+        "peak": "Pico",
+        "percentile": "Percentil",
+        "trend": "Tendência",
     },
     "es": {
         "athlete_report": "Informe del Atleta",
