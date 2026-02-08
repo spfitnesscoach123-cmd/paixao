@@ -461,33 +461,6 @@ export default function CompareAthletes() {
                 </View>
               )}
 
-              {compareMode === 'sessions' && athletes && athletes.length > 0 && (
-                <View style={styles.selectionArea}>
-                  <Text style={styles.selectionTitle}>{t('comparison.selectAthlete')}</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {athletes.map((athlete, index) => {
-                      const athleteId = athlete.id || athlete._id || `athlete-${index}`;
-                      const isSelected = selectedAthlete === athleteId;
-                      const isLoadingThis = loadingGpsFor.includes(athleteId);
-                      return (
-                        <TouchableOpacity
-                          key={athleteId}
-                          style={[styles.athleteChip, isSelected && styles.athleteChipSelected]}
-                          onPress={() => setSelectedAthlete(isSelected ? null : athleteId)}
-                        >
-                          <Text style={[styles.athleteChipText, isSelected && styles.athleteChipTextSelected]}>
-                            {athlete.name}
-                          </Text>
-                          {isSelected && isLoadingThis && (
-                            <ActivityIndicator size="small" color={colors.accent.primary} style={{ marginLeft: 8 }} />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
-
               {compareMode === 'position-group' && positions.length > 0 && (
                 <View style={styles.selectionArea}>
                   <Text style={styles.selectionTitle}>{t('comparison.selectPositions')}</Text>
