@@ -130,7 +130,17 @@ export default function AthleteCharts() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {athlete?.name} - {labels.charts}
         </Text>
-        <View style={{ width: 24 }} />
+        <TouchableOpacity 
+          onPress={() => setShowPreview(true)} 
+          style={styles.pdfButton}
+          disabled={downloading}
+        >
+          {downloading ? (
+            <ActivityIndicator size="small" color={colors.accent.primary} />
+          ) : (
+            <Ionicons name="document-text" size={24} color="#dc2626" />
+          )}
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
