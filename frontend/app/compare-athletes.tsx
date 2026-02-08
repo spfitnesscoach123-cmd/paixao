@@ -391,16 +391,6 @@ export default function CompareAthletes() {
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={[styles.modeButton, compareMode === 'sessions' && styles.modeButtonActive]}
-                onPress={() => setCompareMode('sessions')}
-              >
-                <Ionicons name="calendar" size={18} color={compareMode === 'sessions' ? '#ffffff' : colors.accent.primary} />
-                <Text style={[styles.modeButtonText, compareMode === 'sessions' && styles.modeButtonTextActive]}>
-                  {t('comparison.sessions')}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
                 style={[styles.modeButton, compareMode === 'position-group' && styles.modeButtonActive]}
                 onPress={() => setCompareMode('position-group')}
               >
