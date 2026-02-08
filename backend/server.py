@@ -4110,11 +4110,18 @@ async def generate_athlete_pdf_report(
                 if s.get("mean_velocity"):
                     all_mean_speed.append(s["mean_velocity"])
         
-        # Calculate averages and peaks
-        avg_mean_power = sum(all_mean_power) / len(all_mean_power) if all_mean_power else 0
-        max_peak_power = max(all_peak_power) if all_peak_power else 0
-        avg_mean_speed = sum(all_mean_speed) / len(all_mean_speed) if all_mean_speed else 0
-        max_peak_speed = max(all_peak_speed) if all_peak_speed else 0
+        # Get most recent values (first assessment is the most recent due to sort)
+        latest_assessment = strength_assessments[0] if strength_assessments else None
+        latest_metrics = latest_assessment.get("metrics", {}) if latest_assessment else {}
+        
+        current_mean_power = latest_metrics.get("mean_power", 0) or (all_mean_power[0] if all_mean_power else 0)
+        current_peak_power = latest_metrics.get("peak_power", 0) or 0
+        current_mean_speed = latest_metrics.get("mean_speed", 0) or (all_mean_speed[0] if all_mean_speed else 0)
+        current_peak_speed = latest_metrics.get("peak_speed", 0) or 0
+        
+        # Calculate peaks from all data
+        max_peak_power = max(all_peak_power) if all_peak_power else current_peak_power
+        max_peak_speed = max(all_peak_speed) if all_peak_speed else current_peak_speed
         
         # Calculate RSI stats
         current_rsi = all_rsi[0]["value"] if all_rsi else 0
