@@ -52,6 +52,11 @@ interface TeamDashboardStats {
   // New team averages
   team_avg_body_fat?: number;
   team_avg_power?: number;
+  team_avg_hid?: number;
+  team_avg_rsi?: number;
+  rsi_trend?: string;
+  rsi_percentile?: number;
+  avg_distance_per_session?: number;
 }
 
 interface PositionSummary {
