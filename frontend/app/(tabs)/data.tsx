@@ -258,19 +258,19 @@ export default function DataScreen() {
               <View style={styles.quickStatsGrid}>
                 <View style={styles.quickStatItem}>
                   <QuickStat
-                    label={t('dashboard.sessionsPerAthlete')}
-                    value={(stats.totalSessions / (stats.totalAthletes || 1)).toFixed(1)}
+                    label={t('dashboard.avgDistancePerAthlete')}
+                    value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
                     icon="analytics"
                     color={colors.accent.primary}
                   />
                 </View>
                 <View style={styles.quickStatItem}>
                   <QuickStat
-                    label={t('dashboard.activity7d')}
-                    value={`${stats.recentSessions}`}
+                    label={t('dashboard.wellnessTrend')}
+                    value={stats.avgWellness.toFixed(1)}
                     icon="pulse"
                     color={colors.accent.tertiary}
-                    trend="up"
+                    trend={stats.wellnessTrend}
                   />
                 </View>
               </View>
