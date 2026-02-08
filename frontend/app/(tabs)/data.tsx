@@ -222,11 +222,11 @@ export default function DataScreen() {
                 </View>
                 <View style={styles.cardHalf}>
                   <ImpactCard
-                    title={t('dashboard.avgDistanceWeek')}
-                    value={`${(stats.avgDistance / 1000).toFixed(1)}km`}
-                    subtitle={t('dashboard.perAthlete')}
-                    icon="globe"
-                    gradientColors={colors.gradients.secondary}
+                    title={t('dashboard.avgHSR')}
+                    value={`${Math.round(stats.avgHSR)}m`}
+                    subtitle={t('dashboard.perSession')}
+                    icon="flash"
+                    gradientColors={['#8b5cf6', '#7c3aed']}
                   />
                 </View>
               </View>
