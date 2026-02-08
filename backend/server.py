@@ -4053,10 +4053,11 @@ async def generate_athlete_pdf_report(
     # ============= STRENGTH / VBT SECTION =============
     story.append(Paragraph(f"💪 {t('strength_title')}", heading_style))
     
-    # Get strength assessments
+    # Get strength assessments (filter by type)
     strength_assessments = await db.assessments.find({
         "athlete_id": athlete_id,
-        "coach_id": current_user["_id"]
+        "coach_id": current_user["_id"],
+        "assessment_type": "strength"
     }).sort("date", -1).to_list(50)
     
     # Get VBT data
