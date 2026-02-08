@@ -3333,7 +3333,7 @@ async def get_team_dashboard(
             team_avg_acwr=round(total_acwr / acwr_count, 2) if acwr_count > 0 else 0,
             team_avg_wellness=round(total_wellness / wellness_count, 1) if wellness_count > 0 else 0,
             team_avg_fatigue=round(total_fatigue / fatigue_count, 1) if fatigue_count > 0 else 0,
-            sessions_this_week=total_sessions,
+            sessions_this_week=total_sessions_7d_global,  # Global count: 1 CSV = 1 session
             total_distance_this_week=round(total_distance, 0),
             team_avg_power=round(total_power / power_count, 0) if power_count > 0 else None,
             team_avg_body_fat=round(total_body_fat / body_fat_count, 1) if body_fat_count > 0 else None
