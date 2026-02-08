@@ -128,19 +128,19 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 | Evolução da carga ótima | Backend retorna `optimal_load_evolution` com histórico por sessão | ✅ Implemented |
 | PDF força tradicional | Seção de força tradicional adicionada com tabela separada (Supino, Agachamento, Levantamento Terra, Salto Vertical) | ✅ Implemented |
 | OptimalLoadEvolutionChart | Novo componente em `add-strength.tsx` para visualizar evolução | ✅ Implemented |
-| **Gráfico comparação força** | Atualizado para mostrar valores da última avaliação vs anterior | ✅ Implemented |
-| **PDF seção de força** | PDF agora mostra seção de força com VBT e tradicional | ✅ Fixed |
+| **Gráfico comparação força** | Atualizado para mostrar valores da última avaliação vs anterior com % de mudança | ✅ Implemented |
+| **PDF seção de força** | PDF agora mostra valores mais recentes (não média) da última avaliação de força | ✅ Fixed |
+| **Ordenação por created_at** | Queries ordenam por `[("date", -1), ("created_at", -1)]` para dados do mesmo dia | ✅ Fixed |
 
-**New Backend Fields (Strength Analysis):**
-- `previous_assessment_date` - Data da avaliação anterior
-- `metrics[].variation_from_previous` - % de mudança vs avaliação anterior
-- `metrics[].previous_value` - Valor da avaliação anterior
-- `comparison_with_previous` - Objeto com comparação detalhada
+**Correções Críticas (Feb 8 2026 - Sessão Atual):**
+- PDF mostrava média em vez do valor mais recente → Corrigido para usar `latest_assessment.metrics`
+- Múltiplas avaliações no mesmo dia não ordenavam corretamente → Adicionado `created_at` na ordenação
+- API de análise de força não mostrava comparação → Adicionado `comparison_with_previous` e `variation_from_previous`
 
-**New Frontend Features:**
-- Seção "Comparação com Avaliação Anterior" no `StrengthAnalysisCharts.tsx`
-- Barras visuais mostrando anterior vs atual com % de mudança
-- Indicadores de melhora/piora com cores (verde/vermelho)
+**Testado com atleta: Guilherme Mattos (ID: 6987fac838bbf90dba173d27)**
+- 3 avaliações de força no mesmo dia (2026-02-08)
+- Valores mais recentes: Mean Power 3000W, RSI 3.0
+- PDF e API mostram corretamente os dados mais recentes
 
 ## Prioritized Backlog
 
