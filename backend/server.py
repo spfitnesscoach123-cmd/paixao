@@ -5500,7 +5500,7 @@ async def import_vbt_csv(
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user)
 ):
-    """Import VBT data from CSV file (GymAware, PUSH, Vitruve formats)"""
+    """Import VBT data from CSV file (PUSH Band, Vitruve, Beast formats)"""
     import csv
     
     # Verify athlete
