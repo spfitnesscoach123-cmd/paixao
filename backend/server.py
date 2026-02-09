@@ -6053,9 +6053,6 @@ async def check_feature_access(
         "upgrade_required": not has_access
     }
 
-# Include the router in the main app
-app.include_router(api_router)
-
 # ============= UNIVERSAL LINKS / DEEP LINKS CONFIGURATION =============
 # These routes serve the verification files needed for iOS Universal Links and Android App Links
 # Note: In production, these files should be served from the root domain (.well-known/)
@@ -6109,6 +6106,9 @@ async def android_asset_links():
             "Content-Type": "application/json"
         }
     )
+
+# Include the router in the main app
+app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
