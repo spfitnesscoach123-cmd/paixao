@@ -693,21 +693,9 @@ export default function AddStrengthAssessment() {
 
   const labels = {
     title: locale === 'pt' ? 'Avaliação de Força' : 'Strength Assessment',
-    traditional: locale === 'pt' ? 'Força Tradicional' : 'Traditional Strength',
+    jumpAssessment: locale === 'pt' ? 'Avaliação de Salto' : 'Jump Assessment',
     vbt: 'VBT',
     date: locale === 'pt' ? 'Data' : 'Date',
-    meanPower: locale === 'pt' ? 'Potência Média (W)' : 'Mean Power (W)',
-    peakPower: locale === 'pt' ? 'Pico de Potência (W)' : 'Peak Power (W)',
-    meanSpeed: locale === 'pt' ? 'Velocidade Média (m/s)' : 'Mean Speed (m/s)',
-    peakSpeed: locale === 'pt' ? 'Pico de Velocidade (m/s)' : 'Peak Speed (m/s)',
-    rsi: locale === 'pt' ? 'RSI (Índice de Força Reativa)' : 'RSI (Reactive Strength Index)',
-    fatigueIndex: locale === 'pt' ? 'Índice de Fadiga (%)' : 'Fatigue Index (%)',
-    fatigueHint: locale === 'pt' ? '> 70% = alto nível de fadiga' : '> 70% = high fatigue level',
-    notes: locale === 'pt' ? 'Observações' : 'Notes',
-    save: locale === 'pt' ? 'Salvar Avaliação' : 'Save Assessment',
-    normativeHint: locale === 'pt' 
-      ? 'Valores de referência para jogadores de futebol:'
-      : 'Reference values for football players:',
     exercise: locale === 'pt' ? 'Exercício' : 'Exercise',
     device: locale === 'pt' ? 'Dispositivo' : 'Device',
     addSet: locale === 'pt' ? 'Adicionar Set' : 'Add Set',
@@ -734,16 +722,17 @@ export default function AddStrengthAssessment() {
         {/* Section Tabs */}
         <View style={styles.sectionTabs}>
           <TouchableOpacity
-            style={[styles.sectionTab, activeSection === 'traditional' && styles.sectionTabActive]}
-            onPress={() => setActiveSection('traditional')}
+            style={[styles.sectionTab, activeSection === 'jump' && styles.sectionTabActive]}
+            onPress={() => setActiveSection('jump')}
+            data-testid="jump-tab"
           >
             <Ionicons 
-              name="barbell" 
+              name="trending-up" 
               size={20} 
-              color={activeSection === 'traditional' ? '#ffffff' : colors.text.secondary} 
+              color={activeSection === 'jump' ? '#ffffff' : colors.text.secondary} 
             />
-            <Text style={[styles.sectionTabText, activeSection === 'traditional' && styles.sectionTabTextActive]}>
-              {labels.traditional}
+            <Text style={[styles.sectionTabText, activeSection === 'jump' && styles.sectionTabTextActive]}>
+              {labels.jumpAssessment}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
