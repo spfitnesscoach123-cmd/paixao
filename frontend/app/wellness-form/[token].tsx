@@ -403,6 +403,11 @@ export default function WellnessForm() {
     );
   }
 
+  // Show fallback page for web browsers
+  if (showWebFallback) {
+    return <WebFallbackPage token={token || ''} />;
+  }
+
   if (error) {
     return (
       <View style={styles.centerContainer}>
