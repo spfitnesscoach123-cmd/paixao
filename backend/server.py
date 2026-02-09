@@ -4817,8 +4817,8 @@ async def generate_athlete_pdf_report(
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#f5f3ff')]),
                 # Color code RSI row based on classification
-                ('BACKGROUND', (2, 1), (2, 1), rl_colors.HexColor(rsi_color + '30')),
-                ('TEXTCOLOR', (2, 1), (2, 1), rl_colors.HexColor(rsi_color[1:])),
+                ('BACKGROUND', (2, 1), (2, 1), rl_colors.HexColor(rsi_color)),
+                ('TEXTCOLOR', (2, 1), (2, 1), rl_colors.white),
             ]))
             story.append(cmj_table)
             story.append(Spacer(1, 10))
