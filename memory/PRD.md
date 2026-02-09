@@ -99,7 +99,6 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 | Body Composition | ❌ | ✅ | ✅ |
 | 3D Body Model | ❌ | ❌ | ✅ |
 | Fatigue Alerts | ❌ | ✅ | ✅ |
-| Export PDF/CSV | ❌ | ✅ | ✅ |
 | AI Insights | ❌ | ❌ | ✅ |
 | Multi-user | ❌ | ❌ | ✅ (2) |
 
