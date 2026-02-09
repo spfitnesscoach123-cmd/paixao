@@ -283,10 +283,12 @@ export default function WellnessForm() {
   const [mood, setMood] = useState(5);
 
   useEffect(() => {
-    // Check if running in web browser (not in Expo Go or native app)
-    // On web, we show the fallback page to download the app
-    if (Platform.OS === 'web') {
-      // Show fallback on all web platforms - user needs to download the app
+    // Check if running in web browser
+    // typeof window is undefined during SSR but defined in browser
+    const isWebBrowser = Platform.OS === 'web' || (typeof window !== 'undefined' && !window.hasOwnProperty('expo'));
+    
+    if (isWebBrowser) {
+      // Web browser - show fallback page to download app
       setShowWebFallback(true);
       setIsLoading(false);
       return;
