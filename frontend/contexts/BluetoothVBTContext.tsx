@@ -1,6 +1,29 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { Platform, PermissionsAndroid, Alert } from 'react-native';
-import { BleManager, Device, State, Characteristic } from 'react-native-ble-plx';
+
+// Conditional import for BLE - only on native platforms
+let BleManager: any = null;
+let State: any = { PoweredOn: 'PoweredOn', PoweredOff: 'PoweredOff' };
+
+// We'll dynamically import on native platforms
+const initBLE = async () => {
+  if (Platform.OS !== 'web') {
+    try {
+      const ble = await import('react-native-ble-plx');
+      BleManager = ble.BleManager;
+      State = ble.State;
+      return true;
+    } catch (e) {
+      console.warn('BLE not available:', e);
+      return false;
+    }
+  }
+  return false;
+};
+
+// Type definitions (since we can't import them directly)
+type Device = any;
+type Characteristic = any;
 
 // VBT Device Types
 export type VBTDeviceType = 'push_band' | 'vitruve' | 'beast' | 'unknown';
