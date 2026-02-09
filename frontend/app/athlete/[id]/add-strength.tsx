@@ -550,20 +550,11 @@ export default function AddStrengthAssessment() {
   const { t, locale } = useLanguage();
   const [loading, setLoading] = useState(false);
   
-  // Tab state - Força Tradicional ou VBT
-  const [activeSection, setActiveSection] = useState<'traditional' | 'vbt'>('traditional');
+  // Tab state - Avaliação de Salto ou VBT
+  const [activeSection, setActiveSection] = useState<'jump' | 'vbt'>('jump');
   
-  // Traditional strength form state
-  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [meanPower, setMeanPower] = useState('');
-  const [peakPower, setPeakPower] = useState('');
-  const [meanSpeed, setMeanSpeed] = useState('');
-  const [peakSpeed, setPeakSpeed] = useState('');
-  const [rsi, setRsi] = useState('');
-  const [fatigueIndex, setFatigueIndex] = useState('');
-  const [notes, setNotes] = useState('');
-
   // VBT form state
+  const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [selectedExercise, setSelectedExercise] = useState('Back Squat');
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [provider, setProvider] = useState('manual');
@@ -584,30 +575,12 @@ export default function AddStrengthAssessment() {
     enabled: activeSection === 'vbt',
   });
 
-  // Traditional strength submission
-  const handleSubmitTraditional = async () => {
-    if (!meanPower && !peakPower && !meanSpeed && !peakSpeed && !rsi) {
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Preencha pelo menos uma métrica' : 'Fill at least one metric'
-      );
-      return;
+  // Redirect to Jump Assessment when Jump tab is active
+  useEffect(() => {
+    if (activeSection === 'jump') {
+      router.replace(`/athlete/${id}/jump-assessment`);
     }
-
-    setLoading(true);
-    try {
-      const metrics: Record<string, number> = {};
-      
-      if (meanPower) metrics.mean_power = parseFloat(meanPower);
-      if (peakPower) metrics.peak_power = parseFloat(peakPower);
-      if (meanSpeed) metrics.mean_speed = parseFloat(meanSpeed);
-      if (peakSpeed) metrics.peak_speed = parseFloat(peakSpeed);
-      if (rsi) metrics.rsi = parseFloat(rsi);
-      if (fatigueIndex) metrics.fatigue_index = parseFloat(fatigueIndex);
-
-      await api.post('/assessments', {
-        athlete_id: id,
-        date: date,
+  }, [activeSection, id, router]);
         assessment_type: 'strength',
         metrics: metrics,
         notes: notes || null,
