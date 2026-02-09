@@ -6058,8 +6058,10 @@ app.include_router(api_router)
 
 # ============= UNIVERSAL LINKS / DEEP LINKS CONFIGURATION =============
 # These routes serve the verification files needed for iOS Universal Links and Android App Links
+# Note: In production, these files should be served from the root domain (.well-known/)
+# For now, we also provide them via /api/.well-known for testing purposes
 
-@app.get("/.well-known/apple-app-site-association")
+@api_router.get("/.well-known/apple-app-site-association")
 async def apple_app_site_association():
     """Serve Apple App Site Association file for iOS Universal Links"""
     return JSONResponse(
@@ -6087,7 +6089,7 @@ async def apple_app_site_association():
         }
     )
 
-@app.get("/.well-known/assetlinks.json")
+@api_router.get("/.well-known/assetlinks.json")
 async def android_asset_links():
     """Serve Asset Links file for Android App Links"""
     return JSONResponse(
