@@ -93,10 +93,10 @@ const formatDecimalInput = (value: string): string => {
 // Load-Velocity Profile Chart Component - Responsive
 const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
   const { locale } = useLanguage();
-  // Make chart responsive
-  const chartWidth = Math.min(screenWidth - 48, 400);
-  const chartHeight = Math.min(chartWidth * 0.5, 180);
-  const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+  // Make chart fully responsive
+  const chartWidth = screenWidth - chartPadding;
+  const chartHeight = Math.min(chartWidth * 0.55, 200);
+  const padding = { top: 20, right: 15, bottom: 40, left: 45 };
   
   const innerWidth = chartWidth - padding.left - padding.right;
   const innerHeight = chartHeight - padding.top - padding.bottom;
