@@ -57,8 +57,8 @@ export default function AddAthlete() {
       return;
     }
 
-    const result = await ImagePicker.launchImagePickerAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.5,
