@@ -283,6 +283,27 @@ export default function WellnessForm() {
   const [mood, setMood] = useState(5);
 
   useEffect(() => {
+    // Check if running in web browser (not in Expo Go or native app)
+    // On web, we show the fallback page to download the app
+    if (Platform.OS === 'web') {
+      // Check if it's a mobile browser - if so, show fallback
+      const userAgent = typeof window !== 'undefined' ? window.navigator.userAgent : '';
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
+      
+      if (isMobile) {
+        // Mobile browser - show fallback to download app
+        setShowWebFallback(true);
+        setIsLoading(false);
+        return;
+      }
+      // Desktop browser - you might want to show fallback too or allow form
+      // For now, we'll show fallback on all web platforms
+      setShowWebFallback(true);
+      setIsLoading(false);
+      return;
+    }
+    
+    // Native app - load athletes normally
     loadAthletes();
   }, [token]);
 
