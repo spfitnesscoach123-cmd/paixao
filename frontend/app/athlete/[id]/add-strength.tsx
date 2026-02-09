@@ -551,7 +551,8 @@ export default function AddStrengthAssessment() {
   const [loading, setLoading] = useState(false);
   
   // Tab state - Avaliação de Salto ou VBT
-  const [activeSection, setActiveSection] = useState<'jump' | 'vbt'>('jump');
+  // Start on VBT tab - Jump tab redirects to dedicated jump-assessment page
+  const [activeSection, setActiveSection] = useState<'jump' | 'vbt'>('vbt');
   
   // VBT form state
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
