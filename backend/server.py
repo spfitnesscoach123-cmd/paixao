@@ -3871,14 +3871,10 @@ async def get_team_dashboard(
                 "protocol": "cmj"
             }).sort("date", -1).to_list(10)
             
-            import sys
-            print(f"DEBUG Dashboard: athlete_id={athlete_id}, coach_id/user_id={user_id}, jump_assessments_count={len(athlete_jump_assessments)}", file=sys.stderr)
-            
             if athlete_jump_assessments:
                 # Use new jump assessment system
                 for jump_assessment in athlete_jump_assessments:
                     rsi = jump_assessment.get("rsi")
-                    print(f"DEBUG Dashboard: Found RSI={rsi} from jump_assessment", file=sys.stderr)
                     if rsi and rsi > 0:
                         all_rsi_values.append({
                             "value": rsi,
