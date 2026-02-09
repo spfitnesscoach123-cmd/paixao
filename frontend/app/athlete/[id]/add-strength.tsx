@@ -576,13 +576,6 @@ export default function AddStrengthAssessment() {
     enabled: activeSection === 'vbt',
   });
 
-  // Redirect to Jump Assessment when Jump tab is active
-  useEffect(() => {
-    if (activeSection === 'jump') {
-      router.replace(`/athlete/${id}/jump-assessment`);
-    }
-  }, [activeSection, id, router]);
-
   // VBT submission
   const vbtMutation = useMutation({
     mutationFn: async (data: any) => {
