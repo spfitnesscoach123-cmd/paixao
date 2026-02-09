@@ -284,9 +284,7 @@ class BodyComposition(BaseModel):
 
 class SubscriptionPlan(str, Enum):
     FREE_TRIAL = "free_trial"
-    ESSENCIAL = "essencial"
-    PROFISSIONAL = "profissional"
-    ELITE = "elite"
+    PRO = "pro"
 
 class SubscriptionStatus(str, Enum):
     ACTIVE = "active"
