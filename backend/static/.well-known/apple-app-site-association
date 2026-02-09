@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAM_ID.com.peakperform.app",
+        "paths": [
+          "/wellness-form/*",
+          "/wellness/*"
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": [
+      "TEAM_ID.com.peakperform.app"
+    ]
+  }
+}
