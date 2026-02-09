@@ -695,7 +695,7 @@ export default function AddStrengthAssessment() {
         <View style={styles.sectionTabs}>
           <TouchableOpacity
             style={[styles.sectionTab, activeSection === 'jump' && styles.sectionTabActive]}
-            onPress={() => setActiveSection('jump')}
+            onPress={() => router.push(`/athlete/${id}/jump-assessment`)}
             data-testid="jump-tab"
           >
             <Ionicons 
