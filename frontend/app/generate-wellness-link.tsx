@@ -40,10 +40,9 @@ export default function GenerateWellnessLink() {
     try {
       const response = await api.post(`/wellness/generate-link?expires_hours=${expiresHours}`);
       
-      // Construct full URL
-      const baseUrl = Platform.OS === 'web' 
-        ? window.location.origin 
-        : 'https://loadmanager.app'; // Replace with actual app URL
+      // Use the app's domain for wellness links
+      // This will work with both deep links and web fallback
+      const baseUrl = 'https://peakperform.app';
       
       const fullUrl = `${baseUrl}/wellness-form/${response.data.link_token}`;
       
