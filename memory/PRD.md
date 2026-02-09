@@ -144,6 +144,33 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ## Prioritized Backlog
 
+### ✅ Simplificação da Página de Assinaturas (Fev 9, 2026)
+
+Página de assinaturas completamente redesenhada com apenas 1 plano:
+
+| Região | Preço | Moeda |
+|--------|-------|-------|
+| Brasil | R$ 199,00/mês | BRL |
+| Internacional | $39.99/mês | USD |
+
+**Funcionalidades do Plano Pro:**
+- Trial gratuito de 7 dias com acesso completo
+- Atletas ilimitados
+- Histórico ilimitado
+- VBT, Composição Corporal, Modelo 3D
+- Insights de IA, ACWR detalhado
+- Alertas de fadiga, Comparação de atletas
+- Exportação PDF/CSV
+- Até 5 usuários simultâneos
+- Suporte prioritário
+
+**Novos Endpoints:**
+- `POST /subscription/restore` - Restaurar compras anteriores
+
+**Arquivos Modificados:**
+- `backend/server.py` - PLAN_LIMITS simplificado, novo endpoint restore
+- `frontend/app/subscription.tsx` - UI completamente redesenhada
+
 ### ✅ Correção "Adicionar Atleta Manualmente" (Fev 9, 2026)
 
 | Problema | Solução | Status |
