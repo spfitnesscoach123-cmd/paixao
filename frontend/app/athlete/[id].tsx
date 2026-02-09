@@ -31,6 +31,7 @@ interface GroupedSession {
   session_id: string;
   session_name: string;
   date: string;
+  activity_type?: string;  // "game" or "training"
   periods: GPSData[];
   totals: {
     total_distance: number;
