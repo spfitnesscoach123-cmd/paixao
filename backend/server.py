@@ -761,6 +761,41 @@ async def get_athlete_sessions(
     
     return list(sessions.values())
 
+
+class ActivityTypeUpdate(BaseModel):
+    activity_type: str  # "game" or "training"
+
+
+@api_router.put("/gps-data/session/{session_id}/activity-type")
+async def update_session_activity_type(
+    session_id: str,
+    data: ActivityTypeUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update the activity type (game/training) for all periods in a session"""
+    if data.activity_type not in ["game", "training"]:
+        raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
+    
+    # Update all GPS records with this session_id
+    result = await db.gps_data.update_many(
+        {
+            "session_id": session_id,
+            "coach_id": current_user["_id"]
+        },
+        {"$set": {"activity_type": data.activity_type}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Session not found or no records updated")
+    
+    return {
+        "message": "Activity type updated successfully",
+        "session_id": session_id,
+        "activity_type": data.activity_type,
+        "records_updated": result.modified_count
+    }
+
+
 # ============= WELLNESS ROUTES =============
 
 def calculate_wellness_scores(data: WellnessQuestionnaireCreate) -> tuple:
