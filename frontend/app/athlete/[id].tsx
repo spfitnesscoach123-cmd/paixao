@@ -142,6 +142,7 @@ export default function AthleteDetails() {
           session_id: sessionKey,
           session_name: sessionName,
           date: record.date,
+          activity_type: record.activity_type || 'training',
           periods: [],
           totals: {
             total_distance: 0,
@@ -157,6 +158,10 @@ export default function AthleteDetails() {
 
       const session = sessionMap.get(sessionKey)!;
       session.periods.push(record);
+      // Update activity_type from record if available
+      if (record.activity_type) {
+        session.activity_type = record.activity_type;
+      }
       
       // Accumulate totals
       session.totals.total_distance += record.total_distance || 0;
