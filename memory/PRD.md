@@ -1,4 +1,4 @@
-# PRD - Peak Perform - Athlete Performance Tracking
+# PRD - Load Manager - Athlete Performance Tracking
 
 ## Original Problem Statement
 Sistema de rastreamento de desempenho de atletas com avaliações físicas, composição corporal, integração com wearables e sistemas VBT.
