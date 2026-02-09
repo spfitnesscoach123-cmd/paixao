@@ -3867,7 +3867,7 @@ async def get_team_dashboard(
             # Collect RSI values from new jump_assessments system (preferred) or legacy assessments
             athlete_jump_assessments = await db.jump_assessments.find({
                 "athlete_id": athlete_id,
-                "coach_id": current_user["_id"],
+                "coach_id": user_id,
                 "protocol": "cmj"
             }).sort("date", -1).to_list(10)
             
