@@ -325,6 +325,8 @@ PLAN_LIMITS = {
         "history_months": -1,  # Unlimited
         "features": ["all"],
         "trial_days": 7,
+        "billing_period_days": 30,  # Monthly auto-renewal
+        "auto_renew": True,
         "export_pdf": True,
         "export_csv": True,
         "advanced_analytics": True,
@@ -336,10 +338,9 @@ PLAN_LIMITS = {
         "multi_user": True,
         "max_users": 5,
         "priority_support": True,
-        "custom_branding": True,
         "popular": True,
-        "description_pt": "Acesso completo a todas as funcionalidades do Load Manager",
-        "description_en": "Full access to all Load Manager features",
+        "description_pt": "Acesso completo a todas as funcionalidades do Load Manager. Renovação automática mensal.",
+        "description_en": "Full access to all Load Manager features. Auto-renews monthly.",
         "features_list_pt": [
             "Atletas ilimitados",
             "Histórico ilimitado",
