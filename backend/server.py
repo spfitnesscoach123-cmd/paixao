@@ -139,15 +139,20 @@ class GPSData(BaseModel):
     session_name: Optional[str] = None
     period_name: Optional[str] = None
     total_distance: float
-    high_intensity_distance: float
+    high_intensity_distance: float = 0
     high_speed_running: Optional[float] = None
-    sprint_distance: float
-    number_of_sprints: int
-    number_of_accelerations: int
-    number_of_decelerations: int
+    sprint_distance: Optional[float] = 0
+    number_of_sprints: int = 0
+    number_of_accelerations: Optional[int] = 0
+    number_of_decelerations: Optional[int] = 0
     max_speed: Optional[float] = None
     max_acceleration: Optional[float] = None
     max_deceleration: Optional[float] = None
+    player_load: Optional[float] = None
+    duration_minutes: Optional[float] = None
+    distance_per_min: Optional[float] = None
+    source: Optional[str] = None
+    device: Optional[str] = None
     notes: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
