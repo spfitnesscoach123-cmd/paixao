@@ -111,7 +111,7 @@ interface Props {
 }
 
 export const BluetoothVBTProvider: React.FC<Props> = ({ children }) => {
-  const bleManagerRef = useRef<BleManager | null>(null);
+  const bleManagerRef = useRef<any>(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isBluetoothEnabled, setIsBluetoothEnabled] = useState(false);
   const [discoveredDevices, setDiscoveredDevices] = useState<Device[]>([]);
@@ -119,13 +119,14 @@ export const BluetoothVBTProvider: React.FC<Props> = ({ children }) => {
   const [lastReading, setLastReading] = useState<VBTReading | null>(null);
   const [liveReadings, setLiveReadings] = useState<VBTReading[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [bleInitialized, setBleInitialized] = useState(false);
 
   // Initialize BLE Manager
   useEffect(() => {
     // Skip BLE initialization on web
     if (Platform.OS === 'web') {
       setError('Bluetooth não disponível no navegador');
-      setIsLoading(false);
+      setBleInitialized(true);
       return;
     }
 
@@ -135,7 +136,7 @@ export const BluetoothVBTProvider: React.FC<Props> = ({ children }) => {
       const bleAvailable = await initBLE();
       if (!bleAvailable || !BleManager) {
         setError('Bluetooth não disponível');
-        setIsLoading(false);
+        setBleInitialized(true);
         return;
       }
       
@@ -150,7 +151,7 @@ export const BluetoothVBTProvider: React.FC<Props> = ({ children }) => {
         }
       }, true);
       
-      setIsLoading(false);
+      setBleInitialized(true);
     };
     
     init();
