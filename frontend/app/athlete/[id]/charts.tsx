@@ -233,16 +233,6 @@ export default function AthleteCharts() {
           </View>
         )}
       </ScrollView>
-
-      {/* PDF Preview Modal */}
-      <ReportPreviewModal
-        visible={showPreview}
-        onClose={() => setShowPreview(false)}
-        reportType="pdf"
-        athleteId={id || ''}
-        athleteName={athlete?.name || ''}
-        locale={locale}
-      />
     </View>
   );
 }
@@ -262,9 +252,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: {
-    padding: 8,
-  },
-  pdfButton: {
     padding: 8,
   },
   headerTitle: {
