@@ -353,8 +353,7 @@ PLAN_LIMITS = {
             "Exportação PDF e CSV",
             "Até 5 usuários simultâneos",
             "Suporte prioritário",
-            "Integração com dispositivos GPS",
-            "Relatórios personalizados"
+            "Integração GPS - Catapult* (Playertek / Statsport) Em breve"
         ],
         "features_list_en": [
             "Unlimited athletes",
@@ -369,8 +368,7 @@ PLAN_LIMITS = {
             "PDF and CSV export",
             "Up to 5 simultaneous users",
             "Priority support",
-            "GPS device integration",
-            "Custom reports"
+            "GPS Integration - Catapult* (Playertek / Statsport) Coming soon"
         ],
         "limitations_pt": [],
         "limitations_en": []
