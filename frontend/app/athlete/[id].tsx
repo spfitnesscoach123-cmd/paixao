@@ -711,7 +711,7 @@ export default function AthleteDetails() {
         );
 
       case 'analysis':
-        return <AnalysisTab athleteId={id} />;
+        return <ScientificAnalysisTab athleteId={id} />;
 
       default:
         return null;
