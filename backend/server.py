@@ -6067,7 +6067,7 @@ async def apple_app_site_association():
                 "apps": [],
                 "details": [
                     {
-                        "appID": "TEAM_ID.com.peakperform.app",
+                        "appID": "TEAM_ID.com.loadmanager.app",
                         "paths": [
                             "/wellness-form/*",
                             "/wellness/*"
@@ -6077,7 +6077,7 @@ async def apple_app_site_association():
             },
             "webcredentials": {
                 "apps": [
-                    "TEAM_ID.com.peakperform.app"
+                    "TEAM_ID.com.loadmanager.app"
                 ]
             }
         },
@@ -6095,7 +6095,7 @@ async def android_asset_links():
                 "relation": ["delegate_permission/common.handle_all_urls"],
                 "target": {
                     "namespace": "android_app",
-                    "package_name": "com.peakperform.app",
+                    "package_name": "com.loadmanager.app",
                     "sha256_cert_fingerprints": [
                         "SHA256_FINGERPRINT_PLACEHOLDER"
                     ]
