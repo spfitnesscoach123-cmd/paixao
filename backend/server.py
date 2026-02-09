@@ -3255,15 +3255,19 @@ def get_power_velocity_profile(power_vs_avg: float, velocity_vs_avg: float, lang
 async def generate_jump_ai_feedback(analysis: dict, athlete: dict, lang: str) -> str:
     """Generate AI-powered scientific feedback based on jump analysis"""
     try:
+        system_message = """You are an expert sports scientist specializing in neuromuscular assessment and jump testing.
+        You provide concise, scientific analysis based on sports science literature.
+        Use proper terminology and be direct with recommendations."""
+        
         llm_client = LlmChat(
             api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            system_message=system_message,
             session_id=f"jump_analysis_{analysis['athlete_id']}_{datetime.utcnow().strftime('%Y%m%d')}"
         )
         llm_client = llm_client.with_model("openai", "gpt-4o")
         
         # Build context for AI
         context = f"""
-        You are an expert sports scientist specializing in neuromuscular assessment and jump testing.
         Analyze the following jump test data and provide scientific feedback in {"Portuguese" if lang == "pt" else "English"}.
         
         Athlete: {athlete.get('name')}
