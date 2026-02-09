@@ -581,28 +581,6 @@ export default function AddStrengthAssessment() {
       router.replace(`/athlete/${id}/jump-assessment`);
     }
   }, [activeSection, id, router]);
-        assessment_type: 'strength',
-        metrics: metrics,
-        notes: notes || null,
-      });
-
-      queryClient.invalidateQueries({ queryKey: ['assessments', id] });
-      queryClient.invalidateQueries({ queryKey: ['strength-analysis', id] });
-
-      Alert.alert(
-        locale === 'pt' ? 'Sucesso' : 'Success',
-        locale === 'pt' ? 'Avaliação de força registrada!' : 'Strength assessment recorded!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    } catch (error: any) {
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        error.response?.data?.detail || (locale === 'pt' ? 'Erro ao salvar' : 'Error saving')
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // VBT submission
   const vbtMutation = useMutation({
