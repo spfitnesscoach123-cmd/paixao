@@ -15,8 +15,6 @@ export default function AthleteCharts() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { t, locale } = useLanguage();
-  const [showPreview, setShowPreview] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   
   const labels = useMemo(() => ({
     charts: locale === 'pt' ? 'Gráficos' : 'Charts',
@@ -35,31 +33,7 @@ export default function AthleteCharts() {
     avgReadiness: locale === 'pt' ? 'Prontidão Média' : 'Avg Readiness',
     avgSleep: locale === 'pt' ? 'Sono Médio' : 'Avg Sleep',
     wellnessEvolution: locale === 'pt' ? 'Evolução Wellness' : 'Wellness Evolution',
-    exportPdf: locale === 'pt' ? 'Exportar PDF' : 'Export PDF',
-    preview: locale === 'pt' ? 'Visualizar antes' : 'Preview before',
   }), [locale]);
-
-  const handlePdfExport = async () => {
-    setDownloading(true);
-    try {
-      const baseUrl = api.defaults.baseURL?.replace('/api', '') || '';
-      const fullUrl = `${baseUrl}/api/reports/athlete/${id}/pdf?lang=${locale}`;
-      
-      if (Platform.OS === 'web') {
-        window.open(fullUrl, '_blank');
-      } else {
-        await Linking.openURL(fullUrl);
-      }
-    } catch (error) {
-      console.error('PDF export error:', error);
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Erro ao exportar PDF' : 'Error exporting PDF'
-      );
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const { data: athlete } = useQuery({
     queryKey: ['athlete', id],
