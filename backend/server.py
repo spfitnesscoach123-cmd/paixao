@@ -3871,10 +3871,13 @@ async def get_team_dashboard(
                 "protocol": "cmj"
             }).sort("date", -1).to_list(10)
             
+            logging.info(f"Dashboard: athlete_id={athlete_id}, coach_id/user_id={user_id}, jump_assessments_count={len(athlete_jump_assessments)}")
+            
             if athlete_jump_assessments:
                 # Use new jump assessment system
                 for jump_assessment in athlete_jump_assessments:
                     rsi = jump_assessment.get("rsi")
+                    logging.info(f"Dashboard: Found RSI={rsi} from jump_assessment")
                     if rsi and rsi > 0:
                         all_rsi_values.append({
                             "value": rsi,
