@@ -5737,6 +5737,8 @@ async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
                 "max_users": plan_data.get("max_users", 1),
                 "features": plan_data.get("features", []),
                 "trial_days": plan_data.get("trial_days", 7),
+                "billing_period_days": plan_data.get("billing_period_days", 30),
+                "auto_renew": plan_data.get("auto_renew", True),
                 "description": plan_data.get("description_pt" if is_portuguese else "description_en", ""),
                 "features_list": plan_data.get("features_list_pt" if is_portuguese else "features_list_en", []),
                 "limitations": plan_data.get("limitations_pt" if is_portuguese else "limitations_en", []),
