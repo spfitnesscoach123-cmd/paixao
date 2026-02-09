@@ -21,7 +21,11 @@ import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { format } from 'date-fns';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+// Responsive sizing
+const isSmallScreen = screenWidth < 375;
+const chartPadding = isSmallScreen ? 32 : 48;
 
 // VBT Set Interface
 interface VBTSet {
