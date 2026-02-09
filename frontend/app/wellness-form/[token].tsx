@@ -396,7 +396,8 @@ export default function WellnessForm() {
     </View>
   );
 
-  if (isLoading) {
+  // Show loading while determining platform (client-side detection)
+  if (!isClient || isLoading) {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.accent.primary} />
@@ -405,8 +406,8 @@ export default function WellnessForm() {
     );
   }
 
-  // Show fallback page for web browsers
-  if (showWebFallback) {
+  // Show fallback page for web browsers (only after client-side detection)
+  if (isWebPlatform) {
     return <WebFallbackPage token={token || ''} />;
   }
 
