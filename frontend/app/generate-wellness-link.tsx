@@ -42,7 +42,7 @@ export default function GenerateWellnessLink() {
       
       // Use the app's domain for wellness links
       // This will work with both deep links and web fallback
-      const baseUrl = 'https://peakperform.app';
+      const baseUrl = 'https://loadmanager.app';
       
       const fullUrl = `${baseUrl}/wellness-form/${response.data.link_token}`;
       
