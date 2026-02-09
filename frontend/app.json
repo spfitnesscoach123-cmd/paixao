@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "Peak Perform",
-    "slug": "peak-perform",
+    "name": "Load Manager",
+    "slug": "loadmanager",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "peakperform",
+    "scheme": "loadmanager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.peakperform.app",
+      "bundleIdentifier": "com.loadmanager.app",
       "associatedDomains": [
-        "applinks:peakperform.app",
-        "applinks:*.peakperform.app"
+        "applinks:loadmanager.app",
+        "applinks:*.loadmanager.app"
       ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
@@ -21,7 +21,7 @@
       }
     },
     "android": {
-      "package": "com.peakperform.app",
+      "package": "com.loadmanager.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -40,12 +40,12 @@
           "data": [
             {
               "scheme": "https",
-              "host": "peakperform.app",
+              "host": "loadmanager.app",
               "pathPrefix": "/wellness-form"
             },
             {
               "scheme": "https",
-              "host": "*.peakperform.app",
+              "host": "*.loadmanager.app",
               "pathPrefix": "/wellness-form"
             }
           ],
