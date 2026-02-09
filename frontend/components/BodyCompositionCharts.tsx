@@ -32,6 +32,7 @@ interface BodyCompositionChartsProps {
 }
 
 const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
 
 export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ data, history }) => {
   const { t, locale } = useLanguage();
