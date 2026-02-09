@@ -414,12 +414,11 @@ const OptimalLoadEvolutionChart = ({ data, locale }: { data: Array<{ date: strin
   );
 };
 
-// Velocity Loss Chart Component - Responsive with Fatigue Alert
+// Velocity Loss Chart - Responsive
 const VelocityLossChart = ({ data, locale }: { data: Array<{ set: number; velocity: number; loss_percent: number }>, locale: string }) => {
-  // Make chart responsive
-  const chartWidth = Math.min(screenWidth - 48, 400);
-  const chartHeight = Math.min(chartWidth * 0.4, 150);
-  const padding = { top: 15, right: 15, bottom: 30, left: 40 };
+  const chartWidth = screenWidth - chartPadding;
+  const chartHeight = Math.min(chartWidth * 0.45, 150);
+  const padding = { top: 20, right: 15, bottom: 30, left: 40 };
   
   if (!data || data.length === 0) return null;
   
