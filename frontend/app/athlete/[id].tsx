@@ -1431,4 +1431,55 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontWeight: '500',
   },
+  // Activity Type Classifier styles
+  classifierContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  classifierLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginRight: 12,
+  },
+  classifierButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    flex: 1,
+  },
+  classifierButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    gap: 6,
+  },
+  classifierButtonActive: {
+    borderColor: 'transparent',
+  },
+  classifierButtonTraining: {
+    backgroundColor: '#10b981',
+  },
+  classifierButtonGame: {
+    backgroundColor: '#f59e0b',
+  },
+  classifierButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  classifierButtonTextActive: {
+    color: '#ffffff',
+  },
 });
