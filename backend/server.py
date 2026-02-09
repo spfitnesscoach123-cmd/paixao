@@ -5408,8 +5408,6 @@ async def check_feature_access(
     
     # Check feature access
     feature_map = {
-        "export_pdf": plan_limits.get("export_pdf", False),
-        "export_csv": plan_limits.get("export_csv", False),
         "advanced_analytics": plan_limits.get("advanced_analytics", False),
         "ai_insights": plan_limits.get("ai_insights", False),
         "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
