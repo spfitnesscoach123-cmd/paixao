@@ -236,7 +236,7 @@ export default function AthleteDetails() {
   // Mutation to classify GPS session as game or training
   const classifySessionMutation = useMutation({
     mutationFn: async ({ sessionId, activityType }: { sessionId: string; activityType: string }) => {
-      await api.post(`/gps/session/${sessionId}/classify`, { activity_type: activityType });
+      await api.put(`/gps-data/session/${sessionId}/activity-type`, { activity_type: activityType });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gps', id] });
