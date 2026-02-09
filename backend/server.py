@@ -5895,6 +5895,41 @@ async def cancel_subscription(current_user: dict = Depends(get_current_user)):
     
     return {"message": "Subscription cancelled successfully"}
 
+@api_router.post("/subscription/restore")
+async def restore_subscription(current_user: dict = Depends(get_current_user)):
+    """Restore a previously cancelled subscription (simulates App Store/Google Play restore)"""
+    user_id = current_user["_id"]
+    
+    # Find any cancelled subscription for this user
+    cancelled_sub = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": "cancelled"
+    }, sort=[("cancelled_at", -1)])  # Get most recently cancelled
+    
+    if not cancelled_sub:
+        raise HTTPException(status_code=404, detail="No previous subscription found to restore")
+    
+    # Reactivate the subscription
+    # In a real app, this would verify with App Store/Google Play
+    new_period_end = datetime.utcnow() + timedelta(days=30)
+    
+    result = await db.subscriptions.update_one(
+        {"_id": cancelled_sub["_id"]},
+        {
+            "$set": {
+                "status": "active",
+                "cancelled_at": None,
+                "current_period_end": new_period_end,
+                "restored_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to restore subscription")
+    
+    return {"message": "Subscription restored successfully", "plan": cancelled_sub.get("plan", "pro")}
+
 @api_router.get("/subscription/check-feature/{feature}")
 async def check_feature_access(
     feature: str,
