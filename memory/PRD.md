@@ -212,6 +212,79 @@ Implementada integração completa com RevenueCat para gerenciamento de assinatu
 - Sincronização de status via webhooks
 - Auditoria de eventos (collection `webhook_events`)
 
+### ✅ Novo Módulo de Avaliação de Salto (Dez 9, 2025)
+
+Substituição completa do módulo de "Força Tradicional" por um sistema científico de avaliação de salto.
+
+**Protocolos Implementados:**
+1. **CMJ** (Counter Movement Jump) - Salto bilateral padrão
+2. **SL-CMJ** (Single Leg CMJ) - Perna direita e esquerda
+3. **DJ** (Drop Jump) - Com altura da caixa configurável
+
+**Dados de Entrada:**
+- Tempo de Voo (ms)
+- Tempo de Contato (ms)
+- Altura do Salto (cm) - Opcional, calculada automaticamente
+- Altura da Caixa (cm) - Apenas para DJ
+
+**Cálculos Automáticos:**
+| Métrica | Fórmula |
+|---------|---------|
+| Altura do Salto | h = (g × t²) / 8 |
+| RSI | Altura (m) / Tempo de Contato (s) |
+| RSI Modificado | Tempo de Voo / Tempo de Contato |
+| Pico de Potência | 60.7 × altura(cm) + 45.3 × peso(kg) - 2055 (Sayers) |
+| Pico de Velocidade | √(2 × g × altura) |
+| Potência Relativa | Pico Potência / Peso |
+| Z-Score | (Valor atual - Média) / Desvio Padrão |
+
+**Classificação RSI:**
+| RSI | Classificação |
+|-----|---------------|
+| ≥2.8 | Excelente |
+| ≥2.4 | Muito Bom |
+| ≥2.0 | Bom |
+| ≥1.5 | Médio |
+| ≥1.0 | Abaixo da Média |
+| <1.0 | Fraco |
+
+**Índice de Fadiga (SNC) baseado em variação RSI:**
+| Variação | Status | Cor | Ação |
+|----------|--------|-----|------|
+| 0 a -5% | Verde | #10b981 | Treino normal |
+| -6% a -12% | Amarelo | #f59e0b | Monitorar volume/sprints |
+| < -13% | Vermelho | #ef4444 | Alto risco - Reduzir carga |
+
+**Assimetria de Membros (SL-CMJ):**
+- Diferença >10% = RED FLAG para risco de lesão
+- Identifica perna dominante
+- Recomenda exercícios corretivos
+
+**Perfil Potência-Velocidade:**
+- **Dominante em Velocidade**: Alta velocidade, baixa potência → Treinar Força Máxima
+- **Dominante em Potência**: Alta potência, baixa velocidade → Treinar Pliométricos/Velocidade
+- **Equilibrado**: Manter programa balanceado
+- **Em Desenvolvimento**: Programa completo de S&C
+
+**Insights de IA (GPT-4o via Emergent LLM Key):**
+- Análise científica personalizada
+- Feedbacks em linguagem técnica
+- Recomendações baseadas em literatura esportiva
+
+**Endpoints Criados:**
+- `GET /api/jump/protocols` - Lista protocolos disponíveis
+- `POST /api/jump/assessment` - Criar avaliação
+- `GET /api/jump/assessments/{athlete_id}` - Listar avaliações
+- `GET /api/jump/analysis/{athlete_id}` - Análise completa
+- `DELETE /api/jump/assessment/{id}` - Deletar avaliação
+
+**Arquivos Criados:**
+- `frontend/app/athlete/[id]/jump-assessment.tsx` - Nova página de avaliação
+- Backend: Novos endpoints em `server.py`
+
+**Arquivos Modificados:**
+- `frontend/app/athlete/[id]/add-strength.tsx` - Redirecionamento para nova página
+
 ### ✅ Correção "Adicionar Atleta Manualmente" (Fev 9, 2026)
 
 | Problema | Solução | Status |
