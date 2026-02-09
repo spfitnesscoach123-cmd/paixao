@@ -372,10 +372,36 @@ Corrigido o problema onde usuários web viam "Link inválido ou expirado" em vez
 
 **Arquivo Modificado:** `frontend/app/wellness-form/[token].tsx`
 
+### ✅ Correção Contagem de Sessões GPS + Classificador Jogo/Treino (Dez 2025)
+
+**Problema Original:**
+1. A contagem de atividades GPS mostrava o número de registros individuais (`gpsData.length`) em vez do número correto de sessões (1 CSV = 1 sessão)
+2. Não havia forma de classificar uma sessão GPS como "Jogo" ou "Treino"
+
+**Solução Implementada:**
+
+| Funcionalidade | Implementação | Status |
+|----------------|---------------|--------|
+| Contagem de sessões | Alterado de `gpsData.length` para `groupedSessions.length` | ✅ Implementado |
+| Classificador visual | Botões "Treino" (verde) e "Jogo" (laranja) em cada card de sessão | ✅ Implementado |
+| Backend | Endpoint `PUT /api/gps-data/session/{session_id}/activity-type` | ✅ Implementado |
+| Tipo de atividade | Campo `activity_type` ("game" ou "training") no modelo GPSData | ✅ Implementado |
+
+**Endpoint API:**
+- `PUT /api/gps-data/session/{session_id}/activity-type`
+  - Body: `{ "activity_type": "game" | "training" }`
+  - Atualiza todos os períodos de uma sessão com o tipo de atividade
+
+**Arquivos Modificados:**
+- `frontend/app/athlete/[id].tsx` - UI do classificador e contagem correta
+- `frontend/types/index.ts` - Campos session_id, session_name, period_name, activity_type
+- `backend/server.py` - Endpoint e modelo GPSData
+
+**Teste:** 9/9 testes backend passaram (100%), UI verificada funcionando
+
 ### P1 - Next
 - [ ] Full i18n audit
 - [ ] Global theme (Light/Dark)
-- [ ] Corrigir contagem de sessões em `charts.tsx` (1 CSV = 1 sessão)
 
 ### ✅ Suporte Multi-Formato CSV (Fev 9, 2026)
 
