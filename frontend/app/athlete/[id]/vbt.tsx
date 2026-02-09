@@ -80,12 +80,10 @@ const EXERCISES = [
 ];
 
 const PROVIDERS = [
-  { id: 'gymaware', name: 'GymAware' },
-  { id: 'push_band', name: 'PUSH Band' },
-  { id: 'vitruve', name: 'Vitruve' },
-  { id: 'beast', name: 'Beast Sensor' },
-  { id: 'tendo', name: 'Tendo Unit' },
-  { id: 'manual', name: 'Manual' },
+  { id: 'push_band', name: 'PUSH Band 2.0', icon: 'fitness', color: '#FF6B35' },
+  { id: 'vitruve', name: 'Vitruve', icon: 'speedometer', color: '#00D4AA' },
+  { id: 'beast', name: 'Beast Sensor', icon: 'flash', color: '#FFD700' },
+  { id: 'manual', name: 'Manual', icon: 'create', color: colors.text.secondary },
 ];
 
 // Load-Velocity Profile Chart

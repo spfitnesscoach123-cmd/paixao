@@ -74,12 +74,10 @@ const EXERCISES = [
 ];
 
 const PROVIDERS = [
-  { id: 'gymaware', name: 'GymAware', inputMethod: 'API/Bluetooth' },
-  { id: 'push_band', name: 'PUSH Band', inputMethod: 'App Sync' },
-  { id: 'vitruve', name: 'Vitruve', inputMethod: 'App Sync' },
-  { id: 'beast', name: 'Beast Sensor', inputMethod: 'Bluetooth' },
-  { id: 'tendo', name: 'Tendo Unit', inputMethod: 'USB/CSV' },
-  { id: 'manual', name: 'Manual', inputMethod: 'Manual' },
+  { id: 'push_band', name: 'PUSH Band 2.0', inputMethod: 'Bluetooth', icon: 'fitness', color: '#FF6B35' },
+  { id: 'vitruve', name: 'Vitruve', inputMethod: 'Bluetooth', icon: 'speedometer', color: '#00D4AA' },
+  { id: 'beast', name: 'Beast Sensor', inputMethod: 'Bluetooth', icon: 'flash', color: '#FFD700' },
+  { id: 'manual', name: 'Manual', inputMethod: 'Manual', icon: 'create', color: colors.text.secondary },
 ];
 
 // Helper to format decimal input
