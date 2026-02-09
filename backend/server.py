@@ -4257,6 +4257,297 @@ Be specific, use scientific terminology and base on evidence when possible."""
         return None
 
 
+@api_router.get("/report/scientific/{athlete_id}")
+async def get_scientific_report_pdf(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate a printable scientific report in HTML format.
+    The browser can print this page to PDF.
+    """
+    # Get all scientific analysis data
+    analysis = await get_scientific_analysis(athlete_id, lang, current_user)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Generate HTML report
+    is_pt = lang == "pt"
+    
+    def risk_color(level):
+        return {
+            "low": "#10b981",
+            "moderate": "#f59e0b", 
+            "high": "#ef4444"
+        }.get(level, "#6b7280")
+    
+    def risk_label(level):
+        if is_pt:
+            return {"low": "Baixo", "moderate": "Moderado", "high": "Alto"}.get(level, "Desconhecido")
+        return level.title() if level else "Unknown"
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{'Relatório Científico' if is_pt else 'Scientific Report'} - {athlete['name']}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            line-height: 1.5;
+        }}
+        .container {{ max-width: 800px; margin: 0 auto; }}
+        .header {{ 
+            text-align: center; 
+            padding: 30px 0;
+            border-bottom: 2px solid #334155;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{ font-size: 24px; color: #f8fafc; margin-bottom: 8px; }}
+        .header p {{ color: #94a3b8; font-size: 14px; }}
+        .section {{ 
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+        }}
+        .section-title {{ 
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .section-title span {{ font-size: 20px; }}
+        .risk-badge {{
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: white;
+        }}
+        .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }}
+        .grid-4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
+        .stat-card {{
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }}
+        .stat-value {{ font-size: 20px; font-weight: bold; color: #f8fafc; }}
+        .stat-label {{ font-size: 11px; color: #94a3b8; margin-top: 4px; }}
+        .alert {{
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+        }}
+        .alert p {{ color: #fca5a5; font-size: 13px; }}
+        .insights {{
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+        }}
+        .insights-title {{ font-size: 18px; font-weight: 600; margin-bottom: 16px; }}
+        .insights-text {{ 
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.7;
+            color: #cbd5e1;
+        }}
+        .print-btn {{
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .factor-item {{ 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 13px;
+            color: #94a3b8;
+        }}
+        .factor-item::before {{ content: '⚠️'; }}
+        @media print {{
+            body {{ background: white; color: #1e293b; padding: 0; }}
+            .section {{ border: 1px solid #e2e8f0; background: #f8fafc; }}
+            .print-btn {{ display: none; }}
+            .stat-card {{ background: #f1f5f9; }}
+            .stat-value, .section-title {{ color: #1e293b; }}
+            .stat-label {{ color: #64748b; }}
+            .insights {{ background: #f8fafc; border: 1px solid #e2e8f0; }}
+            .insights-text {{ color: #475569; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{'📊 Relatório Científico Completo' if is_pt else '📊 Complete Scientific Report'}</h1>
+            <p>{athlete['name']} • {analysis.analysis_date}</p>
+            <p>{'Posição' if is_pt else 'Position'}: {athlete.get('position', 'N/A')} | {'Peso' if is_pt else 'Weight'}: {athlete.get('weight', 'N/A')} kg</p>
+        </div>
+        
+        <!-- Risk Level -->
+        <div class="section">
+            <div class="section-title"><span>🎯</span> {'Nível de Risco de Lesão' if is_pt else 'Injury Risk Level'}</div>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div class="risk-badge" style="background: {risk_color(analysis.overall_risk_level)}">
+                    {risk_label(analysis.overall_risk_level)}
+                </div>
+            </div>
+            {''.join(f'<div class="factor-item">{f}</div>' for f in analysis.injury_risk_factors) if analysis.injury_risk_factors else ''}
+        </div>
+"""
+
+    # GPS Section
+    if analysis.gps_summary:
+        gps = analysis.gps_summary
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>📍</span> {'Dados GPS' if is_pt else 'GPS Data'} ({gps['sessions_count']} {'sessões' if is_pt else 'sessions'})</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_distance_m'] / 1000:.1f} km</div>
+                    <div class="stat-label">{'Dist. Média' if is_pt else 'Avg Distance'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_high_intensity_m']:.0f} m</div>
+                    <div class="stat-label">{'Alta Intensidade' if is_pt else 'High Intensity'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_sprints']:.1f}</div>
+                    <div class="stat-label">{'Sprints/Sessão' if is_pt else 'Sprints/Session'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['max_speed_kmh']:.1f}</div>
+                    <div class="stat-label">{'Vel. Máx km/h' if is_pt else 'Max Speed km/h'}</div>
+                </div>
+            </div>
+        </div>
+"""
+
+    # Jump Analysis Section
+    if analysis.jump_analysis:
+        j = analysis.jump_analysis
+        latest = j.get('latest', {})
+        hist = j.get('historical', {})
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>🦘</span> {'Avaliação de Salto' if is_pt else 'Jump Assessment'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('rsi', 0):.2f}</div>
+                    <div class="stat-label">RSI</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('jump_height_cm', 0):.1f}</div>
+                    <div class="stat-label">{'Altura (cm)' if is_pt else 'Height (cm)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('peak_power_w', 0):.0f}</div>
+                    <div class="stat-label">{'Potência (W)' if is_pt else 'Power (W)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {risk_color('high') if hist.get('z_score', 0) < -1.5 else risk_color('moderate') if hist.get('z_score', 0) < -0.5 else risk_color('low')}">{hist.get('z_score', 0):.2f}</div>
+                    <div class="stat-label">Z-Score</div>
+                </div>
+            </div>
+            {f'''<div class="alert"><p>⚠️ {'RSI indica fadiga neuromuscular' if is_pt else 'RSI indicates neuromuscular fatigue'} ({hist.get('rsi_variation_percent', 0):.1f}% {'variação' if is_pt else 'variation'})</p></div>''' if j.get('fatigue_alert') else ''}
+        </div>
+"""
+
+    # VBT Section
+    if analysis.vbt_analysis:
+        v = analysis.vbt_analysis
+        lvp = v.get('load_velocity_profile', {})
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>⚡</span> VBT - {'Perfil Carga-Velocidade' if is_pt else 'Load-Velocity Profile'}</div>
+            <div class="grid">
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('estimated_1rm_kg', 0):.0f} kg</div>
+                    <div class="stat-label">1RM {'Estimado' if is_pt else 'Estimated'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('optimal_load_kg', 0):.0f} kg</div>
+                    <div class="stat-label">{'Carga Ótima' if is_pt else 'Optimal Load'}</div>
+                </div>
+            </div>
+            {f'''<div class="alert"><p>⚠️ {'Perda de velocidade ≥20% - Fadiga periférica' if is_pt else 'Velocity loss ≥20% - Peripheral fatigue'}</p></div>''' if v.get('fatigue_detected') else ''}
+        </div>
+"""
+
+    # Body Composition Section
+    if analysis.body_composition:
+        bc = analysis.body_composition
+        latest = bc.get('latest', {})
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>🏋️</span> {'Composição Corporal' if is_pt else 'Body Composition'}</div>
+            <div class="grid">
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('body_fat_percent', 0):.1f}%</div>
+                    <div class="stat-label">{'Gordura Corporal' if is_pt else 'Body Fat'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('lean_mass_kg', 0):.1f} kg</div>
+                    <div class="stat-label">{'Massa Magra' if is_pt else 'Lean Mass'}</div>
+                </div>
+            </div>
+        </div>
+"""
+
+    # AI Insights Section
+    if analysis.scientific_insights:
+        html_content += f"""
+        <div class="insights">
+            <div class="insights-title">🧠 {'Insights Científicos (IA)' if is_pt else 'Scientific Insights (AI)'}</div>
+            <div class="insights-text">{analysis.scientific_insights}</div>
+        </div>
+"""
+
+    html_content += """
+        <button class="print-btn" onclick="window.print()">
+            🖨️ Imprimir PDF
+        </button>
+    </div>
+</body>
+</html>
+"""
+
+    return HTMLResponse(content=html_content, status_code=200)
+
+
 # ============= TEAM DASHBOARD =============
 
 class TeamDashboardAthlete(BaseModel):
