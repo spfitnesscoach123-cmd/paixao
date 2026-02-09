@@ -302,7 +302,7 @@ PLAN_LIMITS = {
         "price_brl": 0,
         "price_usd": 0,
         "max_athletes": 999,  # Unlimited during trial
-        "history_months": 12,
+        "history_months": -1,  # Unlimited
         "features": ["all"],  # All features during trial
         "trial_days": 7,
         "export_pdf": True,
@@ -313,123 +313,16 @@ PLAN_LIMITS = {
         "vbt_analysis": True,
         "body_composition": True,
         "body_3d_model": True,
-        "multi_user": False,
-        "max_users": 1,
+        "multi_user": True,
+        "max_users": 5,
         "description_pt": "Experimente todas as funcionalidades por 7 dias grátis",
         "description_en": "Try all features free for 7 days",
     },
-    "essencial": {
-        "name": "Essencial",
-        "name_en": "Essential",
-        "price_brl": 39.90,
-        "price_usd": 7.99,
-        "max_athletes": 20,  # Reduced from 25 to 20
-        "history_months": 3,
-        "features": ["basic_reports", "weekly_view", "quick_registration"],
-        "trial_days": 7,
-        "export_pdf": False,
-        "export_csv": False,
-        "advanced_analytics": False,
-        "ai_insights": False,
-        "fatigue_alerts": False,
-        "vbt_analysis": False,
-        "body_composition": False,
-        "body_3d_model": False,
-        "multi_user": False,
-        "max_users": 1,
-        "description_pt": "Ideal para treinadores individuais ou pequenas equipes iniciando no monitoramento de atletas",
-        "description_en": "Ideal for individual coaches or small teams starting athlete monitoring",
-        "features_list_pt": [
-            "Até 20 atletas cadastrados",
-            "Registro rápido de GPS e Wellness",
-            "Visualização semanal de carga",
-            "Histórico de 3 meses",
-            "Relatórios básicos de desempenho",
-            "ACWR básico"
-        ],
-        "features_list_en": [
-            "Up to 20 registered athletes",
-            "Quick GPS and Wellness registration",
-            "Weekly load visualization",
-            "3 months history",
-            "Basic performance reports",
-            "Basic ACWR"
-        ],
-        "limitations_pt": [
-            "Sem VBT (Velocity Based Training)",
-            "Sem Composição Corporal",
-            "Sem alertas de fadiga",
-            "Sem exportação PDF/CSV",
-            "Sem insights de IA"
-        ],
-        "limitations_en": [
-            "No VBT (Velocity Based Training)",
-            "No Body Composition",
-            "No fatigue alerts",
-            "No PDF/CSV export",
-            "No AI insights"
-        ]
-    },
-    "profissional": {
-        "name": "Profissional",
-        "name_en": "Professional",
-        "price_brl": 89.90,
-        "price_usd": 17.99,
-        "max_athletes": 50,
-        "history_months": -1,  # Unlimited
-        "features": ["basic_reports", "weekly_view", "monthly_reports", "athlete_comparison", "context_alerts", "export_pdf", "export_csv", "advanced_analytics", "fatigue_alerts", "vbt_analysis", "body_composition"],
-        "trial_days": 7,
-        "export_pdf": True,
-        "export_csv": True,
-        "advanced_analytics": True,
-        "ai_insights": False,
-        "fatigue_alerts": True,
-        "vbt_analysis": True,
-        "body_composition": True,
-        "body_3d_model": False,
-        "multi_user": False,
-        "max_users": 1,
-        "description_pt": "Para preparadores físicos e clubes que precisam de análises avançadas e comparações",
-        "description_en": "For fitness coaches and clubs needing advanced analytics and comparisons",
-        "features_list_pt": [
-            "Até 50 atletas cadastrados",
-            "Tudo do plano Essencial",
-            "VBT - Velocity Based Training",
-            "Composição Corporal (protocolos científicos)",
-            "ACWR detalhado por métrica",
-            "Comparação entre atletas",
-            "Alertas de fadiga (>30%)",
-            "Exportação PDF e CSV",
-            "Histórico ilimitado"
-        ],
-        "features_list_en": [
-            "Up to 50 registered athletes",
-            "Everything in Essential plan",
-            "VBT - Velocity Based Training",
-            "Body Composition (scientific protocols)",
-            "Detailed ACWR by metric",
-            "Athlete comparison",
-            "Fatigue alerts (>30%)",
-            "PDF and CSV export",
-            "Unlimited history"
-        ],
-        "limitations_pt": [
-            "Sem modelo 3D do corpo",
-            "Sem insights de IA",
-            "Sem múltiplos usuários"
-        ],
-        "limitations_en": [
-            "No 3D body model",
-            "No AI insights",
-            "No multiple users"
-        ],
-        "popular": True
-    },
-    "elite": {
-        "name": "Elite",
-        "name_en": "Elite",
-        "price_brl": 159.90,
-        "price_usd": 29.99,
+    "pro": {
+        "name": "Pro",
+        "name_en": "Pro",
+        "price_brl": 199.00,
+        "price_usd": 39.99,
         "max_athletes": -1,  # Unlimited
         "history_months": -1,  # Unlimited
         "features": ["all"],
@@ -443,32 +336,43 @@ PLAN_LIMITS = {
         "body_composition": True,
         "body_3d_model": True,
         "multi_user": True,
-        "max_users": 2,
+        "max_users": 5,
         "priority_support": True,
         "custom_branding": True,
-        "description_pt": "Solução completa para clubes profissionais e departamentos de performance",
-        "description_en": "Complete solution for professional clubs and performance departments",
+        "popular": True,
+        "description_pt": "Acesso completo a todas as funcionalidades do Load Manager",
+        "description_en": "Full access to all Load Manager features",
         "features_list_pt": [
             "Atletas ilimitados",
-            "Tudo do plano Profissional",
+            "Histórico ilimitado",
+            "VBT - Velocity Based Training",
+            "Composição Corporal completa",
             "Modelo 3D do corpo humano",
             "Insights gerados por IA",
-            "Detecção de fadiga periférica",
-            "Até 2 usuários simultâneos",
+            "ACWR detalhado por métrica",
+            "Comparação entre atletas",
+            "Alertas de fadiga inteligentes",
+            "Exportação PDF e CSV",
+            "Até 5 usuários simultâneos",
             "Suporte prioritário",
-            "Relatórios personalizados",
-            "API de integração (em breve)"
+            "Integração com dispositivos GPS",
+            "Relatórios personalizados"
         ],
         "features_list_en": [
             "Unlimited athletes",
-            "Everything in Professional plan",
+            "Unlimited history",
+            "VBT - Velocity Based Training",
+            "Full Body Composition",
             "3D human body model",
             "AI-generated insights",
-            "Peripheral fatigue detection",
-            "Up to 2 simultaneous users",
+            "Detailed ACWR by metric",
+            "Athlete comparison",
+            "Smart fatigue alerts",
+            "PDF and CSV export",
+            "Up to 5 simultaneous users",
             "Priority support",
-            "Custom reports",
-            "Integration API (coming soon)"
+            "GPS device integration",
+            "Custom reports"
         ],
         "limitations_pt": [],
         "limitations_en": []
