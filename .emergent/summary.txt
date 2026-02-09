@@ -1,0 +1,198 @@
+<analysis>**original_problem_statement:**
+The user initially requested a series of bug fixes and feature enhancements for their athlete performance tracking app, Load Manager. These included fixing dashboard cards (RSI, HSR), implementing a new load-velocity chart to find optimal load, and improving PDF reports. The scope expanded significantly to include a major backend refactor for supporting multiple GPS CSV formats (Catapult, PlayerTek, STATSports) automatically. A critical architectural discussion arose about how athletes can submit wellness data without an account, leading to the implementation of a public deep-linking system that bypasses login. The agent then had to correct a branding mistake where it had changed the app's name. The final task was to create a web fallback page for the wellness deep link for users who don't have the app installed.
+
+**PRODUCT REQUIREMENTS:**
+- **(P0 - IN PROGRESS)** Implement a working web fallback page for the wellness form deep link.
+- **(P0 - NOT STARTED)** Fix the add athlete manually button functionality.
+- **(P0 - NOT STARTED)** Implement support for GPEXE CSV format.
+- **(P0 - NOT STARTED)** Update strength charts to always show the latest assessment data (User reported this is still not working as expected).
+- **(P1 - NOT STARTED)** Correct the session counting logic on the  page to 1 CSV = 1 session.
+- **(P2 - COMPLETED)** Fix dashboard cards on  and  (RSI, HSR, duplicate distance).
+- **(P2 - COMPLETED)** Create a dual-axis load-velocity profile chart and track optimal load.
+- **(P2 - COMPLETED)** Add a comprehensive strength summary (VBT & Traditional) to PDF reports.
+- **(P2 - COMPLETED)** Implement automatic CSV import for Catapult, PlayerTek, and STATSports.
+- **(P2 - COMPLETED)** Implement public, unauthenticated access to the wellness form via deep links.
+
+**User's preferred language**: Português
+
+**what currently exists?**
+The application is a full-stack athlete performance tracker (FastAPI/React Native). The backend has been significantly enhanced with automatic multi-format CSV import logic, new analysis capabilities for VBT (optimal load) and strength (latest vs. previous assessment), and improved PDF reports. A major architectural change was implemented to support public access to the wellness form via deep links, including the creation of  endpoints for domain verification. The frontend was updated to reflect these backend changes, with new charts and corrected dashboard cards. The routing was modified to allow unauthenticated access to the wellness form. The app's branding was corrected back to Load Manager across all files.
+
+**Last working item**:
+- Last item agent was working: The agent was implementing a web fallback page for the wellness form deep link in . The goal was to show a Download the App page to users opening the link in a web browser.
+- Status: IN PROGRESS
+- Agent Testing Done: N
+- Which testing method agent to use? screenshot tool
+- User Testing Done: N
+
+**All Pending/In progress Issue list**:
+- Issue 1: Web fallback for wellness form is broken. (P0)
+- Issue 2: Add athlete manually button is not working. (P0)
+- Issue 3: Strength comparison chart does not update to the latest assessment. (P0)
+- Issue 4: Incorrect session counting on detailed charts page. (P1)
+
+Issues Detail:
+- **Issue 1: Web fallback for wellness form is broken.**
+  - **Description**: The logic in  tries to fetch data from the API even when on a web browser, causing an error (Link inválido ou expirado) instead of showing the intended fallback page. This is likely due to Expo's Server-Side Rendering executing the data fetching logic before client-side platform detection can prevent it.
+  - **Attempted fixes**: The agent tried multiple approaches using , , and  initial values, but all failed to prevent the premature API call.
+  - **Next debug checklist**:
+    1.  Open .
+    2.  Implement a reliable client-side-only check to gate all data-fetching logic. A robust pattern is to use a state that is only set to  inside a  hook: .
+    3.  Wrap the data fetching call () inside a condition: .
+    4.  Render the fallback component when .
+  - **Why fix this issue and what will be achieved with the fix?**: This is critical for the user acquisition flow. Without it, any athlete who clicks the wellness link without the app installed will hit a dead end.
+  - **Status**: IN PROGRESS
+  - **Is recurring issue?** N
+  - **Should Test frontend/backend/both after fix?** Frontend
+  - **Blocked on other issue**: None
+
+- **Issue 2: Add athlete manually button is not working.**
+  - **Description**: The user reported that they cannot add an athlete using the manual entry form.
+  - **Attempted fixes**: The agent verified the backend endpoint works correctly via . It also viewed the frontend code and took screenshots of the form, but did not find the root cause or perform a successful end-to-end test.
+  - **Next debug checklist**:
+    1.  Use the  to run an E2E test: log in, navigate to athletes, click the FAB, fill the form in , and submit.
+    2.  Check the browser's developer console for errors during the submission process.
+    3.  Verify the  handler in  is correctly calling the  hook and that the payload is correct.
+  - **Why fix this issue and what will be achieved with the fix?**: This is a core function for the coach to manage their roster.
+  - **Status**: NOT STARTED
+  - **Is recurring issue?** N
+  - **Should Test frontend/backend/both after fix?** Frontend
+  - **Blocked on other issue**: None
+
+- **Issue 3: Strength comparison chart does not update to the latest assessment.**
+  - **Description**: The user reported that after adding a new strength assessment, the comparison chart still shows old data. The agent implemented a fix by ordering assessments by  for a specific user, but the user reported the issue persists.
+  - **Attempted fixes**: Added  to the sort order in the backend query in  for both the analysis endpoint and the PDF generation.
+  - **Next debug checklist**:
+    1.  Review the query caching mechanism of React Query in . The query key may not be invalidating correctly after a new assessment is added.
+    2.  Ensure the  callback of the mutation that adds a strength assessment calls  with the correct query key for the strength analysis endpoint.
+    3.  Manually test the flow: view the chart, add a new assessment, and verify if the chart updates.
+  - **Why fix this issue and what will be achieved with the fix?**: Ensures the coach always sees the most up-to-date performance data for an athlete.
+  - **Status**: NOT STARTED
+  - **Is recurring issue?** Y
+  - **Should Test frontend/backend/both after fix?** Both
+  - **Blocked on other issue**: None
+
+- **Issue 4: Incorrect session counting on detailed charts page.**
+  - **Description**: The session count on the  page counts every GPS record instead of unique sessions (based on 1 CSV upload = 1 session).
+  - **Attempted fixes**: None yet for this specific page.
+  - **Next debug checklist**:
+    1.  Examine .
+    2.  Locate the logic that calculates the session count.
+    3.  Apply the same fix used in other components: use a  to count unique s from the  array.
+  - **Why fix this issue and what will be achieved with the fix?**: Provides data consistency across all parts of the application.
+  - **Status**: NOT STARTED
+  - **Is recurring issue?** Y
+  - **Should Test frontend/backend/both after fix?** Frontend
+  - **Blocked on other issue**: None
+
+**In progress Task List**:
+- None. The only in-progress item is a bug fix listed above.
+
+**Upcoming and Future Tasks**
+- **Upcoming Tasks:**
+  - **(P0) Implement GPEXE CSV Support:** The user reported GPEXE files are not working. The CSV import logic in  needs to be expanded to include identifiers and column mappings for the GPEXE format.
+  - **(P1) Full i18n Audit:** Review the entire application for hardcoded strings and ensure complete and accurate translations in .
+  - **(P1) Global Theme (Dark/Light Mode):** Implement a global theme switcher.
+- **Future Tasks:**
+  - (P2) Push Notifications.
+  - (P2) Full Wearable Integration (Garmin, Polar) beyond CSV.
+
+**Completed work in this session**
+- **Dashboard Fixes**: Corrected the team dashboard RSI card and replaced a duplicate distance card with an HSR card in .
+- **Optimal Load Feature**: Implemented backend logic and frontend UI in  to calculate, display, and track optimal load from VBT assessments.
+- **Strength Analysis Comparison**: Reworked the strength analysis endpoint and UI in  to compare the latest vs. previous assessment, correctly handling same-day entries.
+- **PDF Report Enhancements**: The PDF report now includes a detailed traditional strength section and displays the *latest* assessment values instead of averages, with correct data fetching.
+- **Multi-Format CSV Import**: The  endpoint in  was completely refactored to automatically detect and parse CSV files from Catapult, PlayerTek, and STATSports.
+- **Wellness Form Public Access**: Implemented a deep-linking system by making the  route public in , configuring , and creating backend  routes for domain verification.
+- **Branding Correction**: Corrected the app's name, bundle ID, and deep link domains from peakperform back to loadmanager across all relevant project files.
+
+**Earlier issues found/mentioned but not fixed**
+- The user's report about **GPEXE CSVs failing** was not addressed. The agent focused on fixing the other providers and did not investigate or implement support for GPEXE.
+
+**Known issue recurrence from previous fork**
+- **Issue**: Incorrect session counting.
+- **Recurrence count**: 3 (Fixed on dashboards/comparisons, but still pending on the  page).
+- **Status**: NOT STARTED
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Backend**: FastAPI, Motor, ReportLab. A dynamic CSV parser with a provider-detection system was a key implementation. Endpoints for Apple/Google domain verification were also added.
+- **Frontend**: React Native (Expo), TypeScript, React Query. A significant architectural change was made to allow a specific route () to be publicly accessible, enabling deep linking for unauthenticated users. The app now attempts to render a different UI based on the platform ( vs. ).
+- **Deep Linking**: Configuration of Universal Links (iOS) and App Links (Android) via  and backend  file hosting to allow external URLs to open the native app directly to a specific screen.
+
+**key DB schema**
+- : Queries now sort by  in addition to Mon Feb  9 13:30:10 UTC 2026 to correctly order multiple assessments on the same day.
+- : Imported records now include  and  fields to track the origin of the data (e.g., ).
+
+**changes in tech stack**
+- None.
+
+**All files of reference**
+- : **(IN PROGRESS)** Contains the broken web fallback logic.
+- : Screen related to the add athlete manually bug.
+- : Contains the strength comparison chart that reportedly doesn't auto-update.
+- : Contains all business logic, including CSV parsing and analysis endpoints.
+- : Contains the pending session counting bug.
+
+**Areas that need refactoring**:
+-  is critically oversized and monolithic. It should be broken down into multiple files by functionality (e.g., routers for reports, analysis, auth; services for CSV importing).
+- The session counting logic has been implemented ad-hoc in multiple frontend components. A shared utility function () should be created to centralize this logic and prevent future bugs.
+
+**key api endpoints**
+- : Reworked to handle multiple CSV formats.
+- : Reworked for latest vs. previous assessment comparison.
+- : New endpoint for iOS Universal Links.
+- : New endpoint for Android App Links.
+- : Public endpoint that authenticates the wellness form via a token.
+
+**Critical Info for New Agent**
+1.  **Top Priorities**: Your first task is to fix the **broken web fallback page** for the wellness form. After that, address the two user-reported bugs: the **non-functional add athlete button** and the **strength chart not auto-updating**.
+2.  **App Name**: The app is **Load Manager**. All code, bundle identifiers, and deep links use . Do not change this.
+3.  **Deep Link Placeholders**: The Universal Link configuration in  and  contains placeholders ( for Apple,  for Android). Inform the user that these must be replaced with their actual production credentials before deployment.
+4.  **Missed Requirement**: The user reported issues with **GPEXE CSV** files, but the agent only implemented support for Catapult, PlayerTek, and STATSports. This is a pending task.
+
+**documents and test reports created in this job**
+-  (Updated)
+- 
+
+**Last 10 User Messages and any pending HUMAN messages**
+- **(user #482):** Confirmed they want a fallback page. (IN PROGRESS)
+- **(user #480):** Asked how an athlete gets the app from the store for the deep link to work. (COMPLETED)
+- **(user #466):** Pointed out the agent used the wrong app name (peakperform) and asked for it to be changed to loadmanager. (COMPLETED)
+- **(user #390):** Asked to test the add athlete button and configure the domain for universal links. (IN PROGRESS)
+- **(user #388):** Asked for clarification on whether the deep link is for CSVs or the wellness form. (COMPLETED)
+- **(user #341):** Approved implementing the deep link solution to bypass login. (COMPLETED)
+- **(user #340):** Asked for confirmation of the public app flow for athletes. (COMPLETED)
+- **(user #338):** Confirmed the problem that the app forces a login for athletes. (COMPLETED)
+- **(user #332):** Asked how an athlete can use the app without a subscription. (COMPLETED)
+- **(user #313):** Reported that STATSports, GPEXE, and PlayerTek CSVs were failing, and the add athlete manually button was broken. (PARTIALLY ADDRESSED)
+
+**Project Health Check:**
+- **Broken**:
+  - Web fallback for the wellness form.
+  - Add athlete manually button/flow.
+- **Needs Verification**:
+  - The strength chart's auto-update functionality on new assessment submission.
+  - The entire Universal/App Link flow on a real device.
+  - User needs to test CSV imports with their actual files for STATSports and PlayerTek.
+- **Mocked**:
+  -  and  in deep link configuration files are placeholders.
+
+**3rd Party Integrations**
+- **ReportLab**: Backend PDF generation.
+- **CSV Providers (Catapult, PlayerTek, STATSports)**: The system now supports their CSV export formats for data import.
+
+**Testing status**
+- **Testing agent used after significant changes**: YES
+- **Troubleshoot agent used after agent stuck in loop**: NO
+- **Test files created**: Temporary CSV files were created in  to test the import logic.
+- **Known regressions**: The strength chart not auto-updating appears to be a regression or an incompletely fixed bug.
+
+**Credentials to test flow:**
+- **User**:  /  (password was reset). This user owns the athlete Guilherme Mattos who has test data.
+
+**What agent forgot to execute**
+- The agent did not implement support for the **GPEXE** CSV format, despite the user reporting it as a problem along with the others.
+- The agent did not fully resolve the add athlete manually bug; it moved on after a preliminary investigation failed to find the cause.</analysis>
