@@ -6056,6 +6056,58 @@ async def check_feature_access(
 # Include the router in the main app
 app.include_router(api_router)
 
+# ============= UNIVERSAL LINKS / DEEP LINKS CONFIGURATION =============
+# These routes serve the verification files needed for iOS Universal Links and Android App Links
+
+@app.get("/.well-known/apple-app-site-association")
+async def apple_app_site_association():
+    """Serve Apple App Site Association file for iOS Universal Links"""
+    return JSONResponse(
+        content={
+            "applinks": {
+                "apps": [],
+                "details": [
+                    {
+                        "appID": "TEAM_ID.com.peakperform.app",
+                        "paths": [
+                            "/wellness-form/*",
+                            "/wellness/*"
+                        ]
+                    }
+                ]
+            },
+            "webcredentials": {
+                "apps": [
+                    "TEAM_ID.com.peakperform.app"
+                ]
+            }
+        },
+        headers={
+            "Content-Type": "application/json"
+        }
+    )
+
+@app.get("/.well-known/assetlinks.json")
+async def android_asset_links():
+    """Serve Asset Links file for Android App Links"""
+    return JSONResponse(
+        content=[
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": "com.peakperform.app",
+                    "sha256_cert_fingerprints": [
+                        "SHA256_FINGERPRINT_PLACEHOLDER"
+                    ]
+                }
+            }
+        ],
+        headers={
+            "Content-Type": "application/json"
+        }
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
