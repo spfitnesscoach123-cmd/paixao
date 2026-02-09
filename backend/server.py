@@ -303,8 +303,6 @@ PLAN_LIMITS = {
         "history_months": -1,  # Unlimited
         "features": ["all"],  # All features during trial
         "trial_days": 7,
-        "export_pdf": True,
-        "export_csv": True,
         "advanced_analytics": True,
         "ai_insights": True,
         "fatigue_alerts": True,
@@ -327,8 +325,6 @@ PLAN_LIMITS = {
         "trial_days": 7,
         "billing_period_days": 30,  # Monthly auto-renewal
         "auto_renew": True,
-        "export_pdf": True,
-        "export_csv": True,
         "advanced_analytics": True,
         "ai_insights": True,
         "fatigue_alerts": True,
