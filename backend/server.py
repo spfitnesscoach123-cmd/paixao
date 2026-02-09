@@ -4832,7 +4832,7 @@ GPS_PROVIDER_MAPPINGS = {
             "player_name": ["Player Name", "Player", "Name", "Athlete"],
             "session_name": ["Drill Title", "Session", "Activity", "Session Name", "Drill Name"],
             "total_distance": ["Total Distance", "Total Distance (m)", "Distance", "Distance (m)", "Dist (m)"],
-            "high_intensity_distance": ["High Speed Running", "HSR", "HSR Distance", "High Speed Running (m)", "HSR (m)", "High Intensity Distance", "HID", "Sprint Distance"],
+            "high_intensity_distance": ["High Speed Running", "HSR", "HSR Distance", "High Speed Running (m)", "HSR (m)", "High Intensity Distance", "HID", "Sprint Distance", "High Speed Running Distance"],
             "sprints": ["Sprints", "Sprint Count", "Number of Sprints", "Sprint Efforts", "Total Sprints", "High Speed Efforts"],
             "max_speed": ["Max Velocity", "Max Speed", "Maximum Speed", "Top Speed", "Peak Speed", "Max Velocity (m/s)", "Max Speed (m/s)", "Vmax"],
             "player_load": ["Player Load", "PlayerLoad", "Total Player Load", "Load"],
