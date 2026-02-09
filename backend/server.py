@@ -6032,6 +6032,320 @@ async def android_asset_links():
         }
     )
 
+# ============= REVENUECAT WEBHOOK INTEGRATION =============
+# These endpoints handle webhook events from RevenueCat for subscription management
+
+REVENUECAT_WEBHOOK_SECRET = os.environ.get('REVENUECAT_WEBHOOK_SECRET', '')
+
+class RevenueCatEventData(BaseModel):
+    """RevenueCat webhook event data"""
+    event_timestamp_ms: Optional[int] = None
+    product_id: Optional[str] = None
+    purchased_at_ms: Optional[int] = None
+    expiration_at_ms: Optional[int] = None
+    environment: Optional[str] = None  # SANDBOX or PRODUCTION
+    entitlement_ids: Optional[List[str]] = None
+    app_user_id: str
+    original_app_user_id: Optional[str] = None
+    currency: Optional[str] = None
+    price: Optional[float] = None
+    cancel_reason: Optional[str] = None
+    store: Optional[str] = None  # APP_STORE, PLAY_STORE
+
+class RevenueCatWebhookPayload(BaseModel):
+    """RevenueCat webhook payload"""
+    event: RevenueCatEventData
+    api_version: str
+    type: str  # Event type: INITIAL_PURCHASE, RENEWAL, CANCELLATION, etc.
+    id: str  # Unique event ID
+
+async def verify_revenuecat_webhook(authorization: Optional[str]) -> bool:
+    """Verify webhook authenticity using authorization header"""
+    if not REVENUECAT_WEBHOOK_SECRET:
+        logging.warning("RevenueCat webhook secret not configured")
+        return True  # Allow in development if not configured
+    
+    if not authorization:
+        return False
+    
+    expected = f"Bearer {REVENUECAT_WEBHOOK_SECRET}"
+    return authorization == expected
+
+@api_router.post("/webhooks/revenuecat")
+async def handle_revenuecat_webhook(
+    payload: RevenueCatWebhookPayload,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Handle RevenueCat webhooks for subscription events.
+    
+    Event types handled:
+    - INITIAL_PURCHASE: First-time subscription
+    - RENEWAL: Subscription renewed
+    - CANCELLATION: User cancelled
+    - EXPIRATION: Subscription expired
+    - BILLING_ISSUE: Payment failed
+    - UNCANCELLATION: User resubscribed
+    - PRODUCT_CHANGE: User changed plan
+    """
+    # Verify webhook authenticity
+    if REVENUECAT_WEBHOOK_SECRET and not await verify_revenuecat_webhook(authorization):
+        logging.warning(f"RevenueCat webhook: Invalid authorization")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    event = payload.event
+    event_type = payload.type
+    event_id = payload.id
+    
+    logging.info(f"RevenueCat webhook received: type={event_type}, user={event.app_user_id}, id={event_id}")
+    
+    # Check for duplicate events (idempotency)
+    existing_event = await db.webhook_events.find_one({"event_id": event_id})
+    if existing_event:
+        logging.info(f"RevenueCat webhook: Duplicate event {event_id}, skipping")
+        return {"status": "duplicate", "message": "Event already processed"}
+    
+    # Log the event for audit trail
+    await db.webhook_events.insert_one({
+        "event_id": event_id,
+        "event_type": event_type,
+        "app_user_id": event.app_user_id,
+        "product_id": event.product_id,
+        "raw_payload": payload.model_dump(),
+        "processed": False,
+        "received_at": datetime.utcnow()
+    })
+    
+    try:
+        # Find user by app_user_id (this should match your user's _id)
+        user = await db.users.find_one({"_id": ObjectId(event.app_user_id)})
+        if not user:
+            # Try to find by email or other identifier
+            logging.warning(f"RevenueCat webhook: User not found for app_user_id={event.app_user_id}")
+            # Still process the event, user might register later
+        
+        user_id = event.app_user_id
+        
+        # Process based on event type
+        if event_type == "INITIAL_PURCHASE":
+            await handle_initial_purchase(user_id, event)
+        elif event_type == "RENEWAL":
+            await handle_renewal(user_id, event)
+        elif event_type == "CANCELLATION":
+            await handle_cancellation(user_id, event)
+        elif event_type == "EXPIRATION":
+            await handle_expiration(user_id, event)
+        elif event_type == "BILLING_ISSUE":
+            await handle_billing_issue(user_id, event)
+        elif event_type == "UNCANCELLATION":
+            await handle_uncancellation(user_id, event)
+        elif event_type == "PRODUCT_CHANGE":
+            await handle_product_change(user_id, event)
+        elif event_type == "SUBSCRIBER_ALIAS":
+            # User IDs were merged in RevenueCat
+            logging.info(f"RevenueCat webhook: Subscriber alias event for {user_id}")
+        else:
+            logging.info(f"RevenueCat webhook: Unhandled event type {event_type}")
+        
+        # Mark event as processed
+        await db.webhook_events.update_one(
+            {"event_id": event_id},
+            {"$set": {"processed": True, "processed_at": datetime.utcnow()}}
+        )
+        
+        return {"status": "success", "message": f"Event {event_type} processed"}
+        
+    except Exception as e:
+        logging.error(f"RevenueCat webhook error: {str(e)}")
+        await db.webhook_events.update_one(
+            {"event_id": event_id},
+            {"$set": {"processed": False, "error": str(e)}}
+        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+async def handle_initial_purchase(user_id: str, event: RevenueCatEventData):
+    """Handle initial purchase event from RevenueCat"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    purchased_at = datetime.utcnow()
+    if event.purchased_at_ms:
+        purchased_at = datetime.fromtimestamp(event.purchased_at_ms / 1000)
+    
+    subscription_data = {
+        "user_id": user_id,
+        "plan": "pro",
+        "status": "active",
+        "source": "revenuecat",
+        "store": event.store,
+        "product_id": event.product_id,
+        "entitlement_ids": event.entitlement_ids,
+        "environment": event.environment,
+        "currency": event.currency,
+        "price": event.price,
+        "start_date": purchased_at,
+        "current_period_end": expires_at,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    # Upsert subscription
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {"$set": subscription_data},
+        upsert=True
+    )
+    
+    logging.info(f"RevenueCat: Initial purchase recorded for user {user_id}")
+
+async def handle_renewal(user_id: str, event: RevenueCatEventData):
+    """Handle subscription renewal event"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "active",
+                "current_period_end": expires_at,
+                "cancel_reason": None,
+                "updated_at": datetime.utcnow()
+            },
+            "$inc": {"renewal_count": 1}
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription renewed for user {user_id}")
+
+async def handle_cancellation(user_id: str, event: RevenueCatEventData):
+    """Handle cancellation event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "cancelled",
+                "cancel_reason": event.cancel_reason,
+                "cancelled_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription cancelled for user {user_id}, reason: {event.cancel_reason}")
+
+async def handle_expiration(user_id: str, event: RevenueCatEventData):
+    """Handle subscription expiration event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "expired",
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription expired for user {user_id}")
+
+async def handle_billing_issue(user_id: str, event: RevenueCatEventData):
+    """Handle billing issue event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "billing_issue": True,
+                "billing_issue_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.warning(f"RevenueCat: Billing issue for user {user_id}")
+
+async def handle_uncancellation(user_id: str, event: RevenueCatEventData):
+    """Handle uncancellation (user resubscribed)"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "active",
+                "current_period_end": expires_at,
+                "cancel_reason": None,
+                "cancelled_at": None,
+                "billing_issue": False,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription reactivated for user {user_id}")
+
+async def handle_product_change(user_id: str, event: RevenueCatEventData):
+    """Handle product change event (user changed plan)"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "product_id": event.product_id,
+                "current_period_end": expires_at,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Product changed for user {user_id} to {event.product_id}")
+
+@api_router.get("/subscription/revenuecat-status/{app_user_id}")
+async def get_revenuecat_subscription_status(
+    app_user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get subscription status from local database (synced via RevenueCat webhooks).
+    This is used to verify subscription status on the backend.
+    """
+    # Security: Only allow users to check their own subscription
+    if current_user["_id"] != app_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this subscription")
+    
+    subscription = await db.subscriptions.find_one({
+        "user_id": app_user_id,
+        "source": "revenuecat"
+    })
+    
+    if not subscription:
+        return {
+            "is_active": False,
+            "status": "NO_SUBSCRIPTION",
+            "message": "No RevenueCat subscription found"
+        }
+    
+    # Check if expired
+    is_expired = False
+    if subscription.get("current_period_end"):
+        is_expired = subscription["current_period_end"] < datetime.utcnow()
+    
+    return {
+        "is_active": subscription.get("status") == "active" and not is_expired,
+        "status": subscription.get("status", "unknown"),
+        "product_id": subscription.get("product_id"),
+        "store": subscription.get("store"),
+        "expires_at": subscription.get("current_period_end").isoformat() if subscription.get("current_period_end") else None,
+        "environment": subscription.get("environment"),
+        "has_billing_issue": subscription.get("billing_issue", False)
+    }
+
 # Include the router in the main app
 app.include_router(api_router)
 
