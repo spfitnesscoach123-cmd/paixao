@@ -119,6 +119,7 @@ class GPSDataCreate(BaseModel):
     session_id: Optional[str] = None  # Unique ID for each CSV upload/session
     session_name: Optional[str] = None  # Name of the session (e.g., "Match vs Team X")
     period_name: Optional[str] = None  # Period within session (1st Half, 2nd Half, Session)
+    activity_type: Optional[str] = None  # "game" or "training"
     total_distance: float  # meters
     high_intensity_distance: float  # HID 14.4-19.8 km/h in meters
     high_speed_running: Optional[float] = None  # HSR 19.8-25.2 km/h in meters  
@@ -139,6 +140,7 @@ class GPSData(BaseModel):
     session_id: Optional[str] = None
     session_name: Optional[str] = None
     period_name: Optional[str] = None
+    activity_type: Optional[str] = None  # "game" or "training"
     total_distance: float
     high_intensity_distance: float = 0
     high_speed_running: Optional[float] = None
