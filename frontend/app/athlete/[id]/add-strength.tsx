@@ -1209,14 +1209,14 @@ const styles = StyleSheet.create({
   summaryGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: isSmallScreen ? 8 : 10,
   },
   summaryCard: {
     flex: 1,
-    minWidth: '45%',
+    minWidth: isSmallScreen ? '46%' : '45%',
     backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 10,
+    padding: isSmallScreen ? 10 : 14,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border.default,
