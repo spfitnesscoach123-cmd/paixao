@@ -66,12 +66,19 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - `ACWRLegend.tsx` - Legend explaining ranges
 - `getACWRClassification()` - Helper function
 
-### ✅ Export Buttons PDF/CSV (Feb 7, 2026)
-**Component:** `ExportButtons.tsx`
-- CSV export (All data, GPS, Wellness, Strength)
-- PDF report export
-- Body Composition PDF report
-- Located on athlete detail page (Info tab)
+### ❌ REMOVIDO: Export PDF/CSV (Dez 2025)
+**Estrutura de relatórios removida completamente:**
+- Componentes deletados: `ExportPDFButton.tsx`, `ExportButtons.tsx`, `ReportPreviewModal.tsx`
+- Endpoints removidos do backend: 
+  - `/api/reports/athlete/{id}/pdf`
+  - `/api/reports/athlete/{id}/csv`
+  - `/api/reports/athlete/{id}/preview`
+  - `/api/reports/athlete/{id}/csv-preview`
+  - `/api/reports/body-composition/{id}/pdf`
+  - `/api/reports/body-composition/{id}/preview`
+  - `/api/reports/team/csv`
+- Tradições de PDF removidas
+- Referências a `export_pdf` e `export_csv` removidas dos planos de assinatura
 
 ### ✅ Wellness Link Duration Options (Feb 7, 2026)
 **Updated Options:**
