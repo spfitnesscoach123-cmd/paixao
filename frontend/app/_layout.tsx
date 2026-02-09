@@ -27,7 +27,6 @@ export default function RootLayout() {
                 }} 
               />
             </Stack>
-            </BluetoothVBTProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>
