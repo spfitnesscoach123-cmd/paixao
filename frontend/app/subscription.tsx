@@ -8,6 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Linking,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,19 +29,9 @@ interface Plan {
   currency: string;
   max_athletes: number;
   history_months: number;
-  export_pdf: boolean;
-  export_csv: boolean;
-  advanced_analytics: boolean;
-  ai_insights: boolean;
-  fatigue_alerts: boolean;
-  multi_user: boolean;
-  max_users: number;
-  features: string[];
+  features_list: string[];
   trial_days: number;
   description: string;
-  features_list: string[];
-  limitations: string[];
-  popular: boolean;
 }
 
 interface CurrentSubscription {
@@ -49,31 +41,14 @@ interface CurrentSubscription {
   price: number;
   max_athletes: number;
   current_athletes: number;
-  history_months: number;
   days_remaining: number | null;
   trial_end_date: string | null;
-  features: {
-    export_pdf: boolean;
-    export_csv: boolean;
-    advanced_analytics: boolean;
-    ai_insights: boolean;
-    fatigue_alerts: boolean;
-    multi_user: boolean;
-    priority_support: boolean;
-  };
-  limits_reached: {
-    athletes: boolean;
-    export_pdf: boolean;
-    export_csv: boolean;
-    advanced_analytics: boolean;
-    ai_insights: boolean;
-  };
 }
 
 export default function Subscription() {
   const router = useRouter();
-  const { t, locale } = useLanguage();
-  const [plans, setPlans] = useState<Plan[]>([]);
+  const { locale } = useLanguage();
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -90,21 +65,22 @@ export default function Subscription() {
       setIsLoading(true);
       const lang = locale === 'pt' ? 'pt' : 'en';
       
-      // Fetch plans first (public endpoint)
+      // Fetch plan
       try {
         const plansRes = await api.get(`/subscription/plans?lang=${lang}&region=${region}`);
-        setPlans(plansRes.data);
+        if (plansRes.data && plansRes.data.length > 0) {
+          setPlan(plansRes.data[0]); // Only one plan: Pro
+        }
       } catch (plansError) {
         console.error('Error fetching plans:', plansError);
       }
       
-      // Fetch current subscription (requires auth, may fail)
+      // Fetch current subscription
       try {
         const currentRes = await api.get(`/subscription/current?lang=${lang}&region=${region}`);
         setCurrentSubscription(currentRes.data);
       } catch (subError) {
         console.error('Error fetching current subscription:', subError);
-        // Don't fail entirely - user may not be logged in
         setCurrentSubscription(null);
       }
     } catch (error) {
@@ -118,33 +94,60 @@ export default function Subscription() {
     fetchData();
   }, [fetchData]);
 
-  const handleSubscribe = async (planId: string) => {
+  const t = {
+    title: locale === 'pt' ? 'Assinatura' : 'Subscription',
+    currentPlan: locale === 'pt' ? 'Plano Atual' : 'Current Plan',
+    trialBanner: locale === 'pt' ? '7 dias grátis para experimentar!' : '7 days free to try!',
+    trialSubtitle: locale === 'pt' ? 'Acesso completo a todas as funcionalidades' : 'Full access to all features',
+    startTrial: locale === 'pt' ? 'Começar Trial Grátis' : 'Start Free Trial',
+    subscribe: locale === 'pt' ? 'Assinar Agora' : 'Subscribe Now',
+    perMonth: locale === 'pt' ? '/mês' : '/month',
+    daysRemaining: locale === 'pt' ? 'dias restantes' : 'days remaining',
+    cancelSubscription: locale === 'pt' ? 'Cancelar Assinatura' : 'Cancel Subscription',
+    restorePurchase: locale === 'pt' ? 'Restaurar Compra' : 'Restore Purchase',
+    manageSubscription: locale === 'pt' ? 'Gerenciar Assinatura' : 'Manage Subscription',
+    termsOfUse: locale === 'pt' ? 'Termos de Uso' : 'Terms of Use',
+    privacyPolicy: locale === 'pt' ? 'Política de Privacidade' : 'Privacy Policy',
+    inAppPurchaseNote: locale === 'pt' 
+      ? 'O pagamento será processado via App Store ou Google Play. A assinatura será renovada automaticamente até ser cancelada.'
+      : 'Payment will be processed via App Store or Google Play. Subscription will auto-renew until cancelled.',
+    cancelNote: locale === 'pt'
+      ? 'Você pode cancelar a qualquer momento nas configurações da loja de apps.'
+      : 'You can cancel anytime in your app store settings.',
+    statusTrial: locale === 'pt' ? 'PERÍODO DE TESTE' : 'TRIAL PERIOD',
+    statusActive: locale === 'pt' ? 'ATIVO' : 'ACTIVE',
+    statusCancelled: locale === 'pt' ? 'CANCELADO' : 'CANCELLED',
+    statusExpired: locale === 'pt' ? 'EXPIRADO' : 'EXPIRED',
+    unlimitedAthletes: locale === 'pt' ? 'Atletas ilimitados' : 'Unlimited athletes',
+    allFeatures: locale === 'pt' ? 'Todas as funcionalidades' : 'All features',
+  };
+
+  const handleStartTrial = async () => {
     setIsProcessing(true);
-    const plan = plans.find(p => p.id === planId);
     
     Alert.alert(
       locale === 'pt' ? 'Iniciar Trial Gratuito' : 'Start Free Trial',
       locale === 'pt' 
-        ? `Deseja iniciar o trial de 7 dias do plano ${plan?.name}?\n\nApós o período de teste, será cobrado ${plan?.price_formatted}/mês via compra no app.`
-        : `Start the 7-day trial of ${plan?.name} plan?\n\nAfter the trial period, ${plan?.price_formatted}/month will be charged via in-app purchase.`,
+        ? `Você terá 7 dias de acesso completo a todas as funcionalidades.\n\nApós o período de teste, será cobrado ${plan?.price_formatted}${t.perMonth} via compra no app.`
+        : `You'll have 7 days of full access to all features.\n\nAfter the trial period, ${plan?.price_formatted}${t.perMonth} will be charged via in-app purchase.`,
       [
         { text: locale === 'pt' ? 'Cancelar' : 'Cancel', style: 'cancel', onPress: () => setIsProcessing(false) },
         {
-          text: locale === 'pt' ? 'Iniciar Trial' : 'Start Trial',
+          text: locale === 'pt' ? 'Iniciar' : 'Start',
           onPress: async () => {
             try {
-              await api.post('/subscription/subscribe', { plan: planId });
+              await api.post('/subscription/subscribe', { plan: 'pro' });
               await fetchData();
               Alert.alert(
-                '🎉 ' + (locale === 'pt' ? 'Sucesso!' : 'Success!'),
+                '🎉 ' + (locale === 'pt' ? 'Bem-vindo!' : 'Welcome!'),
                 locale === 'pt' 
-                  ? `Trial do plano ${plan?.name} ativado! Você tem 7 dias para experimentar todas as funcionalidades.`
-                  : `${plan?.name} plan trial activated! You have 7 days to try all features.`
+                  ? 'Seu trial de 7 dias foi ativado! Aproveite todas as funcionalidades do Load Manager Pro.'
+                  : 'Your 7-day trial is now active! Enjoy all Load Manager Pro features.'
               );
             } catch (error) {
               Alert.alert(
                 locale === 'pt' ? 'Erro' : 'Error',
-                locale === 'pt' ? 'Não foi possível ativar o plano' : 'Could not activate plan'
+                locale === 'pt' ? 'Não foi possível ativar o trial' : 'Could not activate trial'
               );
             } finally {
               setIsProcessing(false);
@@ -155,29 +158,22 @@ export default function Subscription() {
     );
   };
 
-  const handleCancel = async () => {
+  const handleCancelSubscription = async () => {
     Alert.alert(
-      locale === 'pt' ? 'Cancelar Assinatura' : 'Cancel Subscription',
+      t.cancelSubscription,
       locale === 'pt' 
-        ? 'Tem certeza que deseja cancelar? Você perderá acesso às funcionalidades premium.'
-        : 'Are you sure you want to cancel? You will lose access to premium features.',
+        ? 'Para cancelar sua assinatura, acesse as configurações da App Store ou Google Play.\n\nDeseja abrir as configurações agora?'
+        : 'To cancel your subscription, go to App Store or Google Play settings.\n\nWould you like to open settings now?',
       [
         { text: locale === 'pt' ? 'Não' : 'No', style: 'cancel' },
         {
-          text: locale === 'pt' ? 'Sim, Cancelar' : 'Yes, Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await api.post('/subscription/cancel');
-              await fetchData();
-              Alert.alert(
-                locale === 'pt' ? 'Assinatura Cancelada' : 'Subscription Cancelled',
-                locale === 'pt' 
-                  ? 'Sua assinatura foi cancelada. Você ainda pode acessar até o final do período.'
-                  : 'Your subscription has been cancelled. You can still access until the end of the period.'
-              );
-            } catch (error) {
-              Alert.alert(locale === 'pt' ? 'Erro' : 'Error', locale === 'pt' ? 'Erro ao cancelar' : 'Error cancelling');
+          text: locale === 'pt' ? 'Abrir Configurações' : 'Open Settings',
+          onPress: () => {
+            // Open subscription management in app stores
+            if (Platform.OS === 'ios') {
+              Linking.openURL('https://apps.apple.com/account/subscriptions');
+            } else {
+              Linking.openURL('https://play.google.com/store/account/subscriptions');
             }
           },
         },
@@ -185,40 +181,45 @@ export default function Subscription() {
     );
   };
 
-  const getStatusBadge = () => {
-    if (!currentSubscription) return null;
+  const handleRestorePurchase = async () => {
+    setIsProcessing(true);
     
-    const statusConfig: { [key: string]: { color: string; label: string } } = {
-      trial: { color: colors.status.warning, label: locale === 'pt' ? 'TRIAL' : 'TRIAL' },
-      active: { color: colors.status.success, label: locale === 'pt' ? 'ATIVO' : 'ACTIVE' },
-      cancelled: { color: colors.status.error, label: locale === 'pt' ? 'CANCELADO' : 'CANCELLED' },
-      expired: { color: colors.text.tertiary, label: locale === 'pt' ? 'EXPIRADO' : 'EXPIRED' },
-    };
-    
-    const config = statusConfig[currentSubscription.status] || statusConfig.expired;
-    
-    return (
-      <View style={[styles.statusBadge, { backgroundColor: config.color + '20' }]}>
-        <Text style={[styles.statusBadgeText, { color: config.color }]}>{config.label}</Text>
-      </View>
-    );
-  };
-
-  const getPlanIcon = (planId: string) => {
-    switch (planId) {
-      case 'essencial': return 'leaf';
-      case 'profissional': return 'rocket';
-      case 'elite': return 'diamond';
-      default: return 'gift';
+    try {
+      // In a real app, this would verify with App Store/Google Play
+      await api.post('/subscription/restore');
+      await fetchData();
+      Alert.alert(
+        locale === 'pt' ? 'Compra Restaurada' : 'Purchase Restored',
+        locale === 'pt' 
+          ? 'Sua assinatura foi restaurada com sucesso!'
+          : 'Your subscription has been restored successfully!'
+      );
+    } catch (error) {
+      Alert.alert(
+        locale === 'pt' ? 'Nenhuma compra encontrada' : 'No purchase found',
+        locale === 'pt' 
+          ? 'Não encontramos uma assinatura anterior vinculada a esta conta.'
+          : 'We could not find a previous subscription linked to this account.'
+      );
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const getPlanGradient = (planId: string): readonly [string, string, ...string[]] => {
-    switch (planId) {
-      case 'essencial': return ['#3b82f6', '#1d4ed8'];
-      case 'profissional': return ['#8b5cf6', '#6d28d9'];
-      case 'elite': return ['#f59e0b', '#d97706'];
-      default: return ['#6b7280', '#4b5563'];
+  const getStatusConfig = () => {
+    if (!currentSubscription) return null;
+    
+    switch (currentSubscription.status) {
+      case 'trial':
+        return { color: colors.status.warning, label: t.statusTrial, icon: 'time' };
+      case 'active':
+        return { color: colors.status.success, label: t.statusActive, icon: 'checkmark-circle' };
+      case 'cancelled':
+        return { color: colors.status.error, label: t.statusCancelled, icon: 'close-circle' };
+      case 'expired':
+        return { color: colors.text.tertiary, label: t.statusExpired, icon: 'alert-circle' };
+      default:
+        return { color: colors.text.tertiary, label: '', icon: 'help-circle' };
     }
   };
 
@@ -230,193 +231,142 @@ export default function Subscription() {
     );
   }
 
+  const statusConfig = getStatusConfig();
+  const isTrialOrActive = currentSubscription?.status === 'trial' || currentSubscription?.status === 'active';
+
   return (
     <View style={styles.container}>
       <LinearGradient
         colors={[colors.dark.secondary, colors.dark.primary]}
         style={styles.gradient}
       >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('subscription.title')}</Text>
+          <Text style={styles.headerTitle}>{t.title}</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-          {/* Current Subscription Card */}
-          {currentSubscription && (
-            <View style={styles.currentPlanCard}>
+          {/* Current Status Card */}
+          {currentSubscription && statusConfig && (
+            <View style={styles.statusCard}>
               <LinearGradient
-                colors={currentSubscription.plan === 'free_trial' 
-                  ? [colors.dark.tertiary, colors.dark.card] 
-                  : getPlanGradient(currentSubscription.plan)}
-                style={styles.currentPlanGradient}
+                colors={['#8b5cf6', '#6d28d9']}
+                style={styles.statusCardGradient}
               >
-                <View style={styles.currentPlanHeader}>
-                  <Ionicons 
-                    name={getPlanIcon(currentSubscription.plan)} 
-                    size={32} 
-                    color="#ffffff" 
-                  />
-                  <View style={styles.currentPlanInfo}>
-                    <Text style={styles.currentPlanLabel}>{t('subscription.currentPlan')}</Text>
-                    <Text style={styles.currentPlanName}>{currentSubscription.plan_name}</Text>
+                <View style={styles.statusHeader}>
+                  <View style={styles.statusIconContainer}>
+                    <Ionicons name="rocket" size={32} color="#ffffff" />
                   </View>
-                  {getStatusBadge()}
+                  <View style={styles.statusInfo}>
+                    <Text style={styles.statusLabel}>{t.currentPlan}</Text>
+                    <Text style={styles.statusPlanName}>
+                      {currentSubscription.plan === 'free_trial' ? 'Pro Trial' : 'Pro'}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '30' }]}>
+                    <Ionicons name={statusConfig.icon as any} size={14} color={statusConfig.color} />
+                    <Text style={[styles.statusBadgeText, { color: statusConfig.color }]}>
+                      {statusConfig.label}
+                    </Text>
+                  </View>
                 </View>
-                
+
                 {currentSubscription.status === 'trial' && currentSubscription.days_remaining !== null && (
-                  <View style={styles.trialInfo}>
-                    <Ionicons name="time-outline" size={18} color="rgba(255,255,255,0.9)" />
-                    <Text style={styles.trialText}>
-                      {currentSubscription.days_remaining} {locale === 'pt' ? 'dias restantes no trial' : 'days remaining in trial'}
+                  <View style={styles.trialCountdown}>
+                    <Ionicons name="time-outline" size={20} color="rgba(255,255,255,0.9)" />
+                    <Text style={styles.trialCountdownText}>
+                      {currentSubscription.days_remaining} {t.daysRemaining}
                     </Text>
                   </View>
                 )}
 
-                <View style={styles.subscriptionDetails}>
-                  <View style={styles.detailRow}>
-                    <Ionicons name="people" size={16} color="rgba(255,255,255,0.7)" />
-                    <Text style={styles.detailText}>
-                      {currentSubscription.current_athletes} / {currentSubscription.max_athletes === -1 ? '∞' : currentSubscription.max_athletes} {locale === 'pt' ? 'atletas' : 'athletes'}
-                    </Text>
+                <View style={styles.statusFeatures}>
+                  <View style={styles.statusFeature}>
+                    <Ionicons name="checkmark" size={16} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.statusFeatureText}>{t.unlimitedAthletes}</Text>
+                  </View>
+                  <View style={styles.statusFeature}>
+                    <Ionicons name="checkmark" size={16} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.statusFeatureText}>{t.allFeatures}</Text>
                   </View>
                 </View>
               </LinearGradient>
             </View>
           )}
 
-          {/* Trial Banner */}
-          {currentSubscription?.status !== 'trial' && (
-            <View style={styles.trialBanner}>
-              <LinearGradient
-                colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']}
-                style={styles.trialBannerGradient}
-              >
+          {/* Plan Card */}
+          {plan && (
+            <View style={styles.planCard}>
+              {/* Trial Banner */}
+              <View style={styles.trialBanner}>
                 <Ionicons name="gift" size={24} color={colors.status.success} />
                 <View style={styles.trialBannerText}>
-                  <Text style={styles.trialBannerTitle}>
-                    {locale === 'pt' ? '7 dias grátis em todos os planos!' : '7 days free on all plans!'}
-                  </Text>
-                  <Text style={styles.trialBannerSubtitle}>
-                    {locale === 'pt' ? 'Experimente antes de assinar' : 'Try before you subscribe'}
-                  </Text>
+                  <Text style={styles.trialBannerTitle}>{t.trialBanner}</Text>
+                  <Text style={styles.trialBannerSubtitle}>{t.trialSubtitle}</Text>
                 </View>
-              </LinearGradient>
-            </View>
-          )}
-
-          {/* Plans Section */}
-          <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Escolha seu plano' : 'Choose your plan'}
-          </Text>
-
-          {plans.map((plan) => {
-            const isCurrentPlan = currentSubscription?.plan === plan.id;
-            const isPopular = plan.popular;
-            
-            return (
-              <View 
-                key={plan.id} 
-                style={[
-                  styles.planCard,
-                  isCurrentPlan && styles.planCardActive,
-                  isPopular && styles.planCardPopular
-                ]}
-              >
-                {isPopular && (
-                  <View style={styles.popularBadge}>
-                    <Text style={styles.popularBadgeText}>
-                      {locale === 'pt' ? '⭐ MAIS POPULAR' : '⭐ MOST POPULAR'}
-                    </Text>
-                  </View>
-                )}
-                
-                <View style={styles.planHeader}>
-                  <View style={styles.planHeaderLeft}>
-                    <LinearGradient
-                      colors={getPlanGradient(plan.id)}
-                      style={styles.planIconContainer}
-                    >
-                      <Ionicons name={getPlanIcon(plan.id)} size={24} color="#ffffff" />
-                    </LinearGradient>
-                    <View>
-                      <Text style={styles.planName}>{plan.name}</Text>
-                      <View style={styles.priceRow}>
-                        <Text style={styles.planPrice}>{plan.price_formatted}</Text>
-                        <Text style={styles.planPeriod}>/{locale === 'pt' ? 'mês' : 'month'}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  {isCurrentPlan && (
-                    <View style={styles.currentBadge}>
-                      <Ionicons name="checkmark-circle" size={20} color={colors.status.success} />
-                      <Text style={styles.currentBadgeText}>{locale === 'pt' ? 'Atual' : 'Current'}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <Text style={styles.planDescription}>{plan.description}</Text>
-
-                {/* Features List */}
-                <View style={styles.featuresContainer}>
-                  {plan.features_list.map((feature, index) => (
-                    <View key={index} style={styles.featureRow}>
-                      <Ionicons name="checkmark-circle" size={18} color={colors.status.success} />
-                      <Text style={styles.featureText}>{feature}</Text>
-                    </View>
-                  ))}
-                  {plan.limitations.map((limitation, index) => (
-                    <View key={`limit-${index}`} style={styles.featureRow}>
-                      <Ionicons name="close-circle" size={18} color={colors.status.error} />
-                      <Text style={[styles.featureText, styles.limitationText]}>{limitation}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                {/* Action Button */}
-                {!isCurrentPlan && (
-                  <TouchableOpacity
-                    style={[styles.selectButton, isPopular && styles.selectButtonHighlight]}
-                    onPress={() => handleSubscribe(plan.id)}
-                    disabled={isProcessing}
-                  >
-                    <LinearGradient
-                      colors={getPlanGradient(plan.id)}
-                      style={styles.selectButtonGradient}
-                    >
-                      {isProcessing ? (
-                        <ActivityIndicator color="#ffffff" />
-                      ) : (
-                        <>
-                          <Text style={styles.selectButtonText}>
-                            {locale === 'pt' ? 'Começar Trial Grátis' : 'Start Free Trial'}
-                          </Text>
-                          <Ionicons name="arrow-forward" size={18} color="#ffffff" />
-                        </>
-                      )}
-                    </LinearGradient>
-                  </TouchableOpacity>
-                )}
               </View>
-            );
-          })}
 
-          {/* Cancel Subscription */}
-          {currentSubscription && 
-           currentSubscription.plan !== 'free_trial' && 
-           currentSubscription.status !== 'cancelled' && 
-           currentSubscription.status !== 'expired' && (
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>
-                {locale === 'pt' ? 'Cancelar Assinatura' : 'Cancel Subscription'}
-              </Text>
-            </TouchableOpacity>
+              {/* Plan Header */}
+              <View style={styles.planHeader}>
+                <View style={styles.planNameContainer}>
+                  <LinearGradient
+                    colors={['#8b5cf6', '#6d28d9']}
+                    style={styles.planIcon}
+                  >
+                    <Ionicons name="rocket" size={28} color="#ffffff" />
+                  </LinearGradient>
+                  <View>
+                    <Text style={styles.planName}>{plan.name}</Text>
+                    <Text style={styles.planDescription}>{plan.description}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Price */}
+              <View style={styles.priceContainer}>
+                <Text style={styles.priceValue}>{plan.price_formatted}</Text>
+                <Text style={styles.pricePeriod}>{t.perMonth}</Text>
+              </View>
+
+              {/* Features List */}
+              <View style={styles.featuresContainer}>
+                {plan.features_list.map((feature, index) => (
+                  <View key={index} style={styles.featureRow}>
+                    <View style={styles.featureCheck}>
+                      <Ionicons name="checkmark" size={14} color="#ffffff" />
+                    </View>
+                    <Text style={styles.featureText}>{feature}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Subscribe Button */}
+              {!isTrialOrActive && (
+                <TouchableOpacity
+                  style={styles.subscribeButton}
+                  onPress={handleStartTrial}
+                  disabled={isProcessing}
+                >
+                  <LinearGradient
+                    colors={['#8b5cf6', '#6d28d9']}
+                    style={styles.subscribeButtonGradient}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator color="#ffffff" />
+                    ) : (
+                      <>
+                        <Text style={styles.subscribeButtonText}>{t.startTrial}</Text>
+                        <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+                      </>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+            </View>
           )}
 
           {/* Region Toggle */}
@@ -444,13 +394,54 @@ export default function Subscription() {
             </View>
           </View>
 
+          {/* Management Options */}
+          <View style={styles.managementSection}>
+            <TouchableOpacity 
+              style={styles.managementButton}
+              onPress={handleRestorePurchase}
+              disabled={isProcessing}
+            >
+              <Ionicons name="refresh" size={20} color={colors.accent.primary} />
+              <Text style={styles.managementButtonText}>{t.restorePurchase}</Text>
+            </TouchableOpacity>
+
+            {isTrialOrActive && currentSubscription?.plan !== 'free_trial' && (
+              <TouchableOpacity 
+                style={styles.managementButton}
+                onPress={handleCancelSubscription}
+              >
+                <Ionicons name="close-circle-outline" size={20} color={colors.status.error} />
+                <Text style={[styles.managementButtonText, { color: colors.status.error }]}>
+                  {t.cancelSubscription}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Legal Links */}
+          <View style={styles.legalSection}>
+            <TouchableOpacity 
+              style={styles.legalLink}
+              onPress={() => router.push('/terms-of-use')}
+            >
+              <Text style={styles.legalLinkText}>{t.termsOfUse}</Text>
+            </TouchableOpacity>
+            <Text style={styles.legalSeparator}>•</Text>
+            <TouchableOpacity 
+              style={styles.legalLink}
+              onPress={() => router.push('/privacy-policy')}
+            >
+              <Text style={styles.legalLinkText}>{t.privacyPolicy}</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Info Notice */}
           <View style={styles.infoNotice}>
             <Ionicons name="information-circle" size={20} color={colors.accent.primary} />
             <Text style={styles.infoNoticeText}>
-              {locale === 'pt' 
-                ? 'O pagamento será processado via compra no aplicativo (In-App Purchase) através da App Store ou Google Play.'
-                : 'Payment will be processed via In-App Purchase through App Store or Google Play.'}
+              {t.inAppPurchaseNote}
+              {'\n\n'}
+              {t.cancelNote}
             </Text>
           </View>
         </ScrollView>
@@ -497,84 +488,99 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  currentPlanCard: {
-    borderRadius: 16,
+  statusCard: {
+    borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 20,
   },
-  currentPlanGradient: {
+  statusCardGradient: {
     padding: 20,
   },
-  currentPlanHeader: {
+  statusHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  currentPlanInfo: {
-    marginLeft: 16,
-    flex: 1,
+  statusIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  currentPlanLabel: {
+  statusInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  statusLabel: {
     fontSize: 12,
     color: 'rgba(255,255,255,0.7)',
     fontWeight: '600',
   },
-  currentPlanName: {
+  statusPlanName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ffffff',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 20,
+    gap: 4,
   },
   statusBadgeText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
   },
-  trialInfo: {
+  trialCountdown: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     marginTop: 16,
     gap: 8,
   },
-  trialText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+  trialCountdownText: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.95)',
     fontWeight: '600',
   },
-  subscriptionDetails: {
+  statusFeatures: {
+    flexDirection: 'row',
     marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.2)',
-    gap: 8,
+    gap: 20,
   },
-  detailRow: {
+  statusFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
-  detailText: {
+  statusFeatureText: {
     fontSize: 13,
     color: 'rgba(255,255,255,0.8)',
   },
-  trialBanner: {
-    borderRadius: 12,
-    overflow: 'hidden',
+  planCard: {
+    backgroundColor: colors.dark.cardSolid,
+    borderRadius: 20,
+    padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.3)',
+    borderWidth: 2,
+    borderColor: '#8b5cf6',
   },
-  trialBannerGradient: {
+  trialBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 20,
     gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   trialBannerText: {
     flex: 1,
@@ -589,153 +595,89 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 16,
-  },
-  planCard: {
-    backgroundColor: colors.dark.cardSolid,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  planCardActive: {
-    borderColor: colors.status.success,
-    borderWidth: 2,
-  },
-  planCardPopular: {
-    borderColor: '#8b5cf6',
-    borderWidth: 2,
-  },
-  popularBadge: {
-    position: 'absolute',
-    top: -1,
-    right: 20,
-    backgroundColor: '#8b5cf6',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-  },
-  popularBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
   planHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 20,
   },
-  planHeaderLeft: {
+  planNameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 14,
   },
-  planIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
+  planIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
   planName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: colors.text.primary,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
+  planDescription: {
+    fontSize: 13,
+    color: colors.text.secondary,
     marginTop: 2,
   },
-  planPrice: {
-    fontSize: 24,
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  priceValue: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: colors.accent.primary,
   },
-  planPeriod: {
-    fontSize: 14,
+  pricePeriod: {
+    fontSize: 16,
     color: colors.text.secondary,
-    marginLeft: 2,
-  },
-  currentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  currentBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.status.success,
-  },
-  planDescription: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: 16,
-    lineHeight: 20,
+    marginLeft: 4,
   },
   featuresContainer: {
-    gap: 8,
-    marginBottom: 16,
+    gap: 12,
+    marginBottom: 24,
   },
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
+  },
+  featureCheck: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.status.success,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   featureText: {
     fontSize: 14,
     color: colors.text.secondary,
     flex: 1,
   },
-  limitationText: {
-    color: colors.text.tertiary,
-  },
-  selectButton: {
-    borderRadius: 12,
+  subscribeButton: {
+    borderRadius: 14,
     overflow: 'hidden',
   },
-  selectButtonHighlight: {
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  selectButtonGradient: {
+  subscribeButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
+    paddingVertical: 16,
     gap: 8,
   },
-  selectButtonText: {
-    fontSize: 16,
+  subscribeButtonText: {
+    fontSize: 17,
     fontWeight: '700',
     color: '#ffffff',
   },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: 16,
-    marginTop: 8,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.status.error,
-  },
   regionToggle: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default,
+    marginBottom: 20,
   },
   regionLabel: {
     fontSize: 13,
@@ -757,8 +699,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   regionButtonActive: {
-    backgroundColor: 'rgba(0, 212, 255, 0.15)',
-    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderColor: '#8b5cf6',
   },
   regionButtonText: {
     fontSize: 13,
@@ -766,22 +708,59 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   regionButtonTextActive: {
+    color: '#8b5cf6',
+  },
+  managementSection: {
+    gap: 12,
+    marginBottom: 20,
+  },
+  managementButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    paddingVertical: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  managementButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.accent.primary,
+  },
+  legalSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  legalLink: {
+    paddingVertical: 8,
+  },
+  legalLinkText: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    textDecorationLine: 'underline',
+  },
+  legalSeparator: {
+    color: colors.text.tertiary,
   },
   infoNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(0, 212, 255, 0.1)',
+    backgroundColor: 'rgba(0, 212, 255, 0.08)',
     borderRadius: 12,
     padding: 16,
-    marginTop: 20,
     gap: 12,
     borderWidth: 1,
-    borderColor: 'rgba(0, 212, 255, 0.2)',
+    borderColor: 'rgba(0, 212, 255, 0.15)',
   },
   infoNoticeText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     color: colors.text.secondary,
     lineHeight: 18,
   },
