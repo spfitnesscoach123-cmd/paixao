@@ -8,6 +8,10 @@ import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
+const { width: screenWidth } = Dimensions.get('window');
+const isSmallScreen = screenWidth < 375;
+const chartWidth = screenWidth - (isSmallScreen ? 48 : 64);
+
 interface JumpAnalysisData {
   athlete_id: string;
   athlete_name: string;
