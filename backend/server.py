@@ -703,6 +703,7 @@ async def get_athlete_sessions(
                 "session_id": session_key,
                 "session_name": record.get("session_name", f"Sessão {record.get('date', 'N/A')}"),
                 "date": record.get("date"),
+                "activity_type": record.get("activity_type"),  # "game" or "training"
                 "periods": [],
                 "totals": {
                     "total_distance": 0,
