@@ -3864,18 +3864,36 @@ async def get_team_dashboard(
             # Note: total_sessions is now calculated globally at the start
             total_distance += distance_7d
             
-            # Collect RSI values from assessments for this athlete
-            athlete_assessments = [a for a in all_assessments if a.get("athlete_id") == athlete_id]
-            for assessment in athlete_assessments:
-                # RSI is stored inside metrics, not at root level
-                metrics = assessment.get("metrics", {})
-                rsi = metrics.get("rsi") if isinstance(metrics, dict) else None
-                if rsi and rsi > 0:
-                    all_rsi_values.append({
-                        "value": rsi,
-                        "date": assessment.get("date"),
-                        "athlete_id": athlete_id
-                    })
+            # Collect RSI values from new jump_assessments system (preferred) or legacy assessments
+            athlete_jump_assessments = await db.jump_assessments.find({
+                "athlete_id": athlete_id,
+                "coach_id": current_user["_id"],
+                "protocol": "cmj"
+            }).sort("date", -1).to_list(10)
+            
+            if athlete_jump_assessments:
+                # Use new jump assessment system
+                for jump_assessment in athlete_jump_assessments:
+                    rsi = jump_assessment.get("rsi")
+                    if rsi and rsi > 0:
+                        all_rsi_values.append({
+                            "value": rsi,
+                            "date": jump_assessment.get("date"),
+                            "athlete_id": athlete_id
+                        })
+            else:
+                # Fallback to legacy assessments
+                athlete_assessments = [a for a in all_assessments if a.get("athlete_id") == athlete_id]
+                for assessment in athlete_assessments:
+                    # RSI is stored inside metrics, not at root level
+                    metrics = assessment.get("metrics", {})
+                    rsi = metrics.get("rsi") if isinstance(metrics, dict) else None
+                    if rsi and rsi > 0:
+                        all_rsi_values.append({
+                            "value": rsi,
+                            "date": assessment.get("date"),
+                            "athlete_id": athlete_id
+                        })
             
             # Calculate ACWR
             acute_weekly = acute_load / 7
