@@ -149,6 +149,7 @@ export default function AthletesScreen() {
         style={styles.fab}
         onPress={() => router.push('/add-athlete')}
         activeOpacity={0.8}
+        data-testid="add-athlete-fab"
       >
         <LinearGradient
           colors={colors.gradients.primary}
