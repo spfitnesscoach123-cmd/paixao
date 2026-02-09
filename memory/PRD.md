@@ -6,54 +6,52 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 ## Current Architecture
 - **Backend**: FastAPI (Python) + MongoDB
 - **Frontend**: React Native (Expo) + TypeScript
-- **AI Integration**: OpenAI via Emergent LLM Key
+- **AI Integration**: OpenAI via Emergent LLM Key (GPT-4o para insights científicos)
 
 ## What's Been Implemented
 
-### ✅ Core Features
-- User authentication (login/register)
-- Athlete CRUD operations
-- GPS data tracking with filters
-- Wellness questionnaires + QTR gauge
-- **NEW: Jump Assessment System** (replaced traditional strength)
-- Team dashboard with comprehensive metrics
-- i18n support (PT/EN)
+### ✅ Scientific Analysis Tab (Dez 9, 2025) - **NEW**
+**Página de Análises completamente redesenhada com insights científicos baseados em IA:**
 
-### ✅ Jump Assessment System (Dez 9, 2025)
-**Substituição completa do módulo de força tradicional:**
+**Fontes de Dados Consolidadas:**
+- GPS (últimas 30 sessões)
+- ACWR (Acute:Chronic Workload Ratio)
+- Wellness (últimos 14 registros)
+- Jump Assessment (CMJ, RSI, Z-Score)
+- VBT (Perfil Carga-Velocidade)
+- Composição Corporal
 
-**Protocolos:**
-- CMJ (Counter Movement Jump)
-- SL-CMJ Right/Left (Single Leg)
-- DJ (Drop Jump) com altura da caixa
+**Métricas e Gráficos:**
+- Gráfico de Evolução RSI
+- Gráfico Perfil Carga-Velocidade (Load-Velocity)
+- Gráfico Perda de Velocidade por Série
+- Gráfico Donut Composição Corporal
+- Barras de Wellness
+- Resumo GPS
 
-**Métricas Calculadas Automaticamente:**
-| Métrica | Fórmula |
-|---------|---------|
-| RSI | Altura / Tempo de Contato |
-| Pico de Potência | Sayers Equation |
-| Pico de Velocidade | √(2×g×h) |
-| Potência Relativa | Potência / Peso |
-| Z-Score | (Atual - Média) / Desvio Padrão |
+**Insights Científicos (IA GPT-4o):**
+- Síntese Fisiológica
+- Análise de Carga de Treinamento
+- Estado Neuromuscular (fadiga central/periférica)
+- Estado de Recuperação
+- Fatores de Risco e Prevenção
+- Recomendações de Treinamento e Recuperação
+- Terminologia científica específica com referências
 
-**Índice de Fadiga (SNC):**
-| Variação RSI | Status |
-|--------------|--------|
-| 0 a -5% | 🟢 Treino Normal |
-| -6% a -12% | 🟡 Monitorar |
-| < -13% | 🔴 Alto Risco |
+**Funcionalidade PDF:**
+- Botão de impressão de relatório
+- Preview do relatório antes de imprimir
+- Relatório HTML formatado para impressão
+- Inclui todos os dados e insights de IA
 
-**Assimetria (SL-CMJ):**
-- Diferença >10% = RED FLAG
-- Feedback automático com recomendações
+**Endpoints:**
+- `GET /api/analysis/scientific/{athlete_id}` - Análise consolidada
+- `GET /api/report/scientific/{athlete_id}` - Relatório HTML para impressão
 
 **Componentes:**
-- `JumpAnalysisCharts.tsx` - Visualização na página do atleta
-- `jump-assessment.tsx` - Página de entrada de dados
-- Backend endpoints: `/api/jump/*`
-- Seção completa no relatório PDF
+- `ScientificAnalysisTab.tsx` - Componente principal da aba de análises
 
-### ✅ ACWR Classification System (Feb 7, 2026)
+### ❌ REMOVIDO: Export PDF/CSV (Dez 2025)
 | Range | Classification | Status |
 |-------|----------------|--------|
 | <0.8 | Losing Performance | Undertrained |
