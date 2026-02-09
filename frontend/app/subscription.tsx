@@ -21,6 +21,9 @@ import * as Localization from 'expo-localization';
 
 const { width } = Dimensions.get('window');
 
+// Check if we're on native platform
+const isNativePlatform = Platform.OS === 'ios' || Platform.OS === 'android';
+
 interface Plan {
   id: string;
   name: string;
@@ -45,6 +48,39 @@ interface CurrentSubscription {
   trial_end_date: string | null;
 }
 
+// RevenueCat types
+interface RevenueCatPackage {
+  identifier: string;
+  product: {
+    identifier: string;
+    title: string;
+    description: string;
+    priceString: string;
+    price: number;
+    currencyCode: string;
+    introPrice?: {
+      priceString: string;
+      periodUnit: string;
+      periodNumberOfUnits: number;
+    };
+  };
+}
+
+interface RevenueCatCustomerInfo {
+  entitlements: {
+    active: {
+      [key: string]: {
+        identifier: string;
+        isActive: boolean;
+        willRenew: boolean;
+        expirationDate: string | null;
+        periodType: string;
+      };
+    };
+  };
+  managementURL: string | null;
+}
+
 export default function Subscription() {
   const router = useRouter();
   const { locale } = useLanguage();
@@ -53,6 +89,12 @@ export default function Subscription() {
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [region, setRegion] = useState<string>('BR');
+  
+  // RevenueCat state
+  const [revenueCatPackages, setRevenueCatPackages] = useState<RevenueCatPackage[]>([]);
+  const [revenueCatCustomerInfo, setRevenueCatCustomerInfo] = useState<RevenueCatCustomerInfo | null>(null);
+  const [revenueCatInitialized, setRevenueCatInitialized] = useState(false);
+  const [Purchases, setPurchases] = useState<any>(null);
 
   // Detect region based on device locale
   useEffect(() => {
@@ -60,22 +102,74 @@ export default function Subscription() {
     setRegion(detectedRegion);
   }, []);
 
+  // Initialize RevenueCat on native platforms
+  useEffect(() => {
+    const initRevenueCat = async () => {
+      if (!isNativePlatform) {
+        setRevenueCatInitialized(true);
+        return;
+      }
+
+      try {
+        const PurchasesModule = await import('react-native-purchases');
+        const PurchasesSDK = PurchasesModule.default;
+        setPurchases(PurchasesSDK);
+
+        // Get API key based on platform
+        const apiKey = Platform.OS === 'ios'
+          ? process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY
+          : process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY;
+
+        if (apiKey) {
+          await PurchasesSDK.configure({ apiKey });
+          
+          // Get customer info
+          const customerInfo = await PurchasesSDK.getCustomerInfo();
+          setRevenueCatCustomerInfo(customerInfo);
+          
+          // Get offerings
+          const offerings = await PurchasesSDK.getOfferings();
+          if (offerings.current?.availablePackages) {
+            setRevenueCatPackages(offerings.current.availablePackages);
+          }
+          
+          // Listen for updates
+          PurchasesSDK.addCustomerInfoUpdateListener((info: RevenueCatCustomerInfo) => {
+            setRevenueCatCustomerInfo(info);
+          });
+        }
+        
+        setRevenueCatInitialized(true);
+      } catch (err) {
+        console.log('RevenueCat initialization skipped:', err);
+        setRevenueCatInitialized(true);
+      }
+    };
+
+    initRevenueCat();
+  }, []);
+
+  // Check if user has Pro via RevenueCat
+  const hasRevenueCatPro = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.isActive ?? false;
+  const revenueCatExpirationDate = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.expirationDate;
+  const isRevenueCatTrialing = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.periodType === 'trial';
+
   const fetchData = useCallback(async () => {
     try {
       setIsLoading(true);
       const lang = locale === 'pt' ? 'pt' : 'en';
       
-      // Fetch plan
+      // Fetch plan info from backend
       try {
         const plansRes = await api.get(`/subscription/plans?lang=${lang}&region=${region}`);
         if (plansRes.data && plansRes.data.length > 0) {
-          setPlan(plansRes.data[0]); // Only one plan: Pro
+          setPlan(plansRes.data[0]);
         }
       } catch (plansError) {
         console.error('Error fetching plans:', plansError);
       }
       
-      // Fetch current subscription
+      // Fetch current subscription from backend
       try {
         const currentRes = await api.get(`/subscription/current?lang=${lang}&region=${region}`);
         setCurrentSubscription(currentRes.data);
@@ -120,9 +214,52 @@ export default function Subscription() {
     statusExpired: locale === 'pt' ? 'EXPIRADO' : 'EXPIRED',
     unlimitedAthletes: locale === 'pt' ? 'Atletas ilimitados' : 'Unlimited athletes',
     allFeatures: locale === 'pt' ? 'Todas as funcionalidades' : 'All features',
+    webPurchaseNote: locale === 'pt'
+      ? 'As compras no app estão disponíveis apenas no aplicativo móvel. Baixe o app para assinar.'
+      : 'In-app purchases are only available in the mobile app. Download the app to subscribe.',
+    purchaseSuccess: locale === 'pt' ? 'Assinatura ativada com sucesso!' : 'Subscription activated successfully!',
+    purchaseError: locale === 'pt' ? 'Erro ao processar assinatura' : 'Error processing subscription',
+    restoreSuccess: locale === 'pt' ? 'Compras restauradas com sucesso!' : 'Purchases restored successfully!',
+    restoreNoFound: locale === 'pt' ? 'Nenhuma compra anterior encontrada' : 'No previous purchases found',
   };
 
+  // Handle purchase via RevenueCat
+  const handleRevenueCatPurchase = async (pkg: RevenueCatPackage) => {
+    if (!Purchases) return;
+    
+    setIsProcessing(true);
+    
+    try {
+      const { customerInfo } = await Purchases.purchasePackage(pkg);
+      setRevenueCatCustomerInfo(customerInfo);
+      
+      const hasPro = customerInfo?.entitlements?.active?.['pro']?.isActive;
+      
+      if (hasPro) {
+        Alert.alert('🎉', t.purchaseSuccess);
+        await fetchData(); // Refresh backend data
+      }
+    } catch (err: any) {
+      if (!err.userCancelled) {
+        Alert.alert(
+          locale === 'pt' ? 'Erro' : 'Error',
+          t.purchaseError
+        );
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Handle legacy subscription start (for web/testing)
   const handleStartTrial = async () => {
+    // On native with RevenueCat packages, use RevenueCat
+    if (isNativePlatform && revenueCatPackages.length > 0) {
+      handleRevenueCatPurchase(revenueCatPackages[0]);
+      return;
+    }
+    
+    // Fallback for web/testing - use backend
     setIsProcessing(true);
     
     Alert.alert(
@@ -159,6 +296,14 @@ export default function Subscription() {
   };
 
   const handleCancelSubscription = async () => {
+    // For RevenueCat subscriptions, direct to app store
+    const managementURL = revenueCatCustomerInfo?.managementURL;
+    
+    if (managementURL) {
+      Linking.openURL(managementURL);
+      return;
+    }
+    
     Alert.alert(
       t.cancelSubscription,
       locale === 'pt' 
@@ -169,7 +314,6 @@ export default function Subscription() {
         {
           text: locale === 'pt' ? 'Abrir Configurações' : 'Open Settings',
           onPress: () => {
-            // Open subscription management in app stores
             if (Platform.OS === 'ios') {
               Linking.openURL('https://apps.apple.com/account/subscriptions');
             } else {
@@ -185,21 +329,36 @@ export default function Subscription() {
     setIsProcessing(true);
     
     try {
-      // In a real app, this would verify with App Store/Google Play
+      // Try RevenueCat restore first on native
+      if (Purchases && isNativePlatform) {
+        const customerInfo = await Purchases.restorePurchases();
+        setRevenueCatCustomerInfo(customerInfo);
+        
+        const hasPro = customerInfo?.entitlements?.active?.['pro']?.isActive;
+        
+        if (hasPro) {
+          Alert.alert('✓', t.restoreSuccess);
+          await fetchData();
+        } else {
+          Alert.alert(
+            locale === 'pt' ? 'Nenhuma compra encontrada' : 'No purchase found',
+            t.restoreNoFound
+          );
+        }
+        return;
+      }
+      
+      // Fallback to backend restore
       await api.post('/subscription/restore');
       await fetchData();
       Alert.alert(
         locale === 'pt' ? 'Compra Restaurada' : 'Purchase Restored',
-        locale === 'pt' 
-          ? 'Sua assinatura foi restaurada com sucesso!'
-          : 'Your subscription has been restored successfully!'
+        t.restoreSuccess
       );
     } catch (error) {
       Alert.alert(
         locale === 'pt' ? 'Nenhuma compra encontrada' : 'No purchase found',
-        locale === 'pt' 
-          ? 'Não encontramos uma assinatura anterior vinculada a esta conta.'
-          : 'We could not find a previous subscription linked to this account.'
+        t.restoreNoFound
       );
     } finally {
       setIsProcessing(false);
@@ -207,6 +366,15 @@ export default function Subscription() {
   };
 
   const getStatusConfig = () => {
+    // Check RevenueCat status first
+    if (hasRevenueCatPro) {
+      if (isRevenueCatTrialing) {
+        return { color: colors.status.warning, label: t.statusTrial, icon: 'time' };
+      }
+      return { color: colors.status.success, label: t.statusActive, icon: 'checkmark-circle' };
+    }
+    
+    // Fallback to backend status
     if (!currentSubscription) return null;
     
     switch (currentSubscription.status) {
@@ -223,7 +391,18 @@ export default function Subscription() {
     }
   };
 
-  if (isLoading) {
+  // Calculate days remaining from RevenueCat expiration
+  const getDaysRemaining = () => {
+    if (revenueCatExpirationDate) {
+      const expDate = new Date(revenueCatExpirationDate);
+      const now = new Date();
+      const diff = Math.ceil((expDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      return diff > 0 ? diff : 0;
+    }
+    return currentSubscription?.days_remaining ?? null;
+  };
+
+  if (isLoading || !revenueCatInitialized) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.accent.primary} />
@@ -232,7 +411,12 @@ export default function Subscription() {
   }
 
   const statusConfig = getStatusConfig();
-  const isTrialOrActive = currentSubscription?.status === 'trial' || currentSubscription?.status === 'active';
+  const isTrialOrActive = hasRevenueCatPro || currentSubscription?.status === 'trial' || currentSubscription?.status === 'active';
+  const daysRemaining = getDaysRemaining();
+
+  // Get price from RevenueCat if available, otherwise from backend
+  const displayPrice = revenueCatPackages[0]?.product?.priceString || plan?.price_formatted || '';
+  const hasTrialOffer = revenueCatPackages[0]?.product?.introPrice != null;
 
   return (
     <View style={styles.container}>
@@ -242,7 +426,7 @@ export default function Subscription() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} data-testid="back-button">
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t.title}</Text>
@@ -250,9 +434,17 @@ export default function Subscription() {
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+          {/* Web Platform Notice */}
+          {!isNativePlatform && (
+            <View style={styles.webNotice}>
+              <Ionicons name="phone-portrait-outline" size={24} color={colors.accent.primary} />
+              <Text style={styles.webNoticeText}>{t.webPurchaseNote}</Text>
+            </View>
+          )}
+
           {/* Current Status Card */}
-          {currentSubscription && statusConfig && (
-            <View style={styles.statusCard}>
+          {(hasRevenueCatPro || (currentSubscription && statusConfig)) && statusConfig && (
+            <View style={styles.statusCard} data-testid="status-card">
               <LinearGradient
                 colors={['#8b5cf6', '#6d28d9']}
                 style={styles.statusCardGradient}
@@ -263,9 +455,7 @@ export default function Subscription() {
                   </View>
                   <View style={styles.statusInfo}>
                     <Text style={styles.statusLabel}>{t.currentPlan}</Text>
-                    <Text style={styles.statusPlanName}>
-                      {currentSubscription.plan === 'free_trial' ? 'Pro Trial' : 'Pro'}
-                    </Text>
+                    <Text style={styles.statusPlanName}>Pro</Text>
                   </View>
                   <View style={[styles.statusBadge, { backgroundColor: statusConfig.color + '30' }]}>
                     <Ionicons name={statusConfig.icon as any} size={14} color={statusConfig.color} />
@@ -275,11 +465,11 @@ export default function Subscription() {
                   </View>
                 </View>
 
-                {currentSubscription.status === 'trial' && currentSubscription.days_remaining !== null && (
+                {(isRevenueCatTrialing || currentSubscription?.status === 'trial') && daysRemaining !== null && (
                   <View style={styles.trialCountdown}>
                     <Ionicons name="time-outline" size={20} color="rgba(255,255,255,0.9)" />
                     <Text style={styles.trialCountdownText}>
-                      {currentSubscription.days_remaining} {t.daysRemaining}
+                      {daysRemaining} {t.daysRemaining}
                     </Text>
                   </View>
                 )}
@@ -300,15 +490,17 @@ export default function Subscription() {
 
           {/* Plan Card */}
           {plan && (
-            <View style={styles.planCard}>
+            <View style={styles.planCard} data-testid="plan-card">
               {/* Trial Banner */}
-              <View style={styles.trialBanner}>
-                <Ionicons name="gift" size={24} color={colors.status.success} />
-                <View style={styles.trialBannerText}>
-                  <Text style={styles.trialBannerTitle}>{t.trialBanner}</Text>
-                  <Text style={styles.trialBannerSubtitle}>{t.trialSubtitle}</Text>
+              {(hasTrialOffer || plan.trial_days > 0) && !isTrialOrActive && (
+                <View style={styles.trialBanner}>
+                  <Ionicons name="gift" size={24} color={colors.status.success} />
+                  <View style={styles.trialBannerText}>
+                    <Text style={styles.trialBannerTitle}>{t.trialBanner}</Text>
+                    <Text style={styles.trialBannerSubtitle}>{t.trialSubtitle}</Text>
+                  </View>
                 </View>
-              </View>
+              )}
 
               {/* Plan Header */}
               <View style={styles.planHeader}>
@@ -328,7 +520,7 @@ export default function Subscription() {
 
               {/* Price */}
               <View style={styles.priceContainer}>
-                <Text style={styles.priceValue}>{plan.price_formatted}</Text>
+                <Text style={styles.priceValue}>{displayPrice}</Text>
                 <Text style={styles.pricePeriod}>{t.perMonth}</Text>
               </View>
 
@@ -350,6 +542,7 @@ export default function Subscription() {
                   style={styles.subscribeButton}
                   onPress={handleStartTrial}
                   disabled={isProcessing}
+                  data-testid="subscribe-button"
                 >
                   <LinearGradient
                     colors={['#8b5cf6', '#6d28d9']}
@@ -378,6 +571,7 @@ export default function Subscription() {
               <TouchableOpacity
                 style={[styles.regionButton, region === 'BR' && styles.regionButtonActive]}
                 onPress={() => setRegion('BR')}
+                data-testid="region-br"
               >
                 <Text style={[styles.regionButtonText, region === 'BR' && styles.regionButtonTextActive]}>
                   🇧🇷 Brasil (R$)
@@ -386,6 +580,7 @@ export default function Subscription() {
               <TouchableOpacity
                 style={[styles.regionButton, region !== 'BR' && styles.regionButtonActive]}
                 onPress={() => setRegion('US')}
+                data-testid="region-us"
               >
                 <Text style={[styles.regionButtonText, region !== 'BR' && styles.regionButtonTextActive]}>
                   🌎 International ($)
@@ -400,15 +595,17 @@ export default function Subscription() {
               style={styles.managementButton}
               onPress={handleRestorePurchase}
               disabled={isProcessing}
+              data-testid="restore-button"
             >
               <Ionicons name="refresh" size={20} color={colors.accent.primary} />
               <Text style={styles.managementButtonText}>{t.restorePurchase}</Text>
             </TouchableOpacity>
 
-            {isTrialOrActive && currentSubscription?.plan !== 'free_trial' && (
+            {isTrialOrActive && (
               <TouchableOpacity 
                 style={styles.managementButton}
                 onPress={handleCancelSubscription}
+                data-testid="cancel-button"
               >
                 <Ionicons name="close-circle-outline" size={20} color={colors.status.error} />
                 <Text style={[styles.managementButtonText, { color: colors.status.error }]}>
@@ -487,6 +684,23 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 40,
+  },
+  webNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  webNoticeText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text.secondary,
+    lineHeight: 18,
   },
   statusCard: {
     borderRadius: 20,
