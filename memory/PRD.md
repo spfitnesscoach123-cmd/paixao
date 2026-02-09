@@ -171,6 +171,47 @@ Página de assinaturas completamente redesenhada com apenas 1 plano:
 - `backend/server.py` - PLAN_LIMITS simplificado, novo endpoint restore
 - `frontend/app/subscription.tsx` - UI completamente redesenhada
 
+### ✅ Integração RevenueCat para In-App Purchases (Dez 9, 2025)
+
+Implementada integração completa com RevenueCat para gerenciamento de assinaturas via App Store e Google Play.
+
+**Frontend (React Native/Expo):**
+- Instalado `react-native-purchases@9.7.6` SDK
+- Criado `services/revenuecat.ts` - Configuração e helpers
+- Criado `contexts/RevenueCatContext.tsx` - Context provider para gerenciamento de estado
+- Atualizado `app/subscription.tsx` - Integração com RevenueCat SDK
+
+**Backend (FastAPI):**
+- Novos endpoints de webhook:
+  - `POST /api/webhooks/revenuecat` - Recebe eventos do RevenueCat
+  - `GET /api/subscription/revenuecat-status/{app_user_id}` - Verifica status
+- Eventos suportados:
+  - `INITIAL_PURCHASE` - Compra inicial
+  - `RENEWAL` - Renovação automática
+  - `CANCELLATION` - Cancelamento
+  - `EXPIRATION` - Expiração
+  - `BILLING_ISSUE` - Problema de cobrança
+  - `UNCANCELLATION` - Reativação
+  - `PRODUCT_CHANGE` - Mudança de plano
+
+**Configuração Necessária no RevenueCat Dashboard:**
+1. Criar projeto e configurar apps (iOS/Android)
+2. Criar produto `com.peakperform.pro.monthly`
+3. Criar entitlement `pro` e vincular ao produto
+4. Configurar webhook URL: `{BACKEND_URL}/api/webhooks/revenuecat`
+5. Adicionar API keys nas variáveis de ambiente:
+   - `EXPO_PUBLIC_REVENUECAT_APPLE_KEY` - Chave pública iOS
+   - `EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY` - Chave pública Android
+   - `REVENUECAT_WEBHOOK_SECRET` - Secret para validar webhooks
+
+**Funcionalidades:**
+- Compras via App Store e Google Play
+- Restaurar compras anteriores
+- Detecção automática de status (trial/active/cancelled)
+- Fallback gracioso para web (mostra aviso)
+- Sincronização de status via webhooks
+- Auditoria de eventos (collection `webhook_events`)
+
 ### ✅ Correção "Adicionar Atleta Manualmente" (Fev 9, 2026)
 
 | Problema | Solução | Status |
