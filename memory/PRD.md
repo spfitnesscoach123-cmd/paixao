@@ -144,6 +144,23 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ## Prioritized Backlog
 
+### ✅ Fallback Web para Wellness Form (Fev 9, 2026)
+
+Corrigido o problema onde usuários web viam "Link inválido ou expirado" em vez da página de fallback.
+
+| Problema | Solução | Status |
+|----------|---------|--------|
+| SSR executava fetch antes da detecção de plataforma | Implementado `isClient` state com useEffect para detecção client-side only | ✅ Fixed |
+| `Platform.OS` retornava valores inconsistentes no SSR | Separado detecção de plataforma em dois estados: `isClient` e `isWebPlatform` | ✅ Fixed |
+
+**Fluxo Corrigido:**
+1. Página carrega com loading state
+2. `useEffect` executa e detecta `Platform.OS === 'web'`
+3. Se web: mostra página de fallback (sem chamadas à API)
+4. Se nativo: carrega atletas normalmente
+
+**Arquivo Modificado:** `frontend/app/wellness-form/[token].tsx`
+
 ### P1 - Next
 - [ ] Full i18n audit
 - [ ] Global theme (Light/Dark)
