@@ -4264,7 +4264,7 @@ async def get_scientific_report_pdf(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Generate a printable scientific report in HTML format.
+    Generate a printable scientific report in HTML format with all charts.
     The browser can print this page to PDF.
     """
     # Get all scientific analysis data
@@ -4278,7 +4278,30 @@ async def get_scientific_report_pdf(
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
     
-    # Generate HTML report
+    # Get additional data for charts
+    # GPS historical data
+    gps_history = await db.gps_data.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(10).to_list(10)
+    gps_history.reverse()
+    
+    # Wellness historical data
+    wellness_history = await db.wellness_questionnaires.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(14).to_list(14)
+    wellness_history.reverse()
+    
+    # Jump history for RSI evolution
+    jump_history = await db.jump_assessments.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(10).to_list(10)
+    jump_history.reverse()
+    
+    # VBT data for load-velocity chart
+    vbt_data = await db.vbt_data.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(20).to_list(20)
+    
     is_pt = lang == "pt"
     
     def risk_color(level):
@@ -4292,6 +4315,21 @@ async def get_scientific_report_pdf(
         if is_pt:
             return {"low": "Baixo", "moderate": "Moderado", "high": "Alto"}.get(level, "Desconhecido")
         return level.title() if level else "Unknown"
+    
+    # Calculate IMC
+    weight = athlete.get('weight', 0)
+    height_cm = athlete.get('height', 0)
+    imc = (weight / ((height_cm/100) ** 2)) if height_cm > 0 and weight > 0 else 0
+    imc_class = ""
+    if imc > 0:
+        if imc < 18.5:
+            imc_class = "Abaixo do peso" if is_pt else "Underweight"
+        elif imc < 25:
+            imc_class = "Normal" if is_pt else "Normal"
+        elif imc < 30:
+            imc_class = "Sobrepeso" if is_pt else "Overweight"
+        else:
+            imc_class = "Obesidade" if is_pt else "Obese"
     
     html_content = f"""
 <!DOCTYPE html>
@@ -4309,7 +4347,7 @@ async def get_scientific_report_pdf(
             padding: 20px;
             line-height: 1.5;
         }}
-        .container {{ max-width: 800px; margin: 0 auto; }}
+        .container {{ max-width: 900px; margin: 0 auto; }}
         .header {{ 
             text-align: center; 
             padding: 30px 0;
@@ -4324,6 +4362,7 @@ async def get_scientific_report_pdf(
             padding: 20px;
             margin-bottom: 20px;
             border: 1px solid #334155;
+            page-break-inside: avoid;
         }}
         .section-title {{ 
             font-size: 16px;
@@ -4343,6 +4382,7 @@ async def get_scientific_report_pdf(
             color: white;
         }}
         .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }}
+        .grid-3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
         .grid-4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
         .stat-card {{
             background: rgba(255,255,255,0.05);
@@ -4352,6 +4392,17 @@ async def get_scientific_report_pdf(
         }}
         .stat-value {{ font-size: 20px; font-weight: bold; color: #f8fafc; }}
         .stat-label {{ font-size: 11px; color: #94a3b8; margin-top: 4px; }}
+        .chart-container {{
+            margin: 16px 0;
+            text-align: center;
+        }}
+        .chart-title {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            text-align: left;
+        }}
         .alert {{
             background: rgba(239, 68, 68, 0.1);
             border-left: 4px solid #ef4444;
@@ -4360,18 +4411,43 @@ async def get_scientific_report_pdf(
             border-radius: 0 8px 8px 0;
         }}
         .alert p {{ color: #fca5a5; font-size: 13px; }}
+        .alert.warning {{
+            background: rgba(245, 158, 11, 0.1);
+            border-left-color: #f59e0b;
+        }}
+        .alert.warning p {{ color: #fcd34d; }}
         .insights {{
             background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
             border-radius: 12px;
             padding: 20px;
             margin-top: 20px;
+            page-break-inside: avoid;
         }}
-        .insights-title {{ font-size: 18px; font-weight: 600; margin-bottom: 16px; }}
+        .insights-title {{ font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #f8fafc; }}
         .insights-text {{ 
             white-space: pre-wrap;
-            font-size: 13px;
+            font-size: 12px;
             line-height: 1.7;
             color: #cbd5e1;
+        }}
+        .legend {{
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #94a3b8;
+        }}
+        .legend-dot {{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
         }}
         .print-btn {{
             position: fixed;
@@ -4387,7 +4463,9 @@ async def get_scientific_report_pdf(
             display: flex;
             align-items: center;
             gap: 8px;
+            z-index: 100;
         }}
+        .print-btn:hover {{ background: #7c3aed; }}
         .factor-item {{ 
             display: flex;
             align-items: center;
@@ -4397,15 +4475,18 @@ async def get_scientific_report_pdf(
             color: #94a3b8;
         }}
         .factor-item::before {{ content: '⚠️'; }}
+        .two-col {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
         @media print {{
-            body {{ background: white; color: #1e293b; padding: 0; }}
-            .section {{ border: 1px solid #e2e8f0; background: #f8fafc; }}
+            body {{ background: white; color: #1e293b; padding: 10px; font-size: 11px; }}
+            .section {{ border: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; margin-bottom: 15px; }}
             .print-btn {{ display: none; }}
             .stat-card {{ background: #f1f5f9; }}
             .stat-value, .section-title {{ color: #1e293b; }}
             .stat-label {{ color: #64748b; }}
             .insights {{ background: #f8fafc; border: 1px solid #e2e8f0; }}
             .insights-text {{ color: #475569; }}
+            .chart-title {{ color: #475569; }}
+            .legend-item {{ color: #64748b; }}
         }}
     </style>
 </head>
@@ -4413,60 +4494,265 @@ async def get_scientific_report_pdf(
     <div class="container">
         <div class="header">
             <h1>{'📊 Relatório Científico Completo' if is_pt else '📊 Complete Scientific Report'}</h1>
-            <p>{athlete['name']} • {analysis.analysis_date}</p>
-            <p>{'Posição' if is_pt else 'Position'}: {athlete.get('position', 'N/A')} | {'Peso' if is_pt else 'Weight'}: {athlete.get('weight', 'N/A')} kg</p>
+            <p><strong>{athlete['name']}</strong> • {analysis.analysis_date}</p>
+            <p>{'Posição' if is_pt else 'Position'}: {athlete.get('position', 'N/A')} | {'Peso' if is_pt else 'Weight'}: {weight} kg | {'Altura' if is_pt else 'Height'}: {height_cm} cm | IMC: {imc:.1f} ({imc_class})</p>
         </div>
         
         <!-- Risk Level -->
         <div class="section">
             <div class="section-title"><span>🎯</span> {'Nível de Risco de Lesão' if is_pt else 'Injury Risk Level'}</div>
-            <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
                 <div class="risk-badge" style="background: {risk_color(analysis.overall_risk_level)}">
                     {risk_label(analysis.overall_risk_level)}
                 </div>
             </div>
-            {''.join(f'<div class="factor-item">{f}</div>' for f in analysis.injury_risk_factors) if analysis.injury_risk_factors else ''}
+            {''.join(f'<div class="factor-item">{f}</div>' for f in analysis.injury_risk_factors) if analysis.injury_risk_factors else f'<p style="color: #10b981;">{"✅ Nenhum fator de risco identificado" if is_pt else "✅ No risk factors identified"}</p>'}
         </div>
 """
 
-    # GPS Section
-    if analysis.gps_summary:
+    # ============= GPS SECTION WITH CHARTS =============
+    if analysis.gps_summary and gps_history:
         gps = analysis.gps_summary
+        
+        # Generate GPS charts SVG
+        chart_width = 380
+        chart_height = 120
+        padding = 40
+        
+        # Prepare data for charts
+        distances = [g.get('total_distance', 0) for g in gps_history]
+        hi_distances = [g.get('high_intensity_distance', 0) for g in gps_history]
+        sprint_distances = [g.get('sprint_distance', 0) for g in gps_history]
+        sprints = [g.get('sprint_count', 0) for g in gps_history]
+        dates = [g.get('date', '')[:5] for g in gps_history]
+        
+        def make_line_chart(values, color, title, unit, width=chart_width, height=chart_height):
+            if not values or all(v == 0 for v in values):
+                return ""
+            max_val = max(values) * 1.1 if max(values) > 0 else 1
+            min_val = 0
+            inner_w = width - padding * 2
+            inner_h = height - 40
+            
+            points = []
+            for i, v in enumerate(values):
+                x = padding + (i / max(len(values)-1, 1)) * inner_w
+                y = height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else height - 20
+                points.append(f"{x},{y}")
+            
+            polyline = " ".join(points)
+            
+            # Grid lines
+            grid_lines = ""
+            for i in range(4):
+                y = height - 20 - (i / 3) * inner_h
+                val = min_val + (i / 3) * (max_val - min_val)
+                grid_lines += f'<line x1="{padding}" y1="{y}" x2="{width-padding}" y2="{y}" stroke="#334155" stroke-dasharray="4"/>'
+                grid_lines += f'<text x="{padding-5}" y="{y+4}" text-anchor="end" fill="#64748b" font-size="9">{val:.0f}</text>'
+            
+            # Date labels
+            date_labels = ""
+            for i, d in enumerate(dates):
+                if i == 0 or i == len(dates) - 1:
+                    x = padding + (i / max(len(dates)-1, 1)) * inner_w
+                    date_labels += f'<text x="{x}" y="{height-5}" text-anchor="middle" fill="#64748b" font-size="8">{d}</text>'
+            
+            # Points
+            point_circles = ""
+            for i, v in enumerate(values):
+                x = padding + (i / max(len(values)-1, 1)) * inner_w
+                y = height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else height - 20
+                point_circles += f'<circle cx="{x}" cy="{y}" r="4" fill="{color}"/>'
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{title} ({unit})</div>
+                <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+                    {grid_lines}
+                    <polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="2"/>
+                    {point_circles}
+                    {date_labels}
+                </svg>
+            </div>
+            '''
+        
         html_content += f"""
         <div class="section">
             <div class="section-title"><span>📍</span> {'Dados GPS' if is_pt else 'GPS Data'} ({gps['sessions_count']} {'sessões' if is_pt else 'sessions'})</div>
             <div class="grid-4">
                 <div class="stat-card">
-                    <div class="stat-value">{gps['avg_distance_m'] / 1000:.1f} km</div>
-                    <div class="stat-label">{'Dist. Média' if is_pt else 'Avg Distance'}</div>
+                    <div class="stat-value">{gps['avg_distance_m'] / 1000:.1f}</div>
+                    <div class="stat-label">{'Dist. Média (km)' if is_pt else 'Avg Dist (km)'}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{gps['avg_high_intensity_m']:.0f} m</div>
-                    <div class="stat-label">{'Alta Intensidade' if is_pt else 'High Intensity'}</div>
+                    <div class="stat-value">{gps['avg_high_intensity_m']:.0f}</div>
+                    <div class="stat-label">{'Alta Int. (m)' if is_pt else 'High Int (m)'}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">{gps['avg_sprints']:.1f}</div>
-                    <div class="stat-label">{'Sprints/Sessão' if is_pt else 'Sprints/Session'}</div>
+                    <div class="stat-label">{'Sprints/Sessão' if is_pt else 'Sprints/Sess'}</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value">{gps['max_speed_kmh']:.1f}</div>
-                    <div class="stat-label">{'Vel. Máx km/h' if is_pt else 'Max Speed km/h'}</div>
+                    <div class="stat-label">{'Vel. Máx (km/h)' if is_pt else 'Max Speed'}</div>
                 </div>
+            </div>
+            <div class="two-col">
+                {make_line_chart(distances, '#3b82f6', 'Distância Total' if is_pt else 'Total Distance', 'm')}
+                {make_line_chart(hi_distances, '#f59e0b', 'Alta Intensidade' if is_pt else 'High Intensity', 'm')}
+            </div>
+            <div class="two-col">
+                {make_line_chart(sprint_distances, '#ef4444', 'Distância Sprints' if is_pt else 'Sprint Distance', 'm')}
+                {make_line_chart(sprints, '#8b5cf6', 'Número de Sprints' if is_pt else 'Number of Sprints', '')}
             </div>
         </div>
 """
 
-    # Jump Analysis Section
-    if analysis.jump_analysis:
+    # ============= WELLNESS SECTION WITH CHART =============
+    if analysis.wellness_summary and wellness_history:
+        w = analysis.wellness_summary
+        
+        # Wellness evolution chart
+        wellness_scores = [wh.get('wellness_score', 0) for wh in wellness_history]
+        readiness_scores = [wh.get('readiness_score', 0) for wh in wellness_history]
+        wellness_dates = [wh.get('date', '')[:5] for wh in wellness_history]
+        
+        chart_width = 760
+        chart_height = 140
+        padding = 50
+        
+        def make_dual_line_chart(values1, values2, color1, color2, label1, label2):
+            if not values1:
+                return ""
+            max_val = 10
+            min_val = 0
+            inner_w = chart_width - padding * 2
+            inner_h = chart_height - 40
+            
+            def get_points(values):
+                pts = []
+                for i, v in enumerate(values):
+                    x = padding + (i / max(len(values)-1, 1)) * inner_w
+                    y = chart_height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h
+                    pts.append(f"{x},{y}")
+                return " ".join(pts)
+            
+            # Grid
+            grid = ""
+            for i in range(5):
+                y = chart_height - 20 - (i / 4) * inner_h
+                val = min_val + (i / 4) * (max_val - min_val)
+                grid += f'<line x1="{padding}" y1="{y}" x2="{chart_width-padding}" y2="{y}" stroke="#334155" stroke-dasharray="4"/>'
+                grid += f'<text x="{padding-5}" y="{y+4}" text-anchor="end" fill="#64748b" font-size="9">{int(val)}</text>'
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Evolução Wellness & Prontidão' if is_pt else 'Wellness & Readiness Evolution'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    {grid}
+                    <polyline points="{get_points(values1)}" fill="none" stroke="{color1}" stroke-width="2"/>
+                    <polyline points="{get_points(values2)}" fill="none" stroke="{color2}" stroke-width="2"/>
+                </svg>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:{color1}"></div>{label1}</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:{color2}"></div>{label2}</div>
+                </div>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>💚</span> Wellness & {'Prontidão' if is_pt else 'Readiness'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_wellness_score']:.1f}</div>
+                    <div class="stat-label">Wellness Médio</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_readiness_score']:.1f}</div>
+                    <div class="stat-label">{'Prontidão Média' if is_pt else 'Avg Readiness'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_sleep_hours']:.1f}h</div>
+                    <div class="stat-label">{'Sono Médio' if is_pt else 'Avg Sleep'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_fatigue']:.1f}</div>
+                    <div class="stat-label">{'Fadiga Média' if is_pt else 'Avg Fatigue'}</div>
+                </div>
+            </div>
+            {make_dual_line_chart(wellness_scores, readiness_scores, '#10b981', '#3b82f6', 'Wellness', 'Prontidão' if is_pt else 'Readiness')}
+        </div>
+"""
+
+    # ============= JUMP ASSESSMENT SECTION WITH CHARTS =============
+    if analysis.jump_analysis and jump_history:
         j = analysis.jump_analysis
         latest = j.get('latest', {})
         hist = j.get('historical', {})
+        
+        # RSI evolution chart
+        rsi_values = [jh.get('rsi', 0) for jh in jump_history]
+        jump_dates = [jh.get('date', '')[:5] for jh in jump_history]
+        
+        chart_width = 380
+        chart_height = 120
+        
+        def make_rsi_chart():
+            if not rsi_values or all(v == 0 for v in rsi_values):
+                return ""
+            max_val = max(rsi_values) * 1.2 if max(rsi_values) > 0 else 2
+            min_val = min(rsi_values) * 0.8 if min(rsi_values) > 0 else 0
+            inner_w = chart_width - 80
+            inner_h = chart_height - 40
+            
+            points = []
+            circles = ""
+            for i, v in enumerate(rsi_values):
+                x = 50 + (i / max(len(rsi_values)-1, 1)) * inner_w
+                y = chart_height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else chart_height - 20
+                points.append(f"{x},{y}")
+                circles += f'<circle cx="{x}" cy="{y}" r="4" fill="#10b981"/>'
+            
+            # Baseline line
+            avg_rsi = sum(rsi_values) / len(rsi_values)
+            baseline_y = chart_height - 20 - ((avg_rsi - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else chart_height / 2
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Evolução RSI' if is_pt else 'RSI Evolution'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <line x1="50" y1="{baseline_y}" x2="{chart_width-30}" y2="{baseline_y}" stroke="#f59e0b" stroke-dasharray="6 3"/>
+                    <text x="{chart_width-25}" y="{baseline_y-5}" fill="#f59e0b" font-size="9">Baseline</text>
+                    <polyline points="{' '.join(points)}" fill="none" stroke="#10b981" stroke-width="2"/>
+                    {circles}
+                    <text x="45" y="{chart_height - 20 - inner_h + 4}" text-anchor="end" fill="#64748b" font-size="9">{max_val:.2f}</text>
+                    <text x="45" y="{chart_height - 16}" text-anchor="end" fill="#64748b" font-size="9">{min_val:.2f}</text>
+                </svg>
+            </div>
+            '''
+        
+        # Z-Score gauge
+        z_score = hist.get('z_score', 0)
+        z_color = "#ef4444" if z_score < -1.5 else "#f59e0b" if z_score < -0.5 else "#10b981" if z_score < 0.5 else "#3b82f6"
+        
+        # Fatigue index visualization
+        fatigue_pct = abs(hist.get('rsi_variation_percent', 0))
+        fatigue_status = latest.get('fatigue_status', 'green')
+        fatigue_color = "#ef4444" if fatigue_status == 'red' else "#f59e0b" if fatigue_status == 'yellow' else "#10b981"
+        
+        # Check for asymmetry
+        asymmetry_alert = ""
+        if latest.get('protocol', '').startswith('SL-CMJ'):
+            # Would need additional data - for now just show if available in analysis
+            pass
+        
         html_content += f"""
         <div class="section">
-            <div class="section-title"><span>🦘</span> {'Avaliação de Salto' if is_pt else 'Jump Assessment'}</div>
+            <div class="section-title"><span>🦘</span> {'Avaliação de Salto' if is_pt else 'Jump Assessment'} - {latest.get('protocol', 'CMJ')}</div>
             <div class="grid-4">
                 <div class="stat-card">
-                    <div class="stat-value">{latest.get('rsi', 0):.2f}</div>
+                    <div class="stat-value" style="color: {fatigue_color}">{latest.get('rsi', 0):.2f}</div>
                     <div class="stat-label">RSI</div>
                 </div>
                 <div class="stat-card">
@@ -4478,52 +4764,261 @@ async def get_scientific_report_pdf(
                     <div class="stat-label">{'Potência (W)' if is_pt else 'Power (W)'}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value" style="color: {risk_color('high') if hist.get('z_score', 0) < -1.5 else risk_color('moderate') if hist.get('z_score', 0) < -0.5 else risk_color('low')}">{hist.get('z_score', 0):.2f}</div>
+                    <div class="stat-value">{latest.get('relative_power_wkg', 0):.1f}</div>
+                    <div class="stat-label">W/kg</div>
+                </div>
+            </div>
+            <div class="grid-3">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {z_color}">{z_score:.2f}</div>
                     <div class="stat-label">Z-Score</div>
                 </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {fatigue_color}">{fatigue_pct:.1f}%</div>
+                    <div class="stat-label">{'Índice de Fadiga' if is_pt else 'Fatigue Index'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('peak_velocity_ms', 0):.2f}</div>
+                    <div class="stat-label">{'Vel. Pico (m/s)' if is_pt else 'Peak Vel (m/s)'}</div>
+                </div>
             </div>
-            {f'''<div class="alert"><p>⚠️ {'RSI indica fadiga neuromuscular' if is_pt else 'RSI indicates neuromuscular fatigue'} ({hist.get('rsi_variation_percent', 0):.1f}% {'variação' if is_pt else 'variation'})</p></div>''' if j.get('fatigue_alert') else ''}
+            {make_rsi_chart()}
+            {f'<div class="alert"><p>⚠️ {"RSI indica fadiga neuromuscular" if is_pt else "RSI indicates neuromuscular fatigue"} ({hist.get("rsi_variation_percent", 0):.1f}% {"abaixo do baseline" if is_pt else "below baseline"})</p></div>' if j.get('fatigue_alert') else ''}
         </div>
 """
 
-    # VBT Section
-    if analysis.vbt_analysis:
+    # ============= VBT SECTION WITH LOAD-VELOCITY CHART =============
+    if analysis.vbt_analysis and vbt_data:
         v = analysis.vbt_analysis
         lvp = v.get('load_velocity_profile', {})
-        html_content += f"""
-        <div class="section">
-            <div class="section-title"><span>⚡</span> VBT - {'Perfil Carga-Velocidade' if is_pt else 'Load-Velocity Profile'}</div>
-            <div class="grid">
-                <div class="stat-card">
-                    <div class="stat-value">{lvp.get('estimated_1rm_kg', 0):.0f} kg</div>
-                    <div class="stat-label">1RM {'Estimado' if is_pt else 'Estimated'}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value">{lvp.get('optimal_load_kg', 0):.0f} kg</div>
-                    <div class="stat-label">{'Carga Ótima' if is_pt else 'Optimal Load'}</div>
+        
+        # Collect all data points for load-velocity chart
+        all_points = []
+        for session in vbt_data:
+            for s in session.get('sets', []):
+                if s.get('load_kg', 0) > 0 and s.get('mean_velocity', 0) > 0:
+                    all_points.append({'load': s['load_kg'], 'velocity': s['mean_velocity']})
+        
+        # Load-Velocity Chart
+        lv_chart = ""
+        if lvp.get('slope') and lvp.get('intercept') and all_points:
+            chart_width = 380
+            chart_height = 160
+            max_load = lvp.get('estimated_1rm_kg', 150) * 1.1
+            max_vel = 1.5
+            slope = lvp['slope']
+            intercept = lvp['intercept']
+            
+            # Points
+            points_svg = ""
+            for p in all_points:
+                x = 50 + (p['load'] / max_load) * (chart_width - 80)
+                y = chart_height - 30 - (p['velocity'] / max_vel) * (chart_height - 50)
+                points_svg += f'<circle cx="{x}" cy="{y}" r="4" fill="#8b5cf6" opacity="0.6"/>'
+            
+            # Regression line
+            x1 = 50
+            y1 = chart_height - 30 - (intercept / max_vel) * (chart_height - 50)
+            x2 = 50 + (max_load / max_load) * (chart_width - 80)
+            y2_vel = intercept + slope * max_load
+            y2 = chart_height - 30 - (y2_vel / max_vel) * (chart_height - 50)
+            
+            # MVT line
+            mvt = 0.3
+            mvt_y = chart_height - 30 - (mvt / max_vel) * (chart_height - 50)
+            
+            # 1RM point
+            est_1rm = lvp.get('estimated_1rm_kg', 0)
+            rm_x = 50 + (est_1rm / max_load) * (chart_width - 80) if est_1rm else 0
+            
+            # Optimal load point
+            opt_load = lvp.get('optimal_load_kg', 0)
+            opt_vel = intercept + slope * opt_load if opt_load else 0
+            opt_x = 50 + (opt_load / max_load) * (chart_width - 80) if opt_load else 0
+            opt_y = chart_height - 30 - (opt_vel / max_vel) * (chart_height - 50) if opt_vel > 0 else 0
+            
+            lv_chart = f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Perfil Carga-Velocidade' if is_pt else 'Load-Velocity Profile'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <!-- Grid -->
+                    <line x1="50" y1="{chart_height - 30}" x2="{chart_width - 30}" y2="{chart_height - 30}" stroke="#334155"/>
+                    <line x1="50" y1="20" x2="50" y2="{chart_height - 30}" stroke="#334155"/>
+                    
+                    <!-- MVT Line -->
+                    <line x1="50" y1="{mvt_y}" x2="{chart_width - 30}" y2="{mvt_y}" stroke="#ef4444" stroke-dasharray="6 3"/>
+                    <text x="{chart_width - 25}" y="{mvt_y - 5}" fill="#ef4444" font-size="9">MVT</text>
+                    
+                    <!-- Data points -->
+                    {points_svg}
+                    
+                    <!-- Regression line -->
+                    <line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#8b5cf6" stroke-width="2"/>
+                    
+                    <!-- 1RM point -->
+                    {f'<circle cx="{rm_x}" cy="{mvt_y}" r="6" fill="#10b981"/><text x="{rm_x}" y="{mvt_y + 15}" text-anchor="middle" fill="#10b981" font-size="9" font-weight="bold">1RM</text>' if est_1rm else ''}
+                    
+                    <!-- Optimal load point -->
+                    {f'<circle cx="{opt_x}" cy="{opt_y}" r="6" fill="#f59e0b"/>' if opt_load else ''}
+                    
+                    <!-- Axis labels -->
+                    <text x="{chart_width / 2}" y="{chart_height - 5}" text-anchor="middle" fill="#64748b" font-size="9">{'Carga (kg)' if is_pt else 'Load (kg)'}</text>
+                    <text x="15" y="{chart_height / 2}" text-anchor="middle" fill="#64748b" font-size="9" transform="rotate(-90, 15, {chart_height / 2})">m/s</text>
+                </svg>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>1RM: {est_1rm:.0f}kg</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>{'Carga Ótima' if is_pt else 'Optimal'}: {opt_load:.0f}kg</div>
                 </div>
             </div>
-            {f'''<div class="alert"><p>⚠️ {'Perda de velocidade ≥20% - Fadiga periférica' if is_pt else 'Velocity loss ≥20% - Peripheral fatigue'}</p></div>''' if v.get('fatigue_detected') else ''}
+            '''
+        
+        # Velocity Loss Chart
+        vl_data = v.get('velocity_loss_analysis', [])
+        vl_chart = ""
+        if vl_data:
+            chart_width = 380
+            chart_height = 120
+            max_loss = max(30, max(d['loss_percent'] for d in vl_data) * 1.2)
+            bar_width = min(35, (chart_width - 80) / len(vl_data) - 8)
+            
+            bars = ""
+            for i, d in enumerate(vl_data):
+                x = 50 + i * (bar_width + 8)
+                bar_h = (d['loss_percent'] / max_loss) * (chart_height - 50)
+                y = chart_height - 30 - bar_h
+                color = "#ef4444" if d['loss_percent'] >= 20 else "#f59e0b" if d['loss_percent'] >= 10 else "#10b981"
+                bars += f'''
+                    <rect x="{x}" y="{y}" width="{bar_width}" height="{bar_h}" fill="{color}" rx="4"/>
+                    <text x="{x + bar_width/2}" y="{y - 5}" text-anchor="middle" fill="{color}" font-size="9" font-weight="bold">{d['loss_percent']:.0f}%</text>
+                    <text x="{x + bar_width/2}" y="{chart_height - 15}" text-anchor="middle" fill="#64748b" font-size="9">S{d['set']}</text>
+                '''
+            
+            # Fatigue zone line
+            fatigue_y = chart_height - 30 - (20 / max_loss) * (chart_height - 50)
+            
+            vl_chart = f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Perda de Velocidade por Série' if is_pt else 'Velocity Loss by Set'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <line x1="50" y1="{fatigue_y}" x2="{chart_width - 30}" y2="{fatigue_y}" stroke="#ef4444" stroke-dasharray="4"/>
+                    <text x="{chart_width - 25}" y="{fatigue_y - 5}" fill="#ef4444" font-size="8">{"Zona Fadiga" if is_pt else "Fatigue"}</text>
+                    {bars}
+                </svg>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>⚡</span> VBT - {'Perfil Força-Velocidade' if is_pt else 'Force-Velocity Profile'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('estimated_1rm_kg', 0):.0f}</div>
+                    <div class="stat-label">1RM Est. (kg)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('optimal_load_kg', 0):.0f}</div>
+                    <div class="stat-label">{'Carga Ótima (kg)' if is_pt else 'Optimal (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{abs(lvp.get('slope', 0)) * 1000:.2f}</div>
+                    <div class="stat-label">Slope (mm/s/kg)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('intercept', 0):.2f}</div>
+                    <div class="stat-label">V0 (m/s)</div>
+                </div>
+            </div>
+            <div class="two-col">
+                {lv_chart}
+                {vl_chart}
+            </div>
+            {f'<div class="alert"><p>⚠️ {"Perda de velocidade ≥20% detectada - Indica fadiga periférica" if is_pt else "Velocity loss ≥20% detected - Indicates peripheral fatigue"}</p></div>' if v.get("fatigue_detected") else ""}
         </div>
 """
 
-    # Body Composition Section
+    # ============= BODY COMPOSITION SECTION =============
     if analysis.body_composition:
         bc = analysis.body_composition
         latest = bc.get('latest', {})
+        
+        body_fat = latest.get('body_fat_percent', 0)
+        lean_mass = latest.get('lean_mass_kg', 0)
+        fat_mass = latest.get('fat_mass_kg', 0)
+        
+        # Donut chart for body composition
+        donut_chart = ""
+        if lean_mass > 0 or fat_mass > 0:
+            total = lean_mass + fat_mass
+            lean_pct = (lean_mass / total) * 100 if total > 0 else 0
+            
+            # SVG donut
+            size = 120
+            stroke_width = 14
+            radius = (size - stroke_width) / 2
+            circumference = 2 * 3.14159 * radius
+            fat_offset = circumference * (1 - body_fat / 100)
+            
+            donut_chart = f'''
+            <div style="display: flex; align-items: center; gap: 20px; justify-content: center; margin: 16px 0;">
+                <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}">
+                    <circle cx="{size/2}" cy="{size/2}" r="{radius}" stroke="#10b981" stroke-width="{stroke_width}" fill="none"/>
+                    <circle cx="{size/2}" cy="{size/2}" r="{radius}" stroke="#f59e0b" stroke-width="{stroke_width}" fill="none"
+                            stroke-dasharray="{circumference}" stroke-dashoffset="{fat_offset}" stroke-linecap="round"
+                            transform="rotate(-90 {size/2} {size/2})"/>
+                    <text x="{size/2}" y="{size/2 - 8}" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="bold">{body_fat:.1f}%</text>
+                    <text x="{size/2}" y="{size/2 + 10}" text-anchor="middle" fill="#94a3b8" font-size="10">{"Gordura" if is_pt else "Body Fat"}</text>
+                </svg>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #10b981;"></div>
+                        <span style="color: #f8fafc; font-weight: bold;">{lean_mass:.1f} kg</span>
+                        <span style="color: #94a3b8; font-size: 12px;">{"Massa Magra" if is_pt else "Lean Mass"}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #f59e0b;"></div>
+                        <span style="color: #f8fafc; font-weight: bold;">{fat_mass:.1f} kg</span>
+                        <span style="color: #94a3b8; font-size: 12px;">{"Massa Gorda" if is_pt else "Fat Mass"}</span>
+                    </div>
+                </div>
+            </div>
+            '''
+        
+        trend = bc.get('trend', {})
+        trend_html = ""
+        if trend:
+            fat_change = trend.get('fat_percent_change', 0)
+            lean_change = trend.get('lean_mass_change_kg', 0)
+            trend_color = "#10b981" if fat_change <= 0 and lean_change >= 0 else "#ef4444"
+            trend_icon = "📈" if trend.get('direction') == 'improving' else "📉" if trend.get('direction') == 'declining' else "➡️"
+            trend_html = f'''
+            <div class="alert {'warning' if trend.get('direction') != 'improving' else ''}" style="background: rgba(16, 185, 129, 0.1); border-left-color: {trend_color};">
+                <p style="color: {trend_color};">{trend_icon} {"Tendência" if is_pt else "Trend"}: {'+' if fat_change > 0 else ''}{fat_change:.1f}% {"gordura" if is_pt else "fat"}, {'+' if lean_change > 0 else ''}{lean_change:.1f}kg {"massa magra" if is_pt else "lean"}</p>
+            </div>
+            '''
+        
         html_content += f"""
         <div class="section">
             <div class="section-title"><span>🏋️</span> {'Composição Corporal' if is_pt else 'Body Composition'}</div>
-            <div class="grid">
+            <div class="grid-4">
                 <div class="stat-card">
-                    <div class="stat-value">{latest.get('body_fat_percent', 0):.1f}%</div>
-                    <div class="stat-label">{'Gordura Corporal' if is_pt else 'Body Fat'}</div>
+                    <div class="stat-value">{body_fat:.1f}%</div>
+                    <div class="stat-label">{'Gordura' if is_pt else 'Body Fat'}</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">{latest.get('lean_mass_kg', 0):.1f} kg</div>
-                    <div class="stat-label">{'Massa Magra' if is_pt else 'Lean Mass'}</div>
+                    <div class="stat-value">{lean_mass:.1f}</div>
+                    <div class="stat-label">{'Massa Magra (kg)' if is_pt else 'Lean (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{fat_mass:.1f}</div>
+                    <div class="stat-label">{'Massa Gorda (kg)' if is_pt else 'Fat (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{imc:.1f}</div>
+                    <div class="stat-label">IMC</div>
                 </div>
             </div>
+            {donut_chart}
+            {trend_html}
         </div>
 """
 
