@@ -18,6 +18,14 @@ export default function RootLayout() {
               <Stack.Screen name="login" />
               <Stack.Screen name="register" />
               <Stack.Screen name="(tabs)" />
+              {/* Public route - accessible without authentication */}
+              <Stack.Screen 
+                name="wellness-form/[token]" 
+                options={{ 
+                  headerShown: false,
+                  presentation: 'fullScreenModal'
+                }} 
+              />
             </Stack>
           </AuthProvider>
         </LanguageProvider>
