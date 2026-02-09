@@ -338,4 +338,4 @@ Implementado acesso público ao formulário de wellness para atletas:
 - **Password**: test123
 
 ## Last Updated
-February 9, 2026
+December 9, 2025
