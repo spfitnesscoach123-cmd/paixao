@@ -51,7 +51,7 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 **Componentes:**
 - `ScientificAnalysisTab.tsx` - Componente principal da aba de análises
 
-### ❌ REMOVIDO: Export PDF/CSV (Dez 2025)
+### ✅ ACWR Classification System (Feb 7, 2026)
 | Range | Classification | Status |
 |-------|----------------|--------|
 | <0.8 | Losing Performance | Undertrained |
