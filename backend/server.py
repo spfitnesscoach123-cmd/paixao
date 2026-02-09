@@ -5260,8 +5260,6 @@ async def get_current_subscription(
     max_athletes = plan_limits.get("max_athletes", 25)
     limits_reached = {
         "athletes": athlete_count >= max_athletes if max_athletes > 0 else False,
-        "export_pdf": not plan_limits.get("export_pdf", False),
-        "export_csv": not plan_limits.get("export_csv", False),
         "advanced_analytics": not plan_limits.get("advanced_analytics", False),
         "ai_insights": not plan_limits.get("ai_insights", False),
     }
@@ -5277,8 +5275,6 @@ async def get_current_subscription(
         days_remaining=days_remaining,
         trial_end_date=trial_end_str,
         features={
-            "export_pdf": plan_limits.get("export_pdf", False),
-            "export_csv": plan_limits.get("export_csv", False),
             "advanced_analytics": plan_limits.get("advanced_analytics", False),
             "ai_insights": plan_limits.get("ai_insights", False),
             "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
