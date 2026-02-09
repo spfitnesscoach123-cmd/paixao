@@ -109,11 +109,11 @@ export default function Subscription() {
     termsOfUse: locale === 'pt' ? 'Termos de Uso' : 'Terms of Use',
     privacyPolicy: locale === 'pt' ? 'Política de Privacidade' : 'Privacy Policy',
     inAppPurchaseNote: locale === 'pt' 
-      ? 'O pagamento será processado via App Store ou Google Play. A assinatura será renovada automaticamente até ser cancelada.'
-      : 'Payment will be processed via App Store or Google Play. Subscription will auto-renew until cancelled.',
+      ? 'Assinatura com renovação automática mensal (a cada 30 dias). O pagamento será processado via App Store ou Google Play.'
+      : 'Auto-renewing monthly subscription (every 30 days). Payment will be processed via App Store or Google Play.',
     cancelNote: locale === 'pt'
-      ? 'Você pode cancelar a qualquer momento nas configurações da loja de apps.'
-      : 'You can cancel anytime in your app store settings.',
+      ? 'Você pode cancelar a qualquer momento nas configurações da loja de apps. O cancelamento entra em vigor no próximo ciclo de cobrança.'
+      : 'You can cancel anytime in your app store settings. Cancellation takes effect at the next billing cycle.',
     statusTrial: locale === 'pt' ? 'PERÍODO DE TESTE' : 'TRIAL PERIOD',
     statusActive: locale === 'pt' ? 'ATIVO' : 'ACTIVE',
     statusCancelled: locale === 'pt' ? 'CANCELADO' : 'CANCELLED',
