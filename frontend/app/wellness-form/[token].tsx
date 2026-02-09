@@ -286,18 +286,7 @@ export default function WellnessForm() {
     // Check if running in web browser (not in Expo Go or native app)
     // On web, we show the fallback page to download the app
     if (Platform.OS === 'web') {
-      // Check if it's a mobile browser - if so, show fallback
-      const userAgent = typeof window !== 'undefined' ? window.navigator.userAgent : '';
-      const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
-      
-      if (isMobile) {
-        // Mobile browser - show fallback to download app
-        setShowWebFallback(true);
-        setIsLoading(false);
-        return;
-      }
-      // Desktop browser - you might want to show fallback too or allow form
-      // For now, we'll show fallback on all web platforms
+      // Show fallback on all web platforms - user needs to download the app
       setShowWebFallback(true);
       setIsLoading(false);
       return;
