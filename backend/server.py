@@ -5352,10 +5352,8 @@ async def preview_csv_import(
 # ============= VBT (VELOCITY BASED TRAINING) INTEGRATION =============
 
 class VBTProvider(str, Enum):
-    GYMAWARE = "gymaware"
     PUSH_BAND = "push_band"
     BEAST = "beast"
-    TENDO = "tendo"
     VITRUVE = "vitruve"
     MANUAL = "manual"
 
@@ -5369,51 +5367,40 @@ class VBTDataCreate(BaseModel):
 
 @api_router.get("/vbt/providers")
 async def get_vbt_providers():
-    """Get supported VBT providers and their import formats"""
+    """Get supported VBT providers with Bluetooth connectivity"""
     return {
         "providers": [
             {
-                "id": "gymaware",
-                "name": "GymAware",
-                "description_pt": "Sistema VBT profissional com encoder linear",
-                "description_en": "Professional VBT system with linear encoder",
-                "metrics": ["mean_velocity", "peak_velocity", "power", "rom", "force"],
-                "import_format": "csv",
-                "website": "https://gymaware.com"
-            },
-            {
                 "id": "push_band",
-                "name": "PUSH Band",
-                "description_pt": "Sensor vestível para VBT",
-                "description_en": "Wearable sensor for VBT",
+                "name": "PUSH Band 2.0",
+                "description_pt": "Sensor vestível Bluetooth para VBT",
+                "description_en": "Bluetooth wearable sensor for VBT",
                 "metrics": ["mean_velocity", "peak_velocity", "power"],
-                "import_format": "csv",
+                "connection": "bluetooth",
+                "icon": "fitness",
+                "color": "#FF6B35",
                 "website": "https://www.trainwithpush.com"
             },
             {
                 "id": "vitruve",
                 "name": "Vitruve",
-                "description_pt": "Encoder VBT compacto e acessível",
-                "description_en": "Compact and affordable VBT encoder",
+                "description_pt": "Encoder VBT compacto com Bluetooth",
+                "description_en": "Compact VBT encoder with Bluetooth",
                 "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
-                "import_format": "csv",
+                "connection": "bluetooth",
+                "icon": "speedometer",
+                "color": "#00D4AA",
                 "website": "https://vitruve.fit"
             },
             {
                 "id": "beast",
                 "name": "Beast Sensor",
-                "description_pt": "Sensor IMU para VBT",
-                "description_en": "IMU sensor for VBT",
+                "description_pt": "Sensor IMU Bluetooth para VBT",
+                "description_en": "Bluetooth IMU sensor for VBT",
                 "metrics": ["mean_velocity", "peak_velocity", "power"],
-                "import_format": "csv"
-            },
-            {
-                "id": "tendo",
-                "name": "Tendo Unit",
-                "description_pt": "Sistema VBT clássico para força",
-                "description_en": "Classic VBT system for strength",
-                "metrics": ["mean_velocity", "peak_velocity", "power"],
-                "import_format": "manual"
+                "connection": "bluetooth",
+                "icon": "flash",
+                "color": "#FFD700"
             },
             {
                 "id": "manual",
