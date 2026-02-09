@@ -125,22 +125,38 @@ export const BluetoothVBTProvider: React.FC<Props> = ({ children }) => {
     // Skip BLE initialization on web
     if (Platform.OS === 'web') {
       setError('Bluetooth não disponível no navegador');
+      setIsLoading(false);
       return;
     }
 
-    bleManagerRef.current = new BleManager();
+    let subscription: any = null;
     
-    const subscription = bleManagerRef.current.onStateChange((state) => {
-      setIsBluetoothEnabled(state === State.PoweredOn);
-      if (state === State.PoweredOff) {
-        setError('Bluetooth desligado');
-      } else {
-        setError(null);
+    const init = async () => {
+      const bleAvailable = await initBLE();
+      if (!bleAvailable || !BleManager) {
+        setError('Bluetooth não disponível');
+        setIsLoading(false);
+        return;
       }
-    }, true);
+      
+      bleManagerRef.current = new BleManager();
+      
+      subscription = bleManagerRef.current.onStateChange((state: any) => {
+        setIsBluetoothEnabled(state === State.PoweredOn);
+        if (state === State.PoweredOff) {
+          setError('Bluetooth desligado');
+        } else {
+          setError(null);
+        }
+      }, true);
+      
+      setIsLoading(false);
+    };
+    
+    init();
 
     return () => {
-      subscription.remove();
+      subscription?.remove();
       bleManagerRef.current?.destroy();
     };
   }, []);
