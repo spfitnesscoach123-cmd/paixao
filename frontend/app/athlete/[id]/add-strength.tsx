@@ -1222,27 +1222,27 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   summaryValue: {
-    fontSize: 22,
+    fontSize: isSmallScreen ? 18 : 22,
     fontWeight: 'bold',
     color: colors.text.primary,
   },
   summaryLabel: {
-    fontSize: 11,
+    fontSize: isSmallScreen ? 10 : 11,
     color: colors.text.secondary,
     marginTop: 4,
   },
   chartCard: {
     backgroundColor: colors.dark.card,
     borderRadius: 12,
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
     borderWidth: 1,
     borderColor: colors.border.default,
   },
   chartTitle: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : 14,
     fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   chartPlaceholder: {
     height: 120,
