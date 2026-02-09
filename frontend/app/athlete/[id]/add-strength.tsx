@@ -270,9 +270,9 @@ const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
   );
 };
 
-// Optimal Load Evolution Chart Component
+// Optimal Load Evolution Chart Component - Responsive
 const OptimalLoadEvolutionChart = ({ data, locale }: { data: Array<{ date: string; optimal_load: number; optimal_power: number }>, locale: string }) => {
-  const chartWidth = Math.min(screenWidth - 48, 400);
+  const chartWidth = screenWidth - chartPadding;
   const chartHeight = Math.min(chartWidth * 0.4, 150);
   const padding = { top: 20, right: 20, bottom: 30, left: 45 };
   
