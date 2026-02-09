@@ -144,6 +144,32 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ## Prioritized Backlog
 
+### ✅ Integração Bluetooth VBT (Fev 9, 2026)
+
+Removido GymAware e implementado suporte Bluetooth para dispositivos VBT:
+
+| Dispositivo | Conexão | Métricas | Cor |
+|-------------|---------|----------|-----|
+| **PUSH Band 2.0** | Bluetooth BLE | Velocidade, Potência | #FF6B35 |
+| **Vitruve** | Bluetooth BLE | Velocidade, Potência, ROM | #00D4AA |
+| **Beast Sensor** | Bluetooth BLE | Velocidade, Potência | #FFD700 |
+| **Manual** | Entrada manual | Todas | - |
+
+**Novos Arquivos Criados:**
+- `contexts/BluetoothVBTContext.tsx` - Context provider para conexão Bluetooth
+- `components/BluetoothVBTModal.tsx` - Modal para scan e conexão de dispositivos
+
+**Funcionalidades:**
+- Scan de dispositivos BLE com identificação automática
+- Conexão e monitoramento de dispositivos VBT
+- Parsing de dados em tempo real (velocidade, potência, ROM)
+- Fallback gracioso para web (mostra mensagem para usar app)
+- Indicador de força de sinal (RSSI)
+
+**Biblioteca Instalada:** `react-native-ble-plx@3.5.0`
+
+**NOTA:** A conexão Bluetooth real requer teste em dispositivo físico (iOS/Android) com dispositivos VBT reais. Os padrões de identificação de dispositivos são baseados em nomes comuns (PUSH, Vitruve, Beast).
+
 ### ✅ Fallback Web para Wellness Form (Fev 9, 2026)
 
 Corrigido o problema onde usuários web viam "Link inválido ou expirado" em vez da página de fallback.
