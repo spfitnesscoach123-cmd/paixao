@@ -3983,8 +3983,8 @@ async def get_team_dashboard(
                 power_count += 1
         
         # Get latest body composition for team averages
-        latest_body_comp = await db.body_composition_assessments.find_one(
-            {"athlete_id": athlete_id},
+        latest_body_comp = await db.body_compositions.find_one(
+            {"athlete_id": athlete_id, "coach_id": user_id},
             sort=[("date", -1)]
         )
         if latest_body_comp and latest_body_comp.get("body_fat_percentage"):
