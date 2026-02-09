@@ -144,6 +144,19 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 
 ## Prioritized Backlog
 
+### ✅ Correção "Adicionar Atleta Manualmente" (Fev 9, 2026)
+
+| Problema | Solução | Status |
+|----------|---------|--------|
+| `launchImagePickerAsync` não existe no expo-image-picker v17 | Substituído por `launchImageLibraryAsync` | ✅ Fixed |
+| `MediaTypeOptions.Images` obsoleto | Substituído por `['images']` | ✅ Fixed |
+
+**Arquivos Corrigidos:**
+- `frontend/app/add-athlete.tsx`
+- `frontend/app/athlete/[id]/edit.tsx`
+
+**Teste Realizado:** Criação de atleta "Jogador Teste E2E" via formulário - sucesso.
+
 ### ✅ Integração Bluetooth VBT (Fev 9, 2026)
 
 Removido GymAware e implementado suporte Bluetooth para dispositivos VBT:
