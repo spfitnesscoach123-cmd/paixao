@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format, parseISO, isWithinInterval } from 'date-fns';
-import { AnalysisTab } from '../../components/AnalysisTab';
+import { ScientificAnalysisTab } from '../../components/ScientificAnalysisTab';
 import { GPSDateFilter } from '../../components/GPSDateFilter';
 import { WellnessCharts } from '../../components/WellnessCharts';
 import { JumpAnalysisCharts } from '../../components/JumpAnalysisCharts';
