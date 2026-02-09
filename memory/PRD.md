@@ -149,7 +149,7 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - [ ] Global theme (Light/Dark)
 - [ ] Corrigir contagem de sessões em `charts.tsx` (1 CSV = 1 sessão)
 
-### ✅ Suporte Multi-Formato CSV (Fev 8, 2026)
+### ✅ Suporte Multi-Formato CSV (Fev 9, 2026)
 
 O sistema agora suporta importação automática de CSV de múltiplos provedores GPS:
 
@@ -175,6 +175,31 @@ O sistema agora suporta importação automática de CSV de múltiplos provedores
 - Suporte a múltiplos formatos de data
 - Preview dos dados antes da importação
 - Relatório detalhado de importação (importados/pulados/erros)
+
+### ✅ Acesso Público ao Formulário Wellness (Fev 9, 2026)
+
+Implementado acesso público ao formulário de wellness para atletas:
+
+| Configuração | Valor |
+|--------------|-------|
+| **Deep Link Scheme** | `peakperform://` |
+| **Universal Link** | `https://peakperform.app/wellness-form/{token}` |
+| **Bundle ID (iOS)** | `com.peakperform.app` |
+| **Package (Android)** | `com.peakperform.app` |
+
+**Fluxo do Atleta:**
+1. Coach gera link de wellness
+2. Coach compartilha via WhatsApp/Email
+3. Atleta clica no link
+4. Se não tem app → Baixa grátis da App Store/Play Store
+5. App abre direto no formulário (SEM LOGIN)
+6. Atleta preenche e envia
+7. Dados aparecem no dashboard do coach
+
+**Arquivos Modificados:**
+- `app.json` - Configuração de deep links
+- `_layout.tsx` - Rota pública para wellness-form
+- `generate-wellness-link.tsx` - URL do domínio atualizada
 
 ### P2 - Planned
 - [ ] Push Notifications
