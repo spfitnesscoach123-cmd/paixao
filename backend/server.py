@@ -5181,8 +5181,6 @@ async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
                 "currency": currency,
                 "max_athletes": plan_data["max_athletes"],
                 "history_months": plan_data["history_months"],
-                "export_pdf": plan_data.get("export_pdf", False),
-                "export_csv": plan_data.get("export_csv", False),
                 "advanced_analytics": plan_data.get("advanced_analytics", False),
                 "ai_insights": plan_data.get("ai_insights", False),
                 "fatigue_alerts": plan_data.get("fatigue_alerts", False),
