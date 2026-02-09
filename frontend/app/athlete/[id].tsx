@@ -18,8 +18,6 @@ import api from '../../services/api';
 import { Athlete, GPSData, WellnessQuestionnaire, PhysicalAssessment, ComprehensiveAnalysis } from '../../types';
 import { format, parseISO, isWithinInterval } from 'date-fns';
 import { AnalysisTab } from '../../components/AnalysisTab';
-import { ExportPDFButton } from '../../components/ExportPDFButton';
-import { ExportButtons } from '../../components/ExportButtons';
 import { GPSDateFilter } from '../../components/GPSDateFilter';
 import { WellnessCharts } from '../../components/WellnessCharts';
 import { JumpAnalysisCharts } from '../../components/JumpAnalysisCharts';
@@ -345,15 +343,6 @@ export default function AthleteDetails() {
               <Text style={styles.chartsButtonText}>{t('athletes.viewCharts')}</Text>
               <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
-
-            {/* Export Buttons - PDF/CSV */}
-            <ExportButtons 
-              athleteId={id} 
-              athleteName={athlete.name} 
-              locale={locale}
-              bodyCompositionId={bodyCompositionData?.[0]?._id}
-              showBodyCompReport={bodyCompositionData && bodyCompositionData.length > 0}
-            />
 
             <TouchableOpacity 
               style={styles.deleteButton}
