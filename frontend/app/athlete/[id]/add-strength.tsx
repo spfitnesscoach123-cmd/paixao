@@ -750,24 +750,21 @@ export default function AddStrengthAssessment() {
           </TouchableOpacity>
         </View>
 
-        {/* Date Input (shared) */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>{labels.date}</Text>
-          <TextInput
-            style={styles.input}
-            value={date}
-            onChangeText={setDate}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={colors.text.tertiary}
-          />
-        </View>
+        {/* Date Input (VBT only) */}
+        {activeSection === 'vbt' && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>{labels.date}</Text>
+            <TextInput
+              style={styles.input}
+              value={date}
+              onChangeText={setDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.text.tertiary}
+            />
+          </View>
+        )}
 
-        {/* ============= TRADITIONAL STRENGTH SECTION ============= */}
-        {activeSection === 'traditional' && (
-          <View style={styles.form}>
-            {/* Power Metrics */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>
+        {/* ============= VBT SECTION ============= */}
                 <Ionicons name="flash" size={16} color={colors.accent.primary} /> Power
               </Text>
               
