@@ -374,21 +374,21 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
 
 const styles = StyleSheet.create({
   container: {
-    gap: 12,
+    gap: isSmallScreen ? 10 : 12,
   },
   loadingContainer: {
     padding: 40,
     alignItems: 'center',
   },
   emptyContainer: {
-    padding: 32,
+    padding: isSmallScreen ? 24 : 32,
     alignItems: 'center',
     backgroundColor: colors.dark.card,
     borderRadius: 12,
   },
   emptyText: {
     color: colors.text.tertiary,
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : 14,
     marginTop: 12,
     marginBottom: 16,
   },
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.accent.primary,
-    paddingHorizontal: 16,
+    paddingHorizontal: isSmallScreen ? 14 : 16,
     paddingVertical: 10,
     borderRadius: 20,
     gap: 8,
@@ -404,26 +404,26 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#ffffff',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: isSmallScreen ? 13 : 14,
   },
   headerCard: {
     backgroundColor: colors.dark.card,
     borderRadius: 12,
-    padding: 16,
+    padding: isSmallScreen ? 12 : 16,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   title: {
-    fontSize: 16,
+    fontSize: isSmallScreen ? 15 : 16,
     fontWeight: '700',
     color: colors.text.primary,
   },
   date: {
-    fontSize: 11,
+    fontSize: isSmallScreen ? 10 : 11,
     color: colors.text.tertiary,
     marginTop: 2,
   },
