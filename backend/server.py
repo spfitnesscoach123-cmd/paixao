@@ -4716,161 +4716,95 @@ async def generate_athlete_pdf_report(
     
     story.append(Spacer(1, 20))
     
-    # ============= STRENGTH / VBT SECTION =============
-    story.append(Paragraph(f"💪 {t('strength_title')}", heading_style))
+    # ============= JUMP ASSESSMENT SECTION (Replaced old Strength Section) =============
+    jump_title = "Avaliação de Salto (Força Neuromuscular)" if lang == "pt" else "Jump Assessment (Neuromuscular Strength)"
+    story.append(Paragraph(f"💪 {jump_title}", heading_style))
     
-    # Get strength assessments (filter by type, order by date and created_at)
-    strength_assessments = await db.assessments.find({
-        "athlete_id": athlete_id,
-        "coach_id": current_user["_id"],
-        "assessment_type": "strength"
-    }).sort([("date", -1), ("created_at", -1)]).to_list(50)
-    
-    # Get VBT data
-    vbt_records = await db.vbt_data.find({
+    # Get jump assessments
+    jump_assessments = await db.jump_assessments.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
     }).sort("date", -1).to_list(50)
     
-    if strength_assessments or vbt_records:
-        # Collect all strength metrics from assessments (metrics are stored inside 'metrics' dict)
-        all_mean_power = []
-        all_peak_power = []
-        all_mean_speed = []
-        all_peak_speed = []
-        all_rsi = []
+    if jump_assessments:
+        # Separate by protocol
+        cmj_assessments = [a for a in jump_assessments if a.get("protocol") == "cmj"]
+        sl_right_assessments = [a for a in jump_assessments if a.get("protocol") == "sl_cmj_right"]
+        sl_left_assessments = [a for a in jump_assessments if a.get("protocol") == "sl_cmj_left"]
+        dj_assessments = [a for a in jump_assessments if a.get("protocol") == "dj"]
         
-        # Traditional strength metrics
-        traditional_metrics = {
-            'bench_press_1rm': [],
-            'squat_1rm': [],
-            'deadlift_1rm': [],
-            'vertical_jump': []
-        }
+        latest_cmj = cmj_assessments[0] if cmj_assessments else None
+        latest_sl_right = sl_right_assessments[0] if sl_right_assessments else None
+        latest_sl_left = sl_left_assessments[0] if sl_left_assessments else None
         
-        for assessment in strength_assessments:
-            metrics = assessment.get("metrics", {})
+        # ============= RSI SECTION =============
+        if latest_cmj:
+            rsi_section_title = "Índice de Força Reativa (RSI)" if lang == "pt" else "Reactive Strength Index (RSI)"
+            story.append(Paragraph(f"<b>📊 {rsi_section_title}</b>", normal_style))
+            story.append(Spacer(1, 8))
             
-            # VBT metrics
-            if metrics.get("mean_power"):
-                all_mean_power.append(metrics["mean_power"])
-            if metrics.get("peak_power"):
-                all_peak_power.append(metrics["peak_power"])
-            if metrics.get("mean_speed"):
-                all_mean_speed.append(metrics["mean_speed"])
-            if metrics.get("peak_speed"):
-                all_peak_speed.append(metrics["peak_speed"])
-            if metrics.get("rsi") and metrics["rsi"] > 0:
-                all_rsi.append({"value": metrics["rsi"], "date": assessment.get("date")})
+            current_rsi = latest_cmj.get("rsi", 0)
+            rsi_classification = latest_cmj.get("rsi_classification", "")
             
-            # Traditional strength metrics
-            for key in traditional_metrics.keys():
-                if metrics.get(key):
-                    traditional_metrics[key].append(metrics[key])
-        
-        for vbt in vbt_records:
-            sets = vbt.get("sets", [])
-            for s in sets:
-                if s.get("power_watts"):
-                    all_mean_power.append(s["power_watts"])
-                if s.get("mean_velocity"):
-                    all_mean_speed.append(s["mean_velocity"])
-        
-        # Get most recent values (first assessment is the most recent due to sort)
-        latest_assessment = strength_assessments[0] if strength_assessments else None
-        latest_metrics = latest_assessment.get("metrics", {}) if latest_assessment else {}
-        
-        current_mean_power = latest_metrics.get("mean_power", 0) or (all_mean_power[0] if all_mean_power else 0)
-        current_peak_power = latest_metrics.get("peak_power", 0) or 0
-        current_mean_speed = latest_metrics.get("mean_speed", 0) or (all_mean_speed[0] if all_mean_speed else 0)
-        current_peak_speed = latest_metrics.get("peak_speed", 0) or 0
-        
-        # Calculate peaks from all data
-        max_peak_power = max(all_peak_power) if all_peak_power else current_peak_power
-        max_peak_speed = max(all_peak_speed) if all_peak_speed else current_peak_speed
-        
-        # Calculate RSI stats
-        current_rsi = all_rsi[0]["value"] if all_rsi else 0
-        avg_rsi = sum(r["value"] for r in all_rsi) / len(all_rsi) if all_rsi else 0
-        
-        # RSI trend calculation
-        rsi_trend = "stable"
-        if len(all_rsi) >= 2:
-            if all_rsi[0]["value"] > all_rsi[1]["value"] * 1.05:
-                rsi_trend = "up"
-            elif all_rsi[0]["value"] < all_rsi[1]["value"] * 0.95:
-                rsi_trend = "down"
-        
-        # RSI Classification
-        def get_rsi_classification(rsi_value, language):
-            if rsi_value < 1.0:
-                return ("low_performance", "#ef4444") if language == "en" else ("Baixo Desempenho", "#ef4444")
-            elif rsi_value < 2.0:
-                return ("medium_acceptable", "#f59e0b") if language == "en" else ("Médio / Aceitável", "#f59e0b")
-            elif rsi_value < 3.0:
-                return ("good", "#3b82f6") if language == "en" else ("Bom", "#3b82f6")
-            else:
-                return ("excellent", "#10b981") if language == "en" else ("Excelente", "#10b981")
-        
-        # RSI Percentile
-        def get_rsi_percentile(rsi_value):
-            if rsi_value < 1.0:
-                return 25
-            elif rsi_value < 2.0:
-                return 50
-            elif rsi_value < 3.0:
-                return 75
-            else:
-                return 95
-        
-        rsi_class, rsi_color = get_rsi_classification(current_rsi, lang)
-        rsi_percentile = get_rsi_percentile(current_rsi)
-        
-        # Build strength metrics table - showing current (latest) values
-        strength_headers = [
-            t('metric') if lang == "en" else "Métrica",
-            t('current') if lang == "en" else "Atual",
-            t('peak') if lang == "en" else "Pico",
-            t('percentile') if lang == "en" else "Percentil",
-            t('trend') if lang == "en" else "Tendência"
-        ]
-        
-        trend_symbol = "↑" if rsi_trend == "up" else ("↓" if rsi_trend == "down" else "→")
-        
-        strength_data = [strength_headers]
-        
-        # Use current (most recent) values instead of averages
-        if current_mean_power > 0:
-            strength_data.append([
-                "Mean Power",
-                f"{current_mean_power:.0f}W",
-                f"{max_peak_power:.0f}W" if max_peak_power else "-",
-                f"P{min(95, int(current_mean_power / 30))}",  # Simplified percentile
-                "→"
-            ])
-        
-        if current_mean_speed > 0:
-            strength_data.append([
-                "Mean Speed",
-                f"{current_mean_speed:.2f} m/s",
-                f"{max_peak_speed:.2f} m/s" if max_peak_speed else "-",
-                f"P{min(95, int(current_mean_speed * 40))}",  # Simplified percentile
-                "→"
-            ])
-        
-        if current_rsi > 0:
-            strength_data.append([
+            # RSI Classification labels
+            rsi_labels = {
+                "excellent": ("Excelente", "Excellent"),
+                "very_good": ("Muito Bom", "Very Good"),
+                "good": ("Bom", "Good"),
+                "average": ("Médio", "Average"),
+                "below_average": ("Abaixo da Média", "Below Average"),
+                "poor": ("Fraco", "Poor")
+            }
+            rsi_label = rsi_labels.get(rsi_classification, ("", ""))[0 if lang == "pt" else 1]
+            
+            # RSI color based on classification
+            rsi_color_map = {
+                "excellent": "#22c55e",
+                "very_good": "#10b981",
+                "good": "#84cc16",
+                "average": "#f59e0b",
+                "below_average": "#f97316",
+                "poor": "#ef4444"
+            }
+            rsi_color = rsi_color_map.get(rsi_classification, "#6b7280")
+            
+            # Main metrics table
+            cmj_headers = [
+                "Métrica" if lang == "pt" else "Metric",
+                "Valor" if lang == "pt" else "Value",
+                "Classificação" if lang == "pt" else "Classification"
+            ]
+            
+            cmj_data = [cmj_headers]
+            cmj_data.append([
                 "RSI",
                 f"{current_rsi:.2f}",
-                f"{max(r['value'] for r in all_rsi):.2f}" if all_rsi else "-",
-                f"P{rsi_percentile}",
-                trend_symbol
+                rsi_label
             ])
-        
-        if len(strength_data) > 1:
-            strength_table = Table(strength_data, colWidths=[3.5*cm, 3*cm, 3*cm, 2.5*cm, 2*cm])
-            strength_table.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#7c3aed')),
+            cmj_data.append([
+                "Altura do Salto" if lang == "pt" else "Jump Height",
+                f"{latest_cmj.get('jump_height_cm', 0):.1f} cm",
+                "-"
+            ])
+            cmj_data.append([
+                "Pico de Potência" if lang == "pt" else "Peak Power",
+                f"{latest_cmj.get('peak_power_w', 0):.0f} W",
+                "-"
+            ])
+            cmj_data.append([
+                "Pico de Velocidade" if lang == "pt" else "Peak Velocity",
+                f"{latest_cmj.get('peak_velocity_ms', 0):.2f} m/s",
+                "-"
+            ])
+            cmj_data.append([
+                "Potência Relativa" if lang == "pt" else "Relative Power",
+                f"{latest_cmj.get('relative_power_wkg', 0):.1f} W/kg",
+                "-"
+            ])
+            
+            cmj_table = Table(cmj_data, colWidths=[5*cm, 4*cm, 4*cm])
+            cmj_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#8b5cf6')),
                 ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
@@ -4882,100 +4816,416 @@ async def generate_athlete_pdf_report(
                 ('TOPPADDING', (0, 0), (-1, -1), 6),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#f5f3ff')]),
+                # Color code RSI row based on classification
+                ('BACKGROUND', (2, 1), (2, 1), rl_colors.HexColor(rsi_color + '30')),
+                ('TEXTCOLOR', (2, 1), (2, 1), rl_colors.HexColor(rsi_color[1:])),
             ]))
-            story.append(strength_table)
+            story.append(cmj_table)
+            story.append(Spacer(1, 10))
+            
+            # RSI Reference Scale
+            rsi_ref_title = "Escala de Referência RSI" if lang == "pt" else "RSI Reference Scale"
+            story.append(Paragraph(f"<b>{rsi_ref_title}:</b>", normal_style))
+            
+            rsi_ref_data = [
+                ["≥2.8", "2.4-2.8", "2.0-2.4", "1.5-2.0", "1.0-1.5", "<1.0"],
+                [
+                    "Excelente" if lang == "pt" else "Excellent",
+                    "Muito Bom" if lang == "pt" else "Very Good",
+                    "Bom" if lang == "pt" else "Good",
+                    "Médio" if lang == "pt" else "Average",
+                    "Abaixo" if lang == "pt" else "Below",
+                    "Fraco" if lang == "pt" else "Poor"
+                ]
+            ]
+            rsi_ref_table = Table(rsi_ref_data, colWidths=[2.2*cm]*6)
+            rsi_ref_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, 1), rl_colors.HexColor('#22c55e')),
+                ('BACKGROUND', (1, 0), (1, 1), rl_colors.HexColor('#10b981')),
+                ('BACKGROUND', (2, 0), (2, 1), rl_colors.HexColor('#84cc16')),
+                ('BACKGROUND', (3, 0), (3, 1), rl_colors.HexColor('#f59e0b')),
+                ('BACKGROUND', (4, 0), (4, 1), rl_colors.HexColor('#f97316')),
+                ('BACKGROUND', (5, 0), (5, 1), rl_colors.HexColor('#ef4444')),
+                ('TEXTCOLOR', (0, 0), (-1, -1), rl_colors.white),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ]))
+            story.append(rsi_ref_table)
             story.append(Spacer(1, 15))
         
-        # RSI Classification and Insights
-        if current_rsi > 0:
-            story.append(Paragraph(f"<b>RSI Classification:</b> {rsi_class}", normal_style))
-            
-            # RSI Insights based on value
-            insights_title = "Insights Práticos" if lang == "pt" else "Practical Insights"
-            story.append(Paragraph(f"<b>{insights_title}:</b>", normal_style))
-            
-            if current_rsi < 1.0:
-                insight1 = "• Baixa eficiência reativa / 'Pesado em campo'" if lang == "pt" else "• Low reactive efficiency / 'Heavy on field'"
-                insight2 = "• Pode indicar acúmulo de fadiga periférica" if lang == "pt" else "• May indicate peripheral fatigue accumulation"
-                insight3 = "• Recomendação: Foco em força excêntrica e técnica de aterrisagem" if lang == "pt" else "• Recommendation: Focus on eccentric strength and landing technique"
-            elif current_rsi < 2.0:
-                insight1 = "• Nível comum de atletas amadores" if lang == "pt" else "• Common level for amateur athletes"
-                insight2 = "• Base razoável, mas com margem clara de melhora" if lang == "pt" else "• Reasonable base, but clear room for improvement"
-                insight3 = "• Recomendação: Trabalho de pliometria progressiva" if lang == "pt" else "• Recommendation: Progressive plyometric work"
-            elif current_rsi < 3.0:
-                insight1 = "• Bom aproveitamento do ciclo CAE" if lang == "pt" else "• Good use of SSC (Stretch-Shortening Cycle)"
-                insight2 = "• Nível semi-profissional bem desenvolvido" if lang == "pt" else "• Well-developed semi-professional level"
-                insight3 = "• Recomendação: Manter treino e focar em velocidade/potência" if lang == "pt" else "• Recommendation: Maintain training, focus on speed/power"
-            else:
-                insight1 = "• Altíssima reatividade em campo" if lang == "pt" else "• Very high on-field reactivity"
-                insight2 = "• Muita explosividade, reações rápidas" if lang == "pt" else "• High explosiveness, quick reactions"
-                insight3 = "• Recomendação: Foco em velocidade, COD e potência" if lang == "pt" else "• Recommendation: Focus on speed, COD and power"
-            
-            story.append(Paragraph(insight1, normal_style))
-            story.append(Paragraph(insight2, normal_style))
-            story.append(Paragraph(insight3, normal_style))
-            
-            # RSI Alert for sudden drop
-            if rsi_trend == "down":
-                alert_text = "⚠️ Queda detectada no RSI - Monitorar fadiga e ajustar carga. Dias de baixa reatividade = menos saltos e ações explosivas." if lang == "pt" else "⚠️ RSI drop detected - Monitor fatigue and adjust load. Low reactivity days = fewer jumps and explosive actions."
-                alert_style = ParagraphStyle('Alert', parent=normal_style, textColor=rl_colors.HexColor('#dc2626'))
-                story.append(Spacer(1, 5))
-                story.append(Paragraph(alert_text, alert_style))
-        
-        # ============= TRADITIONAL STRENGTH SECTION =============
-        has_traditional = any(len(v) > 0 for v in traditional_metrics.values())
-        if has_traditional:
-            story.append(Spacer(1, 15))
-            trad_title = "Força Tradicional" if lang == "pt" else "Traditional Strength"
-            story.append(Paragraph(f"<b>🏋️ {trad_title}</b>", normal_style))
+        # ============= FATIGUE INDEX SECTION =============
+        if cmj_assessments and len(cmj_assessments) >= 2:
+            fatigue_title = "Índice de Fadiga (SNC)" if lang == "pt" else "Fatigue Index (CNS)"
+            story.append(Paragraph(f"<b>⚡ {fatigue_title}</b>", normal_style))
             story.append(Spacer(1, 8))
             
-            trad_header = [
-                "Exercício" if lang == "pt" else "Exercise",
-                "Atual" if lang == "pt" else "Current",
-                "Máximo" if lang == "pt" else "Max",
-                "Média" if lang == "pt" else "Avg"
-            ]
-            trad_data = [trad_header]
-            
-            exercise_labels = {
-                'bench_press_1rm': ('Supino', 'Bench Press'),
-                'squat_1rm': ('Agachamento', 'Squat'),
-                'deadlift_1rm': ('Levantamento Terra', 'Deadlift'),
-                'vertical_jump': ('Salto Vertical', 'Vertical Jump')
-            }
-            
-            for key, values in traditional_metrics.items():
-                if values:
-                    label = exercise_labels[key][0] if lang == "pt" else exercise_labels[key][1]
-                    unit = "cm" if key == "vertical_jump" else "kg"
-                    current_val = values[0] if values else 0
-                    max_val = max(values) if values else 0
-                    avg_val = sum(values) / len(values) if values else 0
-                    trad_data.append([
-                        label,
-                        f"{current_val:.1f}{unit}",
-                        f"{max_val:.1f}{unit}",
-                        f"{avg_val:.1f}{unit}"
-                    ])
-            
-            if len(trad_data) > 1:
-                trad_table = Table(trad_data, colWidths=[4*cm, 3*cm, 3*cm, 3*cm])
-                trad_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#059669')),
+            # Calculate RSI variation from baseline
+            historical_rsi = [a.get("rsi", 0) for a in cmj_assessments[:5] if a.get("rsi", 0) > 0]
+            if historical_rsi:
+                baseline_rsi = sum(historical_rsi) / len(historical_rsi)
+                current_rsi = cmj_assessments[0].get("rsi", 0)
+                rsi_variation = ((current_rsi - baseline_rsi) / baseline_rsi * 100) if baseline_rsi > 0 else 0
+                
+                # Determine fatigue status
+                if rsi_variation >= -5:
+                    fatigue_status = "Verde - Treino Normal" if lang == "pt" else "Green - Normal Training"
+                    fatigue_color = "#10b981"
+                elif rsi_variation >= -12:
+                    fatigue_status = "Amarelo - Monitorar Volume" if lang == "pt" else "Yellow - Monitor Volume"
+                    fatigue_color = "#f59e0b"
+                else:
+                    fatigue_status = "Vermelho - Alto Risco de Lesão" if lang == "pt" else "Red - High Injury Risk"
+                    fatigue_color = "#ef4444"
+                
+                fatigue_data = [
+                    [
+                        "RSI Baseline" if lang == "en" else "RSI Baseline",
+                        "RSI Atual" if lang == "pt" else "Current RSI",
+                        "Variação" if lang == "pt" else "Variation",
+                        "Status"
+                    ],
+                    [
+                        f"{baseline_rsi:.2f}",
+                        f"{current_rsi:.2f}",
+                        f"{rsi_variation:+.1f}%",
+                        fatigue_status
+                    ]
+                ]
+                
+                fatigue_table = Table(fatigue_data, colWidths=[3.3*cm]*4)
+                fatigue_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#374151')),
                     ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
                     ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-                    ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#86efac')),
-                    ('LEFTPADDING', (0, 0), (-1, -1), 6),
-                    ('RIGHTPADDING', (0, 0), (-1, -1), 6),
-                    ('TOPPADDING', (0, 0), (-1, -1), 6),
-                    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#ecfdf5')]),
+                    ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#9ca3af')),
+                    ('BACKGROUND', (3, 1), (3, 1), rl_colors.HexColor(fatigue_color)),
+                    ('TEXTCOLOR', (3, 1), (3, 1), rl_colors.white),
                 ]))
-                story.append(trad_table)
+                story.append(fatigue_table)
+                story.append(Spacer(1, 8))
+                
+                # Fatigue interpretation
+                if rsi_variation < -5:
+                    fatigue_interpretation = (
+                        "⚠️ Variação RSI indica possível fadiga do Sistema Nervoso Central. "
+                        "Recomendação: Reduzir volume de sprints, exercícios explosivos e pliométricos com ênfase concêntrica."
+                    ) if lang == "pt" else (
+                        "⚠️ RSI variation indicates possible Central Nervous System fatigue. "
+                        "Recommendation: Reduce sprint volume, explosive exercises and concentric-emphasis plyometrics."
+                    )
+                    story.append(Paragraph(fatigue_interpretation, normal_style))
+                
+                story.append(Spacer(1, 10))
+                
+                # Fatigue reference scale
+                fatigue_ref_title = "Escala de Referência Fadiga (baseada em variação RSI)" if lang == "pt" else "Fatigue Reference Scale (based on RSI variation)"
+                story.append(Paragraph(f"<b>{fatigue_ref_title}:</b>", normal_style))
+                
+                fatigue_ref_data = [
+                    ["0 a -5%", "-6% a -12%", "< -13%"],
+                    [
+                        "Treino Normal" if lang == "pt" else "Normal Training",
+                        "Monitorar Volume" if lang == "pt" else "Monitor Volume",
+                        "Alto Risco" if lang == "pt" else "High Risk"
+                    ]
+                ]
+                fatigue_ref_table = Table(fatigue_ref_data, colWidths=[4.4*cm]*3)
+                fatigue_ref_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (0, 1), rl_colors.HexColor('#10b981')),
+                    ('BACKGROUND', (1, 0), (1, 1), rl_colors.HexColor('#f59e0b')),
+                    ('BACKGROUND', (2, 0), (2, 1), rl_colors.HexColor('#ef4444')),
+                    ('TEXTCOLOR', (0, 0), (-1, -1), rl_colors.white),
+                    ('FONTSIZE', (0, 0), (-1, -1), 8),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ]))
+                story.append(fatigue_ref_table)
+                story.append(Spacer(1, 15))
+        
+        # ============= ASYMMETRY SECTION (SL-CMJ) =============
+        if latest_sl_right and latest_sl_left:
+            asymmetry_title = "Assimetria de Membros (SL-CMJ)" if lang == "pt" else "Limb Asymmetry (SL-CMJ)"
+            story.append(Paragraph(f"<b>⚖️ {asymmetry_title}</b>", normal_style))
+            story.append(Spacer(1, 8))
+            
+            right_rsi = latest_sl_right.get("rsi", 0)
+            left_rsi = latest_sl_left.get("rsi", 0)
+            right_height = latest_sl_right.get("jump_height_cm", 0)
+            left_height = latest_sl_left.get("jump_height_cm", 0)
+            
+            # Calculate asymmetry
+            max_rsi = max(right_rsi, left_rsi)
+            min_rsi = min(right_rsi, left_rsi)
+            rsi_asymmetry = ((max_rsi - min_rsi) / max_rsi * 100) if max_rsi > 0 else 0
+            
+            max_height = max(right_height, left_height)
+            min_height = min(right_height, left_height)
+            height_asymmetry = ((max_height - min_height) / max_height * 100) if max_height > 0 else 0
+            
+            dominant_leg = "Direita" if right_rsi > left_rsi else "Esquerda" if left_rsi > right_rsi else "Igual"
+            dominant_leg_en = "Right" if right_rsi > left_rsi else "Left" if left_rsi > right_rsi else "Equal"
+            
+            is_red_flag = rsi_asymmetry > 10 or height_asymmetry > 10
+            
+            asymmetry_data = [
+                [
+                    "Métrica" if lang == "pt" else "Metric",
+                    "Direita" if lang == "pt" else "Right",
+                    "Esquerda" if lang == "pt" else "Left",
+                    "Assimetria" if lang == "pt" else "Asymmetry",
+                    "Status"
+                ],
+                [
+                    "RSI",
+                    f"{right_rsi:.2f}",
+                    f"{left_rsi:.2f}",
+                    f"{rsi_asymmetry:.1f}%",
+                    "🚩 RED FLAG" if rsi_asymmetry > 10 else "✓ OK"
+                ],
+                [
+                    "Altura" if lang == "pt" else "Height",
+                    f"{right_height:.1f} cm",
+                    f"{left_height:.1f} cm",
+                    f"{height_asymmetry:.1f}%",
+                    "🚩 RED FLAG" if height_asymmetry > 10 else "✓ OK"
+                ]
+            ]
+            
+            asymmetry_table = Table(asymmetry_data, colWidths=[2.6*cm]*5)
+            asymmetry_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#6366f1')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 8),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#a5b4fc')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor('#eef2ff')]),
+            ]))
+            
+            # Color code status column
+            if rsi_asymmetry > 10:
+                asymmetry_table.setStyle(TableStyle([('BACKGROUND', (4, 1), (4, 1), rl_colors.HexColor('#fecaca'))]))
+            if height_asymmetry > 10:
+                asymmetry_table.setStyle(TableStyle([('BACKGROUND', (4, 2), (4, 2), rl_colors.HexColor('#fecaca'))]))
+            
+            story.append(asymmetry_table)
+            story.append(Spacer(1, 8))
+            
+            # Asymmetry interpretation
+            asymmetry_note = (
+                f"Perna dominante: {dominant_leg if lang == 'pt' else dominant_leg_en}. "
+            )
+            if is_red_flag:
+                asymmetry_note += (
+                    "⚠️ Assimetria >10% detectada - Risco aumentado de lesão. "
+                    "Recomendação: Incluir exercícios unilaterais corretivos focando no membro não-dominante."
+                ) if lang == "pt" else (
+                    "⚠️ >10% asymmetry detected - Increased injury risk. "
+                    "Recommendation: Include corrective unilateral exercises focusing on non-dominant limb."
+                )
+            else:
+                asymmetry_note += (
+                    "Simetria dentro dos limites aceitáveis (≤10%)."
+                ) if lang == "pt" else (
+                    "Symmetry within acceptable limits (≤10%)."
+                )
+            story.append(Paragraph(asymmetry_note, normal_style))
+            story.append(Spacer(1, 15))
+        
+        # ============= POWER-VELOCITY PROFILE =============
+        if latest_cmj:
+            pv_title = "Perfil Potência-Velocidade" if lang == "pt" else "Power-Velocity Profile"
+            story.append(Paragraph(f"<b>⚡ {pv_title}</b>", normal_style))
+            story.append(Spacer(1, 8))
+            
+            peak_power = latest_cmj.get("peak_power_w", 0)
+            peak_velocity = latest_cmj.get("peak_velocity_ms", 0)
+            relative_power = latest_cmj.get("relative_power_wkg", 0)
+            
+            # Compare with averages (simplified)
+            avg_power = 3000
+            avg_velocity = 2.8
+            power_vs_avg = ((peak_power - avg_power) / avg_power * 100) if avg_power > 0 else 0
+            velocity_vs_avg = ((peak_velocity - avg_velocity) / avg_velocity * 100) if avg_velocity > 0 else 0
+            
+            # Determine profile
+            if power_vs_avg < -10 and velocity_vs_avg >= 0:
+                profile_type = "Dominante em Velocidade" if lang == "pt" else "Velocity Dominant"
+                profile_rec = "Priorizar treino de Força Máxima (cargas >85% 1RM)" if lang == "pt" else "Prioritize Maximum Strength training (loads >85% 1RM)"
+            elif power_vs_avg >= 0 and velocity_vs_avg < -10:
+                profile_type = "Dominante em Potência" if lang == "pt" else "Power Dominant"
+                profile_rec = "Priorizar treino de Potência/Velocidade (Pliométricos, Sprints)" if lang == "pt" else "Prioritize Power/Velocity training (Plyometrics, Sprints)"
+            elif power_vs_avg >= 0 and velocity_vs_avg >= 0:
+                profile_type = "Perfil Equilibrado" if lang == "pt" else "Balanced Profile"
+                profile_rec = "Manter equilíbrio entre força, potência e velocidade" if lang == "pt" else "Maintain balance between strength, power and velocity"
+            else:
+                profile_type = "Em Desenvolvimento" if lang == "pt" else "In Development"
+                profile_rec = "Programa completo de força e condicionamento recomendado" if lang == "pt" else "Complete strength and conditioning program recommended"
+            
+            pv_data = [
+                [
+                    "Pico Potência" if lang == "pt" else "Peak Power",
+                    "Pico Velocidade" if lang == "pt" else "Peak Velocity",
+                    "Potência Relativa" if lang == "pt" else "Relative Power",
+                    "Perfil" if lang == "pt" else "Profile"
+                ],
+                [
+                    f"{peak_power:.0f} W",
+                    f"{peak_velocity:.2f} m/s",
+                    f"{relative_power:.1f} W/kg",
+                    profile_type
+                ]
+            ]
+            
+            pv_table = Table(pv_data, colWidths=[3.3*cm]*4)
+            pv_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#f59e0b')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#fcd34d')),
+            ]))
+            story.append(pv_table)
+            story.append(Spacer(1, 8))
+            story.append(Paragraph(f"<b>Recomendação:</b> {profile_rec}", normal_style))
+            story.append(Spacer(1, 15))
+        
+        # ============= Z-SCORE =============
+        if cmj_assessments and len(cmj_assessments) >= 3:
+            zscore_title = "Z-Score (vs Média Histórica)" if lang == "pt" else "Z-Score (vs Historical Average)"
+            story.append(Paragraph(f"<b>📈 {zscore_title}</b>", normal_style))
+            story.append(Spacer(1, 8))
+            
+            historical_heights = [a.get("jump_height_cm", 0) for a in cmj_assessments if a.get("jump_height_cm", 0) > 0]
+            current_height = cmj_assessments[0].get("jump_height_cm", 0)
+            
+            if len(historical_heights) >= 3:
+                mean_height = sum(historical_heights) / len(historical_heights)
+                variance = sum((x - mean_height) ** 2 for x in historical_heights) / len(historical_heights)
+                std_dev = variance ** 0.5
+                z_score = (current_height - mean_height) / std_dev if std_dev > 0 else 0
+                
+                # Z-Score interpretation
+                if z_score >= 1.5:
+                    zscore_interpretation = "Performance significativamente acima da média histórica!" if lang == "pt" else "Performance significantly above historical average!"
+                elif z_score >= 0.5:
+                    zscore_interpretation = "Performance acima da média histórica." if lang == "pt" else "Performance above historical average."
+                elif z_score >= -0.5:
+                    zscore_interpretation = "Performance dentro da média histórica." if lang == "pt" else "Performance within historical average."
+                elif z_score >= -1.5:
+                    zscore_interpretation = "Performance abaixo da média histórica. Monitorar recuperação." if lang == "pt" else "Performance below historical average. Monitor recovery."
+                else:
+                    zscore_interpretation = "⚠️ Performance significativamente abaixo da média. Investigar causas." if lang == "pt" else "⚠️ Performance significantly below average. Investigate causes."
+                
+                zscore_data = [
+                    [
+                        "Altura Atual" if lang == "pt" else "Current Height",
+                        "Média Histórica" if lang == "pt" else "Historical Mean",
+                        "Z-Score",
+                        "Interpretação" if lang == "pt" else "Interpretation"
+                    ],
+                    [
+                        f"{current_height:.1f} cm",
+                        f"{mean_height:.1f} cm",
+                        f"{z_score:+.2f}",
+                        zscore_interpretation[:30] + "..." if len(zscore_interpretation) > 30 else zscore_interpretation
+                    ]
+                ]
+                
+                zscore_table = Table(zscore_data, colWidths=[3.3*cm]*4)
+                zscore_table.setStyle(TableStyle([
+                    ('BACKGROUND', (0, 0), (-1, 0), rl_colors.HexColor('#6366f1')),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), rl_colors.white),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, -1), 9),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('GRID', (0, 0), (-1, -1), 0.5, rl_colors.HexColor('#a5b4fc')),
+                ]))
+                story.append(zscore_table)
+                story.append(Spacer(1, 8))
+                story.append(Paragraph(zscore_interpretation, normal_style))
+        
+        story.append(Spacer(1, 15))
+        
+        # ============= RECOMMENDATIONS =============
+        rec_title = "Recomendações Baseadas na Avaliação" if lang == "pt" else "Assessment-Based Recommendations"
+        story.append(Paragraph(f"<b>📋 {rec_title}</b>", normal_style))
+        story.append(Spacer(1, 8))
+        
+        recommendations = []
+        
+        # RSI-based recommendations
+        if latest_cmj:
+            rsi = latest_cmj.get("rsi", 0)
+            if rsi < 1.0:
+                recommendations.append(
+                    "• RSI muito baixo (<1.0): Evitar exercícios explosivos, COD, pliométricos com ênfase concêntrica, sprints e trabalhos de velocidade máxima."
+                    if lang == "pt" else
+                    "• Very low RSI (<1.0): Avoid explosive exercises, COD, concentric-emphasis plyometrics, sprints and max velocity work."
+                )
+            elif rsi < 1.5:
+                recommendations.append(
+                    "• RSI abaixo da média: Limitar volume de exercícios de alta intensidade e focar em força base."
+                    if lang == "pt" else
+                    "• Below average RSI: Limit high-intensity exercise volume and focus on base strength."
+                )
+        
+        # Fatigue recommendations
+        if cmj_assessments and len(cmj_assessments) >= 2:
+            historical_rsi = [a.get("rsi", 0) for a in cmj_assessments[:5] if a.get("rsi", 0) > 0]
+            if historical_rsi:
+                baseline_rsi = sum(historical_rsi) / len(historical_rsi)
+                current_rsi = cmj_assessments[0].get("rsi", 0)
+                rsi_variation = ((current_rsi - baseline_rsi) / baseline_rsi * 100) if baseline_rsi > 0 else 0
+                
+                if rsi_variation < -12:
+                    recommendations.append(
+                        "• 🔴 ALERTA: Fadiga do SNC detectada. Reduzir carga imediatamente. Priorizar sono e recuperação."
+                        if lang == "pt" else
+                        "• 🔴 ALERT: CNS fatigue detected. Reduce load immediately. Prioritize sleep and recovery."
+                    )
+                elif rsi_variation < -5:
+                    recommendations.append(
+                        "• 🟡 MONITORAR: Sinais de fadiga. Reduzir volume de sprints e exercícios de alta velocidade."
+                        if lang == "pt" else
+                        "• 🟡 MONITOR: Fatigue signs. Reduce sprint volume and high-speed exercises."
+                    )
+        
+        # Asymmetry recommendations
+        if latest_sl_right and latest_sl_left:
+            right_rsi = latest_sl_right.get("rsi", 0)
+            left_rsi = latest_sl_left.get("rsi", 0)
+            max_rsi = max(right_rsi, left_rsi)
+            min_rsi = min(right_rsi, left_rsi)
+            rsi_asymmetry = ((max_rsi - min_rsi) / max_rsi * 100) if max_rsi > 0 else 0
+            
+            if rsi_asymmetry > 10:
+                recommendations.append(
+                    f"• 🚩 Assimetria significativa ({rsi_asymmetry:.1f}%). Incluir exercícios unilaterais corretivos."
+                    if lang == "pt" else
+                    f"• 🚩 Significant asymmetry ({rsi_asymmetry:.1f}%). Include corrective unilateral exercises."
+                )
+        
+        if not recommendations:
+            recommendations.append(
+                "• ✅ Atleta em boas condições. Continuar com protocolo de treino atual."
+                if lang == "pt" else
+                "• ✅ Athlete in good condition. Continue with current training protocol."
+            )
+        
+        for rec in recommendations:
+            story.append(Paragraph(rec, normal_style))
+        
     else:
         story.append(Paragraph(t('no_data'), normal_style))
     
