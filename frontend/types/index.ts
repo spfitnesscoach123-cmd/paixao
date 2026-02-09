@@ -29,6 +29,10 @@ export interface GPSData {
   athlete_id: string;
   coach_id?: string;
   date: string;
+  session_id?: string;
+  session_name?: string;
+  period_name?: string;
+  activity_type?: string; // "game" or "training"
   total_distance: number;
   high_intensity_distance: number; // HID 14.4-19.8 km/h
   high_speed_running?: number; // HSR 19.8-25.2 km/h
