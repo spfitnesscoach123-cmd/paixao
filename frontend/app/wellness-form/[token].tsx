@@ -270,7 +270,12 @@ export default function WellnessForm() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showWebFallback, setShowWebFallback] = useState(false);
+  
+  // Initialize showWebFallback based on platform - this runs before first render
+  const [showWebFallback, setShowWebFallback] = useState(() => {
+    // On web, we always show the fallback page
+    return Platform.OS === 'web';
+  });
 
   // Form state
   const [selectedAthlete, setSelectedAthlete] = useState('');
@@ -283,20 +288,15 @@ export default function WellnessForm() {
   const [mood, setMood] = useState(5);
 
   useEffect(() => {
-    // Check if running in web browser
-    // typeof window is undefined during SSR but defined in browser
-    const isWebBrowser = Platform.OS === 'web' || (typeof window !== 'undefined' && !window.hasOwnProperty('expo'));
-    
-    if (isWebBrowser) {
-      // Web browser - show fallback page to download app
-      setShowWebFallback(true);
+    // If showing web fallback, don't load athletes
+    if (showWebFallback) {
       setIsLoading(false);
       return;
     }
     
     // Native app - load athletes normally
     loadAthletes();
-  }, [token]);
+  }, [token, showWebFallback]);
 
   const loadAthletes = async () => {
     try {
