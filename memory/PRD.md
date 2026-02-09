@@ -15,9 +15,43 @@ Sistema de rastreamento de desempenho de atletas com avaliações físicas, comp
 - Athlete CRUD operations
 - GPS data tracking with filters
 - Wellness questionnaires + QTR gauge
-- Strength assessments with auto fatigue calculation
+- **NEW: Jump Assessment System** (replaced traditional strength)
 - Team dashboard with comprehensive metrics
 - i18n support (PT/EN)
+
+### ✅ Jump Assessment System (Dez 9, 2025)
+**Substituição completa do módulo de força tradicional:**
+
+**Protocolos:**
+- CMJ (Counter Movement Jump)
+- SL-CMJ Right/Left (Single Leg)
+- DJ (Drop Jump) com altura da caixa
+
+**Métricas Calculadas Automaticamente:**
+| Métrica | Fórmula |
+|---------|---------|
+| RSI | Altura / Tempo de Contato |
+| Pico de Potência | Sayers Equation |
+| Pico de Velocidade | √(2×g×h) |
+| Potência Relativa | Potência / Peso |
+| Z-Score | (Atual - Média) / Desvio Padrão |
+
+**Índice de Fadiga (SNC):**
+| Variação RSI | Status |
+|--------------|--------|
+| 0 a -5% | 🟢 Treino Normal |
+| -6% a -12% | 🟡 Monitorar |
+| < -13% | 🔴 Alto Risco |
+
+**Assimetria (SL-CMJ):**
+- Diferença >10% = RED FLAG
+- Feedback automático com recomendações
+
+**Componentes:**
+- `JumpAnalysisCharts.tsx` - Visualização na página do atleta
+- `jump-assessment.tsx` - Página de entrada de dados
+- Backend endpoints: `/api/jump/*`
+- Seção completa no relatório PDF
 
 ### ✅ ACWR Classification System (Feb 7, 2026)
 | Range | Classification | Status |
