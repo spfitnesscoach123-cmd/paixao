@@ -3658,6 +3658,605 @@ Forneça um insight profissional breve (2-3 frases) sobre o perfil de força des
     )
 
 
+# ============= SCIENTIFIC ANALYSIS - COMPLETE INSIGHTS =============
+
+class ScientificInsightsResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    
+    # GPS Metrics
+    gps_summary: Optional[Dict[str, Any]] = None
+    
+    # ACWR Analysis
+    acwr_analysis: Optional[Dict[str, Any]] = None
+    
+    # Wellness Metrics
+    wellness_summary: Optional[Dict[str, Any]] = None
+    
+    # Jump Assessment (CMJ, RSI, Fatigue)
+    jump_analysis: Optional[Dict[str, Any]] = None
+    
+    # VBT Analysis (Load-Velocity Profile)
+    vbt_analysis: Optional[Dict[str, Any]] = None
+    
+    # Body Composition
+    body_composition: Optional[Dict[str, Any]] = None
+    
+    # AI Scientific Insights
+    scientific_insights: Optional[str] = None
+    
+    # Risk Assessment
+    overall_risk_level: str = "unknown"
+    injury_risk_factors: List[str] = []
+    
+    # Recommendations
+    training_recommendations: List[str] = []
+    recovery_recommendations: List[str] = []
+
+
+@api_router.get("/analysis/scientific/{athlete_id}")
+async def get_scientific_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Complete scientific analysis consolidating GPS, ACWR, Wellness, Jump Assessment, 
+    VBT (Load-Velocity Profile), Body Composition with AI-powered insights based on 
+    sports science literature.
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    response = ScientificInsightsResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    )
+    
+    injury_risk_factors = []
+    
+    # 1. GPS Data Summary (últimos 30 dias)
+    try:
+        gps_data = await db.gps_data.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(30).to_list(30)
+        
+        if gps_data:
+            total_distance = sum(g.get("total_distance", 0) for g in gps_data)
+            avg_distance = total_distance / len(gps_data) if gps_data else 0
+            avg_hi_distance = sum(g.get("high_intensity_distance", 0) for g in gps_data) / len(gps_data)
+            avg_sprints = sum(g.get("sprint_count", 0) for g in gps_data) / len(gps_data)
+            max_speed = max((g.get("max_speed", 0) for g in gps_data), default=0)
+            avg_max_speed = sum(g.get("max_speed", 0) for g in gps_data) / len(gps_data)
+            
+            response.gps_summary = {
+                "sessions_count": len(gps_data),
+                "total_distance_m": round(total_distance, 0),
+                "avg_distance_m": round(avg_distance, 0),
+                "avg_high_intensity_m": round(avg_hi_distance, 0),
+                "avg_sprints": round(avg_sprints, 1),
+                "max_speed_kmh": round(max_speed, 1),
+                "avg_max_speed_kmh": round(avg_max_speed, 1),
+                "last_session_date": gps_data[0].get("date", "") if gps_data else None,
+                "latest_session": {
+                    "distance": gps_data[0].get("total_distance", 0),
+                    "high_intensity": gps_data[0].get("high_intensity_distance", 0),
+                    "sprints": gps_data[0].get("sprint_count", 0),
+                    "max_speed": gps_data[0].get("max_speed", 0)
+                } if gps_data else None
+            }
+    except Exception as e:
+        print(f"GPS Error: {e}")
+    
+    # 2. ACWR Analysis
+    try:
+        acwr_result = await get_acwr_detailed_analysis(athlete_id, lang, current_user)
+        response.acwr_analysis = {
+            "overall_risk": acwr_result.overall_risk,
+            "recommendation": acwr_result.recommendation,
+            "metrics": [
+                {
+                    "name": m.name,
+                    "acwr_ratio": m.acwr_ratio,
+                    "acute_load": m.acute_load,
+                    "chronic_load": m.chronic_load,
+                    "risk_level": m.risk_level
+                } for m in acwr_result.metrics
+            ]
+        }
+        if acwr_result.overall_risk in ["high", "moderate"]:
+            injury_risk_factors.append(f"ACWR em nível {acwr_result.overall_risk}" if lang == "pt" else f"ACWR at {acwr_result.overall_risk} level")
+    except:
+        pass
+    
+    # 3. Wellness Summary
+    try:
+        wellness_data = await db.wellness_questionnaires.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(14).to_list(14)
+        
+        if wellness_data:
+            avg_wellness = sum(w.get("wellness_score", 0) for w in wellness_data) / len(wellness_data)
+            avg_readiness = sum(w.get("readiness_score", 0) for w in wellness_data) / len(wellness_data)
+            avg_sleep = sum(w.get("sleep_hours", 0) for w in wellness_data) / len(wellness_data)
+            avg_fatigue = sum(w.get("fatigue", 0) for w in wellness_data) / len(wellness_data)
+            avg_stress = sum(w.get("stress", 0) for w in wellness_data) / len(wellness_data)
+            avg_soreness = sum(w.get("muscle_soreness", 0) for w in wellness_data) / len(wellness_data)
+            
+            latest = wellness_data[0]
+            response.wellness_summary = {
+                "records_count": len(wellness_data),
+                "avg_wellness_score": round(avg_wellness, 1),
+                "avg_readiness_score": round(avg_readiness, 1),
+                "avg_sleep_hours": round(avg_sleep, 1),
+                "avg_fatigue": round(avg_fatigue, 1),
+                "avg_stress": round(avg_stress, 1),
+                "avg_soreness": round(avg_soreness, 1),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "wellness_score": latest.get("wellness_score", 0),
+                    "readiness_score": latest.get("readiness_score", 0),
+                    "sleep_hours": latest.get("sleep_hours", 0),
+                    "sleep_quality": latest.get("sleep_quality", 0),
+                    "fatigue": latest.get("fatigue", 0),
+                    "stress": latest.get("stress", 0),
+                    "muscle_soreness": latest.get("muscle_soreness", 0),
+                    "mood": latest.get("mood", 0)
+                }
+            }
+            
+            if avg_fatigue >= 7:
+                injury_risk_factors.append("Fadiga percebida elevada (RPE ≥ 7)" if lang == "pt" else "High perceived fatigue (RPE ≥ 7)")
+            if avg_sleep < 7:
+                injury_risk_factors.append("Déficit de sono crônico (<7h)" if lang == "pt" else "Chronic sleep deficit (<7h)")
+            if avg_soreness >= 7:
+                injury_risk_factors.append("Dor muscular elevada persistente" if lang == "pt" else "Persistent high muscle soreness")
+    except Exception as e:
+        print(f"Wellness Error: {e}")
+    
+    # 4. Jump Assessment (CMJ, RSI, Fatigue Index)
+    try:
+        jump_data = await db.jump_assessments.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(10).to_list(10)
+        
+        if jump_data:
+            latest = jump_data[0]
+            
+            # Calculate Z-Score against athlete's history
+            rsi_values = [j.get("rsi", 0) for j in jump_data]
+            avg_rsi = sum(rsi_values) / len(rsi_values) if rsi_values else 0
+            std_rsi = (sum((x - avg_rsi) ** 2 for x in rsi_values) / len(rsi_values)) ** 0.5 if len(rsi_values) > 1 else 0
+            z_score = (latest.get("rsi", 0) - avg_rsi) / std_rsi if std_rsi > 0 else 0
+            
+            # Fatigue detection based on RSI variation
+            if len(jump_data) >= 2:
+                baseline_rsi = sum(rsi_values[1:min(5, len(rsi_values))]) / min(4, len(rsi_values) - 1)
+                rsi_variation = ((latest.get("rsi", 0) - baseline_rsi) / baseline_rsi * 100) if baseline_rsi > 0 else 0
+            else:
+                rsi_variation = 0
+            
+            response.jump_analysis = {
+                "assessments_count": len(jump_data),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "protocol": latest.get("protocol", ""),
+                    "jump_height_cm": latest.get("jump_height_cm", 0),
+                    "flight_time_ms": latest.get("flight_time_ms", 0),
+                    "contact_time_ms": latest.get("contact_time_ms", 0),
+                    "rsi": round(latest.get("rsi", 0), 2),
+                    "rsi_classification": latest.get("rsi_classification", ""),
+                    "peak_power_w": round(latest.get("peak_power_w", 0), 0),
+                    "peak_velocity_ms": round(latest.get("peak_velocity_ms", 0), 2),
+                    "relative_power_wkg": round(latest.get("relative_power_wkg", 0), 1),
+                    "fatigue_status": latest.get("fatigue_status", ""),
+                    "fatigue_percentage": round(latest.get("fatigue_percentage", 0), 1)
+                },
+                "historical": {
+                    "avg_rsi": round(avg_rsi, 2),
+                    "std_rsi": round(std_rsi, 2),
+                    "z_score": round(z_score, 2),
+                    "rsi_variation_percent": round(rsi_variation, 1),
+                    "trend": "declining" if rsi_variation < -5 else "stable" if rsi_variation < 5 else "improving"
+                },
+                "fatigue_alert": latest.get("fatigue_status", "") in ["yellow", "red"],
+                "history": [
+                    {
+                        "date": j.get("date", ""),
+                        "rsi": round(j.get("rsi", 0), 2),
+                        "jump_height_cm": j.get("jump_height_cm", 0),
+                        "protocol": j.get("protocol", "")
+                    } for j in jump_data[:7]
+                ]
+            }
+            
+            if latest.get("fatigue_status", "") == "red":
+                injury_risk_factors.append("RSI indica fadiga neuromuscular severa (>12% abaixo do baseline)" if lang == "pt" else "RSI indicates severe neuromuscular fatigue (>12% below baseline)")
+            elif latest.get("fatigue_status", "") == "yellow":
+                injury_risk_factors.append("RSI indica fadiga moderada (5-12% abaixo do baseline)" if lang == "pt" else "RSI indicates moderate fatigue (5-12% below baseline)")
+    except Exception as e:
+        print(f"Jump Error: {e}")
+    
+    # 5. VBT Analysis (Load-Velocity Profile)
+    try:
+        vbt_data = await db.vbt_data.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(20).to_list(20)
+        
+        if vbt_data:
+            # Group by exercise and get latest for primary exercise
+            exercises = {}
+            for v in vbt_data:
+                ex = v.get("exercise", "Back Squat")
+                if ex not in exercises:
+                    exercises[ex] = []
+                exercises[ex].append(v)
+            
+            primary_exercise = max(exercises.keys(), key=lambda x: len(exercises[x]))
+            primary_data = exercises[primary_exercise]
+            
+            # Calculate load-velocity profile
+            all_sets = []
+            for session in primary_data:
+                for s in session.get("sets", []):
+                    if s.get("load_kg", 0) > 0 and s.get("mean_velocity", 0) > 0:
+                        all_sets.append({
+                            "load": s.get("load_kg"),
+                            "velocity": s.get("mean_velocity")
+                        })
+            
+            # Linear regression for load-velocity
+            slope, intercept, estimated_1rm, optimal_load = None, None, None, None
+            if len(all_sets) >= 2:
+                loads = [s["load"] for s in all_sets]
+                velocities = [s["velocity"] for s in all_sets]
+                n = len(loads)
+                sum_x = sum(loads)
+                sum_y = sum(velocities)
+                sum_xy = sum(l * v for l, v in zip(loads, velocities))
+                sum_x2 = sum(l * l for l in loads)
+                
+                denom = n * sum_x2 - sum_x * sum_x
+                if denom != 0:
+                    slope = (n * sum_xy - sum_x * sum_y) / denom
+                    intercept = (sum_y - slope * sum_x) / n
+                    
+                    # MVT (Minimum Velocity Threshold) typically 0.3 m/s for squat
+                    mvt = 0.3
+                    if slope != 0:
+                        estimated_1rm = (mvt - intercept) / slope
+                        # Optimal load for power (typically around 50-60% 1RM)
+                        optimal_load = estimated_1rm * 0.55
+            
+            # Latest session velocity loss
+            latest_session = primary_data[0]
+            sets = latest_session.get("sets", [])
+            velocity_loss = []
+            if len(sets) >= 2:
+                first_velocity = sets[0].get("mean_velocity", 0)
+                for i, s in enumerate(sets):
+                    loss = ((first_velocity - s.get("mean_velocity", 0)) / first_velocity * 100) if first_velocity > 0 else 0
+                    velocity_loss.append({
+                        "set": i + 1,
+                        "velocity": s.get("mean_velocity", 0),
+                        "loss_percent": round(loss, 1)
+                    })
+            
+            response.vbt_analysis = {
+                "sessions_count": len(vbt_data),
+                "primary_exercise": primary_exercise,
+                "load_velocity_profile": {
+                    "slope": round(slope, 4) if slope else None,
+                    "intercept": round(intercept, 2) if intercept else None,
+                    "estimated_1rm_kg": round(estimated_1rm, 1) if estimated_1rm else None,
+                    "optimal_load_kg": round(optimal_load, 1) if optimal_load else None,
+                    "mvt": 0.3,
+                    "data_points": len(all_sets)
+                },
+                "latest_session": {
+                    "date": latest_session.get("date", ""),
+                    "exercise": latest_session.get("exercise", ""),
+                    "sets_count": len(sets),
+                    "avg_velocity": round(sum(s.get("mean_velocity", 0) for s in sets) / len(sets), 2) if sets else 0,
+                    "max_velocity": round(max((s.get("peak_velocity", 0) for s in sets), default=0), 2),
+                    "max_load": max((s.get("load_kg", 0) for s in sets), default=0),
+                    "max_power": max((s.get("power_watts", 0) for s in sets), default=0)
+                },
+                "velocity_loss_analysis": velocity_loss,
+                "fatigue_detected": any(v["loss_percent"] >= 20 for v in velocity_loss) if velocity_loss else False
+            }
+            
+            if response.vbt_analysis.get("fatigue_detected"):
+                injury_risk_factors.append("Perda de velocidade ≥20% detectada na última sessão VBT (fadiga periférica)" if lang == "pt" else "Velocity loss ≥20% detected in last VBT session (peripheral fatigue)")
+    except Exception as e:
+        print(f"VBT Error: {e}")
+    
+    # 6. Body Composition
+    try:
+        body_comp = await db.body_compositions.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(5).to_list(5)
+        
+        if body_comp:
+            latest = body_comp[0]
+            response.body_composition = {
+                "records_count": len(body_comp),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "protocol": latest.get("protocol", ""),
+                    "body_fat_percent": latest.get("body_fat_percent", 0),
+                    "lean_mass_kg": latest.get("lean_mass_kg", 0),
+                    "fat_mass_kg": latest.get("fat_mass_kg", 0),
+                    "weight_kg": latest.get("weight", 0),
+                    "classification": latest.get("classification", "")
+                },
+                "trend": None
+            }
+            
+            if len(body_comp) >= 2:
+                prev = body_comp[1]
+                fat_change = latest.get("body_fat_percent", 0) - prev.get("body_fat_percent", 0)
+                lean_change = latest.get("lean_mass_kg", 0) - prev.get("lean_mass_kg", 0)
+                response.body_composition["trend"] = {
+                    "fat_percent_change": round(fat_change, 1),
+                    "lean_mass_change_kg": round(lean_change, 1),
+                    "direction": "improving" if fat_change < 0 and lean_change >= 0 else "declining" if fat_change > 0 else "stable"
+                }
+    except Exception as e:
+        print(f"Body Comp Error: {e}")
+    
+    # 7. Determine Overall Risk Level
+    response.injury_risk_factors = injury_risk_factors
+    if len(injury_risk_factors) >= 3:
+        response.overall_risk_level = "high"
+    elif len(injury_risk_factors) >= 1:
+        response.overall_risk_level = "moderate"
+    else:
+        response.overall_risk_level = "low"
+    
+    # 8. Generate AI Scientific Insights
+    try:
+        insights_text = await generate_scientific_ai_insights(response, athlete, lang)
+        response.scientific_insights = insights_text
+    except Exception as e:
+        print(f"AI Insights Error: {e}")
+        response.scientific_insights = None
+    
+    return response
+
+
+async def generate_scientific_ai_insights(data: ScientificInsightsResponse, athlete: dict, lang: str) -> str:
+    """
+    Generate AI-powered scientific insights based on comprehensive athlete data.
+    Uses sports science terminology and evidence-based recommendations.
+    """
+    from emergentintegrations.llm import LlmChat
+    
+    llm_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not llm_key:
+        return None
+    
+    # Build comprehensive data context
+    context_parts = []
+    
+    # Athlete info
+    athlete_info = f"Atleta: {athlete['name']}, Posição: {athlete.get('position', 'N/A')}"
+    if athlete.get('weight'):
+        athlete_info += f", Peso: {athlete['weight']}kg"
+    if athlete.get('height'):
+        athlete_info += f", Altura: {athlete['height']}cm"
+    context_parts.append(athlete_info)
+    
+    # GPS Data
+    if data.gps_summary:
+        gps = data.gps_summary
+        context_parts.append(f"""
+DADOS GPS (últimas {gps['sessions_count']} sessões):
+- Distância média: {gps['avg_distance_m']}m
+- Distância alta intensidade média: {gps['avg_high_intensity_m']}m
+- Sprints médios: {gps['avg_sprints']}
+- Velocidade máxima: {gps['max_speed_kmh']} km/h
+- Última sessão: {gps.get('latest_session', {})}
+""")
+    
+    # ACWR
+    if data.acwr_analysis:
+        acwr = data.acwr_analysis
+        context_parts.append(f"""
+ANÁLISE ACWR (Acute:Chronic Workload Ratio):
+- Risco geral: {acwr['overall_risk']}
+- Métricas: {acwr['metrics']}
+""")
+    
+    # Wellness
+    if data.wellness_summary:
+        w = data.wellness_summary
+        context_parts.append(f"""
+WELLNESS (últimos {w['records_count']} registros):
+- Wellness Score médio: {w['avg_wellness_score']}/10
+- Readiness médio: {w['avg_readiness_score']}/10
+- Sono médio: {w['avg_sleep_hours']}h
+- Fadiga média: {w['avg_fatigue']}/10
+- Dor muscular média: {w['avg_soreness']}/10
+- Último registro: {w.get('latest', {})}
+""")
+    
+    # Jump Assessment
+    if data.jump_analysis:
+        j = data.jump_analysis
+        latest = j.get('latest', {})
+        hist = j.get('historical', {})
+        context_parts.append(f"""
+AVALIAÇÃO DE SALTO (CMJ/DJ):
+- RSI atual: {latest.get('rsi', 0)} ({latest.get('rsi_classification', '')})
+- Altura do salto: {latest.get('jump_height_cm', 0)} cm
+- Pico de potência: {latest.get('peak_power_w', 0)} W
+- Potência relativa: {latest.get('relative_power_wkg', 0)} W/kg
+- Status de fadiga: {latest.get('fatigue_status', '')}
+- Z-Score RSI: {hist.get('z_score', 0)} (variação: {hist.get('rsi_variation_percent', 0)}%)
+- Tendência: {hist.get('trend', '')}
+""")
+    
+    # VBT
+    if data.vbt_analysis:
+        v = data.vbt_analysis
+        lvp = v.get('load_velocity_profile', {})
+        context_parts.append(f"""
+PERFIL CARGA-VELOCIDADE (VBT):
+- Exercício principal: {v['primary_exercise']}
+- 1RM estimado: {lvp.get('estimated_1rm_kg', 'N/A')} kg
+- Carga ótima (potência máx): {lvp.get('optimal_load_kg', 'N/A')} kg
+- Slope: {lvp.get('slope', 'N/A')}
+- Intercept: {lvp.get('intercept', 'N/A')}
+- Perda de velocidade: {v.get('velocity_loss_analysis', [])}
+- Fadiga periférica detectada: {v.get('fatigue_detected', False)}
+""")
+    
+    # Body Composition
+    if data.body_composition:
+        bc = data.body_composition
+        latest = bc.get('latest', {})
+        context_parts.append(f"""
+COMPOSIÇÃO CORPORAL:
+- Gordura corporal: {latest.get('body_fat_percent', 0)}%
+- Massa magra: {latest.get('lean_mass_kg', 0)} kg
+- Massa gorda: {latest.get('fat_mass_kg', 0)} kg
+- Classificação: {latest.get('classification', '')}
+- Tendência: {bc.get('trend', {})}
+""")
+    
+    # Risk factors
+    if data.injury_risk_factors:
+        context_parts.append(f"""
+FATORES DE RISCO IDENTIFICADOS:
+{chr(10).join('- ' + f for f in data.injury_risk_factors)}
+Nível de risco geral: {data.overall_risk_level}
+""")
+    
+    full_context = "\n".join(context_parts)
+    
+    # Determine language
+    if lang == "pt":
+        system_prompt = """Você é um cientista do esporte especializado em fisiologia do exercício, biomecânica e 
+periodização do treinamento. Analise os dados fornecidos usando terminologia científica específica e forneça 
+insights baseados em evidências da literatura científica atual.
+
+IMPORTANTE: Use termos científicos específicos como:
+- Fadiga neuromuscular central vs periférica
+- Capacidade contrátil muscular
+- Potencialização pós-ativação (PAP)
+- Supercompensação e adaptação
+- Índice de Força Reativa (RSI)
+- Perfil força-velocidade
+- Déficit bilateral
+- Assimetria funcional
+- Monotonia e strain da carga
+- Readiness neuromuscular
+
+Cite referências científicas quando apropriado (ex: "Segundo Gabbett (2016)...")."""
+
+        user_prompt = f"""Com base nos seguintes dados científicos do atleta, forneça uma análise técnica completa:
+
+{full_context}
+
+Forneça sua análise no seguinte formato estruturado:
+
+## SÍNTESE FISIOLÓGICA
+Breve avaliação do estado neuromuscular e metabólico atual do atleta (3-4 linhas).
+
+## ANÁLISE DE CARGA DE TREINAMENTO
+Interpretação do ACWR e métricas de carga com base na literatura de monitoramento de carga.
+
+## ESTADO NEUROMUSCULAR
+Análise do RSI, perfil carga-velocidade e indicadores de fadiga central/periférica.
+
+## ESTADO DE RECUPERAÇÃO
+Avaliação baseada nos dados de wellness, sono e fatores psicométricos.
+
+## COMPOSIÇÃO CORPORAL E POTÊNCIA
+Relação entre composição corporal e métricas de potência/força.
+
+## FATORES DE RISCO E PREVENÇÃO
+Análise dos fatores de risco identificados com recomendações baseadas em evidências.
+
+## RECOMENDAÇÕES DE TREINAMENTO
+Prescrições específicas baseadas nos dados para otimização da performance e redução de risco de lesão.
+
+## RECOMENDAÇÕES DE RECUPERAÇÃO
+Estratégias de recuperação baseadas no perfil atual do atleta.
+
+Seja específico, use terminologia científica e fundamente em evidências quando possível."""
+
+    else:
+        system_prompt = """You are a sports scientist specialized in exercise physiology, biomechanics and 
+training periodization. Analyze the provided data using specific scientific terminology and provide 
+evidence-based insights from current scientific literature.
+
+IMPORTANT: Use specific scientific terms such as:
+- Central vs peripheral neuromuscular fatigue
+- Muscle contractile capacity
+- Post-activation potentiation (PAP)
+- Supercompensation and adaptation
+- Reactive Strength Index (RSI)
+- Force-velocity profile
+- Bilateral deficit
+- Functional asymmetry
+- Load monotony and strain
+- Neuromuscular readiness
+
+Cite scientific references when appropriate (e.g., "According to Gabbett (2016)...")."""
+
+        user_prompt = f"""Based on the following scientific data from the athlete, provide a complete technical analysis:
+
+{full_context}
+
+Provide your analysis in the following structured format:
+
+## PHYSIOLOGICAL SYNTHESIS
+Brief assessment of the athlete's current neuromuscular and metabolic state (3-4 lines).
+
+## TRAINING LOAD ANALYSIS
+Interpretation of ACWR and load metrics based on load monitoring literature.
+
+## NEUROMUSCULAR STATE
+Analysis of RSI, load-velocity profile and central/peripheral fatigue indicators.
+
+## RECOVERY STATE
+Assessment based on wellness data, sleep and psychometric factors.
+
+## BODY COMPOSITION AND POWER
+Relationship between body composition and power/strength metrics.
+
+## RISK FACTORS AND PREVENTION
+Analysis of identified risk factors with evidence-based recommendations.
+
+## TRAINING RECOMMENDATIONS
+Specific prescriptions based on data for performance optimization and injury risk reduction.
+
+## RECOVERY RECOMMENDATIONS
+Recovery strategies based on the athlete's current profile.
+
+Be specific, use scientific terminology and base on evidence when possible."""
+    
+    try:
+        chat = LlmChat(
+            api_key=llm_key,
+            model="gpt-4o",
+            system_message=system_prompt
+        )
+        response = chat.send_message(user_prompt)
+        return response
+    except Exception as e:
+        print(f"LLM Error: {e}")
+        return None
+
+
 # ============= TEAM DASHBOARD =============
 
 class TeamDashboardAthlete(BaseModel):
