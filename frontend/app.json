@@ -1,21 +1,27 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Peak Perform",
+    "slug": "peak-perform",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "peakperform",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.peakperform.app",
+      "associatedDomains": [
+        "applinks:peakperform.app",
+        "applinks:*.peakperform.app"
+      ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Tire fotos dos atletas"
       }
     },
     "android": {
+      "package": "com.peakperform.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -26,6 +32,25 @@
         "WRITE_EXTERNAL_STORAGE",
         "CAMERA",
         "READ_MEDIA_IMAGES"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "peakperform.app",
+              "pathPrefix": "/wellness-form"
+            },
+            {
+              "scheme": "https",
+              "host": "*.peakperform.app",
+              "pathPrefix": "/wellness-form"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "web": {
