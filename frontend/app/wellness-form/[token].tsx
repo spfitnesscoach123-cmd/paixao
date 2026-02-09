@@ -271,11 +271,9 @@ export default function WellnessForm() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  // Initialize showWebFallback based on platform - this runs before first render
-  const [showWebFallback, setShowWebFallback] = useState(() => {
-    // On web, we always show the fallback page
-    return Platform.OS === 'web';
-  });
+  // Client-side only state - prevents SSR issues
+  const [isClient, setIsClient] = useState(false);
+  const [isWebPlatform, setIsWebPlatform] = useState(false);
 
   // Form state
   const [selectedAthlete, setSelectedAthlete] = useState('');
@@ -287,16 +285,29 @@ export default function WellnessForm() {
   const [stress, setStress] = useState(5);
   const [mood, setMood] = useState(5);
 
+  // First effect: detect client-side and platform (runs once after mount)
   useEffect(() => {
-    // If showing web fallback, don't load athletes
-    if (showWebFallback) {
-      setIsLoading(false);
-      return;
-    }
+    setIsClient(true);
+    const isWeb = Platform.OS === 'web';
+    setIsWebPlatform(isWeb);
     
-    // Native app - load athletes normally
+    // If we're on web, stop loading immediately
+    if (isWeb) {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Second effect: load athletes only on native platforms after client detection
+  useEffect(() => {
+    // Wait until we've determined we're on client-side
+    if (!isClient) return;
+    
+    // If we're on web, don't fetch athletes
+    if (isWebPlatform) return;
+    
+    // Native app - load athletes
     loadAthletes();
-  }, [token, showWebFallback]);
+  }, [isClient, isWebPlatform, token]);
 
   const loadAthletes = async () => {
     try {
