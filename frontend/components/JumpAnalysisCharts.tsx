@@ -384,12 +384,94 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
         </View>
       )}
 
-      {/* Power-Velocity Profile Card */}
+      {/* Power-Velocity Profile Card with Visual Chart */}
       {pvProfile && (
         <View style={styles.pvCard}>
           <View style={styles.pvHeader}>
             <Ionicons name="flash" size={20} color="#f59e0b" />
             <Text style={styles.pvTitle}>{labels.powerVelocity}</Text>
+          </View>
+          
+          {/* Power-Velocity Visual Chart */}
+          <View style={styles.pvChartContainer}>
+            <Svg width={chartWidth} height={160}>
+              {/* Background grid */}
+              <Line x1="50" y1="20" x2="50" y2="130" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+              <Line x1="50" y1="130" x2={chartWidth - 20} y2="130" stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+              
+              {/* Y-axis label (Power) */}
+              <SvgText x="15" y="75" fill={colors.text.secondary} fontSize="9" transform="rotate(-90, 15, 75)">
+                {locale === 'pt' ? 'Potência (W)' : 'Power (W)'}
+              </SvgText>
+              
+              {/* X-axis label (Velocity) */}
+              <SvgText x={chartWidth / 2} y="150" fill={colors.text.secondary} fontSize="9" textAnchor="middle">
+                {locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}
+              </SvgText>
+              
+              {/* Quadrant backgrounds */}
+              <Rect x="50" y="20" width={(chartWidth - 70) / 2} height="55" fill="rgba(239, 68, 68, 0.1)" />
+              <Rect x={50 + (chartWidth - 70) / 2} y="20" width={(chartWidth - 70) / 2} height="55" fill="rgba(34, 197, 94, 0.1)" />
+              <Rect x="50" y="75" width={(chartWidth - 70) / 2} height="55" fill="rgba(156, 163, 175, 0.1)" />
+              <Rect x={50 + (chartWidth - 70) / 2} y="75" width={(chartWidth - 70) / 2} height="55" fill="rgba(251, 191, 36, 0.1)" />
+              
+              {/* Quadrant labels */}
+              <SvgText x={50 + (chartWidth - 70) / 4} y="50" fill="#ef4444" fontSize="8" textAnchor="middle" fontWeight="600">
+                {locale === 'pt' ? 'Força' : 'Strength'}
+              </SvgText>
+              <SvgText x={50 + 3 * (chartWidth - 70) / 4} y="50" fill="#22c55e" fontSize="8" textAnchor="middle" fontWeight="600">
+                {locale === 'pt' ? 'Equilibrado' : 'Balanced'}
+              </SvgText>
+              <SvgText x={50 + (chartWidth - 70) / 4} y="105" fill="#9ca3af" fontSize="8" textAnchor="middle" fontWeight="600">
+                {locale === 'pt' ? 'Desenvolver' : 'Develop'}
+              </SvgText>
+              <SvgText x={50 + 3 * (chartWidth - 70) / 4} y="105" fill="#fbbf24" fontSize="8" textAnchor="middle" fontWeight="600">
+                {locale === 'pt' ? 'Velocidade' : 'Speed'}
+              </SvgText>
+              
+              {/* Center lines */}
+              <Line x1={50 + (chartWidth - 70) / 2} y1="20" x2={50 + (chartWidth - 70) / 2} y2="130" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
+              <Line x1="50" y1="75" x2={chartWidth - 20} y2="75" stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
+              
+              {/* Athlete point */}
+              {(() => {
+                const normalizedVelocity = Math.min(Math.max((pvProfile.velocity_vs_average_percent + 50) / 100, 0), 1);
+                const normalizedPower = Math.min(Math.max((pvProfile.power_vs_average_percent + 50) / 100, 0), 1);
+                const pointX = 50 + normalizedVelocity * (chartWidth - 70);
+                const pointY = 130 - normalizedPower * 110;
+                return (
+                  <>
+                    <Circle cx={pointX} cy={pointY} r="12" fill={pvProfile.profile.color} opacity={0.3} />
+                    <Circle cx={pointX} cy={pointY} r="8" fill={pvProfile.profile.color} />
+                    <SvgText x={pointX} y={pointY - 18} fill={colors.text.primary} fontSize="10" textAnchor="middle" fontWeight="bold">
+                      {locale === 'pt' ? 'Atleta' : 'Athlete'}
+                    </SvgText>
+                  </>
+                );
+              })()}
+            </Svg>
+          </View>
+
+          {/* Stats Row */}
+          <View style={styles.pvStatsRow}>
+            <View style={styles.pvStatItem}>
+              <Text style={styles.pvStatValue}>{pvProfile.peak_power_w.toFixed(0)}</Text>
+              <Text style={styles.pvStatLabel}>{locale === 'pt' ? 'Potência (W)' : 'Power (W)'}</Text>
+              <Text style={[styles.pvStatDiff, { color: pvProfile.power_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
+                {pvProfile.power_vs_average_percent >= 0 ? '+' : ''}{pvProfile.power_vs_average_percent.toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.pvStatItem}>
+              <Text style={styles.pvStatValue}>{pvProfile.peak_velocity_ms.toFixed(2)}</Text>
+              <Text style={styles.pvStatLabel}>{locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}</Text>
+              <Text style={[styles.pvStatDiff, { color: pvProfile.velocity_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
+                {pvProfile.velocity_vs_average_percent >= 0 ? '+' : ''}{pvProfile.velocity_vs_average_percent.toFixed(0)}%
+              </Text>
+            </View>
+            <View style={styles.pvStatItem}>
+              <Text style={styles.pvStatValue}>{pvProfile.relative_power_wkg.toFixed(1)}</Text>
+              <Text style={styles.pvStatLabel}>W/kg</Text>
+            </View>
           </View>
           
           <View style={[styles.pvProfile, { backgroundColor: pvProfile.profile.color + '20', borderColor: pvProfile.profile.color }]}>
