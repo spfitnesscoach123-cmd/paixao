@@ -78,10 +78,8 @@ export default function CreatePeriodizationScreen() {
 
   // Form state
   const [weekName, setWeekName] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(addDays(new Date(), 6));
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [startDateStr, setStartDateStr] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [endDateStr, setEndDateStr] = useState(format(addDays(new Date(), 6), 'yyyy-MM-dd'));
   const [currentStep, setCurrentStep] = useState(1); // 1: dates, 2: days, 3: weekly, 4: daily
   const [days, setDays] = useState<DailyPrescription[]>([]);
   const [weeklyPrescription, setWeeklyPrescription] = useState<WeeklyPrescription>({
@@ -93,6 +91,10 @@ export default function CreatePeriodizationScreen() {
     acc_dec_total_multiplier: 1.3,
   });
   const [selectedMetricForMultiplier, setSelectedMetricForMultiplier] = useState<string | null>(null);
+
+  // Parse dates
+  const startDate = parseISO(startDateStr);
+  const endDate = parseISO(endDateStr);
 
   // Generate days when dates change
   const generateDays = () => {
