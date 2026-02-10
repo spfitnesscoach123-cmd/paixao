@@ -715,6 +715,17 @@ def detect_manufacturer_from_columns(columns: List[str]) -> Manufacturer:
             if sig.lower() in normalized_columns:
                 scores[manufacturer] += 1
     
+    # Bonus: if the manufacturer's own name appears as a column value, give strong weight
+    name_bonus = {
+        Manufacturer.CATAPULT: {"catapult"},
+        Manufacturer.STATSPORTS: {"statsports", "apex"},
+        Manufacturer.PLAYERTEK: {"playertek"},
+        Manufacturer.GPEXE: {"gpexe"},
+    }
+    for manufacturer, names in name_bonus.items():
+        if names & normalized_columns:
+            scores[manufacturer] += 5  # Strong signal
+    
     # Find manufacturer with highest score
     best_manufacturer = max(scores, key=scores.get)
     
