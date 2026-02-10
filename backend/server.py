@@ -7476,6 +7476,374 @@ async def get_revenuecat_subscription_status(
         "has_billing_issue": subscription.get("billing_issue", False)
     }
 
+# ============= JUMP DATA IMPORT ROUTES =============
+
+@api_router.get("/jumps/providers")
+async def get_jump_providers():
+    """
+    Get list of supported jump data providers/manufacturers.
+    
+    Returns list of supported contact mat and force plate systems.
+    """
+    return {
+        "providers": list_jump_manufacturers(),
+        "description": "Fabricantes de tapetes de contato e plataformas de força suportados"
+    }
+
+
+@api_router.post("/jumps/upload/preview")
+async def preview_jump_csv(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Preview jump data CSV before importing.
+    
+    Validates all rows and returns:
+    - Valid records (preview, not saved)
+    - Invalid rows with detailed error messages
+    - Detected manufacturer
+    - Metrics that will be auto-calculated
+    - Athletes not found in system
+    
+    Does NOT save anything to database.
+    """
+    # Read file content
+    file_content = await file.read()
+    
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
+    
+    # Get existing athlete IDs for this coach
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Parse CSV
+    parser = JumpCSVParser()
+    raw_rows, parse_errors = parser.parse(file_content, file.filename or "upload.csv")
+    
+    if not raw_rows and parse_errors:
+        return {
+            "success": False,
+            "total_rows": 0,
+            "valid_count": 0,
+            "error_count": len(parse_errors),
+            "errors": [e.model_dump() for e in parse_errors],
+            "valid_records": [],
+            "detected_manufacturer": parser.detected_manufacturer or "unknown",
+            "calculated_metrics": [],
+            "athletes_not_found": [],
+            "jump_types_found": []
+        }
+    
+    # Initialize validator and calculator
+    validator = JumpValidator(existing_athlete_ids)
+    calculator = JumpCalculator()
+    
+    valid_records = []
+    all_errors = list(parse_errors)
+    jump_types_found = set()
+    all_calculated_metrics = set()
+    
+    for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Calculate derived metrics
+        calculator.reset_tracking()
+        row_with_metrics = calculator.calculate(raw_row)
+        all_calculated_metrics.update(calculator.calculated_fields)
+        
+        # Track jump types
+        jt = row_with_metrics.get('jump_type')
+        if jt:
+            jump_types_found.add(str(jt).upper())
+        
+        # Validate
+        is_valid, record_or_error = validator.validate(row_with_metrics, row_num)
+        
+        if is_valid:
+            # Convert record to dict for JSON response
+            record_dict = record_or_error.model_dump()
+            # Convert datetime to string for JSON
+            if record_dict.get('jump_date'):
+                record_dict['jump_date'] = record_dict['jump_date'].isoformat()
+            valid_records.append(record_dict)
+        else:
+            all_errors.append(record_or_error)
+    
+    return {
+        "success": len(all_errors) == 0,
+        "total_rows": len(raw_rows),
+        "valid_count": len(valid_records),
+        "error_count": len(all_errors),
+        "valid_records": valid_records,
+        "errors": [e.model_dump() for e in all_errors],
+        "detected_manufacturer": parser.detected_manufacturer or "generic",
+        "calculated_metrics": list(all_calculated_metrics),
+        "athletes_not_found": list(validator.athletes_not_found),
+        "jump_types_found": list(jump_types_found)
+    }
+
+
+@api_router.post("/jumps/upload/import")
+async def import_jump_csv(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import validated jump data from CSV into database.
+    
+    Only imports valid records. Invalid rows are rejected with error messages.
+    
+    Returns:
+    - Total imported count
+    - Total rejected count
+    - IDs of created records
+    - Error details for rejected rows
+    """
+    # Read file content
+    file_content = await file.read()
+    
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
+    
+    # Get existing athlete IDs for this coach
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Parse CSV
+    parser = JumpCSVParser()
+    raw_rows, parse_errors = parser.parse(file_content, file.filename or "upload.csv")
+    
+    if not raw_rows:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nenhum dado válido encontrado no CSV. Erros: {[e.message for e in parse_errors]}"
+        )
+    
+    # Initialize validator and calculator
+    validator = JumpValidator(existing_athlete_ids)
+    calculator = JumpCalculator()
+    
+    valid_records = []
+    all_errors = list(parse_errors)
+    
+    for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Calculate derived metrics
+        row_with_metrics = calculator.calculate(raw_row)
+        
+        # Validate
+        is_valid, record_or_error = validator.validate(row_with_metrics, row_num)
+        
+        if is_valid:
+            valid_records.append(record_or_error)
+        else:
+            all_errors.append(record_or_error)
+    
+    if not valid_records:
+        return {
+            "success": False,
+            "message": "Nenhum registro válido para importar",
+            "imported_count": 0,
+            "rejected_count": len(all_errors),
+            "created_ids": [],
+            "errors": [e.model_dump() for e in all_errors]
+        }
+    
+    # Prepare documents for insertion
+    documents = []
+    for record in valid_records:
+        doc = record.model_dump()
+        doc['coach_id'] = current_user["_id"]
+        doc['created_at'] = datetime.utcnow()
+        # Convert jump_date if it's a datetime object
+        if isinstance(doc.get('jump_date'), datetime):
+            doc['jump_date_str'] = doc['jump_date'].strftime('%Y-%m-%d')
+        documents.append(doc)
+    
+    # Insert into database
+    result = await db.jump_data.insert_many(documents)
+    created_ids = [str(id) for id in result.inserted_ids]
+    
+    return {
+        "success": True,
+        "message": f"{len(created_ids)} registros de salto importados com sucesso",
+        "imported_count": len(created_ids),
+        "rejected_count": len(all_errors),
+        "created_ids": created_ids,
+        "errors": [e.model_dump() for e in all_errors] if all_errors else []
+    }
+
+
+@api_router.get("/jumps/athlete/{athlete_id}")
+async def get_athlete_jumps(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all jump data for a specific athlete.
+    
+    Returns jump records sorted by date (newest first).
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get jump records, excluding MongoDB _id from raw_row if present
+    jump_records = await db.jump_data.find(
+        {
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        },
+        {"_id": 1, "athlete_id": 1, "jump_type": 1, "jump_height_cm": 1,
+         "flight_time_s": 1, "contact_time_s": 1, "reactive_strength_index": 1,
+         "peak_power_w": 1, "takeoff_velocity_m_s": 1, "load_kg": 1,
+         "jump_date": 1, "jump_date_str": 1, "source_system": 1,
+         "attempt_number": 1, "test_id": 1, "protocol": 1, "notes": 1,
+         "created_at": 1}
+    ).sort("jump_date", -1).to_list(1000)
+    
+    # Convert ObjectId to string
+    for record in jump_records:
+        record["id"] = str(record.pop("_id"))
+        # Convert datetime to ISO string
+        if isinstance(record.get("jump_date"), datetime):
+            record["jump_date"] = record["jump_date"].isoformat()
+        if isinstance(record.get("created_at"), datetime):
+            record["created_at"] = record["created_at"].isoformat()
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "total_jumps": len(jump_records),
+        "jumps": jump_records
+    }
+
+
+@api_router.delete("/jumps/{jump_id}")
+async def delete_jump(
+    jump_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Delete a specific jump record.
+    """
+    result = await db.jump_data.delete_one({
+        "_id": ObjectId(jump_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Registro de salto não encontrado")
+    
+    return {"message": "Registro de salto excluído com sucesso", "id": jump_id}
+
+
+@api_router.get("/jumps/analysis/{athlete_id}")
+async def get_jump_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get jump performance analysis for an athlete.
+    
+    Includes:
+    - Best values by jump type
+    - Recent trend analysis
+    - RSI analysis (for DJ/RJ)
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get all jump records
+    jump_records = await db.jump_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("jump_date", -1).to_list(1000)
+    
+    if not jump_records:
+        return {
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name", ""),
+            "total_jumps": 0,
+            "analysis": None,
+            "message": "Nenhum dado de salto encontrado para este atleta"
+        }
+    
+    # Analyze by jump type
+    by_type = {}
+    for record in jump_records:
+        jt = record.get("jump_type", "UNKNOWN")
+        if jt not in by_type:
+            by_type[jt] = {
+                "count": 0,
+                "best_height_cm": None,
+                "avg_height_cm": None,
+                "heights": [],
+                "best_rsi": None,
+                "avg_rsi": None,
+                "rsis": [],
+                "recent_heights": [],
+            }
+        
+        by_type[jt]["count"] += 1
+        
+        height = record.get("jump_height_cm")
+        if height is not None:
+            by_type[jt]["heights"].append(height)
+            if by_type[jt]["best_height_cm"] is None or height > by_type[jt]["best_height_cm"]:
+                by_type[jt]["best_height_cm"] = height
+        
+        rsi = record.get("reactive_strength_index")
+        if rsi is not None:
+            by_type[jt]["rsis"].append(rsi)
+            if by_type[jt]["best_rsi"] is None or rsi > by_type[jt]["best_rsi"]:
+                by_type[jt]["best_rsi"] = rsi
+    
+    # Calculate averages
+    for jt, data in by_type.items():
+        if data["heights"]:
+            data["avg_height_cm"] = round(sum(data["heights"]) / len(data["heights"]), 2)
+            data["recent_heights"] = data["heights"][:10]  # Last 10
+        if data["rsis"]:
+            data["avg_rsi"] = round(sum(data["rsis"]) / len(data["rsis"]), 2)
+        # Remove raw lists from response
+        del data["heights"]
+        del data["rsis"]
+    
+    # Overall best
+    all_heights = [r.get("jump_height_cm") for r in jump_records if r.get("jump_height_cm")]
+    overall_best = max(all_heights) if all_heights else None
+    overall_avg = round(sum(all_heights) / len(all_heights), 2) if all_heights else None
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "total_jumps": len(jump_records),
+        "analysis": {
+            "overall": {
+                "best_height_cm": overall_best,
+                "avg_height_cm": overall_avg,
+                "jump_count": len(jump_records)
+            },
+            "by_type": by_type
+        }
+    }
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
