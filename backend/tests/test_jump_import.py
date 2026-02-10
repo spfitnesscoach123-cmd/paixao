@@ -325,7 +325,7 @@ ATH001,CMJ,35.0,0.54,,2026-01-15,generic
     def test_detect_manufacturer_generic(self):
         """Test manufacturer detection returns generic for standard headers."""
         # Use clearly generic headers that don't match any specific manufacturer
-        headers = ['athlete_id', 'jump_type', 'jump_height_cm', 'flight_time_s', 'jump_date', 'source_system']
+        headers = ['subject_id', 'measurement_type', 'value_cm', 'duration_s', 'measurement_date', 'system']
         manufacturer = detect_manufacturer_from_headers(headers, "my_custom_data.csv")
         
         assert manufacturer == 'generic'
