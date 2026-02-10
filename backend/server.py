@@ -7846,6 +7846,162 @@ async def get_jump_analysis(
     }
 
 
+@api_router.get("/jumps/report/{athlete_id}")
+async def get_jump_report(
+    athlete_id: str,
+    jump_type: str = "CMJ",
+    window_days: int = 14,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate a comprehensive jump performance report for an athlete.
+    
+    Returns:
+    - Readiness status (optimal, good, moderate, low, poor)
+    - Fatigue detection flag
+    - Trend analysis (vs baseline, vs career)
+    - Baseline metrics (best, rolling averages, CV%)
+    - Actionable recommendations
+    
+    Query Parameters:
+    - jump_type: Type of jump to analyze (CMJ, SJ, DJ, RJ). Default: CMJ
+    - window_days: Analysis window in days. Default: 14
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get all jump records for athlete
+    jump_records = await db.jump_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("jump_date", -1).to_list(1000)
+    
+    # Convert MongoDB records to dicts (handle ObjectId and datetime)
+    jumps = []
+    for record in jump_records:
+        record_dict = dict(record)
+        record_dict.pop("_id", None)
+        record_dict.pop("coach_id", None)
+        jumps.append(record_dict)
+    
+    # Generate report using jump_analysis module
+    report = generate_report(
+        jumps=jumps,
+        athlete_id=athlete_id,
+        athlete_name=athlete.get("name", ""),
+        jump_type=jump_type.upper(),
+        window_days=window_days
+    )
+    
+    return report
+
+
+@api_router.get("/jumps/compare")
+async def compare_athletes_jumps(
+    athlete_ids: str,
+    jump_type: str = "CMJ",
+    metric: str = "z_height",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Compare jump performance across multiple athletes.
+    
+    Query Parameters:
+    - athlete_ids: Comma-separated athlete IDs (e.g., "id1,id2,id3")
+    - jump_type: Type of jump to compare (CMJ, SJ, DJ, RJ). Default: CMJ
+    - metric: Comparison metric (z_height, pct_best_height, pct_career_height). Default: z_height
+    
+    Returns ranked list with group statistics.
+    """
+    from jump_analysis import calculate_athlete_baseline
+    
+    # Parse athlete IDs
+    ids = [id.strip() for id in athlete_ids.split(",") if id.strip()]
+    
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="Pelo menos 2 atletas são necessários para comparação")
+    
+    if len(ids) > 20:
+        raise HTTPException(status_code=400, detail="Máximo de 20 atletas por comparação")
+    
+    # Collect data for all athletes
+    athlete_data = []
+    
+    for aid in ids:
+        # Verify athlete belongs to user
+        try:
+            athlete = await db.athletes.find_one({
+                "_id": ObjectId(aid),
+                "coach_id": current_user["_id"]
+            })
+        except Exception:
+            continue
+        
+        if not athlete:
+            continue
+        
+        # Get jump records
+        jump_records = await db.jump_data.find({
+            "athlete_id": aid,
+            "coach_id": current_user["_id"]
+        }).to_list(1000)
+        
+        if not jump_records:
+            continue
+        
+        # Convert to list of dicts
+        jumps = []
+        for record in jump_records:
+            record_dict = dict(record)
+            record_dict.pop("_id", None)
+            record_dict.pop("coach_id", None)
+            jumps.append(record_dict)
+        
+        # Calculate baseline
+        baseline = calculate_athlete_baseline(
+            jumps=jumps,
+            athlete_id=aid,
+            jump_type=jump_type.upper()
+        )
+        
+        athlete_data.append({
+            "athlete_id": aid,
+            "athlete_name": athlete.get("name", ""),
+            "baseline": baseline.to_dict(),
+            "jumps": jumps
+        })
+    
+    if len(athlete_data) < 2:
+        raise HTTPException(
+            status_code=400, 
+            detail="Dados insuficientes: pelo menos 2 atletas com dados de salto são necessários"
+        )
+    
+    # Run comparison
+    comparison = compare_athletes(
+        athlete_data=athlete_data,
+        metric=metric,
+        jump_type=jump_type.upper()
+    )
+    
+    # Add athlete names to results
+    name_map = {d["athlete_id"]: d["athlete_name"] for d in athlete_data}
+    for athlete in comparison.get("athletes", []):
+        athlete["athlete_name"] = name_map.get(athlete["athlete_id"], "")
+    
+    return {
+        "jump_type": jump_type.upper(),
+        "metric": metric,
+        "athlete_count": len(athlete_data),
+        "comparison": comparison
+    }
+
+
 # Include the router in the main app
 app.include_router(api_router)
 
