@@ -41,6 +41,8 @@ from jump_import import (
 )
 from jump_import.mappers import list_supported_manufacturers as list_jump_manufacturers
 
+from jump_analysis import generate_report, compare_athletes
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
