@@ -1448,6 +1448,11 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
     textAlign: 'center',
   },
+  pvMetricDiff: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   pvProfile: {
     borderRadius: 12,
     padding: 12,
