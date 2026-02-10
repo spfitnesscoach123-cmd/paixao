@@ -20,6 +20,10 @@ from gps_import.manufacturer_aliases import (
 )
 from gps_import.csv_parser import GPSCSVParser, parse_gps_csv
 from gps_import.normalizer import GPSDataNormalizer, normalize_gps_data
+from gps_import.consolidator import (
+    consolidate_session, _classify_period_name,
+    SUMMABLE_METRICS, MAX_METRICS, AVERAGE_METRICS,
+)
 
 
 # ============ CANONICAL METRICS TESTS ============
@@ -240,6 +244,107 @@ class TestNormalizer:
         result = normalize_gps_data(records, "a", "c")
         doc = result[0]
         assert "player_load" not in doc or doc.get("player_load") is not None
+
+
+# ============ CONSOLIDATOR TESTS ============
+
+class TestConsolidator:
+    def _make_record(self, period_name="Period 1", **overrides):
+        base = {
+            "athlete_id": "a1", "coach_id": "c1", "session_id": "s1",
+            "session_name": "Test", "date": "2025-01-01",
+            "activity_type": "training", "source": "csv_import_catapult",
+            "device": "Catapult", "period_name": period_name,
+            "total_distance": 0, "high_intensity_distance": 0,
+            "high_speed_running": 0, "sprint_distance": 0,
+            "number_of_sprints": 0, "number_of_accelerations": 0,
+            "number_of_decelerations": 0, "max_speed": 0,
+            "max_acceleration": 0, "max_deceleration": 0,
+        }
+        base.update(overrides)
+        return base
+
+    # --- Period classification ---
+    def test_classify_session_total_keyword(self):
+        assert _classify_period_name("Match - Session Total") == "session_total"
+        assert _classify_period_name("Session") == "session_total"
+        assert _classify_period_name("Total") == "session_total"
+        assert _classify_period_name("Full Session") == "session_total"
+
+    def test_classify_period_keyword(self):
+        assert _classify_period_name("1st Half") == "period"
+        assert _classify_period_name("2nd Half") == "period"
+        assert _classify_period_name("1º Tempo") == "period"
+        assert _classify_period_name("Period 2") == "period"
+
+    def test_classify_ambiguous_defaults_to_period(self):
+        assert _classify_period_name("Treino Tático") == "period"
+        assert _classify_period_name("Drill 3") == "period"
+        assert _classify_period_name("") == "period"
+
+    # --- Consolidation with session total ---
+    def test_consolidate_with_session_total_no_duplication(self):
+        """The core bug scenario: session(10000) + 1st(5000) + 2nd(5000) = 10000, NOT 20000"""
+        records = [
+            self._make_record("Match - Session Total", total_distance=10000, max_speed=9.5, number_of_sprints=18),
+            self._make_record("Match - 1st Half", total_distance=5000, max_speed=9.5, number_of_sprints=10),
+            self._make_record("Match - 2nd Half", total_distance=5000, max_speed=9.0, number_of_sprints=8),
+        ]
+        result = consolidate_session(records)
+        assert result is not None
+        assert result["total_distance"] == 10000  # From session total, NOT 20000
+        assert result["number_of_sprints"] == 18   # From session total
+        assert result["max_speed"] == 9.5           # Max across all
+        assert result["has_session_total"] is True
+        assert len(result["periods"]) == 2
+
+    def test_consolidate_session_total_max_speed_from_period(self):
+        """max_speed should be the MAX across ALL rows including periods"""
+        records = [
+            self._make_record("Session Total", total_distance=10000, max_speed=8.0),
+            self._make_record("1st Half", total_distance=5000, max_speed=9.5),
+            self._make_record("2nd Half", total_distance=5000, max_speed=8.5),
+        ]
+        result = consolidate_session(records)
+        assert result["total_distance"] == 10000  # From session total
+        assert result["max_speed"] == 9.5          # Max across all (from 1st Half)
+
+    # --- Consolidation without session total (sum periods) ---
+    def test_consolidate_periods_only_sums(self):
+        records = [
+            self._make_record("1st Half", total_distance=5500, number_of_sprints=11, max_speed=9.3),
+            self._make_record("2nd Half", total_distance=4800, number_of_sprints=7, max_speed=8.7),
+        ]
+        result = consolidate_session(records)
+        assert result["total_distance"] == 10300   # 5500 + 4800
+        assert result["number_of_sprints"] == 18   # 11 + 7
+        assert result["max_speed"] == 9.3           # Max
+        assert result["has_session_total"] is False
+        assert len(result["periods"]) == 2
+
+    # --- Single record ---
+    def test_consolidate_single_record(self):
+        records = [self._make_record("Treino", total_distance=8200)]
+        result = consolidate_session(records)
+        assert result["total_distance"] == 8200
+        assert result["has_session_total"] is True
+        assert len(result["periods"]) == 0
+
+    # --- Empty input ---
+    def test_consolidate_empty(self):
+        assert consolidate_session([]) is None
+
+    # --- Period entries contain metrics ---
+    def test_periods_embed_metrics(self):
+        records = [
+            self._make_record("Session Total", total_distance=10000),
+            self._make_record("1st Half", total_distance=5000, high_speed_running=900),
+        ]
+        result = consolidate_session(records)
+        period = result["periods"][0]
+        assert period["period_name"] == "1st Half"
+        assert period["total_distance"] == 5000
+        assert period["high_speed_running"] == 900
 
 
 if __name__ == "__main__":
