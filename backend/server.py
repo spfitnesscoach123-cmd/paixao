@@ -6661,10 +6661,70 @@ async def preview_csv_import(
     """
     Preview CSV before importing.
     Returns detected manufacturer, column mapping, sample normalized records.
+    Includes identity resolution for athlete names found in CSV.
+    Import is BLOCKED if any athletes are unresolved.
     """
     content = await file.read()
 
     parse_result = parse_gps_csv(content, filename=file.filename or "upload.csv", strict=False)
+
+    # ========== IDENTITY RESOLUTION ==========
+    # Get existing athletes
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Extract unique athlete names from GPS data
+    athlete_names_from_csv = set()
+    for rec in parse_result.records:
+        # Check common GPS CSV columns for athlete name
+        athlete_name = (
+            rec.get('athlete_name', '') or 
+            rec.get('player_name', '') or
+            rec.get('name', '') or
+            rec.get('player', '')
+        )
+        if athlete_name and isinstance(athlete_name, str):
+            athlete_name = athlete_name.strip()
+            if athlete_name and athlete_name not in existing_athlete_ids:
+                athlete_names_from_csv.add(athlete_name)
+    
+    # Run identity resolution if there are names to resolve
+    identity_resolution = {
+        "resolved": {},
+        "resolved_count": 0,
+        "unresolved": [],
+        "unresolved_count": 0,
+        "can_import": True,
+        "message": "Nenhum nome de atleta encontrado no CSV ou todos já resolvidos"
+    }
+    
+    if athlete_names_from_csv:
+        identity_resolver = IdentityResolver()
+        resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+            names=list(athlete_names_from_csv),
+            athletes=athletes,
+            aliases=aliases,
+            coach_id=current_user["_id"],
+            source_system="gps"
+        )
+        
+        can_import = len(unresolved_athletes) == 0
+        identity_resolution = {
+            "resolved": resolved_names,
+            "resolved_count": len(resolved_names),
+            "unresolved": [u.to_dict() for u in unresolved_athletes],
+            "unresolved_count": len(unresolved_athletes),
+            "can_import": can_import,
+            "message": "Todos os atletas resolvidos" if can_import else f"{len(unresolved_athletes)} atleta(s) pendente(s) de confirmação"
+        }
 
     # Build sample preview (first 5 parsed records)
     sample = []
@@ -6682,7 +6742,8 @@ async def preview_csv_import(
         "sample_data": sample,
         "errors": [e.to_dict() for e in parse_result.errors[:10]],
         "warnings": [w.to_dict() for w in parse_result.warnings[:10]],
-        "ready_to_import": parse_result.valid_rows > 0,
+        "ready_to_import": parse_result.valid_rows > 0 and identity_resolution["can_import"],
+        "identity_resolution": identity_resolution,
     }
 
 
