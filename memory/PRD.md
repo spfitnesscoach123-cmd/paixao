@@ -406,6 +406,28 @@ backend/identity_resolver/
 
 ---
 
+## Módulo Periodização
+
+### ✅ COMPLETO - Página Periodização
+- [x] Listagem de semanas de periodização
+- [x] Criação de nova semana com classificação de dias (MD, MD-1, etc.)
+- [x] Visualização de metas semanais e diárias por atleta
+- [x] Cálculo de metas baseado em peak values (máximos históricos de JOGO)
+- [x] Sistema de notificações de novos picos
+- [x] Modo tabela e cards para visualização
+- [x] Contraste visual do botão "Voltar ao Menu Principal" corrigido
+
+### Bug Fix (2026-02-10)
+**Problema:** Valores calculados apareciam apenas para o 1º atleta; demais mostravam 0.
+
+**Causa raiz:** Inconsistência de tipo no `athlete_id` entre escrita (às vezes ObjectId) e leitura (sempre string) na coleção `athlete_peak_values`.
+
+**Correção aplicada:**
+1. Normalização para `str` na escrita: `athlete_id = str(session_records[0].get("athlete_id"))`
+2. Normalização para `str` na leitura: `peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}`
+
+---
+
 ## Referências Científicas
 
 - Claudino et al. (2017) - CMJ monitoring in team sports
