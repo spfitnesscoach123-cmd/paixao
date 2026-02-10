@@ -95,7 +95,7 @@ class ResolutionResult(BaseModel):
     normalized_name: str
     athlete_id: Optional[str] = None
     athlete_name: Optional[str] = None
-    candidates: List[ResolutionCandidate] = Field(default_factory=list)
+    candidates: List[Any] = Field(default_factory=list)
     message: str = ""
     alias_id: Optional[str] = None  # If alias was created/used
 
