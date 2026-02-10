@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://no-duplication-gps.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://jump-data-hub.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "test@test.com"

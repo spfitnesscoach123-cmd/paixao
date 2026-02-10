@@ -1,163 +1,170 @@
 <analysis>**original_problem_statement:**
-The user initially requested the implementation of a multi-manufacturer CSV import system to support data from Catapult, Statsports, PlayerTek, and GPEXE. This system needed to map data from various CSV formats to a canonical data dictionary, with tolerant parsing and rigorous validation, without altering the UI, periodization logic, or existing data models beyond what was necessary for CSV ingestion.
+The user has issued a directive to ignore all previous tasks and start a new project from scratch.
 
-Subsequently, the user identified a critical bug where the system was duplicating metrics. When a CSV file contained data for a single activity split into multiple periods (e.g., 1st half, 2nd half) and also included a row for the session total, the system would incorrectly sum all values, leading to inflated metrics.
+The new project is to build a hardware-agnostic, CSV-based import system for jump data collected from sports contact mats. The system must be built with a clean architecture, separating concerns for parsing, validation, and calculation.
 
-The user provided a new set of requirements to fix this bug:
-- **Consolidate on Ingest**: Each CSV must be processed to produce a single database record per athlete/session.
-- **Data Prioritization Rules**:
-    1.  If a session total metric is present, use it exclusively for that metric.
-    2.  If no session total is present, sum the period values to calculate the total.
-    3.  Never sum session total and period values together.
-- **Data Modeling**: The final database document should contain the consolidated top-level metrics, an embedded array  with the breakdown, and a boolean flag .
-- **Scope Limitation**: No changes to UI, periodization, load calculations, or metric definitions. The fix should be contained within the data ingestion pipeline.
+**PRODUCT REQUIREMENTS (as per user's latest request):**
+1.  **Core Module ()**: Create a full-stack module to handle CSV data import for jumps.
+    *   : Define a canonical  data model using Pydantic.
+    *   : Implement safe and tolerant CSV parsing.
+    *   : Validate data against the schema and specific business rules (e.g.,  is mandatory for 'DJ' but must be null for 'CMJ').
+    *   : Calculate derived metrics.
+    *   : Create a directory for provider-specific data mappers (e.g., , ).
+2.  **Canonical Data Model ()**: All imported data must be normalized to a standard Pydantic model including fields like , , , , , , , and .
+3.  **Business & Calculation Rules**:
+    *   Empty CSV fields must be parsed as .
+    *   If  is missing, calculate it from  using the formula: .
+    *   Calculate Reactive Strength Index (RSI) as  only when both values are present.
+4.  **Athlete Integration**:
+    *   The  must reference an existing athlete in the system.
+    *   The system must never create athletes automatically during import. An error should be returned if the athlete does not exist.
+5.  **API Endpoints (FastAPI)**:
+    *   : Reads and validates a CSV, returning a report of valid/invalid rows with detailed errors, without saving to the database.
+    *   : Persists pre-validated jump records to a dedicated  collection in the database.
+6.  **Analytical Module ()**:
+    *   Create a new module for sports science analytics (, , , etc.).
+    *   Implement an endpoint  that returns a structured JSON report with readiness status, trends, and a fatigue flag.
+7.  **Testing**: Create automated tests covering parsing, validation, calculations, and API endpoints.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The application has a fully functional multi-manufacturer CSV import pipeline. It supports Catapult, Statsports, PlayerTek, and GPEXE. A robust data consolidation layer has been implemented during the ingestion process. This layer correctly processes CSV files containing both session-level and period-level data, creating a single, consolidated document in the database for each imported session. This effectively prevents the metric duplication bug. The system also includes extensive unit and integration tests covering the import and consolidation logic.
+The agent has successfully implemented the entire  module as requested. This includes the complete directory structure (, , , , and mappers), the Pydantic models, and the two required API endpoints ( and ). The system correctly parses, validates, calculates derived metrics, and imports jump data from CSV files. Unit tests and sample CSVs were also created, and the entire flow was successfully tested via API calls. The agent has also created the directory and empty file structure for the next major task: the  module.
 
 **Last working item**:
-- **Last item agent was working**: The agent finished implementing a data consolidation architecture to fix a critical bug where GPS metrics were duplicated if a CSV contained both session totals and per-period breakdowns. This involved creating a new  module, updating the import endpoint in  to use it, and adding defense-in-depth logic to functions that read GPS data to handle legacy data. The agent also created new test files to replicate the bug, verified the fix via API calls, updated the unit tests, and ran the testing agent.
-- **Status**: USER VERIFICATION PENDING
-- **Agent Testing Done**: Y
-- **Which testing method agent to use?**: NA
+- **Last item agent was working**: The agent had just started work on the new  module, which is the next major feature requested by the user. The last actions were creating the directory  and the initial empty Python files within it (, , , , , and ).
+- **Status**: IN PROGRESS
+- **Agent Testing Done**: N
+- **Which testing method agent to use?**: backend testing agent
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-There are no known pending or in-progress issues. The last major task was completed and tested by the agent.
+There are no known bugs or issues. The pending work is the implementation of the next feature.
 
 **In progress Task List**:
-There are no tasks currently in progress.
+-   **Task 1**: Implement the  module and the reporting endpoint (Priority: P0)
+    -   **Where to resume**: The file structure is ready in . The next step is to implement the business logic inside each file, starting with  to calculate athlete baselines.
+    -   **What will be achieved**: An analytical engine that provides sports science insights (readiness, fatigue, trends) from the imported jump data, accessible via a new API endpoint.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: backend
+    -   **Blocked on something**: No.
 
 **Upcoming and Future Tasks**
-There are no upcoming or future tasks explicitly requested by the user in the provided history.
+-   **Upcoming Tasks**:
+    -   **P0**: Complete the implementation of the  module logic (trends, fatigue, etc.).
+    -   **P1**: Implement and test the new  endpoint in  to expose the analysis results.
+-   **Future Tasks**:
+    -   **P2**: Implement statistical normalization (Z-scores, percentile of best) for cross-device and cross-athlete comparisons.
+    -   **P3**: Build a minimal frontend UI for CSV upload, data visualization (session table, charts), and displaying readiness status.
 
 **Completed work in this session**
-- **Multi-Manufacturer CSV Import System (DONE)**:
-    - Created the  module with dedicated parsers for Catapult, Statsports, PlayerTek, and GPEXE.
-    - Implemented a  to map provider-specific column names to a canonical data model.
-    - Integrated the new import pipeline into  via the  and  endpoints.
-- **Provider Detection Logic (DONE)**:
-    - Fixed a bug where provider detection failed because it received normalized headers instead of original headers.
-    - Improved detection accuracy by giving higher weight to provider names found within the CSV data/columns.
-- **Metric Duplication Bug Fix (DONE)**:
-    - **Architected and implemented a consolidation layer** () that processes all rows from a single CSV upload and produces a single, consolidated database document.
-    - The new logic correctly handles CSVs with session totals and period breakdowns according to user-specified rules (prioritizing session totals, summing periods if no total exists, and storing period data in a nested array).
-    - Refactored  to use the new consolidation logic, which simplified data handling in several parts of the application (peak values, ACWR, dashboards).
-    - Implemented a defense-in-depth fix in  to handle legacy, non-consolidated data already in the database.
-- **Testing (DONE)**:
-    - Created comprehensive unit tests for the import and consolidation logic in .
-    - Successfully ran the  to perform end-to-end API integration tests, confirming that both the initial import feature and the duplication bug fix work as expected. All 46 tests passed.
+- **Jump Data Import System (DONE)**:
+    - Created the  module with a clean architecture (, , , , ).
+    - Implemented API endpoints  and  in .
+    - Implemented business logic for data validation and derived metric calculations (jump height from flight time, RSI).
+    - Added unit tests in  and successfully passed all 30 tests.
+- **Bug Fix (DONE)**:
+    - Resolved an issue where  was not being correctly mapped due to incorrect manufacturer detection. Added  to the  to fix the underlying issue.
 - **Documentation (DONE)**:
-    - Updated  to reflect the completed tasks.
+    - Updated  with details of the new jump import system.
+- **Module Scaffolding (DONE)**:
+    - Created the complete file structure for the next major task, the  module.
 
 **Earlier issues found/mentioned but not fixed**
-None. All identified issues, such as provider misidentification and missing column aliases, were addressed during the session.
+None. All identified issues were resolved during the session.
 
 **Known issue recurrence from previous fork**
-None. This appears to be the first session on this project.
+None. The user started an entirely new project, making the previous fork's context irrelevant.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Backend**: Python with Flask framework.
--   **Database**: MongoDB.
--   **Data Processing**: The core logic involves a multi-stage pipeline for ingesting external data:
-    1.  **Parsing**: Reading raw CSV files.
-    2.  **Detection**: Identifying the data provider based on header signatures.
-    3.  **Normalization**: Mapping provider-specific data into a canonical format.
-    4.  **Consolidation**: Aggregating multiple data rows (e.g., session vs. periods) into a single, structured document before database insertion.
--   **Testing**: Unit testing with ============================= test session starts ==============================
-platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0
-rootdir: /app/frontend
-plugins: anyio-4.12.1
-collected 0 items
-
-============================ no tests ran in 0.02s ============================= and automated API integration testing via the .
+-   **Backend**: FastAPI
+-   **Data Modeling**: Pydantic for strict data validation, serialization, and settings management.
+-   **Architecture**: Clean separation of concerns within the  module (Parsing, Validation, Calculation, Mapping).
+-   **Data Processing**: A pipeline that takes raw CSV data, identifies the provider, maps columns to a canonical model, validates business rules, calculates derived metrics, and prepares it for storage.
+-   **Database**: MongoDB, with a dedicated  collection.
 
 **key DB schema**
--   **gps_data** collection:
-    -   : ObjectId
-    -   : String
-    -   Tue Feb 10 20:11:08 UTC 2026: ISODate
-    -   : String ('game' or 'training')
-    -   : String
-    -   : String (e.g., 'catapult', 'gpexe')
-    -   **Consolidated Metrics (Top-Level)**:
-        -   : Number
-        -   : Number
-        -   : Number
-        -   (and all other canonical metrics)
-    -   : Boolean (Indicates if the source CSV had an explicit session total row)
-    -   : Array of Objects (Contains the breakdown of metrics for each period/split)
-        -   
+-   **jump_data** collection (documents based on ):
+    -   :  (references an athlete in the  collection)
+    -   :  (Enum: SJ, CMJ, DJ, RJ)
+    -   : 
+    -   : 
+    -   : 
+    -   : 
+    -   : 
+    -   :  (e.g., 'generic', 'chronojump')
+    -   :  (The original, unmodified CSV row for auditing)
+    -   ... (other optional metrics like , , etc.)
 
 **changes in tech stack**
-None. The stack remains Python, Flask, and MongoDB.
+No changes to the core stack. Pydantic was heavily utilized for the new feature implementation as per user requirements.
 
 **All files of reference**
--   : Modified to integrate the new import pipeline and use the consolidated data structure.
--   : Created to expose the main  function.
--   : Created for Catapult-specific parsing.
--   : Created for GPEXE-specific parsing.
--   : Created for PlayerTek-specific parsing.
--   : Created for Statsports-specific parsing.
--   : Created to standardize data from all providers.
--   : Created to fix the metric duplication bug by creating a single document per import.
--   : Created and updated to include unit tests for all parsers and the consolidation logic.
--   : Updated with the status of completed tasks.
--   : Various CSV files created for testing purposes.
+-   **Created & Implemented**:
+    -    (and all files within)
+    -   
+    -   
+-   **Created (Skeleton only)**:
+    -    (and all files within)
+-   **Modified**:
+    -   : Added the  endpoints.
+    -   : Updated with documentation for the new feature.
 
 **Areas that need refactoring**:
-None identified. The agent's recent work on the consolidation layer already constituted a significant and positive refactor, simplifying data consumption logic throughout the application.
+None. The code is new and follows the clean architecture specified by the user.
 
 **key api endpoints**
--   : Previews the content of an uploaded CSV file.
--   : Imports the data from a CSV file into the database.
--   : Lists the supported GPS providers.
--   : Retrieves GPS session data for a specific athlete.
+-   : Validates a jump data CSV and returns a summary.
+-   : Imports validated jump data into the database.
+-   : (Implicitly available) Lists available data mappers.
 
 **Critical Info for New Agent**
--   **Data Consolidation is Key**: The most critical architectural change is the introduction of the  module. All GPS CSV data is now processed into a single database document per session *before* being saved. This was done to fix a major data duplication bug. You must be aware of this new data structure ().
--   **Defense-in-Depth for Legacy Data**: Functions that read from the  collection, like , contain fallback logic to correctly handle older data that might exist in the non-consolidated, multi-document format. This ensures backward compatibility.
--   **Respond in Portuguese**: The user's preferred language is Portuguese. Please conduct all communication in Portuguese.
+-   **Project Pivot**: You MUST ignore the initial handoff summary regarding GPS data. The project has been completely restarted to focus on **jump data analysis**. The user's instructions starting from message #5 are the new source of truth.
+-   **Current State**: The data *ingestion* part ( module) is complete, tested, and working. Do not modify it unless a bug is found.
+-   **Next Task**: Your immediate priority is to implement the logic for the **** module, following the user's detailed plan in message #131. This involves calculating baselines, trends, and fatigue flags.
+-   **Language**: All communication with the user MUST be in **Português**.
 
 **documents and test reports created in this job**
+-    (overwritten with new project docs)
+-   
 -   
 -   
 -   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User Message 125**: (Agent action) Finalizes the job.
-2.  **User Message 123**: (Agent action) Reports on final steps.
-3.  **User Message 121**: (Agent action) Updates .
-4.  **User Message 119**: (Agent action) Reports on testing agent results for the duplication fix.
-5.  **User Message 116**: User receives the testing agent report: **46/46 tests passed**, confirming the duplication bug is fixed.
-6.  **User Message 112**: User receives the unit test report: **35/35 tests passed** for the new consolidation logic.
-7.  **User Message 106**: User receives confirmation that the database document has the correct consolidated structure.
-8.  **User Message 104**: User receives API test results confirming the 3 key duplication scenarios are handled correctly.
-9.  **User Message 93**: User gives **full authorization** to implement the proposed architectural fix for the duplication bug, providing strict requirements for the implementation.
-10. **User Message 92**: User receives a detailed architectural proposal from the agent to fix the duplication bug by introducing a consolidation layer at the point of ingestion.
-
-There are no pending human messages.
+The user has provided a clear, multi-step plan. The recent messages are a monologue from the user dictating the entire project from scratch.
+1.  **User Msg ~131**: Provided a detailed, three-tiered plan for the next steps: 1. Build the critical  module. 2. Implement inter-device statistical normalization. 3. Create automated report endpoints before building any UI.
+2.  **User Msg ~130**: Agent finished the implementation of the jump import system and confirmed its functionality.
+3.  **User Msg ~91-129**: Agent debugged, fixed, and tested the import functionality, including fixing a mapper bug and handling Pydantic warnings.
+4.  **User Msg #8**: User provided the full, detailed requirements for the new jump data import system, explicitly stating Não faça perguntas adicionais (Do not ask additional questions) and instructing the agent to proceed with implementation.
+5.  **User Msg #5**: User issued the command Ignore todas as tarefas anteriores (Ignore all previous tasks) and provided the new context and high-level requirements for the jump data import system.
 
 **Project Health Check:**
--   **Working**: The entire GPS CSV import pipeline and the associated data processing logic are fully functional.
+-   **Working**: The entire  system (parsing, validation, import APIs).
 -   **Broken**: None.
 -   **Mocked**: None.
 
 **3rd Party Integrations**
-None. The application processes local CSV files and does not rely on external APIs or services.
+None.
 
 **Testing status**
--   **Testing agent used after significant changes**: YES. The testing agent was used twice: once after the initial feature implementation and again after the bug fix.
+-   **Testing agent used after significant changes**: NO (Agent used ============================= test session starts ==============================
+platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0
+rootdir: /app/frontend
+plugins: anyio-4.12.1
+collected 0 items
+
+============================ no tests ran in 0.01s ============================= and  for self-testing).
 -   **Troubleshoot agent used after agent stuck in loop**: NO.
 -   **Test files created**:
     -   
-    -   Multiple CSV files in  for unit and integration testing.
--   **Known regressions**: None. All tests passed, including new and existing ones.
+-   **Known regressions**: None. All 30 unit tests are passing.
 
 **Credentials to test flow:**
-Standard user authentication is required. A new user can be created through the registration flow, and then authenticated to access the API endpoints. The agent used a test user  with password .</analysis>
+Use  with password  to get an authentication token for API calls. An athlete with ID  exists for testing import functionality.
+
+**What agent forgot to execute**
+Nothing. The agent has been following the user's instructions precisely and is currently in the middle of executing the user's latest request.</analysis>
