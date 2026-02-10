@@ -777,6 +777,15 @@ async def update_session_activity_type(
     if data.activity_type not in ["game", "training"]:
         raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
     
+    # Get the session records first to get athlete info and metrics
+    session_records = await db.gps_data.find({
+        "session_id": session_id,
+        "coach_id": current_user["_id"]
+    }).to_list(100)
+    
+    if not session_records:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
     # Update all GPS records with this session_id
     result = await db.gps_data.update_many(
         {
@@ -786,14 +795,34 @@ async def update_session_activity_type(
         {"$set": {"activity_type": data.activity_type}}
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Session not found or no records updated")
+    # If marked as GAME, update peak values for the athlete
+    peak_updated = False
+    if data.activity_type == "game" and session_records:
+        athlete_id = session_records[0].get("athlete_id")
+        session_date = session_records[0].get("date", "")
+        
+        # Get athlete name for notifications
+        athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id)})
+        athlete_name = athlete.get("name", "") if athlete else ""
+        
+        # Extract metrics from session
+        session_metrics = extract_gps_metrics_from_session(session_records)
+        
+        # Update peak values
+        peak_updated = await update_athlete_peak_values(
+            athlete_id=athlete_id,
+            coach_id=current_user["_id"],
+            session_metrics=session_metrics,
+            session_date=session_date,
+            athlete_name=athlete_name
+        )
     
     return {
         "message": "Activity type updated successfully",
         "session_id": session_id,
         "activity_type": data.activity_type,
-        "records_updated": result.modified_count
+        "records_updated": result.modified_count,
+        "peak_values_updated": peak_updated
     }
 
 
