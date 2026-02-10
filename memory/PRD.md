@@ -388,9 +388,17 @@ backend/identity_resolver/
 - [x] Bloquear importação se houver atletas não resolvidos (`can_import: false`)
 - [x] Atualizar `last_used_at` quando alias é usado em importação
 
-### P2 - Normalização Estatística
-- [ ] Correção por dispositivo (offsets de medição)
-- [ ] Percentis de grupo (ranking entre equipe)
+### ⏸️ P2 - Novos Pipelines de Importação (AGUARDANDO ESPECIFICAÇÃO)
+**Status:** Não autorizado para implementação sem especificação formal.
+
+Os seguintes pipelines foram mencionados como intenção futura, mas **não devem ser criados** até nova instrução:
+- [ ] `force_import` — Importação CSV de dados de plataformas de força
+- [ ] `wellness_import` — Importação CSV de questionários wellness em lote
+
+**Requisitos para aprovação:**
+- Definição explícita de formatos CSV suportados
+- Regras de identity resolution específicas para cada tipo
+- Critérios de bloqueio e auditoria
 
 ### P3 - Interface Frontend
 - [ ] Upload de CSV com preview
