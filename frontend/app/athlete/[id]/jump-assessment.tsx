@@ -1426,6 +1426,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.primary,
   },
+  pvChartContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   pvMetrics: {
     flexDirection: 'row',
     marginBottom: 16,
