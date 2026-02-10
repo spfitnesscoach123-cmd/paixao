@@ -929,27 +929,78 @@ class PeakValueNotification(BaseModel):
 # ============= PERIODIZATION HELPER FUNCTIONS =============
 
 def extract_gps_metrics_from_session(gps_records: List[dict]) -> dict:
-    """Extract and calculate GPS metrics from a session's records"""
-    metrics = {
-        "total_distance": 0,
-        "hid_z3": 0,
-        "hsr_z4": 0,
-        "sprint_z5": 0,
-        "sprints_count": 0,
-        "acc_dec_total": 0
-    }
+    """
+    Extract and calculate GPS metrics from a session's records.
     
+    Defense-in-depth: applies session_total vs period logic for legacy data
+    that was stored before the consolidator was introduced.
+    New imports produce a single consolidated document, so this function
+    simply reads its fields. For legacy multi-record sessions, it applies
+    the same prioritization rules as the consolidator.
+    """
+    if not gps_records:
+        return {
+            "total_distance": 0, "hid_z3": 0, "hsr_z4": 0,
+            "sprint_z5": 0, "sprints_count": 0, "acc_dec_total": 0,
+        }
+
+    # If the document is already consolidated (has_session_total flag), use it directly
+    if len(gps_records) == 1 and "has_session_total" in gps_records[0]:
+        r = gps_records[0]
+        return {
+            "total_distance": r.get("total_distance", 0),
+            "hid_z3": r.get("high_intensity_distance", 0),
+            "hsr_z4": r.get("high_speed_running", 0),
+            "sprint_z5": r.get("sprint_distance", 0),
+            "sprints_count": r.get("number_of_sprints", 0),
+            "acc_dec_total": (
+                r.get("number_of_accelerations", 0) +
+                r.get("number_of_decelerations", 0)
+            ),
+        }
+
+    # Legacy path: multiple records per session — apply session/period logic
+    _SESSION_KEYWORDS = {"session", "total", "full", "complete", "summary", "sessão"}
+    _PERIOD_KEYWORDS = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+
+    session_total_record = None
+    period_records = []
+
     for record in gps_records:
+        pname = (record.get("period_name") or "").lower()
+        is_session_total = any(kw in pname for kw in _SESSION_KEYWORDS)
+        is_period = any(kw in pname for kw in _PERIOD_KEYWORDS)
+
+        if is_session_total and not is_period:
+            if session_total_record is None:
+                session_total_record = record
+        else:
+            period_records.append(record)
+
+    # Choose source: session total OR sum of periods
+    if session_total_record:
+        source = [session_total_record]
+    elif period_records:
+        source = period_records
+    else:
+        source = gps_records  # Fallback: use everything
+
+    metrics = {
+        "total_distance": 0, "hid_z3": 0, "hsr_z4": 0,
+        "sprint_z5": 0, "sprints_count": 0, "acc_dec_total": 0,
+    }
+
+    for record in source:
         metrics["total_distance"] += record.get("total_distance", 0)
-        metrics["hid_z3"] += record.get("high_intensity_distance", 0)  # HID 15-20 km/h
-        metrics["hsr_z4"] += record.get("high_speed_running", 0)  # HSR 20-25 km/h
-        metrics["sprint_z5"] += record.get("sprint_distance", 0)  # Sprint >25 km/h
+        metrics["hid_z3"] += record.get("high_intensity_distance", 0)
+        metrics["hsr_z4"] += record.get("high_speed_running", 0)
+        metrics["sprint_z5"] += record.get("sprint_distance", 0)
         metrics["sprints_count"] += record.get("number_of_sprints", 0)
         metrics["acc_dec_total"] += (
-            record.get("number_of_accelerations", 0) + 
+            record.get("number_of_accelerations", 0) +
             record.get("number_of_decelerations", 0)
         )
-    
+
     return metrics
 
 
