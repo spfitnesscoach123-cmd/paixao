@@ -6552,6 +6552,8 @@ async def import_wearable_csv(
     """
     Import GPS data from CSV with automatic manufacturer detection.
     Supported: Catapult, STATSports, PlayerTek, GPEXE (+ unknown fallback).
+    
+    BLOCKED if athlete_id is not resolved or if CSV contains unresolved athlete names.
     """
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
@@ -6575,6 +6577,56 @@ async def import_wearable_csv(
     parse_result = parser.parse(content, filename=file.filename or "upload.csv")
 
     manufacturer = forced if forced else parse_result.manufacturer
+    
+    # ========== IDENTITY RESOLUTION CHECK ==========
+    # Get existing athletes for alias checking
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Check if CSV contains multiple athlete names that need resolution
+    athlete_names_from_csv = set()
+    for rec in parse_result.records:
+        athlete_name = (
+            rec.get('athlete_name', '') or 
+            rec.get('player_name', '') or
+            rec.get('name', '') or
+            rec.get('player', '')
+        )
+        if athlete_name and isinstance(athlete_name, str):
+            athlete_name = athlete_name.strip()
+            if athlete_name and athlete_name not in existing_athlete_ids:
+                athlete_names_from_csv.add(athlete_name)
+    
+    # Run identity resolution if there are names in CSV
+    if athlete_names_from_csv:
+        identity_resolver = IdentityResolver()
+        resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+            names=list(athlete_names_from_csv),
+            athletes=athletes,
+            aliases=aliases,
+            coach_id=current_user["_id"],
+            source_system="gps"
+        )
+        
+        # BLOCK import if there are unresolved athletes
+        if unresolved_athletes:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": f"Importação bloqueada: {len(unresolved_athletes)} atleta(s) não resolvido(s) no CSV",
+                    "unresolved_count": len(unresolved_athletes),
+                    "unresolved": [u.to_dict() for u in unresolved_athletes],
+                    "action_required": "Use o endpoint /api/athletes/confirm-alias para confirmar as associações antes de importar"
+                }
+            )
 
     # Normalize into GPSData documents
     normalizer = GPSDataNormalizer(
