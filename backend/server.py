@@ -30,6 +30,17 @@ from gps_import import (
     METRIC_CATEGORIES,
 )
 
+from jump_import import (
+    JumpCSVParser,
+    JumpValidator,
+    JumpCalculator,
+    JumpRecord,
+    JumpValidationError,
+    JumpPreviewResult,
+    process_jump_csv,
+)
+from jump_import.mappers import list_supported_manufacturers as list_jump_manufacturers
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
