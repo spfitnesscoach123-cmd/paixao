@@ -438,12 +438,52 @@ Pipeline de importação CSV completamente refatorado em módulo independente (`
 - `GET /api/wearables/csv/supported-providers` — Lista fabricantes e métricas canônicas
 - `POST /api/wearables/csv/preview` — Preview com mapeamento de colunas
 
-**Testes:** 44/44 passaram (26 unitários + 18 integração API)
+**Testes:** 46/46 passaram (35 unitários + 11 integração API)
 
 **Extensibilidade:** Para adicionar novo fabricante:
 1. Adicionar entrada em `Manufacturer` enum
 2. Adicionar aliases em `MANUFACTURER_ALIASES` 
 3. Adicionar assinaturas em `MANUFACTURER_SIGNATURES`
+
+### ✅ Consolidação de Sessão GPS — Anti-Duplicação (Fev 10, 2026)
+
+**Problema Corrigido:**
+Quando um CSV continha Session Total (10.000m) + 1º Tempo (5.000m) + 2º Tempo (5.000m), o sistema somava tudo e gerava 20.000m.
+
+**Solução:**
+Novo módulo `consolidator.py` no pipeline de ingestão. Consolida N linhas de CSV em 1 documento MongoDB ANTES da persistência.
+
+| Cenário | Antes (BUG) | Depois (CORRETO) |
+|---------|-------------|------------------|
+| Session Total + Períodos | 20.000m (soma de tudo) | 10.000m (usa session total) |
+| Apenas Períodos | Múltiplos docs | 1 doc com soma dos períodos |
+| Linha Única | 1 doc | 1 doc (passthrough) |
+
+**Regras de Agregação:**
+| Tipo de Métrica | Regra |
+|-----------------|-------|
+| Acumuláveis (distância, sprints, acc, dec, player_load) | Session total se disponível, senão soma de períodos |
+| Máximas (max_speed, max_accel, max_decel) | MAX de todos os registros |
+| Médias (avg_hr, metabolic_power) | Session total se disponível, senão média |
+
+**Estrutura do Documento MongoDB:**
+```json
+{
+  "total_distance": 10000,
+  "has_session_total": true,
+  "periods": [
+    {"period_name": "1st Half", "total_distance": 5000},
+    {"period_name": "2nd Half", "total_distance": 5000}
+  ]
+}
+```
+
+**Defesa em Profundidade:**
+`extract_gps_metrics_from_session()` corrigida para dados legados — aplica mesma lógica session/period.
+
+**Testes:** 46/46 passaram (35 unitários + 11 integração API)
+
+**Nenhuma alteração em:** UI, periodização, métricas canônicas, estrutura semanas/dias, classificação jogo/treino.
 
 ### ✅ Acesso Público ao Formulário Wellness (Fev 9, 2026)
 
