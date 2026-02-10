@@ -228,8 +228,8 @@ class TestConsolidationAPI:
         data = response.json()
         
         assert data["ready_to_import"] == True
-        assert data["rows_parsed"] == 3
-        assert data["manufacturer_detected"] == "catapult"
+        assert data["total_rows"] == 3, f"total_rows should be 3, got {data.get('total_rows')}"
+        assert data["detected_manufacturer"] == "catapult", f"Should detect catapult, got {data.get('detected_manufacturer')}"
         
         print(f"✓ Preview: correctly parses 3-row CSV, ready_to_import=True")
     
@@ -256,11 +256,18 @@ class TestConsolidationAPI:
         print(f"✓ Supported providers: {provider_ids}")
     
     # ============================================================
-    # TEST 8: Verify MongoDB Document Structure
+    # TEST 8: Verify Import Response Contains Consolidation Info
     # ============================================================
-    def test_verify_mongodb_document_structure(self, headers):
-        """After import, verify the MongoDB document has correct structure"""
-        # First import a test CSV
+    def test_import_response_contains_consolidation_fields(self, headers):
+        """
+        Verify that the import response includes consolidation-related fields:
+        - consolidated: true
+        - has_session_total: true/false
+        - periods_count: number
+        
+        Note: The actual MongoDB document has 'has_session_total' and 'periods' fields
+        but the GPSData API model doesn't return them. The import endpoint does return them.
+        """
         csv_content = """Date,Player Name,Drill Title,Total Distance,High Speed Running,Sprint Distance,Player Load,Max Velocity,Sprints,Accelerations,Decelerations
 2025-12-25,Test Player,Match - Session Total,9500,1700,500,600,33.0,16,50,45
 2025-12-25,Test Player,Match - 1st Half,4700,850,250,300,33.0,9,25,23
@@ -275,31 +282,25 @@ class TestConsolidationAPI:
         
         assert response.status_code == 200
         data = response.json()
-        session_id = data.get("session_id")
         
-        # Now fetch the GPS data for the athlete
-        response = requests.get(
-            f"{BASE_URL}/api/gps-data/athlete/{ATHLETE_ID}",
-            headers=headers
-        )
+        # Verify import response has consolidation fields
+        assert "consolidated" in data, "Response should have 'consolidated' field"
+        assert data["consolidated"] == True, "consolidated should be True"
         
-        assert response.status_code == 200
-        gps_records = response.json()
+        assert "has_session_total" in data, "Response should have 'has_session_total' field"
+        assert data["has_session_total"] == True
         
-        # Find the just-imported record by session_id
-        matching = [r for r in gps_records if r.get("session_id") == session_id]
+        assert "periods_count" in data, "Response should have 'periods_count' field"
+        assert data["periods_count"] == 2
         
-        if matching:
-            record = matching[0]
-            # Verify key fields exist
-            assert "total_distance" in record
-            assert "has_session_total" in record, "Document should have 'has_session_total' flag"
-            assert "periods" in record, "Document should have 'periods' array"
-            assert record["has_session_total"] == True
-            assert len(record["periods"]) == 2
-            print(f"✓ MongoDB document structure verified: has_session_total={record['has_session_total']}, periods_count={len(record['periods'])}")
-        else:
-            print(f"⚠ Could not find imported record with session_id={session_id}")
+        # Verify the imported data
+        assert data["records_imported"] == 1
+        imported = data["import_details"]["imported"]
+        assert imported[0]["total_distance"] == 9500  # From session total, not summed
+        assert imported[0]["has_session_total"] == True
+        assert imported[0]["periods_count"] == 2
+        
+        print(f"✓ Import response contains consolidation fields: consolidated=True, has_session_total=True, periods_count=2")
 
 
 class TestEdgeCases:
