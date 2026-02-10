@@ -399,9 +399,22 @@ const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalys
   );
 };
 
-// Power-Velocity Profile Card
+// Power-Velocity Profile Card with Visual Chart
 const PowerVelocityCard = ({ data, locale }: { data: JumpAnalysis['power_velocity_insights']; locale: string }) => {
   if (!data) return null;
+  
+  // Calculate position on the quadrant chart (0-100 scale)
+  // Center is at 50,50. Values are offset by their deviation from average
+  const chartWidth = screenWidth - 80;
+  const chartHeight = 150;
+  
+  // Normalize values to 0-100 range for chart positioning
+  const normalizedVelocity = Math.min(Math.max((data.velocity_vs_average_percent + 50) / 100 * 100, 5), 95);
+  const normalizedPower = Math.min(Math.max((data.power_vs_average_percent + 50) / 100 * 100, 5), 95);
+  
+  // Point position
+  const pointX = 40 + (normalizedVelocity / 100) * (chartWidth - 60);
+  const pointY = chartHeight - 20 - (normalizedPower / 100) * (chartHeight - 40);
   
   return (
     <View style={styles.pvCard}>
@@ -412,24 +425,72 @@ const PowerVelocityCard = ({ data, locale }: { data: JumpAnalysis['power_velocit
         </Text>
       </View>
       
+      {/* Visual Quadrant Chart */}
+      <View style={styles.pvChartContainer}>
+        <Svg width={chartWidth} height={chartHeight}>
+          {/* Background quadrants */}
+          <Rect x="40" y="10" width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(239, 68, 68, 0.15)" />
+          <Rect x={40 + (chartWidth - 60) / 2} y="10" width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(34, 197, 94, 0.15)" />
+          <Rect x="40" y={10 + (chartHeight - 30) / 2} width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(156, 163, 175, 0.15)" />
+          <Rect x={40 + (chartWidth - 60) / 2} y={10 + (chartHeight - 30) / 2} width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(251, 191, 36, 0.15)" />
+          
+          {/* Center lines */}
+          <Line x1={40 + (chartWidth - 60) / 2} y1="10" x2={40 + (chartWidth - 60) / 2} y2={chartHeight - 20} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
+          <Line x1="40" y1={10 + (chartHeight - 30) / 2} x2={chartWidth - 20} y2={10 + (chartHeight - 30) / 2} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
+          
+          {/* Quadrant labels */}
+          <SvgText x={40 + (chartWidth - 60) / 4} y="35" fill="#ef4444" fontSize="9" textAnchor="middle" fontWeight="600">
+            {locale === 'pt' ? 'Força' : 'Strength'}
+          </SvgText>
+          <SvgText x={40 + 3 * (chartWidth - 60) / 4} y="35" fill="#22c55e" fontSize="9" textAnchor="middle" fontWeight="600">
+            {locale === 'pt' ? 'Equilibrado' : 'Balanced'}
+          </SvgText>
+          <SvgText x={40 + (chartWidth - 60) / 4} y={chartHeight - 35} fill="#9ca3af" fontSize="9" textAnchor="middle" fontWeight="600">
+            {locale === 'pt' ? 'Desenvolver' : 'Develop'}
+          </SvgText>
+          <SvgText x={40 + 3 * (chartWidth - 60) / 4} y={chartHeight - 35} fill="#fbbf24" fontSize="9" textAnchor="middle" fontWeight="600">
+            {locale === 'pt' ? 'Velocidade' : 'Speed'}
+          </SvgText>
+          
+          {/* Axis labels */}
+          <SvgText x="15" y={(chartHeight - 10) / 2} fill={colors.text.tertiary} fontSize="8" transform={`rotate(-90, 15, ${(chartHeight - 10) / 2})`} textAnchor="middle">
+            {locale === 'pt' ? 'Potência' : 'Power'}
+          </SvgText>
+          <SvgText x={chartWidth / 2} y={chartHeight - 5} fill={colors.text.tertiary} fontSize="8" textAnchor="middle">
+            {locale === 'pt' ? 'Velocidade' : 'Velocity'}
+          </SvgText>
+          
+          {/* Athlete point */}
+          <Circle cx={pointX} cy={pointY} r="14" fill={data.profile.color} opacity={0.3} />
+          <Circle cx={pointX} cy={pointY} r="10" fill={data.profile.color} />
+          <SvgText x={pointX} y={pointY - 20} fill={colors.text.primary} fontSize="9" textAnchor="middle" fontWeight="bold">
+            {locale === 'pt' ? 'Atleta' : 'Athlete'}
+          </SvgText>
+        </Svg>
+      </View>
+      
       <View style={styles.pvMetrics}>
         <View style={styles.pvMetric}>
           <Text style={styles.pvMetricValue}>{data.peak_power_w.toFixed(0)}</Text>
           <Text style={styles.pvMetricLabel}>
-            {locale === 'pt' ? 'Pico Potência (W)' : 'Peak Power (W)'}
+            {locale === 'pt' ? 'Potência (W)' : 'Power (W)'}
+          </Text>
+          <Text style={[styles.pvMetricDiff, { color: data.power_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
+            {data.power_vs_average_percent >= 0 ? '+' : ''}{data.power_vs_average_percent.toFixed(0)}%
           </Text>
         </View>
         <View style={styles.pvMetric}>
           <Text style={styles.pvMetricValue}>{data.peak_velocity_ms.toFixed(2)}</Text>
           <Text style={styles.pvMetricLabel}>
-            {locale === 'pt' ? 'Pico Velocidade (m/s)' : 'Peak Velocity (m/s)'}
+            {locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}
+          </Text>
+          <Text style={[styles.pvMetricDiff, { color: data.velocity_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
+            {data.velocity_vs_average_percent >= 0 ? '+' : ''}{data.velocity_vs_average_percent.toFixed(0)}%
           </Text>
         </View>
         <View style={styles.pvMetric}>
           <Text style={styles.pvMetricValue}>{data.relative_power_wkg.toFixed(1)}</Text>
-          <Text style={styles.pvMetricLabel}>
-            {locale === 'pt' ? 'Potência Relativa (W/kg)' : 'Relative Power (W/kg)'}
-          </Text>
+          <Text style={styles.pvMetricLabel}>W/kg</Text>
         </View>
       </View>
       
