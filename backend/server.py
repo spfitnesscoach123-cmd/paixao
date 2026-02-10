@@ -7968,8 +7968,19 @@ async def preview_jump_csv(
     athlete_names_from_csv = set()
     for raw_row in raw_rows:
         # Check for athlete_id or athlete_name columns
-        athlete_id = raw_row.get('athlete_id', '').strip()
-        athlete_name = raw_row.get('athlete_name', '').strip()
+        # Also check inside raw_row['raw_row'] which contains original CSV values
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        
+        # Check in raw_row (original CSV data)
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
         
         if athlete_name:
             athlete_names_from_csv.add(athlete_name)
