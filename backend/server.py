@@ -19,6 +19,16 @@ import uuid
 from io import BytesIO
 import io
 
+from gps_import import (
+    GPSCSVParser,
+    parse_gps_csv,
+    GPSDataNormalizer,
+    normalize_gps_data,
+    Manufacturer,
+    CANONICAL_METRICS,
+    METRIC_CATEGORIES,
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -6169,453 +6179,112 @@ async def get_supported_wearables():
         ]
     }
 
-# ============= CSV FORMAT DETECTION AND MAPPING =============
-
-# Column mappings for different GPS providers
-GPS_PROVIDER_MAPPINGS = {
-    "catapult": {
-        "identifiers": ["Player Name", "Drill Title", "Player Load", "Total Distance", "High Speed Running"],
-        "columns": {
-            "date": ["Date", "date", "Session Date", "Activity Date", "Start Time"],
-            "player_name": ["Player Name", "Player", "Name", "Athlete"],
-            "session_name": ["Drill Title", "Session", "Activity", "Session Name", "Drill Name"],
-            "total_distance": ["Total Distance", "Total Distance (m)", "Distance", "Distance (m)", "Dist (m)"],
-            "high_intensity_distance": ["High Speed Running", "HSR", "HSR Distance", "High Speed Running (m)", "HSR (m)", "High Intensity Distance", "HID", "Sprint Distance", "High Speed Running Distance"],
-            "sprints": ["Sprints", "Sprint Count", "Number of Sprints", "Sprint Efforts", "Total Sprints", "High Speed Efforts"],
-            "max_speed": ["Max Velocity", "Max Speed", "Maximum Speed", "Top Speed", "Peak Speed", "Max Velocity (m/s)", "Max Speed (m/s)", "Vmax"],
-            "player_load": ["Player Load", "PlayerLoad", "Total Player Load", "Load"],
-            "duration": ["Duration", "Total Duration", "Time", "Session Duration"],
-            "max_acceleration": ["Max Acceleration", "Peak Acceleration", "Max Accel"],
-            "distance_per_min": ["Distance Per Min", "m/min", "Meters Per Minute"],
-        }
-    },
-    "playertek": {
-        "identifiers": ["PlayerTek", "Player Load", "Total Distance", "High Speed Running Distance"],
-        "columns": {
-            "date": ["Date", "date", "Session Date", "Activity Date"],
-            "player_name": ["Player Name", "Player", "Name", "First Name", "Athlete Name"],
-            "session_name": ["Session", "Activity", "Session Name", "Drill", "Activity Name"],
-            "total_distance": ["Total Distance", "Total Distance (m)", "Distance", "Distance (m)", "Total Dist"],
-            "high_intensity_distance": ["High Speed Running Distance", "HSR Distance", "HSR", "High Speed Running", "High Intensity Distance", "Sprint Distance", "High Speed Distance"],
-            "sprints": ["Sprints", "Sprint Count", "Number of Sprints", "Sprint Efforts", "No. Sprints", "High Speed Runs"],
-            "max_speed": ["Max Speed", "Top Speed", "Maximum Speed", "Peak Speed", "Max Velocity", "Vmax", "Max Speed (km/h)", "Max Speed (m/s)"],
-            "player_load": ["Player Load", "PlayerLoad", "Total Load", "Load", "Body Load"],
-            "duration": ["Duration", "Session Duration", "Time", "Total Time", "Playing Time"],
-            "max_acceleration": ["Max Acceleration", "Peak Acceleration", "Top Acceleration"],
-            "distance_per_min": ["Distance Per Min", "m/min", "Dist/min"],
-        }
-    },
-    "statsports": {
-        "identifiers": ["STATSports", "Apex", "HML Efforts", "High Intensity Bursts", "Collisions"],
-        "columns": {
-            "date": ["Date", "date", "Session Date", "Activity Date", "Start Date"],
-            "player_name": ["Player", "Player Name", "Name", "Athlete", "First Name"],
-            "session_name": ["Session", "Session Name", "Activity", "Drill", "Training"],
-            "total_distance": ["Total Distance", "Distance", "Total Distance (m)", "Distance (m)", "Total Dist"],
-            "high_intensity_distance": ["High Speed Running", "HSR", "HSR Distance", "High Intensity Distance", "High Speed Distance", "HML Distance", "Sprint Distance"],
-            "sprints": ["Sprints", "Sprint Count", "Sprint Efforts", "High Intensity Bursts", "HML Efforts", "Number of Sprints", "No. Sprints"],
-            "max_speed": ["Max Speed", "Top Speed", "Peak Speed", "Maximum Speed", "Max Velocity", "Vmax"],
-            "player_load": ["Dynamic Stress Load", "DSL", "Player Load", "Load", "Total Load"],
-            "duration": ["Duration", "Session Duration", "Time", "Total Duration"],
-            "max_acceleration": ["Max Acceleration", "Peak Acceleration", "Max Accel"],
-            "distance_per_min": ["Distance Per Min", "m/min", "Meters/min"],
-            "accelerations": ["Accelerations", "Accel Count", "Total Accelerations"],
-            "decelerations": ["Decelerations", "Decel Count", "Total Decelerations"],
-        }
-    },
-    "gpexe": {
-        "identifiers": ["GPexe", "Equivalent Distance", "Metabolic Power"],
-        "columns": {
-            "date": ["Date", "Session Date", "Activity Date"],
-            "player_name": ["Player", "Player Name", "Athlete"],
-            "session_name": ["Session", "Drill", "Activity"],
-            "total_distance": ["Total Distance", "Distance", "Distance (m)"],
-            "high_intensity_distance": ["High Speed Running", "HSR", "High Intensity Distance", "Speed Zone 5", "Speed Zone 6"],
-            "sprints": ["Sprints", "Sprint Count", "High Speed Efforts"],
-            "max_speed": ["Max Speed", "Vmax", "Peak Speed", "Top Speed"],
-            "metabolic_power": ["Metabolic Power", "Avg Metabolic Power", "Mean Metabolic Power"],
-            "equivalent_distance": ["Equivalent Distance", "Equiv Distance", "ED"],
-        }
-    },
-    "polar": {
-        "identifiers": ["Polar", "Training Load", "Recovery Time"],
-        "columns": {
-            "date": ["Date", "Start time", "Session Date"],
-            "player_name": ["Name", "Player", "Athlete"],
-            "session_name": ["Sport", "Activity", "Session"],
-            "total_distance": ["Distance", "Total distance", "Distance (km)", "Distance (m)"],
-            "high_intensity_distance": ["Distance in zone 5", "High intensity distance", "Speed zone 5"],
-            "max_speed": ["Max speed", "Top speed", "Maximum speed"],
-            "avg_heart_rate": ["Average heart rate", "Avg HR", "Mean HR"],
-            "max_heart_rate": ["Maximum heart rate", "Max HR", "Peak HR"],
-            "duration": ["Duration", "Total time", "Exercise time"],
-            "calories": ["Calories", "Energy", "kcal"],
-        }
-    },
-    "garmin": {
-        "identifiers": ["Garmin", "Training Effect", "VO2 Max"],
-        "columns": {
-            "date": ["Date", "Start Time", "Activity Date"],
-            "player_name": ["Name", "Title", "Activity Name"],
-            "session_name": ["Activity Type", "Sport", "Activity"],
-            "total_distance": ["Distance", "Total Distance", "Distance (m)", "Distance (km)"],
-            "max_speed": ["Max Speed", "Max Pace", "Best Speed"],
-            "avg_heart_rate": ["Avg HR", "Average Heart Rate", "Mean HR"],
-            "max_heart_rate": ["Max HR", "Maximum Heart Rate", "Peak HR"],
-            "duration": ["Time", "Duration", "Moving Time", "Elapsed Time"],
-            "calories": ["Calories", "Cal"],
-            "elevation": ["Elevation Gain", "Total Ascent", "Ascent"],
-        }
-    },
-    "generic": {
-        "identifiers": [],  # Fallback for unknown formats
-        "columns": {
-            "date": ["date", "Date", "DATA", "Fecha", "Datum", "session_date", "activity_date"],
-            "player_name": ["player", "name", "athlete", "Player", "Name", "Athlete", "player_name", "athlete_name"],
-            "session_name": ["session", "activity", "drill", "Session", "Activity", "Drill", "session_name"],
-            "total_distance": ["total_distance", "distance", "Total Distance", "Distance", "dist", "DISTANCE", "distancia"],
-            "high_intensity_distance": ["high_intensity_distance", "hsr", "high_speed_running", "HSR", "High Speed Running", "sprint_distance", "hid"],
-            "sprints": ["sprints", "sprint_count", "Sprints", "Sprint Count", "num_sprints", "sprint_efforts"],
-            "max_speed": ["max_speed", "top_speed", "Max Speed", "Top Speed", "vmax", "peak_speed", "maximum_speed"],
-            "player_load": ["player_load", "load", "Player Load", "Load", "body_load"],
-            "duration": ["duration", "time", "Duration", "Time", "session_duration"],
-        }
-    }
-}
-
-def detect_csv_provider(headers: list) -> tuple:
-    """
-    Detect the GPS provider based on CSV headers.
-    Returns (provider_name, confidence_score)
-    """
-    headers_lower = [h.lower().strip() for h in headers]
-    headers_set = set(headers_lower)
-    
-    best_match = ("generic", 0)
-    
-    for provider, config in GPS_PROVIDER_MAPPINGS.items():
-        if provider == "generic":
-            continue
-            
-        # Check for identifier columns
-        identifier_matches = 0
-        for identifier in config["identifiers"]:
-            if identifier.lower() in headers_lower or any(identifier.lower() in h for h in headers_lower):
-                identifier_matches += 1
-        
-        # Check for column matches
-        column_matches = 0
-        for field, possible_names in config["columns"].items():
-            for name in possible_names:
-                if name.lower() in headers_lower:
-                    column_matches += 1
-                    break
-        
-        # Calculate score (identifiers weighted more heavily)
-        score = (identifier_matches * 3) + column_matches
-        
-        if score > best_match[1]:
-            best_match = (provider, score)
-    
-    # If no good match found, use generic
-    if best_match[1] < 3:
-        return ("generic", 0)
-    
-    return best_match
-
-def find_column_value(row: dict, field: str, provider: str) -> any:
-    """
-    Find a value in a row using the provider's column mappings.
-    Tries multiple possible column names.
-    """
-    config = GPS_PROVIDER_MAPPINGS.get(provider, GPS_PROVIDER_MAPPINGS["generic"])
-    possible_names = config["columns"].get(field, [])
-    
-    # Also check generic mappings as fallback
-    if provider != "generic":
-        generic_names = GPS_PROVIDER_MAPPINGS["generic"]["columns"].get(field, [])
-        possible_names = list(possible_names) + list(generic_names)
-    
-    for name in possible_names:
-        # Try exact match
-        if name in row:
-            return row[name]
-        # Try case-insensitive match
-        for key in row.keys():
-            if key.lower().strip() == name.lower().strip():
-                return row[key]
-    
-    return None
-
-def parse_numeric(value: any, default: float = 0) -> float:
-    """Parse a numeric value from various formats."""
-    if value is None or value == "":
-        return default
-    try:
-        # Handle string values
-        if isinstance(value, str):
-            # Remove common units and whitespace
-            value = value.strip().replace(",", ".").replace(" ", "")
-            # Remove units like 'm', 'km', 'm/s', etc.
-            for unit in ["m/s", "km/h", "km", "m", "s", "min", "W", "bpm"]:
-                value = value.replace(unit, "")
-            value = value.strip()
-        return float(value) if value else default
-    except (ValueError, TypeError):
-        return default
-
-def parse_date(value: any) -> str:
-    """Parse date from various formats and return YYYY-MM-DD."""
-    if value is None or value == "":
-        return datetime.utcnow().strftime("%Y-%m-%d")
-    
-    try:
-        value_str = str(value).strip()
-        
-        # Try common date formats
-        date_formats = [
-            "%Y-%m-%d",
-            "%d/%m/%Y",
-            "%m/%d/%Y",
-            "%d-%m-%Y",
-            "%Y/%m/%d",
-            "%d.%m.%Y",
-            "%Y-%m-%d %H:%M:%S",
-            "%d/%m/%Y %H:%M:%S",
-            "%d/%m/%Y %H:%M",
-            "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%dT%H:%M:%SZ",
-        ]
-        
-        for fmt in date_formats:
-            try:
-                parsed = datetime.strptime(value_str, fmt)
-                return parsed.strftime("%Y-%m-%d")
-            except ValueError:
-                continue
-        
-        # If nothing works, return the original value or today's date
-        return value_str if len(value_str) >= 8 else datetime.utcnow().strftime("%Y-%m-%d")
-    except:
-        return datetime.utcnow().strftime("%Y-%m-%d")
-
+# ============= CSV IMPORT (via gps_import module) =============
 
 @api_router.post("/wearables/import/csv")
 async def import_wearable_csv(
     athlete_id: str,
     file: UploadFile = File(...),
-    data_type: str = "gps",  # gps, heart_rate, training
-    provider: Optional[str] = None,  # Optional: force specific provider
+    provider: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Import wearable data from CSV file with automatic format detection.
-    
-    Supports multiple GPS providers:
-    - Catapult (OpenField)
-    - PlayerTek
-    - STATSports (Apex)
-    - GPexe
-    - Polar
-    - Garmin
-    - Generic CSV format
-    
-    The system automatically detects the provider based on column headers.
+    Import GPS data from CSV with automatic manufacturer detection.
+    Supported: Catapult, STATSports, PlayerTek, GPEXE (+ unknown fallback).
     """
-    import csv
-    
-    # Verify athlete
     athlete = await db.athletes.find_one({
         "_id": ObjectId(athlete_id),
         "coach_id": current_user["_id"]
     })
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
-    
-    # Read CSV content
+
     content = await file.read()
-    
-    # Try different encodings
-    decoded = None
-    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
-        try:
-            decoded = content.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
-    
-    if decoded is None:
-        raise HTTPException(status_code=400, detail="Could not decode CSV file. Please ensure it's a valid CSV.")
-    
-    # Parse CSV
-    lines = decoded.splitlines()
-    if not lines:
-        raise HTTPException(status_code=400, detail="CSV file is empty")
-    
-    reader = csv.DictReader(lines)
-    headers = reader.fieldnames or []
-    
-    if not headers:
-        raise HTTPException(status_code=400, detail="CSV file has no headers")
-    
-    # Detect provider if not specified
+
+    # Force manufacturer if provided
+    forced = None
     if provider:
-        detected_provider = provider
-        confidence = 100
-    else:
-        detected_provider, confidence = detect_csv_provider(headers)
-    
-    imported_records = []
-    skipped_records = []
-    errors = []
-    
-    # Generate a unique session ID for this import
-    session_id = f"import_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}_{athlete_id[:8]}"
-    
-    for row_num, row in enumerate(reader, start=2):  # Start at 2 because row 1 is headers
         try:
-            if data_type == "gps":
-                # Extract values using provider-specific mappings
-                date_val = find_column_value(row, "date", detected_provider)
-                total_dist = find_column_value(row, "total_distance", detected_provider)
-                hid = find_column_value(row, "high_intensity_distance", detected_provider)
-                sprints = find_column_value(row, "sprints", detected_provider)
-                max_spd = find_column_value(row, "max_speed", detected_provider)
-                player_load = find_column_value(row, "player_load", detected_provider)
-                duration = find_column_value(row, "duration", detected_provider)
-                session_name = find_column_value(row, "session_name", detected_provider)
-                player_name = find_column_value(row, "player_name", detected_provider)
-                max_accel = find_column_value(row, "max_acceleration", detected_provider)
-                dist_per_min = find_column_value(row, "distance_per_min", detected_provider)
-                
-                # Parse values
-                total_distance = parse_numeric(total_dist)
-                high_intensity_distance = parse_numeric(hid)
-                number_of_sprints = int(parse_numeric(sprints))
-                max_speed = parse_numeric(max_spd)
-                
-                # Convert km to m if values seem too small (likely in km)
-                if total_distance > 0 and total_distance < 100:
-                    total_distance = total_distance * 1000
-                if high_intensity_distance > 0 and high_intensity_distance < 50:
-                    high_intensity_distance = high_intensity_distance * 1000
-                
-                # Convert km/h to m/s if max_speed seems too high (likely in km/h)
-                if max_speed > 15:  # Probably km/h
-                    max_speed = max_speed / 3.6
-                
-                # Skip rows with no meaningful data
-                if total_distance == 0 and high_intensity_distance == 0 and number_of_sprints == 0:
-                    skipped_records.append({"row": row_num, "reason": "No data"})
-                    continue
-                
-                gps_record = {
-                    "athlete_id": athlete_id,
-                    "coach_id": current_user["_id"],
-                    "date": parse_date(date_val),
-                    "session_id": session_id,
-                    "session_name": str(session_name) if session_name else file.filename,
-                    "total_distance": round(total_distance, 2),
-                    "high_intensity_distance": round(high_intensity_distance, 2),
-                    "high_speed_running": round(high_intensity_distance, 2),  # Alias
-                    "number_of_sprints": number_of_sprints,
-                    "max_speed": round(max_speed, 2),
-                    "player_load": round(parse_numeric(player_load), 2) if player_load else None,
-                    "duration_minutes": parse_numeric(duration) if duration else None,
-                    "max_acceleration": round(parse_numeric(max_accel), 2) if max_accel else None,
-                    "distance_per_min": round(parse_numeric(dist_per_min), 2) if dist_per_min else None,
-                    "source": f"csv_import_{detected_provider}",
-                    "device": detected_provider.title(),
-                    "original_player_name": str(player_name) if player_name else None,
-                    "imported_at": datetime.utcnow(),
-                    "import_session_id": session_id
-                }
-                
-                # Remove None values
-                gps_record = {k: v for k, v in gps_record.items() if v is not None}
-                
-                await db.gps_data.insert_one(gps_record)
-                imported_records.append({
-                    "row": row_num,
-                    "date": gps_record["date"],
-                    "total_distance": gps_record["total_distance"],
-                    "hid": gps_record.get("high_intensity_distance", 0),
-                    "sprints": gps_record["number_of_sprints"]
-                })
-                
-            elif data_type == "heart_rate":
-                date_val = find_column_value(row, "date", detected_provider)
-                avg_hr = find_column_value(row, "avg_heart_rate", detected_provider)
-                max_hr = find_column_value(row, "max_heart_rate", detected_provider)
-                
-                if avg_hr is None and max_hr is None:
-                    skipped_records.append({"row": row_num, "reason": "No heart rate data"})
-                    continue
-                
-                hr_record = {
-                    "athlete_id": athlete_id,
-                    "coach_id": current_user["_id"],
-                    "date": parse_date(date_val),
-                    "average_heart_rate": int(parse_numeric(avg_hr)),
-                    "max_heart_rate": int(parse_numeric(max_hr)),
-                    "source": f"csv_import_{detected_provider}",
-                    "imported_at": datetime.utcnow()
-                }
-                await db.heart_rate_data.insert_one(hr_record)
-                imported_records.append({"row": row_num, "date": hr_record["date"]})
-                
+            forced = Manufacturer(provider.lower())
+        except ValueError:
+            forced = None
+
+    # Parse CSV through the new pipeline (tolerant mode)
+    parser = GPSCSVParser(strict_validation=False)
+    parse_result = parser.parse(content, filename=file.filename or "upload.csv")
+
+    manufacturer = forced if forced else parse_result.manufacturer
+
+    # Normalize into GPSData documents
+    normalizer = GPSDataNormalizer(
+        athlete_id=athlete_id,
+        coach_id=current_user["_id"],
+        session_name=file.filename or "CSV Import",
+        manufacturer=manufacturer,
+    )
+    normalized = normalizer.normalize_records(parse_result.records)
+
+    imported = []
+    skipped = []
+    errors_list = []
+
+    for idx, doc in enumerate(normalized):
+        try:
+            await db.gps_data.insert_one(doc)
+            imported.append({
+                "row": doc.get("_row_number", idx + 2),
+                "date": doc.get("date"),
+                "total_distance": doc.get("total_distance", 0),
+                "hid": doc.get("high_intensity_distance", 0),
+                "sprints": doc.get("number_of_sprints", 0),
+            })
         except Exception as e:
-            errors.append({"row": row_num, "error": str(e)})
-    
+            errors_list.append({"row": idx + 2, "error": str(e)})
+
+    skipped_count = parse_result.total_rows - len(normalized)
+
     return {
         "success": True,
-        "provider_detected": detected_provider,
-        "confidence": f"{min(100, confidence * 10)}%",
-        "records_imported": len(imported_records),
-        "records_skipped": len(skipped_records),
-        "errors": len(errors),
-        "data_type": data_type,
+        "provider_detected": manufacturer.value,
+        "records_imported": len(imported),
+        "records_skipped": skipped_count,
+        "errors": len(errors_list) + len(parse_result.errors),
         "athlete_id": athlete_id,
-        "session_id": session_id,
-        "headers_found": headers[:10],  # First 10 headers for debugging
+        "session_id": normalizer.session_id,
+        "column_mapping": parse_result.column_mapping,
+        "unmapped_columns": parse_result.unmapped_columns,
+        "parse_warnings": [w.to_dict() for w in parse_result.warnings[:10]],
+        "parse_errors": [e.to_dict() for e in parse_result.errors[:10]],
         "import_details": {
-            "imported": imported_records[:5],  # First 5 for preview
-            "skipped": skipped_records[:5],
-            "errors": errors[:5]
-        }
+            "imported": imported[:5],
+            "errors": errors_list[:5],
+        },
     }
 
 
 @api_router.get("/wearables/csv/supported-providers")
 async def get_supported_csv_providers():
-    """Get list of supported CSV providers and their expected columns."""
+    """List supported CSV manufacturers and the canonical metrics they can map."""
+    manufacturers = [m for m in Manufacturer if m != Manufacturer.UNKNOWN]
     providers = []
-    for name, config in GPS_PROVIDER_MAPPINGS.items():
-        if name == "generic":
-            continue
+    for m in manufacturers:
         providers.append({
-            "id": name,
-            "name": name.title().replace("_", " "),
-            "identifier_columns": config["identifiers"],
-            "supported_fields": list(config["columns"].keys()),
-            "example_columns": {
-                field: names[:3] for field, names in config["columns"].items()
-            }
+            "id": m.value,
+            "name": m.value.title(),
         })
-    
+
     return {
         "providers": providers,
-        "generic_fallback": {
-            "description": "If no provider is detected, the system will try to match columns using common naming patterns",
-            "supported_fields": list(GPS_PROVIDER_MAPPINGS["generic"]["columns"].keys())
+        "canonical_metrics": {
+            category: metrics for category, metrics in METRIC_CATEGORIES.items()
         },
         "tips": [
-            "The system automatically detects the CSV format based on column headers",
-            "Make sure your CSV has a header row with column names",
-            "Date formats supported: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY, and more",
-            "Distance values are automatically converted from km to meters if needed",
-            "Speed values are automatically converted from km/h to m/s if needed"
-        ]
+            "The system automatically detects the manufacturer based on column headers",
+            "Supported delimiters: comma, semicolon, tab",
+            "Supported encodings: UTF-8, Latin-1, CP1252",
+            "Date formats supported: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY and more",
+            "Decimal separators: both dot and comma are supported",
+        ],
     }
 
 
@@ -6625,74 +6294,30 @@ async def preview_csv_import(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    Preview CSV file before importing.
-    Shows detected provider, mapped columns, and sample data.
+    Preview CSV before importing.
+    Returns detected manufacturer, column mapping, sample normalized records.
     """
-    import csv
-    
     content = await file.read()
-    
-    # Try different encodings
-    decoded = None
-    for encoding in ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']:
-        try:
-            decoded = content.decode(encoding)
-            break
-        except UnicodeDecodeError:
-            continue
-    
-    if decoded is None:
-        raise HTTPException(status_code=400, detail="Could not decode CSV file")
-    
-    lines = decoded.splitlines()
-    if not lines:
-        raise HTTPException(status_code=400, detail="CSV file is empty")
-    
-    reader = csv.DictReader(lines)
-    headers = reader.fieldnames or []
-    
-    # Detect provider
-    detected_provider, confidence = detect_csv_provider(headers)
-    
-    # Get sample rows with mapped values
-    sample_rows = []
-    for i, row in enumerate(reader):
-        if i >= 5:  # Only first 5 rows
-            break
-        
-        mapped = {
-            "date": find_column_value(row, "date", detected_provider),
-            "total_distance": find_column_value(row, "total_distance", detected_provider),
-            "high_intensity_distance": find_column_value(row, "high_intensity_distance", detected_provider),
-            "sprints": find_column_value(row, "sprints", detected_provider),
-            "max_speed": find_column_value(row, "max_speed", detected_provider),
-            "player_name": find_column_value(row, "player_name", detected_provider),
-            "session_name": find_column_value(row, "session_name", detected_provider),
-        }
-        sample_rows.append({
-            "original": dict(row),
-            "mapped": mapped
-        })
-    
-    # Show which columns were matched
-    column_mapping = {}
-    config = GPS_PROVIDER_MAPPINGS.get(detected_provider, GPS_PROVIDER_MAPPINGS["generic"])
-    for field, possible_names in config["columns"].items():
-        for name in possible_names:
-            if name in headers or name.lower() in [h.lower() for h in headers]:
-                column_mapping[field] = name
-                break
-    
+
+    parse_result = parse_gps_csv(content, filename=file.filename or "upload.csv", strict=False)
+
+    # Build sample preview (first 5 parsed records)
+    sample = []
+    for rec in parse_result.records[:5]:
+        preview = {k: v for k, v in rec.items() if not k.startswith("_")}
+        sample.append(preview)
+
     return {
         "filename": file.filename,
-        "total_rows": len(lines) - 1,  # Minus header
-        "headers": headers,
-        "detected_provider": detected_provider,
-        "confidence": f"{min(100, confidence * 10)}%",
-        "column_mapping": column_mapping,
-        "unmapped_headers": [h for h in headers if h not in column_mapping.values()],
-        "sample_data": sample_rows,
-        "ready_to_import": len(column_mapping) >= 2  # At least date and one metric
+        "total_rows": parse_result.total_rows,
+        "valid_rows": parse_result.valid_rows,
+        "detected_manufacturer": parse_result.manufacturer.value,
+        "column_mapping": parse_result.column_mapping,
+        "unmapped_columns": parse_result.unmapped_columns,
+        "sample_data": sample,
+        "errors": [e.to_dict() for e in parse_result.errors[:10]],
+        "warnings": [w.to_dict() for w in parse_result.warnings[:10]],
+        "ready_to_import": parse_result.valid_rows > 0,
     }
 
 
