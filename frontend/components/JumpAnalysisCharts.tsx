@@ -282,8 +282,8 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
         </View>
       )}
 
-      {/* Asymmetry Card */}
-      {asymmetry && (
+      {/* Asymmetry Card with Visual Bars */}
+      {asymmetry && data.protocols.sl_cmj && (
         <View style={[styles.asymmetryCard, asymmetry.red_flag && styles.asymmetryCardRedFlag]}>
           <View style={styles.asymmetryHeader}>
             <Ionicons 
@@ -299,19 +299,85 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
             )}
           </View>
           
-          <View style={styles.asymmetryValues}>
-            <View style={styles.asymmetryValue}>
-              <Text style={styles.asymmetryLabel}>RSI</Text>
-              <Text style={[styles.asymmetryPercent, asymmetry.rsi.red_flag && { color: '#ef4444' }]}>
-                {asymmetry.rsi.asymmetry_percent.toFixed(1)}%
+          {/* Visual Bar Chart for Asymmetry */}
+          <View style={styles.asymmetryBarsContainer}>
+            {/* RSI Comparison */}
+            <View style={styles.asymmetryBarSection}>
+              <Text style={styles.asymmetryBarLabel}>RSI</Text>
+              <View style={styles.asymmetryBarsRow}>
+                <View style={styles.asymmetryLegRow}>
+                  <Text style={styles.legLabel}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
+                  <View style={styles.barBackground}>
+                    <View style={[
+                      styles.barFill,
+                      { 
+                        width: `${Math.min((data.protocols.sl_cmj.right.rsi / Math.max(data.protocols.sl_cmj.right.rsi, data.protocols.sl_cmj.left.rsi)) * 100, 100)}%`,
+                        backgroundColor: asymmetry.rsi.dominant_leg === 'right' ? '#22c55e' : '#60a5fa'
+                      }
+                    ]} />
+                  </View>
+                  <Text style={styles.barValue}>{data.protocols.sl_cmj.right.rsi.toFixed(2)}</Text>
+                </View>
+                <View style={styles.asymmetryLegRow}>
+                  <Text style={styles.legLabel}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
+                  <View style={styles.barBackground}>
+                    <View style={[
+                      styles.barFill,
+                      { 
+                        width: `${Math.min((data.protocols.sl_cmj.left.rsi / Math.max(data.protocols.sl_cmj.right.rsi, data.protocols.sl_cmj.left.rsi)) * 100, 100)}%`,
+                        backgroundColor: asymmetry.rsi.dominant_leg === 'left' ? '#22c55e' : '#60a5fa'
+                      }
+                    ]} />
+                  </View>
+                  <Text style={styles.barValue}>{data.protocols.sl_cmj.left.rsi.toFixed(2)}</Text>
+                </View>
+              </View>
+              <Text style={[styles.asymmetryDiff, asymmetry.rsi.red_flag && { color: '#ef4444' }]}>
+                Δ {asymmetry.rsi.asymmetry_percent.toFixed(1)}%
               </Text>
             </View>
-            <View style={styles.asymmetryValue}>
-              <Text style={styles.asymmetryLabel}>{locale === 'pt' ? 'Altura' : 'Height'}</Text>
-              <Text style={[styles.asymmetryPercent, asymmetry.jump_height.red_flag && { color: '#ef4444' }]}>
-                {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
+
+            {/* Jump Height Comparison */}
+            <View style={styles.asymmetryBarSection}>
+              <Text style={styles.asymmetryBarLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
+              <View style={styles.asymmetryBarsRow}>
+                <View style={styles.asymmetryLegRow}>
+                  <Text style={styles.legLabel}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
+                  <View style={styles.barBackground}>
+                    <View style={[
+                      styles.barFill,
+                      { 
+                        width: `${Math.min((data.protocols.sl_cmj.right.jump_height_cm / Math.max(data.protocols.sl_cmj.right.jump_height_cm, data.protocols.sl_cmj.left.jump_height_cm)) * 100, 100)}%`,
+                        backgroundColor: asymmetry.jump_height.dominant_leg === 'right' ? '#f59e0b' : '#a78bfa'
+                      }
+                    ]} />
+                  </View>
+                  <Text style={styles.barValue}>{data.protocols.sl_cmj.right.jump_height_cm.toFixed(1)}</Text>
+                </View>
+                <View style={styles.asymmetryLegRow}>
+                  <Text style={styles.legLabel}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
+                  <View style={styles.barBackground}>
+                    <View style={[
+                      styles.barFill,
+                      { 
+                        width: `${Math.min((data.protocols.sl_cmj.left.jump_height_cm / Math.max(data.protocols.sl_cmj.right.jump_height_cm, data.protocols.sl_cmj.left.jump_height_cm)) * 100, 100)}%`,
+                        backgroundColor: asymmetry.jump_height.dominant_leg === 'left' ? '#f59e0b' : '#a78bfa'
+                      }
+                    ]} />
+                  </View>
+                  <Text style={styles.barValue}>{data.protocols.sl_cmj.left.jump_height_cm.toFixed(1)}</Text>
+                </View>
+              </View>
+              <Text style={[styles.asymmetryDiff, asymmetry.jump_height.red_flag && { color: '#ef4444' }]}>
+                Δ {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
               </Text>
             </View>
+          </View>
+
+          {/* Red flag threshold indicator */}
+          <View style={styles.asymmetryThreshold}>
+            <View style={styles.thresholdLine} />
+            <Text style={styles.thresholdText}>{locale === 'pt' ? 'Limite: >10% = Risco' : 'Threshold: >10% = Risk'}</Text>
           </View>
           
           <Text style={styles.asymmetryInterpretation}>{asymmetry.interpretation}</Text>
