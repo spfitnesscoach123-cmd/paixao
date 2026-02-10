@@ -382,10 +382,11 @@ backend/identity_resolver/
 
 ## Próximos Passos (Backlog)
 
-### P1 - Integração com Pipelines de Upload
-- [ ] Aplicar resolução de identidade no preview de jump_import
-- [ ] Aplicar resolução de identidade no preview de gps_import
-- [ ] Bloquear importação se houver atletas não resolvidos
+### ✅ P1 - Integração com Pipelines de Upload (COMPLETO)
+- [x] Aplicar resolução de identidade no preview de jump_import
+- [x] Aplicar resolução de identidade no preview de gps_import
+- [x] Bloquear importação se houver atletas não resolvidos (`can_import: false`)
+- [x] Atualizar `last_used_at` quando alias é usado em importação
 
 ### P2 - Normalização Estatística
 - [ ] Correção por dispositivo (offsets de medição)
@@ -396,6 +397,12 @@ backend/identity_resolver/
 - [ ] Dashboard de atleta com gráficos
 - [ ] Indicadores visuais de prontidão
 - [ ] Comparação lado a lado
+- [ ] Modal de resolução de identidade durante upload
+
+### P4 - Merge de Atletas (FUTURO)
+- [ ] Funcionalidade para consolidar dois athlete_ids num único perfil
+- [ ] Migrar dados históricos automaticamente
+- [ ] Trilha de auditoria própria
 
 ---
 
