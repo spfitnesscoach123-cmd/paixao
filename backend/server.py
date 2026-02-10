@@ -8027,9 +8027,18 @@ async def preview_jump_csv(
     calculator = JumpCalculator()
     
     for row_num, raw_row in enumerate(raw_rows, start=2):
-        # Resolve athlete_id from name if needed
-        athlete_id = raw_row.get('athlete_id', '').strip()
-        athlete_name = raw_row.get('athlete_name', '').strip()
+        # Extract athlete_id and athlete_name from raw_row and inner raw_row
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
         
         # Try to resolve athlete name to ID
         resolved_athlete_id = None
@@ -8038,7 +8047,8 @@ async def preview_jump_csv(
                 resolved_athlete_id = resolved_names[athlete_name]
             elif athlete_name in name_to_athlete_id:
                 resolved_athlete_id = name_to_athlete_id[athlete_name]
-        elif athlete_id:
+        
+        if not resolved_athlete_id and athlete_id:
             if athlete_id in existing_athlete_ids:
                 resolved_athlete_id = athlete_id
             elif athlete_id in resolved_names:
