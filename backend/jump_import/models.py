@@ -43,6 +43,9 @@ class JumpRecord(BaseModel):
     - peak_power_w: watts (absolute)
     - load_kg: kilograms
     """
+    model_config = {
+        "use_enum_values": True,
+    }
     
     # Athlete identification (required)
     athlete_id: str = Field(
