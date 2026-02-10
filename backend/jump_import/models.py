@@ -180,12 +180,6 @@ class JumpRecord(BaseModel):
             }
             return aliases.get(v_upper, v_upper)
         return v
-    
-    class Config:
-        use_enum_values = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
 
 
 class JumpValidationError(BaseModel):
