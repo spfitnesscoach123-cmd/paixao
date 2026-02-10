@@ -438,23 +438,17 @@ export default function CreatePeriodizationScreen() {
               </View>
               {days.map((day, dayIndex) => (
                 <View key={day.date} style={styles.dailyTableDayCell}>
-                  <TouchableOpacity
+                  <TextInput
                     style={styles.percentInput}
-                    onPress={() => {
-                      const currentValue = (day as any)[`${metric.id}_percent`];
-                      const newValue = prompt(
-                        `${metric.label} - ${format(parseISO(day.date), 'dd/MM')}`,
-                        currentValue.toString()
-                      );
-                      if (newValue) {
-                        updateDayPercent(dayIndex, metric.id, parseInt(newValue) || 0);
-                      }
+                    value={String((day as any)[`${metric.id}_percent`])}
+                    onChangeText={(text) => {
+                      const numValue = parseInt(text) || 0;
+                      updateDayPercent(dayIndex, metric.id, numValue);
                     }}
-                  >
-                    <Text style={styles.percentValue}>
-                      {(day as any)[`${metric.id}_percent`]}%
-                    </Text>
-                  </TouchableOpacity>
+                    keyboardType="numeric"
+                    selectTextOnFocus
+                  />
+                  <Text style={styles.percentSymbol}>%</Text>
                 </View>
               ))}
             </View>
