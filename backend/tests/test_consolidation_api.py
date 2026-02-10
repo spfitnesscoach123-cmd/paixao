@@ -17,7 +17,7 @@ import requests
 import os
 import io
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://periodization-gps.preview.emergentagent.com")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://no-duplication-gps.preview.emergentagent.com")
 ATHLETE_ID = "69862b75fc9efff29476e3ce"
 
 
