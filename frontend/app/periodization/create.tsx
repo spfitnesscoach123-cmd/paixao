@@ -851,4 +851,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#ffffff',
   },
+  dateInput: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
 });
