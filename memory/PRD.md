@@ -76,7 +76,9 @@ v = √(2gh)
 - Nunca criar atletas automaticamente
 - Erro claro se atleta não existir
 
-## API Endpoints
+---
+
+## API Endpoints - Jump Import
 
 ### GET /api/jumps/providers
 Lista fabricantes suportados.
@@ -105,134 +107,200 @@ Pré-visualização de importação (não salva dados).
 ### POST /api/jumps/upload/import
 Importa dados validados para o banco.
 
-**Request:** `multipart/form-data` com arquivo CSV
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "8 registros importados com sucesso",
-  "imported_count": 8,
-  "rejected_count": 0,
-  "created_ids": ["...", "..."],
-  "errors": []
-}
-```
-
 ### GET /api/jumps/athlete/{athlete_id}
 Recupera todos os saltos de um atleta.
 
 ### GET /api/jumps/analysis/{athlete_id}
-Análise de performance de salto do atleta.
+Análise básica de performance de salto.
 
 ### DELETE /api/jumps/{jump_id}
 Remove um registro de salto.
 
-## Estrutura do Módulo
+---
 
-```
-backend/jump_import/
-├── __init__.py        # Exports e funções de conveniência
-├── models.py          # Modelos Pydantic (JumpRecord, JumpValidationError)
-├── parser.py          # Parser CSV tolerante
-├── validator.py       # Validação de schema e regras
-├── calculator.py      # Cálculos de métricas derivadas
-└── mappers/
-    ├── __init__.py    # Registry de mappers
-    ├── base.py        # Classe base abstrata
-    ├── generic.py     # Mapper genérico
-    ├── chronojump.py  # Mapper Chronojump
-    ├── force_decks.py # Mapper Force Decks
-    ├── axon_jump.py   # Mapper Axon Jump
-    └── custom.py      # Mapper customizável
-```
+## API Endpoints - Jump Analysis (NOVO)
 
-## Adicionando Novos Fabricantes
+### GET /api/jumps/report/{athlete_id}
+Gera um relatório completo de performance de salto.
 
-1. **Criar arquivo mapper** em `mappers/new_manufacturer.py`:
-```python
-from .base import BaseMapper
+**Query Parameters:**
+- `jump_type`: Tipo de salto (CMJ, SJ, DJ, RJ). Padrão: CMJ
+- `window_days`: Janela de análise em dias. Padrão: 14
 
-class NewManufacturerMapper(BaseMapper):
-    MANUFACTURER_NAME = "new_manufacturer"
-    
-    COLUMN_MAP = {
-        'manufacturer_col': 'canonical_col',
-        # ... mapeamentos
-    }
-```
-
-2. **Registrar em `mappers/__init__.py`**:
-```python
-from .new_manufacturer import NewManufacturerMapper
-
-MAPPER_REGISTRY['new_manufacturer'] = NewManufacturerMapper
-
-HEADER_SIGNATURES['new_manufacturer'] = [
-    'distinctive_header_1', 
-    'distinctive_header_2'
-]
-```
-
-## Exemplos de CSV
-
-### Generic Format
-```csv
-athlete_id,jump_type,flight_time_s,contact_time_s,jump_date,source_system
-ATH001,CMJ,0.52,,2026-01-15,generic
-ATH001,DJ,0.42,0.21,2026-01-15,generic
-```
-
-### Chronojump Format
-```csv
-uniqueID,personID,sessionID,type,tv,tc,fall,weight,datetime
-1001,ATH001,S001,CMJ,0.52,-1,,75.0,2026-01-15 09:30:00
-```
-
-## Database Schema
-
-Coleção: `jump_data`
-
+**Response:**
 ```json
 {
-  "_id": "ObjectId",
-  "coach_id": "ObjectId",
-  "athlete_id": "string",
-  "jump_type": "SJ|CMJ|DJ|RJ",
-  "jump_height_cm": "number",
-  "flight_time_s": "number",
-  "contact_time_s": "number|null",
-  "reactive_strength_index": "number|null",
-  "peak_power_w": "number|null",
-  "takeoff_velocity_m_s": "number|null",
-  "load_kg": "number|null",
-  "jump_date": "ISODate",
-  "jump_date_str": "string",
-  "source_system": "string",
-  "raw_row": "object",
-  "created_at": "ISODate"
+  "athlete_id": "...",
+  "athlete_name": "João Silva",
+  "generated_at": "2026-02-10T21:00:00",
+  "status": "ok|warning|alert|critical",
+  "readiness": "optimal|good|moderate|low|poor|unknown",
+  "readiness_score": 77,
+  "cmj_trend": -2.58,
+  "rsi_trend": null,
+  "fatigue_flag": false,
+  "status_emoji": "🟢",
+  "headline": "Prontidão normal - pode treinar conforme planejado",
+  "recommendation": "Atleta em bom estado...",
+  "training_load_modifier": 1.0,
+  "data_quality": "good",
+  "jumps_analyzed": 10,
+  "baseline": { ... },
+  "trends": { ... },
+  "fatigue": { ... },
+  "readiness_detail": { ... }
 }
 ```
 
+### GET /api/jumps/compare
+Compara performance de múltiplos atletas.
+
+**Query Parameters:**
+- `athlete_ids`: IDs separados por vírgula (ex: "id1,id2,id3")
+- `jump_type`: Tipo de salto. Padrão: CMJ
+- `metric`: Métrica de comparação (z_height, pct_best_height, pct_career_height). Padrão: z_height
+
+**Response:**
+```json
+{
+  "jump_type": "CMJ",
+  "metric": "pct_best_height",
+  "athlete_count": 2,
+  "comparison": {
+    "athletes": [
+      {
+        "athlete_id": "...",
+        "athlete_name": "Pedro Santos",
+        "value": 98.73,
+        "raw_height_cm": 39.0,
+        "pct_best_height": 98.73,
+        "rank": 1,
+        "percentile": 100.0
+      },
+      ...
+    ],
+    "group_mean": 96.455,
+    "group_std": 3.217
+  }
+}
+```
+
+---
+
+## Módulo Jump Analysis
+
+### Estrutura
+
+```
+backend/jump_analysis/
+├── __init__.py        # Exports públicos
+├── baselines.py       # Cálculo de baselines (best, avg, CV%)
+├── trends.py          # Análise de tendências (slope, deltas)
+├── fatigue.py         # Detecção de fadiga neuromuscular
+├── readiness.py       # Avaliação de prontidão
+├── comparisons.py     # Comparações entre atletas/dispositivos
+└── report.py          # Geração de relatórios estruturados
+```
+
+### Funcionalidades
+
+#### 1. Baseline Calculator (`baselines.py`)
+- **Historical Best**: Melhor performance de todos os tempos
+- **Rolling Averages**: Médias de 7, 14 e 28 dias
+- **Career Average**: Média de carreira
+- **CV%**: Coeficiente de variação (consistência)
+
+#### 2. Trend Analysis (`trends.py`)
+- **Delta vs Baseline**: % mudança em relação à referência
+- **Weekly Slope**: Regressão linear (cm/semana)
+- **Direction**: improving, stable, declining
+
+#### 3. Fatigue Detection (`fatigue.py`)
+Baseado em evidência científica:
+- CMJ height drop ≥ 5% = threshold breach
+- RSI drop ≥ 10% = threshold breach
+- Sustained ≥ 2 sessões = fatigue confirmed
+
+**Níveis**: none, low, moderate, high, critical
+
+#### 4. Readiness Assessment (`readiness.py`)
+Score composto (0-100):
+- Fatigue Score: 50% peso
+- Trend Score: 30% peso
+- Consistency Score: 20% peso
+
+**Níveis**: optimal (≥85), good (≥70), moderate (≥55), low (≥40), poor (<40)
+
+#### 5. Comparisons (`comparisons.py`)
+- **Z-Score**: Normalização intra-atleta
+- **Percent of Best**: % do melhor pessoal
+- **Percentile**: Ranking entre grupo
+- **Device Correction**: Ajuste por dispositivo
+
+---
+
 ## Testes
 
-- **30 testes unitários** cobrindo:
-  - Cálculos de métricas (altura, RSI, velocidade)
-  - Validação por tipo de salto
-  - Parsing de CSV com diferentes formatos
-  - Detecção de fabricantes
-  - Mapeamento de colunas
-  - Regras de negócio (empty → null, zero preservado)
+### Jump Import (30 testes)
+- Cálculos de métricas (altura, RSI, velocidade)
+- Validação por tipo de salto
+- Parsing de CSV
+- Detecção de fabricantes
+- Mapeamento de colunas
+
+### Jump Analysis (27 testes)
+- Cálculo de baselines
+- Análise de tendências
+- Detecção de fadiga
+- Avaliação de prontidão
+- Geração de relatórios
+- Comparação entre atletas
+- Análise de RSI
+
+**Total: 57 testes passando**
+
+---
 
 ## Status da Implementação
 
-✅ **COMPLETO** - Sistema totalmente funcional
-
+### ✅ COMPLETO - Jump Import
 - [x] Módulo `jump_import/` com separação de responsabilidades
 - [x] Mappers para 4 fabricantes + custom
 - [x] Cálculos de métricas derivadas
 - [x] Validação de regras de negócio
 - [x] API endpoints (preview, import, athlete, analysis, delete)
-- [x] Testes unitários
-- [x] Arquivos CSV de exemplo
-- [x] Documentação técnica
+- [x] 30 testes unitários
+
+### ✅ COMPLETO - Jump Analysis
+- [x] Módulo `jump_analysis/` com análise esportiva
+- [x] Cálculo de baselines (best, rolling, CV%)
+- [x] Análise de tendências (slope, direction)
+- [x] Detecção de fadiga neuromuscular
+- [x] Avaliação de prontidão (score 0-100)
+- [x] Comparação entre atletas (z-score, percentil)
+- [x] API endpoint de relatório (/api/jumps/report/{id})
+- [x] API endpoint de comparação (/api/jumps/compare)
+- [x] 27 testes unitários
+
+---
+
+## Próximos Passos (Backlog)
+
+### P2 - Normalização Estatística
+- [ ] Correção por dispositivo (offsets de medição)
+- [ ] Percentis de grupo (ranking entre equipe)
+
+### P3 - Interface Frontend
+- [ ] Upload de CSV com preview
+- [ ] Dashboard de atleta com gráficos
+- [ ] Indicadores visuais de prontidão
+- [ ] Comparação lado a lado
+
+---
+
+## Referências Científicas
+
+- Claudino et al. (2017) - CMJ monitoring in team sports
+- Gathercole et al. (2015) - Neuromuscular fatigue markers
+- Taylor et al. (2012) - Jump testing for monitoring fatigue
+- Bosco et al. (1983) - Simple method for mechanical power measurement
