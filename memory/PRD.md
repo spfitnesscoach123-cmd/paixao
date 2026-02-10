@@ -1,531 +1,238 @@
-# PRD - Load Manager - Athlete Performance Tracking
+# Jump Data Import System - PRD
 
-## Original Problem Statement
-Sistema de rastreamento de desempenho de atletas com avaliações físicas, composição corporal, integração com wearables e sistemas VBT.
+## Overview
 
-## Current Architecture
-- **Backend**: FastAPI (Python) + MongoDB
-- **Frontend**: React Native (Expo) + TypeScript
-- **AI Integration**: OpenAI via Emergent LLM Key (GPT-4o para insights científicos)
+Sistema de importação de dados de saltos (jump data) via CSV, agnóstico ao hardware, com validação rigorosa, cálculo de métricas derivadas e conversão para um modelo canônico único.
 
-## What's Been Implemented
+## Fabricantes Suportados
 
-### ✅ Scientific Analysis Tab (Dez 9, 2025) - **NEW**
-**Página de Análises completamente redesenhada com insights científicos baseados em IA:**
+| Fabricante | ID | Descrição |
+|------------|-----|-----------|
+| Generic | `generic` | Formato CSV padrão com colunas nomeadas |
+| Chronojump | `chronojump` | Sistema open-source Chronojump |
+| VALD Force Decks | `force_decks` | Plataformas de força VALD Performance |
+| Axon Jump | `axon_jump` | Tapete de contato Axon Jump |
+| Custom | `custom` | Mapeamento personalizado definido pelo usuário |
 
-**Fontes de Dados Consolidadas:**
-- GPS (últimas 30 sessões)
-- ACWR (Acute:Chronic Workload Ratio)
-- Wellness (últimos 14 registros)
-- Jump Assessment (CMJ, RSI, Z-Score)
-- VBT (Perfil Carga-Velocidade)
-- Composição Corporal
+## Modelo Canônico (JumpRecord)
 
-**Métricas e Gráficos:**
-- Gráfico de Evolução RSI
-- Gráfico Perfil Carga-Velocidade (Load-Velocity)
-- Gráfico Perda de Velocidade por Série
-- Gráfico Donut Composição Corporal
-- Barras de Wellness
-- Resumo GPS
-
-**Insights Científicos (IA GPT-4o):**
-- Síntese Fisiológica
-- Análise de Carga de Treinamento
-- Estado Neuromuscular (fadiga central/periférica)
-- Estado de Recuperação
-- Fatores de Risco e Prevenção
-- Recomendações de Treinamento e Recuperação
-- Terminologia científica específica com referências
-
-**Funcionalidade PDF:**
-- Botão de impressão de relatório
-- Preview do relatório antes de imprimir
-- Relatório HTML formatado para impressão
-- Inclui todos os dados e insights de IA
-
-**Endpoints:**
-- `GET /api/analysis/scientific/{athlete_id}` - Análise consolidada
-- `GET /api/report/scientific/{athlete_id}` - Relatório HTML para impressão
-
-**Componentes:**
-- `ScientificAnalysisTab.tsx` - Componente principal da aba de análises
-
-### ✅ ACWR Classification System (Feb 7, 2026)
-| Range | Classification | Status |
-|-------|----------------|--------|
-| <0.8 | Losing Performance | Undertrained |
-| 0.8-1.3 | Sweet Spot | Optimal |
-| 1.3-1.5 | Caution Zone | Warning |
-| >1.5 | High Risk | Overtrained |
-
-**Components:**
-- `ACWRBadge.tsx` - Visual badge with color coding
-- `ACWRLegend.tsx` - Legend explaining ranges
-- `getACWRClassification()` - Helper function
-
-### ❌ REMOVIDO: Export PDF/CSV (Dez 2025)
-**Estrutura de relatórios removida completamente:**
-- Componentes deletados: `ExportPDFButton.tsx`, `ExportButtons.tsx`, `ReportPreviewModal.tsx`
-- Endpoints removidos do backend: 
-  - `/api/reports/athlete/{id}/pdf`
-  - `/api/reports/athlete/{id}/csv`
-  - `/api/reports/athlete/{id}/preview`
-  - `/api/reports/athlete/{id}/csv-preview`
-  - `/api/reports/body-composition/{id}/pdf`
-  - `/api/reports/body-composition/{id}/preview`
-  - `/api/reports/team/csv`
-- Tradições de PDF removidas
-- Referências a `export_pdf` e `export_csv` removidas dos planos de assinatura
-
-### ✅ Wellness Link Duration Options (Feb 7, 2026)
-**Updated Options:**
-- 30 minutes
-- 2 hours
-- 8 hours
-- 24 hours (default)
-
-**Backend:** `/api/wellness/generate-link?expires_hours=X`
-
-### ✅ Subscription Plans Updated (Feb 7, 2026)
-
-| Feature | Essencial | Profissional | Elite |
-|---------|-----------|--------------|-------|
-| **Max Athletes** | **20** | 50 | Ilimitado |
-| **Price BRL** | R$ 39,90 | R$ 89,90 | R$ 159,90 |
-| VBT Analysis | ❌ | ✅ | ✅ |
-| Body Composition | ❌ | ✅ | ✅ |
-| 3D Body Model | ❌ | ❌ | ✅ |
-| Fatigue Alerts | ❌ | ✅ | ✅ |
-| AI Insights | ❌ | ❌ | ✅ |
-| Multi-user | ❌ | ❌ | ✅ (2) |
-
-### ✅ VBT Integration
-- Integrated into Strength page with tabs
-- Load-Velocity Profile chart
-- Velocity Loss chart with 30% fatigue threshold
-- Device providers with input methods
-
-### ✅ Body Composition
-- 4 scientific protocols (Guedes, Pollock 7/9, Faulkner)
-- Dynamic form fields
-- 3D body model visualization (Elite only)
-
-### ✅ Team Dashboard
-- 6 stat cards (ACWR, Wellness, Fatigue, Power, Body Fat, Sessions)
-- ACWR Legend with classification
-- Risk distribution chart
-- Athlete list with ACWR badges
-- Position group averages section
-
-### ✅ Bug Fixes (Feb 7, 2026 - Latest Session)
-
-| Issue | Fix | Status |
-|-------|-----|--------|
-| Dashboard session count incorrect | Changed to count unique sessions by `date + session_name` | ✅ Fixed |
-| Position groups showing individuals | Implemented GROUP AVERAGES for each position | ✅ Fixed |
-| Training zones using heart rate | Already using velocity-based zones (% Vmax) | ✅ Verified |
-| Wellness colors inverted | Implemented `getValueColor()` with inverted logic for fatigue/stress/pain | ✅ Fixed |
-| Decimal input for m/s fields | Added `formatDecimalInput()` to convert comma to dot | ✅ Fixed |
-| QTRGauge component cut off | Fixed height/viewBox calculations (containerHeight = size * 0.85) | ✅ Fixed |
-| injury_risk None type error | Changed to proper boolean validation | ✅ Fixed |
-
-**Position Summary now includes:**
-- `count` - Number of athletes
-- `avg_acwr` - Group average ACWR
-- `avg_wellness` - Group average wellness
-- `avg_fatigue` - Group average fatigue
-- `avg_distance` - Group average distance (meters)
-- `avg_sprints` - Group average sprints
-- `avg_max_speed` - Group average max speed (km/h)
-- `high_risk_count` - Athletes at high risk
-
-### ✅ Bug Fixes (Feb 8, 2026 - Latest Session)
-
-| Issue | Fix | Status |
-|-------|-----|--------|
-| VBT decimal input (m/s) not working | Implemented `vbtInputs` state for raw input tracking with `getVbtInputValue()` helper | ✅ Fixed |
-| Body Composition Donut chart incorrect | Fixed SVG strokeDasharray/strokeDashoffset calculation, added zero-check | ✅ Fixed |
-| Query invalidation key mismatch | Added `body-composition` key to invalidation in `add-body-composition.tsx` | ✅ Fixed |
-
-### ✅ Dashboard & VBT Enhancements (Dezembro 2025)
-
-| Feature | Implementation | Status |
-|---------|---------------|--------|
-| RSI card em branco no dashboard | Backend corrigido para buscar RSI de `metrics.rsi` em vez de `assessment.rsi` | ✅ Fixed |
-| HSR em metros | `team.tsx` já mostra em metros (team_avg_hid) | ✅ Verified |
-| Card duplicado de distância | Substituído por card de HSR Médio em `data.tsx` | ✅ Fixed |
-| Carga ótima (VBT) | Backend calcula optimal_load, optimal_velocity, optimal_power usando fórmula P=carga×velocidade | ✅ Implemented |
-| Evolução da carga ótima | Backend retorna `optimal_load_evolution` com histórico por sessão | ✅ Implemented |
-| PDF força tradicional | Seção de força tradicional adicionada com tabela separada (Supino, Agachamento, Levantamento Terra, Salto Vertical) | ✅ Implemented |
-| OptimalLoadEvolutionChart | Novo componente em `add-strength.tsx` para visualizar evolução | ✅ Implemented |
-| **Gráfico comparação força** | Atualizado para mostrar valores da última avaliação vs anterior com % de mudança | ✅ Implemented |
-| **PDF seção de força** | PDF agora mostra valores mais recentes (não média) da última avaliação de força | ✅ Fixed |
-| **Ordenação por created_at** | Queries ordenam por `[("date", -1), ("created_at", -1)]` para dados do mesmo dia | ✅ Fixed |
-
-**Correções Críticas (Feb 8 2026 - Sessão Atual):**
-- PDF mostrava média em vez do valor mais recente → Corrigido para usar `latest_assessment.metrics`
-- Múltiplas avaliações no mesmo dia não ordenavam corretamente → Adicionado `created_at` na ordenação
-- API de análise de força não mostrava comparação → Adicionado `comparison_with_previous` e `variation_from_previous`
-
-**Testado com atleta: Guilherme Mattos (ID: 6987fac838bbf90dba173d27)**
-- 3 avaliações de força no mesmo dia (2026-02-08)
-- Valores mais recentes: Mean Power 3000W, RSI 3.0
-- PDF e API mostram corretamente os dados mais recentes
-
-## Prioritized Backlog
-
-### ✅ Simplificação da Página de Assinaturas (Fev 9, 2026)
-
-Página de assinaturas completamente redesenhada com apenas 1 plano:
-
-| Região | Preço | Moeda |
-|--------|-------|-------|
-| Brasil | R$ 199,00/mês | BRL |
-| Internacional | $39.99/mês | USD |
-
-**Funcionalidades do Plano Pro:**
-- Trial gratuito de 7 dias com acesso completo
-- Atletas ilimitados
-- Histórico ilimitado
-- VBT, Composição Corporal, Modelo 3D
-- Insights de IA, ACWR detalhado
-- Alertas de fadiga, Comparação de atletas
-- Exportação PDF/CSV
-- Até 5 usuários simultâneos
-- Suporte prioritário
-
-**Novos Endpoints:**
-- `POST /subscription/restore` - Restaurar compras anteriores
-
-**Arquivos Modificados:**
-- `backend/server.py` - PLAN_LIMITS simplificado, novo endpoint restore
-- `frontend/app/subscription.tsx` - UI completamente redesenhada
-
-### ✅ Integração RevenueCat para In-App Purchases (Dez 9, 2025)
-
-Implementada integração completa com RevenueCat para gerenciamento de assinaturas via App Store e Google Play.
-
-**Frontend (React Native/Expo):**
-- Instalado `react-native-purchases@9.7.6` SDK
-- Criado `services/revenuecat.ts` - Configuração e helpers
-- Criado `contexts/RevenueCatContext.tsx` - Context provider para gerenciamento de estado
-- Atualizado `app/subscription.tsx` - Integração com RevenueCat SDK
-
-**Backend (FastAPI):**
-- Novos endpoints de webhook:
-  - `POST /api/webhooks/revenuecat` - Recebe eventos do RevenueCat
-  - `GET /api/subscription/revenuecat-status/{app_user_id}` - Verifica status
-- Eventos suportados:
-  - `INITIAL_PURCHASE` - Compra inicial
-  - `RENEWAL` - Renovação automática
-  - `CANCELLATION` - Cancelamento
-  - `EXPIRATION` - Expiração
-  - `BILLING_ISSUE` - Problema de cobrança
-  - `UNCANCELLATION` - Reativação
-  - `PRODUCT_CHANGE` - Mudança de plano
-
-**Configuração Necessária no RevenueCat Dashboard:**
-1. Criar projeto e configurar apps (iOS/Android)
-2. Criar produto `com.peakperform.pro.monthly`
-3. Criar entitlement `pro` e vincular ao produto
-4. Configurar webhook URL: `{BACKEND_URL}/api/webhooks/revenuecat`
-5. Adicionar API keys nas variáveis de ambiente:
-   - `EXPO_PUBLIC_REVENUECAT_APPLE_KEY` - Chave pública iOS
-   - `EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY` - Chave pública Android
-   - `REVENUECAT_WEBHOOK_SECRET` - Secret para validar webhooks
-
-**Funcionalidades:**
-- Compras via App Store e Google Play
-- Restaurar compras anteriores
-- Detecção automática de status (trial/active/cancelled)
-- Fallback gracioso para web (mostra aviso)
-- Sincronização de status via webhooks
-- Auditoria de eventos (collection `webhook_events`)
-
-### ✅ Novo Módulo de Avaliação de Salto (Dez 9, 2025)
-
-Substituição completa do módulo de "Força Tradicional" por um sistema científico de avaliação de salto.
-
-**Protocolos Implementados:**
-1. **CMJ** (Counter Movement Jump) - Salto bilateral padrão
-2. **SL-CMJ** (Single Leg CMJ) - Perna direita e esquerda
-3. **DJ** (Drop Jump) - Com altura da caixa configurável
-
-**Dados de Entrada:**
-- Tempo de Voo (ms)
-- Tempo de Contato (ms)
-- Altura do Salto (cm) - Opcional, calculada automaticamente
-- Altura da Caixa (cm) - Apenas para DJ
-
-**Cálculos Automáticos:**
-| Métrica | Fórmula |
-|---------|---------|
-| Altura do Salto | h = (g × t²) / 8 |
-| RSI | Altura (m) / Tempo de Contato (s) |
-| RSI Modificado | Tempo de Voo / Tempo de Contato |
-| Pico de Potência | 60.7 × altura(cm) + 45.3 × peso(kg) - 2055 (Sayers) |
-| Pico de Velocidade | √(2 × g × altura) |
-| Potência Relativa | Pico Potência / Peso |
-| Z-Score | (Valor atual - Média) / Desvio Padrão |
-
-**Classificação RSI:**
-| RSI | Classificação |
-|-----|---------------|
-| ≥2.8 | Excelente |
-| ≥2.4 | Muito Bom |
-| ≥2.0 | Bom |
-| ≥1.5 | Médio |
-| ≥1.0 | Abaixo da Média |
-| <1.0 | Fraco |
-
-**Índice de Fadiga (SNC) baseado em variação RSI:**
-| Variação | Status | Cor | Ação |
-|----------|--------|-----|------|
-| 0 a -5% | Verde | #10b981 | Treino normal |
-| -6% a -12% | Amarelo | #f59e0b | Monitorar volume/sprints |
-| < -13% | Vermelho | #ef4444 | Alto risco - Reduzir carga |
-
-**Assimetria de Membros (SL-CMJ):**
-- Diferença >10% = RED FLAG para risco de lesão
-- Identifica perna dominante
-- Recomenda exercícios corretivos
-
-**Perfil Potência-Velocidade:**
-- **Dominante em Velocidade**: Alta velocidade, baixa potência → Treinar Força Máxima
-- **Dominante em Potência**: Alta potência, baixa velocidade → Treinar Pliométricos/Velocidade
-- **Equilibrado**: Manter programa balanceado
-- **Em Desenvolvimento**: Programa completo de S&C
-
-**Insights de IA (GPT-4o via Emergent LLM Key):**
-- Análise científica personalizada
-- Feedbacks em linguagem técnica
-- Recomendações baseadas em literatura esportiva
-
-**Endpoints Criados:**
-- `GET /api/jump/protocols` - Lista protocolos disponíveis
-- `POST /api/jump/assessment` - Criar avaliação
-- `GET /api/jump/assessments/{athlete_id}` - Listar avaliações
-- `GET /api/jump/analysis/{athlete_id}` - Análise completa
-- `DELETE /api/jump/assessment/{id}` - Deletar avaliação
-
-**Arquivos Criados:**
-- `frontend/app/athlete/[id]/jump-assessment.tsx` - Nova página de avaliação
-- Backend: Novos endpoints em `server.py`
-
-**Arquivos Modificados:**
-- `frontend/app/athlete/[id]/add-strength.tsx` - Redirecionamento para nova página
-
-### ✅ Correção "Adicionar Atleta Manualmente" (Fev 9, 2026)
-
-| Problema | Solução | Status |
-|----------|---------|--------|
-| `launchImagePickerAsync` não existe no expo-image-picker v17 | Substituído por `launchImageLibraryAsync` | ✅ Fixed |
-| `MediaTypeOptions.Images` obsoleto | Substituído por `['images']` | ✅ Fixed |
-
-**Arquivos Corrigidos:**
-- `frontend/app/add-athlete.tsx`
-- `frontend/app/athlete/[id]/edit.tsx`
-
-**Teste Realizado:** Criação de atleta "Jogador Teste E2E" via formulário - sucesso.
-
-### ✅ Integração Bluetooth VBT (Fev 9, 2026)
-
-Removido GymAware e implementado suporte Bluetooth para dispositivos VBT:
-
-| Dispositivo | Conexão | Métricas | Cor |
-|-------------|---------|----------|-----|
-| **PUSH Band 2.0** | Bluetooth BLE | Velocidade, Potência | #FF6B35 |
-| **Vitruve** | Bluetooth BLE | Velocidade, Potência, ROM | #00D4AA |
-| **Beast Sensor** | Bluetooth BLE | Velocidade, Potência | #FFD700 |
-| **Manual** | Entrada manual | Todas | - |
-
-**Novos Arquivos Criados:**
-- `contexts/BluetoothVBTContext.tsx` - Context provider para conexão Bluetooth
-- `components/BluetoothVBTModal.tsx` - Modal para scan e conexão de dispositivos
-
-**Funcionalidades:**
-- Scan de dispositivos BLE com identificação automática
-- Conexão e monitoramento de dispositivos VBT
-- Parsing de dados em tempo real (velocidade, potência, ROM)
-- Fallback gracioso para web (mostra mensagem para usar app)
-- Indicador de força de sinal (RSSI)
-
-**Biblioteca Instalada:** `react-native-ble-plx@3.5.0`
-
-**NOTA:** A conexão Bluetooth real requer teste em dispositivo físico (iOS/Android) com dispositivos VBT reais. Os padrões de identificação de dispositivos são baseados em nomes comuns (PUSH, Vitruve, Beast).
-
-### ✅ Fallback Web para Wellness Form (Fev 9, 2026)
-
-Corrigido o problema onde usuários web viam "Link inválido ou expirado" em vez da página de fallback.
-
-| Problema | Solução | Status |
-|----------|---------|--------|
-| SSR executava fetch antes da detecção de plataforma | Implementado `isClient` state com useEffect para detecção client-side only | ✅ Fixed |
-| `Platform.OS` retornava valores inconsistentes no SSR | Separado detecção de plataforma em dois estados: `isClient` e `isWebPlatform` | ✅ Fixed |
-
-**Fluxo Corrigido:**
-1. Página carrega com loading state
-2. `useEffect` executa e detecta `Platform.OS === 'web'`
-3. Se web: mostra página de fallback (sem chamadas à API)
-4. Se nativo: carrega atletas normalmente
-
-**Arquivo Modificado:** `frontend/app/wellness-form/[token].tsx`
-
-### ✅ Correção Contagem de Sessões GPS + Classificador Jogo/Treino (Dez 2025)
-
-**Problema Original:**
-1. A contagem de atividades GPS mostrava o número de registros individuais (`gpsData.length`) em vez do número correto de sessões (1 CSV = 1 sessão)
-2. Não havia forma de classificar uma sessão GPS como "Jogo" ou "Treino"
-
-**Solução Implementada:**
-
-| Funcionalidade | Implementação | Status |
-|----------------|---------------|--------|
-| Contagem de sessões | Alterado de `gpsData.length` para `groupedSessions.length` | ✅ Implementado |
-| Classificador visual | Botões "Treino" (verde) e "Jogo" (laranja) em cada card de sessão | ✅ Implementado |
-| Backend | Endpoint `PUT /api/gps-data/session/{session_id}/activity-type` | ✅ Implementado |
-| Tipo de atividade | Campo `activity_type` ("game" ou "training") no modelo GPSData | ✅ Implementado |
-
-**Endpoint API:**
-- `PUT /api/gps-data/session/{session_id}/activity-type`
-  - Body: `{ "activity_type": "game" | "training" }`
-  - Atualiza todos os períodos de uma sessão com o tipo de atividade
-
-**Arquivos Modificados:**
-- `frontend/app/athlete/[id].tsx` - UI do classificador e contagem correta
-- `frontend/types/index.ts` - Campos session_id, session_name, period_name, activity_type
-- `backend/server.py` - Endpoint e modelo GPSData
-
-**Teste:** 9/9 testes backend passaram (100%), UI verificada funcionando
-
-### P1 - Next
-- [ ] Full i18n audit
-- [ ] Global theme (Light/Dark)
-
-### ✅ Suporte Multi-Formato CSV (Fev 9, 2026) — REFATORADO Fev 10, 2026
-
-Pipeline de importação CSV completamente refatorado em módulo independente (`/app/backend/gps_import/`):
-
-**Arquitetura Modular:**
-| Módulo | Responsabilidade |
-|--------|-----------------|
-| `canonical_metrics.py` | Dicionário canônico com 25+ métricas GPS, validação de ranges |
-| `manufacturer_aliases.py` | Mapeamento de colunas por fabricante, detecção automática via assinaturas |
-| `csv_parser.py` | Parser robusto: multi-encoding, multi-delimiter, decimal europeu |
-| `normalizer.py` | Conversão para modelo GPSData interno (unidades, defaults, tipos) |
-
-**Fabricantes Suportados (com detecção automática):**
-| Fabricante | Assinaturas | Parsing | Status |
-|------------|------------|---------|--------|
-| **Catapult** | Player Load, IMA | `,` delimiter | ✅ Testado |
-| **STATSports** | Dynamic Stress Load, HSR zones | `,` delimiter | ✅ Testado |
-| **PlayerTek** | PlayerTek column name | `,` delimiter | ✅ Testado |
-| **GPEXE** | power events, equivalent distance | `;` delimiter, `,` decimal | ✅ Testado |
-
-**Funcionalidades do Pipeline:**
-- Auto-detecção de encoding (UTF-8, Latin-1, CP1252, UTF-16, BOM)
-- Auto-detecção de delimiter (`,`, `;`, `\t`)
-- Parsing de decimais europeus (1.234,56 e 1,234.56)
-- Validação rigorosa contra ranges do dicionário canônico
-- Normalização: km/h → m/s para max_speed, int casting para contagens
-- Fallback de high_speed_running → high_intensity_distance
-- Rows sem dados significativos são descartadas automaticamente
-
-**Endpoints (mesmos paths, nova implementação):**
-- `POST /api/wearables/import/csv?athlete_id={id}` — Import com detecção automática
-- `POST /api/wearables/import/csv?athlete_id={id}&provider=catapult` — Import com fabricante forçado
-- `GET /api/wearables/csv/supported-providers` — Lista fabricantes e métricas canônicas
-- `POST /api/wearables/csv/preview` — Preview com mapeamento de colunas
-
-**Testes:** 46/46 passaram (35 unitários + 11 integração API)
-
-**Extensibilidade:** Para adicionar novo fabricante:
-1. Adicionar entrada em `Manufacturer` enum
-2. Adicionar aliases em `MANUFACTURER_ALIASES` 
-3. Adicionar assinaturas em `MANUFACTURER_SIGNATURES`
-
-### ✅ Consolidação de Sessão GPS — Anti-Duplicação (Fev 10, 2026)
-
-**Problema Corrigido:**
-Quando um CSV continha Session Total (10.000m) + 1º Tempo (5.000m) + 2º Tempo (5.000m), o sistema somava tudo e gerava 20.000m.
-
-**Solução:**
-Novo módulo `consolidator.py` no pipeline de ingestão. Consolida N linhas de CSV em 1 documento MongoDB ANTES da persistência.
-
-| Cenário | Antes (BUG) | Depois (CORRETO) |
-|---------|-------------|------------------|
-| Session Total + Períodos | 20.000m (soma de tudo) | 10.000m (usa session total) |
-| Apenas Períodos | Múltiplos docs | 1 doc com soma dos períodos |
-| Linha Única | 1 doc | 1 doc (passthrough) |
-
-**Regras de Agregação:**
-| Tipo de Métrica | Regra |
-|-----------------|-------|
-| Acumuláveis (distância, sprints, acc, dec, player_load) | Session total se disponível, senão soma de períodos |
-| Máximas (max_speed, max_accel, max_decel) | MAX de todos os registros |
-| Médias (avg_hr, metabolic_power) | Session total se disponível, senão média |
-
-**Estrutura do Documento MongoDB:**
 ```json
 {
-  "total_distance": 10000,
-  "has_session_total": true,
-  "periods": [
-    {"period_name": "1st Half", "total_distance": 5000},
-    {"period_name": "2nd Half", "total_distance": 5000}
-  ]
+  "athlete_id": "string (required)",
+  "athlete_external_id": "string | null",
+  "jump_type": "SJ | CMJ | DJ | RJ (required)",
+  "jump_height_cm": "float | null",
+  "flight_time_s": "float | null",
+  "contact_time_s": "float | null",
+  "reactive_strength_index": "float | null",
+  "peak_power_w": "float | null",
+  "takeoff_velocity_m_s": "float | null",
+  "load_kg": "float | null",
+  "jump_date": "datetime (required)",
+  "source_system": "string (required)",
+  "raw_row": "dict (audit trail)"
 }
 ```
 
-**Defesa em Profundidade:**
-`extract_gps_metrics_from_session()` corrigida para dados legados — aplica mesma lógica session/period.
+## Tipos de Salto
 
-**Testes:** 46/46 passaram (35 unitários + 11 integração API)
+| Código | Nome | Descrição | contact_time_s |
+|--------|------|-----------|----------------|
+| SJ | Squat Jump | Salto estático | **Deve ser null** |
+| CMJ | Countermovement Jump | Salto com contramovimento | **Deve ser null** |
+| DJ | Drop Jump | Salto de queda | **Obrigatório** |
+| RJ | Reactive Jump | Saltos reativos/repetidos | **Obrigatório** |
 
-**Nenhuma alteração em:** UI, periodização, métricas canônicas, estrutura semanas/dias, classificação jogo/treino.
+## Regras de Negócio
 
-### ✅ Acesso Público ao Formulário Wellness (Fev 9, 2026)
+### 1. Tratamento de Campos Vazios
+- Campos vazios no CSV → `null` (nunca zero)
+- Zero explícito no CSV → preservado como `0`
 
-Implementado acesso público ao formulário de wellness para atletas:
+### 2. Cálculo de Métricas Derivadas
 
-| Configuração | Valor |
-|--------------|-------|
-| **Deep Link Scheme** | `peakperform://` |
-| **Universal Link** | `https://peakperform.app/wellness-form/{token}` |
-| **Bundle ID (iOS)** | `com.peakperform.app` |
-| **Package (Android)** | `com.peakperform.app` |
+#### Jump Height (se não fornecido)
+```
+h = (g × t²) / 8
+```
+- `g` = 9.81 m/s²
+- `t` = flight_time_s
+- Resultado em centímetros
 
-**Fluxo do Atleta:**
-1. Coach gera link de wellness
-2. Coach compartilha via WhatsApp/Email
-3. Atleta clica no link
-4. Se não tem app → Baixa grátis da App Store/Play Store
-5. App abre direto no formulário (SEM LOGIN)
-6. Atleta preenche e envia
-7. Dados aparecem no dashboard do coach
+#### Reactive Strength Index (RSI)
+```
+RSI = jump_height_cm / contact_time_s
+```
+- Só calculado quando ambos valores existem
 
-**Arquivos Modificados:**
-- `app.json` - Configuração de deep links
-- `_layout.tsx` - Rota pública para wellness-form
-- `generate-wellness-link.tsx` - URL do domínio atualizada
+#### Takeoff Velocity
+```
+v = √(2gh)
+```
+- `h` = jump_height_cm / 100 (em metros)
 
-### P2 - Planned
-- [ ] Push Notifications
-- [ ] Full OAuth wearable integration
+### 3. Validação de Atletas
+- `athlete_id` **deve** referenciar atleta existente
+- Nunca criar atletas automaticamente
+- Erro claro se atleta não existir
 
-### P3 - Future
-- [ ] Gamification/Leaderboards
-- [ ] Video analysis integration
+## API Endpoints
 
-## Test Credentials
-- **Email**: test@test.com
-- **Password**: test1234
+### GET /api/jumps/providers
+Lista fabricantes suportados.
 
-## Known Pending Issues
-- **P0**: Team Dashboard cards (RSI, Body Composition) show "None" — `/api/dashboard/team` endpoint
-- **P1**: Strength comparison chart may not invalidate React Query cache after new assessment
-- **Pending User Verification**: Periodization feature (complete but not tested by user)
+### POST /api/jumps/upload/preview
+Pré-visualização de importação (não salva dados).
 
-## Last Updated
-February 10, 2026
+**Request:** `multipart/form-data` com arquivo CSV
+
+**Response:**
+```json
+{
+  "success": true,
+  "total_rows": 8,
+  "valid_count": 8,
+  "error_count": 0,
+  "valid_records": [...],
+  "errors": [],
+  "detected_manufacturer": "generic",
+  "calculated_metrics": ["jump_height_cm", "takeoff_velocity_m_s"],
+  "athletes_not_found": [],
+  "jump_types_found": ["CMJ", "DJ"]
+}
+```
+
+### POST /api/jumps/upload/import
+Importa dados validados para o banco.
+
+**Request:** `multipart/form-data` com arquivo CSV
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "8 registros importados com sucesso",
+  "imported_count": 8,
+  "rejected_count": 0,
+  "created_ids": ["...", "..."],
+  "errors": []
+}
+```
+
+### GET /api/jumps/athlete/{athlete_id}
+Recupera todos os saltos de um atleta.
+
+### GET /api/jumps/analysis/{athlete_id}
+Análise de performance de salto do atleta.
+
+### DELETE /api/jumps/{jump_id}
+Remove um registro de salto.
+
+## Estrutura do Módulo
+
+```
+backend/jump_import/
+├── __init__.py        # Exports e funções de conveniência
+├── models.py          # Modelos Pydantic (JumpRecord, JumpValidationError)
+├── parser.py          # Parser CSV tolerante
+├── validator.py       # Validação de schema e regras
+├── calculator.py      # Cálculos de métricas derivadas
+└── mappers/
+    ├── __init__.py    # Registry de mappers
+    ├── base.py        # Classe base abstrata
+    ├── generic.py     # Mapper genérico
+    ├── chronojump.py  # Mapper Chronojump
+    ├── force_decks.py # Mapper Force Decks
+    ├── axon_jump.py   # Mapper Axon Jump
+    └── custom.py      # Mapper customizável
+```
+
+## Adicionando Novos Fabricantes
+
+1. **Criar arquivo mapper** em `mappers/new_manufacturer.py`:
+```python
+from .base import BaseMapper
+
+class NewManufacturerMapper(BaseMapper):
+    MANUFACTURER_NAME = "new_manufacturer"
+    
+    COLUMN_MAP = {
+        'manufacturer_col': 'canonical_col',
+        # ... mapeamentos
+    }
+```
+
+2. **Registrar em `mappers/__init__.py`**:
+```python
+from .new_manufacturer import NewManufacturerMapper
+
+MAPPER_REGISTRY['new_manufacturer'] = NewManufacturerMapper
+
+HEADER_SIGNATURES['new_manufacturer'] = [
+    'distinctive_header_1', 
+    'distinctive_header_2'
+]
+```
+
+## Exemplos de CSV
+
+### Generic Format
+```csv
+athlete_id,jump_type,flight_time_s,contact_time_s,jump_date,source_system
+ATH001,CMJ,0.52,,2026-01-15,generic
+ATH001,DJ,0.42,0.21,2026-01-15,generic
+```
+
+### Chronojump Format
+```csv
+uniqueID,personID,sessionID,type,tv,tc,fall,weight,datetime
+1001,ATH001,S001,CMJ,0.52,-1,,75.0,2026-01-15 09:30:00
+```
+
+## Database Schema
+
+Coleção: `jump_data`
+
+```json
+{
+  "_id": "ObjectId",
+  "coach_id": "ObjectId",
+  "athlete_id": "string",
+  "jump_type": "SJ|CMJ|DJ|RJ",
+  "jump_height_cm": "number",
+  "flight_time_s": "number",
+  "contact_time_s": "number|null",
+  "reactive_strength_index": "number|null",
+  "peak_power_w": "number|null",
+  "takeoff_velocity_m_s": "number|null",
+  "load_kg": "number|null",
+  "jump_date": "ISODate",
+  "jump_date_str": "string",
+  "source_system": "string",
+  "raw_row": "object",
+  "created_at": "ISODate"
+}
+```
+
+## Testes
+
+- **30 testes unitários** cobrindo:
+  - Cálculos de métricas (altura, RSI, velocidade)
+  - Validação por tipo de salto
+  - Parsing de CSV com diferentes formatos
+  - Detecção de fabricantes
+  - Mapeamento de colunas
+  - Regras de negócio (empty → null, zero preservado)
+
+## Status da Implementação
+
+✅ **COMPLETO** - Sistema totalmente funcional
+
+- [x] Módulo `jump_import/` com separação de responsabilidades
+- [x] Mappers para 4 fabricantes + custom
+- [x] Cálculos de métricas derivadas
+- [x] Validação de regras de negócio
+- [x] API endpoints (preview, import, athlete, analysis, delete)
+- [x] Testes unitários
+- [x] Arquivos CSV de exemplo
+- [x] Documentação técnica
