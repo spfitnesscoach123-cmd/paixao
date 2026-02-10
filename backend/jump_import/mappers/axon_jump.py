@@ -104,6 +104,7 @@ class AxonJumpMapper(BaseMapper):
         'data': 'jump_date',
         'datetime': 'jump_date',
         'test date': 'jump_date',
+        'test_date': 'jump_date',
         
         'time': 'test_time',
         'hora': 'test_time',
