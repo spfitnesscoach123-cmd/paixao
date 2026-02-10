@@ -403,32 +403,47 @@ Corrigido o problema onde usuários web viam "Link inválido ou expirado" em vez
 - [ ] Full i18n audit
 - [ ] Global theme (Light/Dark)
 
-### ✅ Suporte Multi-Formato CSV (Fev 9, 2026)
+### ✅ Suporte Multi-Formato CSV (Fev 9, 2026) — REFATORADO Fev 10, 2026
 
-O sistema agora suporta importação automática de CSV de múltiplos provedores GPS:
+Pipeline de importação CSV completamente refatorado em módulo independente (`/app/backend/gps_import/`):
 
-| Provedor | Identificadores | Status |
-|----------|-----------------|--------|
-| **Catapult** | Player Name, Drill Title, Player Load | ✅ Suportado |
-| **PlayerTek** | PlayerTek, Total Distance, HSR Distance | ✅ Suportado |
-| **STATSports** | STATSports, Apex, HML Efforts | ✅ Suportado |
-| **GPexe** | GPexe, Equivalent Distance, Metabolic Power | ✅ Suportado |
-| **Polar** | Polar, Training Load, Recovery Time | ✅ Suportado |
-| **Garmin** | Garmin, Training Effect, VO2 Max | ✅ Suportado |
-| **Genérico** | Fallback para formatos desconhecidos | ✅ Suportado |
+**Arquitetura Modular:**
+| Módulo | Responsabilidade |
+|--------|-----------------|
+| `canonical_metrics.py` | Dicionário canônico com 25+ métricas GPS, validação de ranges |
+| `manufacturer_aliases.py` | Mapeamento de colunas por fabricante, detecção automática via assinaturas |
+| `csv_parser.py` | Parser robusto: multi-encoding, multi-delimiter, decimal europeu |
+| `normalizer.py` | Conversão para modelo GPSData interno (unidades, defaults, tipos) |
 
-**Novos Endpoints:**
-- `POST /api/wearables/import/csv` - Importação com detecção automática
-- `GET /api/wearables/csv/supported-providers` - Lista provedores suportados
-- `POST /api/wearables/csv/preview` - Preview antes de importar
+**Fabricantes Suportados (com detecção automática):**
+| Fabricante | Assinaturas | Parsing | Status |
+|------------|------------|---------|--------|
+| **Catapult** | Player Load, IMA | `,` delimiter | ✅ Testado |
+| **STATSports** | Dynamic Stress Load, HSR zones | `,` delimiter | ✅ Testado |
+| **PlayerTek** | PlayerTek column name | `,` delimiter | ✅ Testado |
+| **GPEXE** | power events, equivalent distance | `;` delimiter, `,` decimal | ✅ Testado |
 
-**Funcionalidades:**
-- Detecção automática de formato baseada nos headers
-- Mapeamento inteligente de colunas (múltiplos nomes aceitos)
-- Conversão automática de unidades (km→m, km/h→m/s)
-- Suporte a múltiplos formatos de data
-- Preview dos dados antes da importação
-- Relatório detalhado de importação (importados/pulados/erros)
+**Funcionalidades do Pipeline:**
+- Auto-detecção de encoding (UTF-8, Latin-1, CP1252, UTF-16, BOM)
+- Auto-detecção de delimiter (`,`, `;`, `\t`)
+- Parsing de decimais europeus (1.234,56 e 1,234.56)
+- Validação rigorosa contra ranges do dicionário canônico
+- Normalização: km/h → m/s para max_speed, int casting para contagens
+- Fallback de high_speed_running → high_intensity_distance
+- Rows sem dados significativos são descartadas automaticamente
+
+**Endpoints (mesmos paths, nova implementação):**
+- `POST /api/wearables/import/csv?athlete_id={id}` — Import com detecção automática
+- `POST /api/wearables/import/csv?athlete_id={id}&provider=catapult` — Import com fabricante forçado
+- `GET /api/wearables/csv/supported-providers` — Lista fabricantes e métricas canônicas
+- `POST /api/wearables/csv/preview` — Preview com mapeamento de colunas
+
+**Testes:** 44/44 passaram (26 unitários + 18 integração API)
+
+**Extensibilidade:** Para adicionar novo fabricante:
+1. Adicionar entrada em `Manufacturer` enum
+2. Adicionar aliases em `MANUFACTURER_ALIASES` 
+3. Adicionar assinaturas em `MANUFACTURER_SIGNATURES`
 
 ### ✅ Acesso Público ao Formulário Wellness (Fev 9, 2026)
 
