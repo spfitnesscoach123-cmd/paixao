@@ -24,6 +24,7 @@ from gps_import import (
     parse_gps_csv,
     GPSDataNormalizer,
     normalize_gps_data,
+    consolidate_session,
     Manufacturer,
     CANONICAL_METRICS,
     METRIC_CATEGORIES,
