@@ -201,51 +201,30 @@ export default function CreatePeriodizationScreen() {
           <Text style={styles.inputLabel}>
             {locale === 'pt' ? 'Data Início' : 'Start Date'}
           </Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowStartPicker(true)}
-            data-testid="start-date-button"
-          >
-            <Ionicons name="calendar" size={20} color={colors.accent.primary} />
-            <Text style={styles.dateButtonText}>
-              {format(startDate, 'dd/MM/yyyy')}
-            </Text>
-          </TouchableOpacity>
+          <TextInput
+            style={styles.dateInput}
+            value={startDateStr}
+            onChangeText={setStartDateStr}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.text.tertiary}
+            data-testid="start-date-input"
+          />
         </View>
 
         <View style={styles.dateGroup}>
           <Text style={styles.inputLabel}>
             {locale === 'pt' ? 'Data Fim' : 'End Date'}
           </Text>
-          <TouchableOpacity
-            style={styles.dateButton}
-            onPress={() => setShowEndPicker(true)}
-            data-testid="end-date-button"
-          >
-            <Ionicons name="calendar" size={20} color={colors.accent.primary} />
-            <Text style={styles.dateButtonText}>
-              {format(endDate, 'dd/MM/yyyy')}
-            </Text>
-          </TouchableOpacity>
+          <TextInput
+            style={styles.dateInput}
+            value={endDateStr}
+            onChangeText={setEndDateStr}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={colors.text.tertiary}
+            data-testid="end-date-input"
+          />
         </View>
       </View>
-
-      {(showStartPicker || showEndPicker) && (
-        <DateTimePicker
-          value={showStartPicker ? startDate : endDate}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selectedDate) => {
-            if (showStartPicker) {
-              setShowStartPicker(false);
-              if (selectedDate) setStartDate(selectedDate);
-            } else {
-              setShowEndPicker(false);
-              if (selectedDate) setEndDate(selectedDate);
-            }
-          }}
-        />
-      )}
 
       <TouchableOpacity
         style={[styles.nextButton, !weekName && styles.nextButtonDisabled]}
