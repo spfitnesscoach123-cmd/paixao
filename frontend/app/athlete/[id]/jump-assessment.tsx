@@ -884,7 +884,7 @@ export default function JumpAssessment() {
             <FatigueStatusCard fatigue={analysis.fatigue_analysis} locale={locale} />
             
             {/* Asymmetry */}
-            <AsymmetryCard asymmetry={analysis.asymmetry} locale={locale} />
+            <AsymmetryCard asymmetry={analysis.asymmetry} slCmjData={analysis.protocols.sl_cmj} locale={locale} />
             
             {/* Power-Velocity Profile */}
             <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />
