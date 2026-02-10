@@ -1,0 +1,9 @@
+test_id,athlete_id,athlete_name,test_date,test_time,jump_type,attempt_number,flight_time_s,contact_time_s,jump_height_cm,reactive_strength_index,takeoff_velocity_m_s,power_relative_w_kg,body_mass_kg,device_brand,device_model,test_protocol,operator_name,notes
+TEST_001,ATH_001,João Silva,2026-01-15,09:30:12,CMJ,1,0.52,,34.4,,2.60,52.1,75.0,Generic,ContactMat v1,CMJ hands on hips,Carlos,First attempt
+TEST_001,ATH_001,João Silva,2026-01-15,09:30:35,CMJ,2,0.54,,36.9,,2.68,53.4,75.0,Generic,ContactMat v1,CMJ hands on hips,Carlos,Best attempt
+TEST_001,ATH_001,João Silva,2026-01-15,09:30:58,CMJ,3,0.51,,33.1,,2.55,51.2,75.0,Generic,ContactMat v1,CMJ hands on hips,Carlos,
+TEST_002,ATH_002,Maria Santos,2026-01-15,10:05:18,DJ,1,0.42,0.21,24.0,114.3,2.06,48.7,68.0,Generic,ContactMat v1,Drop Jump 30 cm,Carlos,Good reactive strength
+TEST_002,ATH_002,Maria Santos,2026-01-15,10:05:45,DJ,2,0.44,0.22,26.0,118.2,2.14,50.2,68.0,Generic,ContactMat v1,Drop Jump 30 cm,Carlos,Excellent form
+TEST_003,ATH_003,Pedro Oliveira,2026-01-15,11:20:00,SJ,1,0.48,,29.3,,2.38,47.5,82.0,Generic,ContactMat v1,Squat Jump,Carlos,
+TEST_003,ATH_003,Pedro Oliveira,2026-01-15,11:20:22,SJ,2,0.50,,31.8,,2.48,49.1,82.0,Generic,ContactMat v1,Squat Jump,Carlos,
+TEST_004,ATH_001,João Silva,2026-01-15,14:00:00,RJ,1,0.38,0.18,18.4,102.2,1.94,43.2,75.0,Generic,ContactMat v1,Repeated Jumps 10s,Carlos,Reactive test
