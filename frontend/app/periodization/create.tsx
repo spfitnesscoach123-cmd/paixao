@@ -567,7 +567,14 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     padding: 8,
+  },
+  headerBackText: {
+    fontSize: 14,
+    color: colors.text.primary,
   },
   headerTitle: {
     fontSize: 18,
