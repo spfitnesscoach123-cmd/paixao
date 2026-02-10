@@ -531,8 +531,9 @@ export default function CreatePeriodizationScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/periodization')} style={styles.headerBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          <Text style={styles.headerBackText}>Voltar ao Menu Principal</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {locale === 'pt' ? 'Nova Semana' : 'New Week'}

@@ -330,8 +330,9 @@ export default function PeriodizationDetailScreen() {
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerBack}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/periodization')} style={styles.headerBack}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          <Text style={styles.headerBackText}>Voltar ao Menu Principal</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{week.name}</Text>
