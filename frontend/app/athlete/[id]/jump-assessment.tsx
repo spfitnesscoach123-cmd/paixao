@@ -273,8 +273,8 @@ const FatigueStatusCard = ({ fatigue, locale }: { fatigue: JumpAnalysis['fatigue
   );
 };
 
-// Asymmetry Card
-const AsymmetryCard = ({ asymmetry, locale }: { asymmetry: JumpAnalysis['asymmetry']; locale: string }) => {
+// Asymmetry Card with Visual Bar Chart
+const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalysis['asymmetry']; slCmjData?: JumpAnalysis['protocols']['sl_cmj']; locale: string }) => {
   if (!asymmetry) return null;
   
   const getDominantLegLabel = (leg: string) => {
@@ -282,6 +282,34 @@ const AsymmetryCard = ({ asymmetry, locale }: { asymmetry: JumpAnalysis['asymmet
     if (leg === 'left') return locale === 'pt' ? 'Esquerda' : 'Left';
     return locale === 'pt' ? 'Igual' : 'Equal';
   };
+  
+  // Calculate bar widths based on actual values
+  const getRsiBarWidths = () => {
+    if (!slCmjData) return { right: 50, left: 50 };
+    const rightRsi = slCmjData.right?.rsi || 0;
+    const leftRsi = slCmjData.left?.rsi || 0;
+    const maxRsi = Math.max(rightRsi, leftRsi);
+    if (maxRsi === 0) return { right: 50, left: 50 };
+    return {
+      right: (rightRsi / maxRsi) * 100,
+      left: (leftRsi / maxRsi) * 100
+    };
+  };
+  
+  const getHeightBarWidths = () => {
+    if (!slCmjData) return { right: 50, left: 50 };
+    const rightHeight = slCmjData.right?.jump_height_cm || 0;
+    const leftHeight = slCmjData.left?.jump_height_cm || 0;
+    const maxHeight = Math.max(rightHeight, leftHeight);
+    if (maxHeight === 0) return { right: 50, left: 50 };
+    return {
+      right: (rightHeight / maxHeight) * 100,
+      left: (leftHeight / maxHeight) * 100
+    };
+  };
+  
+  const rsiWidths = getRsiBarWidths();
+  const heightWidths = getHeightBarWidths();
   
   return (
     <View style={[styles.asymmetryCard, asymmetry.red_flag && styles.asymmetryCardRedFlag]}>
@@ -301,46 +329,60 @@ const AsymmetryCard = ({ asymmetry, locale }: { asymmetry: JumpAnalysis['asymmet
         )}
       </View>
       
-      <View style={styles.asymmetryBars}>
-        {/* RSI Asymmetry */}
-        <View style={styles.asymmetryBarContainer}>
-          <Text style={styles.asymmetryBarLabel}>RSI</Text>
-          <View style={styles.asymmetryBarWrapper}>
-            <View style={[styles.asymmetryBar, { width: '50%', backgroundColor: '#3b82f6' }]} />
-            <View style={[styles.asymmetryBar, { width: '50%', backgroundColor: '#8b5cf6' }]} />
-            <View style={[styles.asymmetryIndicator, { left: `${50 - asymmetry.rsi.asymmetry_percent / 2}%` }]} />
+      {/* RSI Comparison Bars */}
+      <View style={styles.asymmetryBarSection}>
+        <Text style={styles.asymmetryMetricTitle}>RSI</Text>
+        <View style={styles.asymmetryComparisonRow}>
+          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
+          <View style={styles.asymmetryBarContainer}>
+            <View style={[styles.asymmetryBarFill, { 
+              width: `${rsiWidths.right}%`,
+              backgroundColor: asymmetry.rsi.dominant_leg === 'right' ? '#22c55e' : '#60a5fa'
+            }]} />
           </View>
-          <View style={styles.asymmetryLabels}>
-            <Text style={styles.asymmetryLegLabel}>{locale === 'pt' ? 'Esq' : 'Left'}</Text>
-            <Text style={[
-              styles.asymmetryPercent, 
-              { color: asymmetry.rsi.red_flag ? '#ef4444' : colors.text.primary }
-            ]}>
-              {asymmetry.rsi.asymmetry_percent.toFixed(1)}%
-            </Text>
-            <Text style={styles.asymmetryLegLabel}>{locale === 'pt' ? 'Dir' : 'Right'}</Text>
-          </View>
+          <Text style={styles.asymmetryValueText}>{slCmjData?.right?.rsi?.toFixed(2) || '-'}</Text>
         </View>
-        
-        {/* Jump Height Asymmetry */}
-        <View style={styles.asymmetryBarContainer}>
-          <Text style={styles.asymmetryBarLabel}>{locale === 'pt' ? 'Altura' : 'Height'}</Text>
-          <View style={styles.asymmetryBarWrapper}>
-            <View style={[styles.asymmetryBar, { width: '50%', backgroundColor: '#3b82f6' }]} />
-            <View style={[styles.asymmetryBar, { width: '50%', backgroundColor: '#8b5cf6' }]} />
-            <View style={[styles.asymmetryIndicator, { left: `${50 - asymmetry.jump_height.asymmetry_percent / 2}%` }]} />
+        <View style={styles.asymmetryComparisonRow}>
+          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
+          <View style={styles.asymmetryBarContainer}>
+            <View style={[styles.asymmetryBarFill, { 
+              width: `${rsiWidths.left}%`,
+              backgroundColor: asymmetry.rsi.dominant_leg === 'left' ? '#22c55e' : '#60a5fa'
+            }]} />
           </View>
-          <View style={styles.asymmetryLabels}>
-            <Text style={styles.asymmetryLegLabel}>{locale === 'pt' ? 'Esq' : 'Left'}</Text>
-            <Text style={[
-              styles.asymmetryPercent, 
-              { color: asymmetry.jump_height.red_flag ? '#ef4444' : colors.text.primary }
-            ]}>
-              {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
-            </Text>
-            <Text style={styles.asymmetryLegLabel}>{locale === 'pt' ? 'Dir' : 'Right'}</Text>
-          </View>
+          <Text style={styles.asymmetryValueText}>{slCmjData?.left?.rsi?.toFixed(2) || '-'}</Text>
         </View>
+        <Text style={[styles.asymmetryDiffText, asymmetry.rsi.red_flag && { color: '#ef4444' }]}>
+          Δ {asymmetry.rsi.asymmetry_percent.toFixed(1)}%
+        </Text>
+      </View>
+      
+      {/* Jump Height Comparison Bars */}
+      <View style={styles.asymmetryBarSection}>
+        <Text style={styles.asymmetryMetricTitle}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
+        <View style={styles.asymmetryComparisonRow}>
+          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
+          <View style={styles.asymmetryBarContainer}>
+            <View style={[styles.asymmetryBarFill, { 
+              width: `${heightWidths.right}%`,
+              backgroundColor: asymmetry.jump_height.dominant_leg === 'right' ? '#f59e0b' : '#a78bfa'
+            }]} />
+          </View>
+          <Text style={styles.asymmetryValueText}>{slCmjData?.right?.jump_height_cm?.toFixed(1) || '-'}</Text>
+        </View>
+        <View style={styles.asymmetryComparisonRow}>
+          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
+          <View style={styles.asymmetryBarContainer}>
+            <View style={[styles.asymmetryBarFill, { 
+              width: `${heightWidths.left}%`,
+              backgroundColor: asymmetry.jump_height.dominant_leg === 'left' ? '#f59e0b' : '#a78bfa'
+            }]} />
+          </View>
+          <Text style={styles.asymmetryValueText}>{slCmjData?.left?.jump_height_cm?.toFixed(1) || '-'}</Text>
+        </View>
+        <Text style={[styles.asymmetryDiffText, asymmetry.jump_height.red_flag && { color: '#ef4444' }]}>
+          Δ {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
+        </Text>
       </View>
       
       <Text style={styles.asymmetryInterpretation}>{asymmetry.interpretation}</Text>
