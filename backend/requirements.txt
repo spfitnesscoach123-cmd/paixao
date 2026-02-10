@@ -136,3 +136,5 @@ websockets==15.0.1
 yarl==1.22.0
 zipp==3.23.0
 zopfli==0.4.0
+thefuzz==0.22.1
+python-Levenshtein==0.27.3
