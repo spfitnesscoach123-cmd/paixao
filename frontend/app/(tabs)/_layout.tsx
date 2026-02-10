@@ -22,9 +22,9 @@ export default function TabsLayout() {
           paddingTop: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: '700',
-          letterSpacing: 0.5,
+          letterSpacing: 0.3,
         },
         headerStyle: {
           backgroundColor: colors.dark.secondary,
@@ -42,7 +42,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.athletes'),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people" size={size + 2} color={color} />
+            <Ionicons name="people" size={size} color={color} />
           ),
         }}
       />
@@ -51,7 +51,16 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.team') || 'Equipe',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="analytics" size={size + 2} color={color} />
+            <Ionicons name="analytics" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="periodization"
+        options={{
+          title: t('tabs.periodization') || 'Periodização',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar" size={size} color={color} />
           ),
         }}
       />
@@ -60,7 +69,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.dashboard'),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size + 2} color={color} />
+            <Ionicons name="stats-chart" size={size} color={color} />
           ),
         }}
       />
@@ -69,7 +78,7 @@ export default function TabsLayout() {
         options={{
           title: t('tabs.profile'),
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size + 2} color={color} />
+            <Ionicons name="person" size={size} color={color} />
           ),
         }}
       />
