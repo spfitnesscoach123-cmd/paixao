@@ -331,7 +331,7 @@ export default function PeriodizationDetailScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/periodization')} style={styles.headerBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          <Ionicons name="arrow-back" size={20} color={colors.accent.light} />
           <Text style={styles.headerBackText}>Voltar ao Menu Principal</Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
