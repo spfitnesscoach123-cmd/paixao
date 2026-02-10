@@ -8151,8 +8151,18 @@ async def import_jump_csv(
     # Extract unique athlete names/IDs from CSV
     athlete_names_from_csv = set()
     for raw_row in raw_rows:
-        athlete_id = raw_row.get('athlete_id', '').strip()
-        athlete_name = raw_row.get('athlete_name', '').strip()
+        # Check both raw_row and inner raw_row for athlete info
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
         
         if athlete_name:
             athlete_names_from_csv.add(athlete_name)
