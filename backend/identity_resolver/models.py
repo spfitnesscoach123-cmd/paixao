@@ -6,7 +6,7 @@ Data models for athlete aliases and resolution workflow.
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any
 from pydantic import BaseModel, Field
 from enum import Enum
 
