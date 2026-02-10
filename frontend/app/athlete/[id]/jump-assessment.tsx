@@ -1314,7 +1314,52 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 12,
   },
-  asymmetryBarContainer: {},
+  asymmetryBarSection: {
+    marginBottom: 16,
+  },
+  asymmetryMetricTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginBottom: 8,
+  },
+  asymmetryComparisonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 6,
+  },
+  asymmetryLegText: {
+    width: 30,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+  },
+  asymmetryBarContainer: {
+    flex: 1,
+    height: 24,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  asymmetryBarFill: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  asymmetryValueText: {
+    width: 45,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.primary,
+    textAlign: 'right',
+  },
+  asymmetryDiffText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.accent.primary,
+    textAlign: 'right',
+    marginTop: 4,
+  },
   asymmetryBarLabel: {
     fontSize: 10,
     color: colors.text.tertiary,
