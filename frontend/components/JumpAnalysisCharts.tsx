@@ -796,4 +796,104 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 16,
   },
+  // Asymmetry bar chart styles
+  asymmetryBarsContainer: {
+    gap: 16,
+    marginBottom: 12,
+  },
+  asymmetryBarSection: {
+    gap: 6,
+  },
+  asymmetryBarLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginBottom: 4,
+  },
+  asymmetryBarsRow: {
+    gap: 6,
+  },
+  asymmetryLegRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  legLabel: {
+    width: 28,
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.tertiary,
+  },
+  barBackground: {
+    flex: 1,
+    height: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  barFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  barValue: {
+    width: 45,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.primary,
+    textAlign: 'right',
+  },
+  asymmetryDiff: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.accent.primary,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  asymmetryThreshold: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  thresholdLine: {
+    width: 16,
+    height: 2,
+    backgroundColor: '#ef4444',
+  },
+  thresholdText: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+  },
+  // Power-Velocity chart styles
+  pvChartContainer: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pvStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  pvStatItem: {
+    alignItems: 'center',
+  },
+  pvStatValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  pvStatLabel: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  pvStatDiff: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 2,
+  },
 });
