@@ -1,170 +1,149 @@
 <analysis>**original_problem_statement:**
-The user has issued a directive to ignore all previous tasks and start a new project from scratch.
+The user initially requested a full-stack system for importing, analyzing, and reporting on jump data from contact mats. This included modules for parsing (), analysis (), and corresponding API endpoints.
 
-The new project is to build a hardware-agnostic, CSV-based import system for jump data collected from sports contact mats. The system must be built with a clean architecture, separating concerns for parsing, validation, and calculation.
+Subsequently, the user pivoted to a new, high-priority architectural task: to design and build a robust, centralized **athlete identity resolution system**. This system must handle inconsistencies in athlete names from various data sources (e.g., João Vitor, J. Vitor, Vitor, João) by using a persistent mapping () between raw names and a unique internal . The system must block data imports if any athlete identity is ambiguous or unresolved, forcing a coach to manually confirm the mapping.
 
-**PRODUCT REQUIREMENTS (as per user's latest request):**
-1.  **Core Module ()**: Create a full-stack module to handle CSV data import for jumps.
-    *   : Define a canonical  data model using Pydantic.
-    *   : Implement safe and tolerant CSV parsing.
-    *   : Validate data against the schema and specific business rules (e.g.,  is mandatory for 'DJ' but must be null for 'CMJ').
-    *   : Calculate derived metrics.
-    *   : Create a directory for provider-specific data mappers (e.g., , ).
-2.  **Canonical Data Model ()**: All imported data must be normalized to a standard Pydantic model including fields like , , , , , , , and .
-3.  **Business & Calculation Rules**:
-    *   Empty CSV fields must be parsed as .
-    *   If  is missing, calculate it from  using the formula: .
-    *   Calculate Reactive Strength Index (RSI) as  only when both values are present.
-4.  **Athlete Integration**:
-    *   The  must reference an existing athlete in the system.
-    *   The system must never create athletes automatically during import. An error should be returned if the athlete does not exist.
-5.  **API Endpoints (FastAPI)**:
-    *   : Reads and validates a CSV, returning a report of valid/invalid rows with detailed errors, without saving to the database.
-    *   : Persists pre-validated jump records to a dedicated  collection in the database.
-6.  **Analytical Module ()**:
-    *   Create a new module for sports science analytics (, , , etc.).
-    *   Implement an endpoint  that returns a structured JSON report with readiness status, trends, and a fatigue flag.
-7.  **Testing**: Create automated tests covering parsing, validation, calculations, and API endpoints.
+The final task was to integrate this new identity resolution module into the existing  and  data pipelines as a P1 priority.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent has successfully implemented the entire  module as requested. This includes the complete directory structure (, , , , and mappers), the Pydantic models, and the two required API endpoints ( and ). The system correctly parses, validates, calculates derived metrics, and imports jump data from CSV files. Unit tests and sample CSVs were also created, and the entire flow was successfully tested via API calls. The agent has also created the directory and empty file structure for the next major task: the  module.
+The application now contains three core backend modules:
+1.  ****: A complete and tested module for parsing, validating, and importing CSV jump data.
+2.  ****: A complete and tested module for sports science analysis, providing reports on athlete baselines, trends, and fatigue via API endpoints.
+3.  ****: A new, fully implemented module that handles ambiguous athlete identities. It uses fuzzy string matching () to suggest matches, persists confirmed aliases in an  collection, and provides API endpoints to manage this process.
+
+The  and  pipelines have been successfully modified to use the . The  endpoints now analyze athlete names from a CSV, return a resolution status (resolved, needs confirmation, not found), and block the import () if any athletes are unresolved.
 
 **Last working item**:
-- **Last item agent was working**: The agent had just started work on the new  module, which is the next major feature requested by the user. The last actions were creating the directory  and the initial empty Python files within it (, , , , , and ).
-- **Status**: IN PROGRESS
-- **Agent Testing Done**: N
+- **Last item agent was working**: The agent was integrating the new  module into the  pipeline. This involved modifying the  and  endpoints to call the identity resolver, process the results, and block the import if any athlete names were ambiguous. The agent debugged and fixed issues related to extracting athlete names from nested  objects and ensuring the resolution logic was correctly applied before data validation.
+- **Status**: USER VERIFICATION PENDING
+- **Agent Testing Done**: Y (Agent conducted extensive end-to-end testing via  commands, demonstrating the full workflow: preview with unresolved names, confirming an alias via API, re-running the preview successfully, and finally importing the data.)
 - **Which testing method agent to use?**: backend testing agent
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-There are no known bugs or issues. The pending work is the implementation of the next feature.
+There are no known bugs or issues.
 
 **In progress Task List**:
--   **Task 1**: Implement the  module and the reporting endpoint (Priority: P0)
-    -   **Where to resume**: The file structure is ready in . The next step is to implement the business logic inside each file, starting with  to calculate athlete baselines.
-    -   **What will be achieved**: An analytical engine that provides sports science insights (readiness, fatigue, trends) from the imported jump data, accessible via a new API endpoint.
-    -   **Status**: IN PROGRESS
-    -   **Should Test frontend/backend/both after fix?**: backend
-    -   **Blocked on something**: No.
+None.
 
 **Upcoming and Future Tasks**
--   **Upcoming Tasks**:
-    -   **P0**: Complete the implementation of the  module logic (trends, fatigue, etc.).
-    -   **P1**: Implement and test the new  endpoint in  to expose the analysis results.
--   **Future Tasks**:
-    -   **P2**: Implement statistical normalization (Z-scores, percentile of best) for cross-device and cross-athlete comparisons.
-    -   **P3**: Build a minimal frontend UI for CSV upload, data visualization (session table, charts), and displaying readiness status.
+- **Upcoming Tasks**:
+    - **P1**: The code for integrating the identity resolver into the  pipeline has been written but **not tested**. The next agent must create and run tests for the GPS data import flow to verify that the identity resolution works as expected.
+    - **P2**: Apply the identity resolution system to other data import pipelines, such as  and .
+- **Future Tasks**:
+    - **P3**: Implement a feature for **merging duplicate athlete profiles**. This should be a deliberate, manual action by a coach with a full audit trail.
+    - Build a frontend UI to facilitate the manual resolution of ambiguous athlete names identified during the preview stage.
+    - Address multi-coach ambiguity where different coaches might map the same raw name to different athletes.
 
 **Completed work in this session**
-- **Jump Data Import System (DONE)**:
-    - Created the  module with a clean architecture (, , , , ).
-    - Implemented API endpoints  and  in .
-    - Implemented business logic for data validation and derived metric calculations (jump height from flight time, RSI).
-    - Added unit tests in  and successfully passed all 30 tests.
-- **Bug Fix (DONE)**:
-    - Resolved an issue where  was not being correctly mapped due to incorrect manufacturer detection. Added  to the  to fix the underlying issue.
+- **Jump Analysis Module (DONE)**:
+    - Implemented all logic for , , , , and .
+    - Created and tested the  and  API endpoints.
+    - Created 27 unit tests in .
+- **Athlete Identity Resolution Module (DONE)**:
+    - Created the  module with logic for normalization, fuzzy matching, and resolution.
+    - Implemented API endpoints: , , and .
+    - Created 19 unit tests in .
+- **Pipeline Integration (DONE for Jumps, IN PROGRESS for GPS)**:
+    - Modified the  preview and import endpoints to use the identity resolver, blocking imports with unresolved athletes.
+    - Modified the  endpoints with the same logic (but this part is untested).
 - **Documentation (DONE)**:
-    - Updated  with details of the new jump import system.
-- **Module Scaffolding (DONE)**:
-    - Created the complete file structure for the next major task, the  module.
+    - Updated  with detailed architecture and API specs for the new identity resolution system.
 
 **Earlier issues found/mentioned but not fixed**
-None. All identified issues were resolved during the session.
+None.
 
 **Known issue recurrence from previous fork**
-None. The user started an entirely new project, making the previous fork's context irrelevant.
+None.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **Backend**: FastAPI
--   **Data Modeling**: Pydantic for strict data validation, serialization, and settings management.
--   **Architecture**: Clean separation of concerns within the  module (Parsing, Validation, Calculation, Mapping).
--   **Data Processing**: A pipeline that takes raw CSV data, identifies the provider, maps columns to a canonical model, validates business rules, calculates derived metrics, and prepares it for storage.
--   **Database**: MongoDB, with a dedicated  collection.
+- **Backend**: FastAPI
+- **Data Modeling**: Pydantic
+- **Architecture**: Clean separation of concerns (Import, Analysis, Identity).
+- **Identity Resolution**: A centralized service to deduplicate athlete identities using a combination of exact matching, persistent aliases, and fuzzy string matching ( library) with a confidence threshold.
+- **Data Processing**: Import pipelines are now designed to be all or nothing, blocking the entire import if even one athlete's identity cannot be resolved with high confidence.
 
 **key DB schema**
--   **jump_data** collection (documents based on ):
-    -   :  (references an athlete in the  collection)
-    -   :  (Enum: SJ, CMJ, DJ, RJ)
+-   **athlete_aliases**:
     -   : 
+    -   :  (references  collection)
+    -   :  (references  collection)
+    -   :  (The raw name from the source system, e.g., J. Vitor)
+    -   :  (The normalized version for matching, e.g., j vitor)
+    -   :  (e.g., jump_data, gps_data)
     -   : 
-    -   : 
-    -   : 
-    -   : 
-    -   :  (e.g., 'generic', 'chronojump')
-    -   :  (The original, unmodified CSV row for auditing)
-    -   ... (other optional metrics like , , etc.)
 
 **changes in tech stack**
-No changes to the core stack. Pydantic was heavily utilized for the new feature implementation as per user requirements.
+-   **Added**: , ,  to support fuzzy string matching.
+-   **Added**:  for running asynchronous unit tests.
 
 **All files of reference**
 -   **Created & Implemented**:
     -    (and all files within)
     -   
     -   
--   **Created (Skeleton only)**:
-    -    (and all files within)
 -   **Modified**:
-    -   : Added the  endpoints.
-    -   : Updated with documentation for the new feature.
+    -   : Added identity resolution endpoints and integrated the logic into jump and GPS import/preview endpoints.
+    -   : Added new dependencies.
+    -   : Updated with extensive documentation on the identity resolution architecture.
 
 **Areas that need refactoring**:
-None. The code is new and follows the clean architecture specified by the user.
+None.
 
 **key api endpoints**
--   : Validates a jump data CSV and returns a summary.
--   : Imports validated jump data into the database.
--   : (Implicitly available) Lists available data mappers.
+-   **Identity Resolution**:
+    -   : Takes a list of names and returns their resolution status.
+    -   : Creates a persistent mapping between a raw name () and an .
+    -   : Lists all known aliases for a given athlete.
+-   **Analysis**:
+    -   : Returns a full sports science report for an athlete.
+    -   : Compares an athlete's metrics against a group.
+-   **Import (Modified)**:
+    -   
+    -   
+    -    (for GPS)
 
 **Critical Info for New Agent**
--   **Project Pivot**: You MUST ignore the initial handoff summary regarding GPS data. The project has been completely restarted to focus on **jump data analysis**. The user's instructions starting from message #5 are the new source of truth.
--   **Current State**: The data *ingestion* part ( module) is complete, tested, and working. Do not modify it unless a bug is found.
--   **Next Task**: Your immediate priority is to implement the logic for the **** module, following the user's detailed plan in message #131. This involves calculating baselines, trends, and fatigue flags.
--   **Language**: All communication with the user MUST be in **Português**.
+-   **Primary Language**: You MUST communicate with the user in **Português**.
+-   **Focus**: The core of the recent work is the new, generic  module. It is a critical piece of infrastructure for the entire application.
+-   **Untested Code**: The integration of the identity resolver into the **GPS import pipeline** () has been coded but **NOT TESTED**. Your first task should be to write and execute tests for this flow to ensure it works correctly and doesn't have the same bugs the agent found and fixed in the  flow.
+-   **User Directives**: The user has given very clear, structured instructions. Follow the priorities laid out: ensure P1 (integration into all pipelines) is complete and tested before considering P2/P3 tasks.
 
 **documents and test reports created in this job**
--    (overwritten with new project docs)
--   
 -   
 -   
 -   
 
 **Last 10 User Messages and any pending HUMAN messages**
-The user has provided a clear, multi-step plan. The recent messages are a monologue from the user dictating the entire project from scratch.
-1.  **User Msg ~131**: Provided a detailed, three-tiered plan for the next steps: 1. Build the critical  module. 2. Implement inter-device statistical normalization. 3. Create automated report endpoints before building any UI.
-2.  **User Msg ~130**: Agent finished the implementation of the jump import system and confirmed its functionality.
-3.  **User Msg ~91-129**: Agent debugged, fixed, and tested the import functionality, including fixing a mapper bug and handling Pydantic warnings.
-4.  **User Msg #8**: User provided the full, detailed requirements for the new jump data import system, explicitly stating Não faça perguntas adicionais (Do not ask additional questions) and instructing the agent to proceed with implementation.
-5.  **User Msg #5**: User issued the command Ignore todas as tarefas anteriores (Ignore all previous tasks) and provided the new context and high-level requirements for the jump data import system.
+1.  **User Msg #166**: User approved the implemented identity resolution system and provided clear priorities. **P1: Integrate resolver into  and  pipelines immediately.** P2/P3 (other integrations, UI) are future tasks. Explicitly approved merging athletes as a future task.
+2.  **User Msg #165**: Agent finished the  module and proposed next steps, including the merge functionality.
+3.  **User Msg #75**: User gave final approval on the architecture for the identity resolution system, choosing specific options (block on unresolved, fuzzy matching, backend-only for now) and defining the required API endpoints and behavior. Instructed the agent to proceed with full implementation.
+4.  **User Msg #74**: Agent proposed a detailed architecture for the identity resolution system and asked for user decisions on several key points (e.g., how to handle unresolved athletes, which matching algorithm to use).
+5.  **User Msg #72**: User issued a major directive to **ignore all previous tasks** and act as a logic architect to solve the athlete identity problem. Provided detailed requirements, principles, and constraints for the new system.
 
 **Project Health Check:**
--   **Working**: The entire  system (parsing, validation, import APIs).
+-   **Working**:  module,  module,  module, and the tested integration between the resolver and .
 -   **Broken**: None.
 -   **Mocked**: None.
 
 **3rd Party Integrations**
-None.
+-   , , : Used for fuzzy string matching in the  module.
 
 **Testing status**
--   **Testing agent used after significant changes**: NO (Agent used ============================= test session starts ==============================
-platform linux -- Python 3.11.14, pytest-9.0.2, pluggy-1.6.0
-rootdir: /app/frontend
-plugins: anyio-4.12.1
-collected 0 items
-
-============================ no tests ran in 0.01s ============================= and  for self-testing).
--   **Troubleshoot agent used after agent stuck in loop**: NO.
+-   **Testing agent used after significant changes**: NO
+-   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**:
     -   
--   **Known regressions**: None. All 30 unit tests are passing.
+    -   
+-   **Known regressions**: None. All 76 tests across the three main modules are passing.
 
 **Credentials to test flow:**
-Use  with password  to get an authentication token for API calls. An athlete with ID  exists for testing import functionality.
+Use the user  with password . This user was created during the session for testing the identity resolution flow.
 
 **What agent forgot to execute**
-Nothing. The agent has been following the user's instructions precisely and is currently in the middle of executing the user's latest request.</analysis>
+The agent wrote the code to integrate the identity resolver into the  endpoint () as requested by the user's P1 priority. However, the agent **did not perform any tests** on this specific integration. All end-to-end tests were focused on the  flow. This is a critical gap that needs to be addressed.</analysis>
