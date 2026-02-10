@@ -479,8 +479,13 @@ Implementado acesso público ao formulário de wellness para atletas:
 - [ ] Video analysis integration
 
 ## Test Credentials
-- **Email**: preview_test@test.com
-- **Password**: test123
+- **Email**: test@test.com
+- **Password**: test1234
+
+## Known Pending Issues
+- **P0**: Team Dashboard cards (RSI, Body Composition) show "None" — `/api/dashboard/team` endpoint
+- **P1**: Strength comparison chart may not invalidate React Query cache after new assessment
+- **Pending User Verification**: Periodization feature (complete but not tested by user)
 
 ## Last Updated
-December 9, 2025
+February 10, 2026
