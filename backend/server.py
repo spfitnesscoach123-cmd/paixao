@@ -7803,8 +7803,10 @@ async def preview_jump_csv(
     - Detected manufacturer
     - Metrics that will be auto-calculated
     - Athletes not found in system
+    - Identity resolution status (resolved/unresolved athletes)
     
     Does NOT save anything to database.
+    Import is BLOCKED if any athletes are unresolved.
     """
     # Read file content
     file_content = await file.read()
@@ -7812,12 +7814,17 @@ async def preview_jump_csv(
     if not file_content:
         raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
     
-    # Get existing athlete IDs for this coach
+    # Get existing athletes for this coach
     athletes = await db.athletes.find(
         {"coach_id": current_user["_id"]},
-        {"_id": 1}
+        {"_id": 1, "name": 1}
     ).to_list(1000)
     existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
     
     # Parse CSV
     parser = JumpCSVParser()
@@ -7834,19 +7841,77 @@ async def preview_jump_csv(
             "detected_manufacturer": parser.detected_manufacturer or "unknown",
             "calculated_metrics": [],
             "athletes_not_found": [],
-            "jump_types_found": []
+            "jump_types_found": [],
+            "identity_resolution": {
+                "resolved": {},
+                "unresolved": [],
+                "can_import": False,
+                "message": "Erro ao parsear CSV"
+            }
         }
     
-    # Initialize validator and calculator
-    validator = JumpValidator(existing_athlete_ids)
-    calculator = JumpCalculator()
+    # ========== IDENTITY RESOLUTION ==========
+    # Extract unique athlete names/IDs from CSV
+    athlete_names_from_csv = set()
+    for raw_row in raw_rows:
+        # Check for athlete_id or athlete_name columns
+        athlete_id = raw_row.get('athlete_id', '').strip()
+        athlete_name = raw_row.get('athlete_name', '').strip()
+        
+        if athlete_name:
+            athlete_names_from_csv.add(athlete_name)
+        elif athlete_id and athlete_id not in existing_athlete_ids:
+            # athlete_id provided but not found - treat as name for resolution
+            athlete_names_from_csv.add(athlete_id)
     
+    # Run identity resolution
+    identity_resolver = IdentityResolver()
+    resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+        names=list(athlete_names_from_csv),
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system="jump_data"
+    )
+    
+    can_import = len(unresolved_athletes) == 0
+    
+    # Build name -> athlete_id mapping (including resolved)
+    name_to_athlete_id = dict(resolved_names)
+    
+    # Add existing athlete IDs that are direct matches
+    for athlete in athletes:
+        aid = str(athlete["_id"])
+        name = athlete.get("name", "")
+        normalized = normalize_for_comparison(name)
+        if normalized:
+            name_to_athlete_id[name] = aid
+    
+    # ========== VALIDATION ==========
+    # Now validate with resolved athlete IDs
     valid_records = []
     all_errors = list(parse_errors)
     jump_types_found = set()
     all_calculated_metrics = set()
     
+    # Expand existing_athlete_ids with resolved names
+    resolved_ids = set(existing_athlete_ids)
+    for name, aid in resolved_names.items():
+        resolved_ids.add(aid)
+    
+    validator = JumpValidator(resolved_ids)
+    calculator = JumpCalculator()
+    
     for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Resolve athlete_id from name if needed
+        athlete_id = raw_row.get('athlete_id', '').strip()
+        athlete_name = raw_row.get('athlete_name', '').strip()
+        
+        if athlete_name and athlete_name in resolved_names:
+            raw_row['athlete_id'] = resolved_names[athlete_name]
+        elif athlete_id and athlete_id in resolved_names:
+            raw_row['athlete_id'] = resolved_names[athlete_id]
+        
         # Calculate derived metrics
         calculator.reset_tracking()
         row_with_metrics = calculator.calculate(raw_row)
@@ -7871,7 +7936,7 @@ async def preview_jump_csv(
             all_errors.append(record_or_error)
     
     return {
-        "success": len(all_errors) == 0,
+        "success": len(all_errors) == 0 and can_import,
         "total_rows": len(raw_rows),
         "valid_count": len(valid_records),
         "error_count": len(all_errors),
@@ -7880,7 +7945,15 @@ async def preview_jump_csv(
         "detected_manufacturer": parser.detected_manufacturer or "generic",
         "calculated_metrics": list(all_calculated_metrics),
         "athletes_not_found": list(validator.athletes_not_found),
-        "jump_types_found": list(jump_types_found)
+        "jump_types_found": list(jump_types_found),
+        "identity_resolution": {
+            "resolved": resolved_names,
+            "resolved_count": len(resolved_names),
+            "unresolved": [u.to_dict() for u in unresolved_athletes],
+            "unresolved_count": len(unresolved_athletes),
+            "can_import": can_import,
+            "message": "Todos os atletas resolvidos" if can_import else f"{len(unresolved_athletes)} atleta(s) pendente(s) de confirmação"
+        }
     }
 
 
