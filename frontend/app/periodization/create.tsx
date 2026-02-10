@@ -9,6 +9,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,10 +18,8 @@ import { useRouter } from 'expo-router';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../services/api';
-import { format, addDays, parseISO, eachDayOfInterval, startOfWeek, endOfWeek } from 'date-fns';
+import { format, addDays, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Platform } from 'react-native';
 
 const { width: screenWidth } = Dimensions.get('window');
 
