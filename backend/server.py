@@ -797,6 +797,547 @@ async def update_session_activity_type(
     }
 
 
+# ============= PERIODIZATION MODELS =============
+
+class DayClassification(str, Enum):
+    MD = "MD"      # Match Day
+    MD_1 = "MD-1"  # Match Day minus 1
+    MD_2 = "MD-2"  # Match Day minus 2
+    MD_3 = "MD-3"  # Match Day minus 3
+    MD_4 = "MD-4"  # Match Day minus 4
+    MD_5 = "MD-5"  # Match Day minus 5
+    DO = "D.O"     # Day Off
+
+class GPSMetricType(str, Enum):
+    TOTAL_DISTANCE = "total_distance"
+    HID_Z3 = "hid_z3"           # 15-20 km/h
+    HSR_Z4 = "hsr_z4"           # 20-25 km/h
+    SPRINT_Z5 = "sprint_z5"     # >25 km/h
+    SPRINTS_COUNT = "sprints_count"
+    ACC_DEC_TOTAL = "acc_dec_total"  # ACC + DECC sum
+
+# Peak values for each athlete (updated when new higher value from GAME)
+class AthletePeakValues(BaseModel):
+    athlete_id: str
+    coach_id: str
+    total_distance: float = 0
+    hid_z3: float = 0           # High Intensity Distance 15-20 km/h
+    hsr_z4: float = 0           # High Speed Running 20-25 km/h
+    sprint_z5: float = 0        # Sprint >25 km/h
+    sprints_count: int = 0
+    acc_dec_total: int = 0      # Accelerations + Decelerations
+    last_updated: Optional[datetime] = None
+    update_history: List[Dict] = []  # Track updates for notifications
+
+class WeeklyPrescription(BaseModel):
+    total_distance_multiplier: float = 1.0
+    hid_z3_multiplier: float = 1.0
+    hsr_z4_multiplier: float = 1.0
+    sprint_z5_multiplier: float = 1.0
+    sprints_count_multiplier: float = 1.0
+    acc_dec_total_multiplier: float = 1.0
+
+class DailyPrescription(BaseModel):
+    day_classification: str  # MD, MD-1, etc.
+    date: str
+    total_distance_percent: float = 0
+    hid_z3_percent: float = 0
+    hsr_z4_percent: float = 0
+    sprint_z5_percent: float = 0
+    sprints_count_percent: float = 0
+    acc_dec_total_percent: float = 0
+
+class AthleteOverride(BaseModel):
+    athlete_id: str
+    metric: str  # which metric to override
+    value: float  # overridden value (percentage or multiplier)
+    reason: Optional[str] = None  # e.g., "wellness concern", "RSI low"
+
+class PeriodizationWeekCreate(BaseModel):
+    name: str  # e.g., "Semana 1 - Pré-temporada"
+    start_date: str  # YYYY-MM-DD
+    end_date: str    # YYYY-MM-DD
+    days: List[DailyPrescription]
+    weekly_prescription: WeeklyPrescription
+    athlete_overrides: List[AthleteOverride] = []
+
+class PeriodizationWeek(BaseModel):
+    id: Optional[str] = None
+    coach_id: str
+    name: str
+    start_date: str
+    end_date: str
+    days: List[DailyPrescription]
+    weekly_prescription: WeeklyPrescription
+    athlete_overrides: List[AthleteOverride] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class PeakValueNotification(BaseModel):
+    id: Optional[str] = None
+    coach_id: str
+    athlete_id: str
+    athlete_name: str
+    metric: str
+    old_value: float
+    new_value: float
+    session_date: str
+    created_at: Optional[datetime] = None
+    read: bool = False
+
+
+# ============= PERIODIZATION HELPER FUNCTIONS =============
+
+def extract_gps_metrics_from_session(gps_records: List[dict]) -> dict:
+    """Extract and calculate GPS metrics from a session's records"""
+    metrics = {
+        "total_distance": 0,
+        "hid_z3": 0,
+        "hsr_z4": 0,
+        "sprint_z5": 0,
+        "sprints_count": 0,
+        "acc_dec_total": 0
+    }
+    
+    for record in gps_records:
+        metrics["total_distance"] += record.get("total_distance", 0)
+        metrics["hid_z3"] += record.get("high_intensity_distance", 0)  # HID 15-20 km/h
+        metrics["hsr_z4"] += record.get("high_speed_running", 0)  # HSR 20-25 km/h
+        metrics["sprint_z5"] += record.get("sprint_distance", 0)  # Sprint >25 km/h
+        metrics["sprints_count"] += record.get("number_of_sprints", 0)
+        metrics["acc_dec_total"] += (
+            record.get("number_of_accelerations", 0) + 
+            record.get("number_of_decelerations", 0)
+        )
+    
+    return metrics
+
+
+async def update_athlete_peak_values(
+    athlete_id: str, 
+    coach_id: str, 
+    session_metrics: dict,
+    session_date: str,
+    athlete_name: str = ""
+):
+    """Update peak values if new metrics from GAME are higher"""
+    # Get current peak values
+    peak_doc = await db.athlete_peak_values.find_one({
+        "athlete_id": athlete_id,
+        "coach_id": coach_id
+    })
+    
+    if not peak_doc:
+        # Create new peak values document
+        peak_doc = {
+            "athlete_id": athlete_id,
+            "coach_id": coach_id,
+            "total_distance": 0,
+            "hid_z3": 0,
+            "hsr_z4": 0,
+            "sprint_z5": 0,
+            "sprints_count": 0,
+            "acc_dec_total": 0,
+            "last_updated": None,
+            "update_history": []
+        }
+    
+    updates = {}
+    notifications = []
+    
+    metric_names = {
+        "total_distance": "Distância Total",
+        "hid_z3": "HID Z3 (15-20 km/h)",
+        "hsr_z4": "HSR Z4 (20-25 km/h)",
+        "sprint_z5": "Sprint Z5 (>25 km/h)",
+        "sprints_count": "Sprints",
+        "acc_dec_total": "ACC + DECC"
+    }
+    
+    for metric, new_value in session_metrics.items():
+        current_value = peak_doc.get(metric, 0)
+        if new_value > current_value:
+            updates[metric] = new_value
+            # Create notification
+            notifications.append({
+                "coach_id": coach_id,
+                "athlete_id": athlete_id,
+                "athlete_name": athlete_name,
+                "metric": metric_names.get(metric, metric),
+                "old_value": current_value,
+                "new_value": new_value,
+                "session_date": session_date,
+                "created_at": datetime.utcnow(),
+                "read": False
+            })
+    
+    if updates:
+        updates["last_updated"] = datetime.utcnow()
+        
+        # Add to update history
+        history_entry = {
+            "date": session_date,
+            "updated_at": datetime.utcnow().isoformat(),
+            "metrics_updated": list(updates.keys())
+        }
+        
+        await db.athlete_peak_values.update_one(
+            {"athlete_id": athlete_id, "coach_id": coach_id},
+            {
+                "$set": updates,
+                "$push": {"update_history": history_entry}
+            },
+            upsert=True
+        )
+        
+        # Insert notifications
+        if notifications:
+            await db.peak_value_notifications.insert_many(notifications)
+    
+    return len(updates) > 0
+
+
+# ============= PERIODIZATION ROUTES =============
+
+@api_router.get("/periodization/weeks")
+async def get_periodization_weeks(current_user: dict = Depends(get_current_user)):
+    """Get all periodization weeks for the coach"""
+    weeks = await db.periodization_weeks.find({
+        "coach_id": current_user["_id"]
+    }).sort("start_date", -1).to_list(100)
+    
+    for week in weeks:
+        week["id"] = str(week.pop("_id"))
+    
+    return weeks
+
+
+@api_router.get("/periodization/weeks/{week_id}")
+async def get_periodization_week(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific periodization week"""
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    week["id"] = str(week.pop("_id"))
+    return week
+
+
+@api_router.post("/periodization/weeks")
+async def create_periodization_week(
+    week_data: PeriodizationWeekCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new periodization week"""
+    week_doc = {
+        "coach_id": current_user["_id"],
+        "name": week_data.name,
+        "start_date": week_data.start_date,
+        "end_date": week_data.end_date,
+        "days": [day.dict() for day in week_data.days],
+        "weekly_prescription": week_data.weekly_prescription.dict(),
+        "athlete_overrides": [override.dict() for override in week_data.athlete_overrides],
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    result = await db.periodization_weeks.insert_one(week_doc)
+    week_doc["id"] = str(result.inserted_id)
+    del week_doc["_id"]
+    
+    return week_doc
+
+
+@api_router.put("/periodization/weeks/{week_id}")
+async def update_periodization_week(
+    week_id: str,
+    week_data: PeriodizationWeekCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a periodization week (only if not past)"""
+    # Check if week exists and is editable
+    existing_week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not existing_week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Check if week is in the past
+    end_date = datetime.strptime(existing_week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot edit past weeks")
+    
+    update_doc = {
+        "name": week_data.name,
+        "start_date": week_data.start_date,
+        "end_date": week_data.end_date,
+        "days": [day.dict() for day in week_data.days],
+        "weekly_prescription": week_data.weekly_prescription.dict(),
+        "athlete_overrides": [override.dict() for override in week_data.athlete_overrides],
+        "updated_at": datetime.utcnow()
+    }
+    
+    await db.periodization_weeks.update_one(
+        {"_id": ObjectId(week_id)},
+        {"$set": update_doc}
+    )
+    
+    return {"message": "Week updated successfully", "id": week_id}
+
+
+@api_router.delete("/periodization/weeks/{week_id}")
+async def delete_periodization_week(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a periodization week (only if not past)"""
+    existing_week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not existing_week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    end_date = datetime.strptime(existing_week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot delete past weeks")
+    
+    await db.periodization_weeks.delete_one({"_id": ObjectId(week_id)})
+    
+    return {"message": "Week deleted successfully"}
+
+
+@api_router.get("/periodization/peak-values")
+async def get_all_peak_values(current_user: dict = Depends(get_current_user)):
+    """Get peak values for all athletes"""
+    peak_values = await db.athlete_peak_values.find({
+        "coach_id": current_user["_id"]
+    }).to_list(500)
+    
+    for pv in peak_values:
+        pv["id"] = str(pv.pop("_id"))
+    
+    return peak_values
+
+
+@api_router.get("/periodization/peak-values/{athlete_id}")
+async def get_athlete_peak_values(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get peak values for a specific athlete"""
+    peak_values = await db.athlete_peak_values.find_one({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    })
+    
+    if not peak_values:
+        # Return default values if none exist
+        return {
+            "athlete_id": athlete_id,
+            "total_distance": 0,
+            "hid_z3": 0,
+            "hsr_z4": 0,
+            "sprint_z5": 0,
+            "sprints_count": 0,
+            "acc_dec_total": 0,
+            "last_updated": None
+        }
+    
+    peak_values["id"] = str(peak_values.pop("_id"))
+    return peak_values
+
+
+@api_router.get("/periodization/calculated/{week_id}")
+async def get_calculated_prescriptions(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get calculated prescriptions for all athletes based on peak values and multipliers"""
+    # Get the week
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Get all athletes
+    athletes = await db.athletes.find({
+        "coach_id": current_user["_id"]
+    }).to_list(500)
+    
+    # Get all peak values
+    peak_values = await db.athlete_peak_values.find({
+        "coach_id": current_user["_id"]
+    }).to_list(500)
+    
+    peak_values_map = {pv["athlete_id"]: pv for pv in peak_values}
+    
+    # Get athlete overrides map
+    overrides_map = {}
+    for override in week.get("athlete_overrides", []):
+        key = f"{override['athlete_id']}_{override['metric']}"
+        overrides_map[key] = override
+    
+    weekly_prescription = week["weekly_prescription"]
+    
+    results = []
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        peak = peak_values_map.get(athlete_id, {})
+        
+        # Calculate weekly targets
+        weekly_targets = {
+            "total_distance": peak.get("total_distance", 0) * weekly_prescription.get("total_distance_multiplier", 1.0),
+            "hid_z3": peak.get("hid_z3", 0) * weekly_prescription.get("hid_z3_multiplier", 1.0),
+            "hsr_z4": peak.get("hsr_z4", 0) * weekly_prescription.get("hsr_z4_multiplier", 1.0),
+            "sprint_z5": peak.get("sprint_z5", 0) * weekly_prescription.get("sprint_z5_multiplier", 1.0),
+            "sprints_count": peak.get("sprints_count", 0) * weekly_prescription.get("sprints_count_multiplier", 1.0),
+            "acc_dec_total": peak.get("acc_dec_total", 0) * weekly_prescription.get("acc_dec_total_multiplier", 1.0)
+        }
+        
+        # Calculate daily targets
+        daily_targets = []
+        for day in week["days"]:
+            day_target = {
+                "date": day["date"],
+                "day_classification": day["day_classification"],
+                "total_distance": peak.get("total_distance", 0) * (day.get("total_distance_percent", 0) / 100),
+                "hid_z3": peak.get("hid_z3", 0) * (day.get("hid_z3_percent", 0) / 100),
+                "hsr_z4": peak.get("hsr_z4", 0) * (day.get("hsr_z4_percent", 0) / 100),
+                "sprint_z5": peak.get("sprint_z5", 0) * (day.get("sprint_z5_percent", 0) / 100),
+                "sprints_count": peak.get("sprints_count", 0) * (day.get("sprints_count_percent", 0) / 100),
+                "acc_dec_total": peak.get("acc_dec_total", 0) * (day.get("acc_dec_total_percent", 0) / 100)
+            }
+            
+            # Apply athlete-specific overrides
+            for metric in ["total_distance", "hid_z3", "hsr_z4", "sprint_z5", "sprints_count", "acc_dec_total"]:
+                override_key = f"{athlete_id}_{metric}_{day['date']}"
+                if override_key in overrides_map:
+                    override = overrides_map[override_key]
+                    day_target[metric] = peak.get(metric, 0) * (override["value"] / 100)
+            
+            daily_targets.append(day_target)
+        
+        results.append({
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name", ""),
+            "peak_values": {
+                "total_distance": peak.get("total_distance", 0),
+                "hid_z3": peak.get("hid_z3", 0),
+                "hsr_z4": peak.get("hsr_z4", 0),
+                "sprint_z5": peak.get("sprint_z5", 0),
+                "sprints_count": peak.get("sprints_count", 0),
+                "acc_dec_total": peak.get("acc_dec_total", 0)
+            },
+            "weekly_targets": weekly_targets,
+            "daily_targets": daily_targets
+        })
+    
+    return {
+        "week_id": week_id,
+        "week_name": week["name"],
+        "start_date": week["start_date"],
+        "end_date": week["end_date"],
+        "weekly_prescription": weekly_prescription,
+        "days_config": week["days"],
+        "athletes": results
+    }
+
+
+@api_router.put("/periodization/athlete-override/{week_id}")
+async def update_athlete_override(
+    week_id: str,
+    override: AthleteOverride,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add or update an athlete-specific override"""
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Check if week is editable
+    end_date = datetime.strptime(week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot edit past weeks")
+    
+    # Update or add override
+    overrides = week.get("athlete_overrides", [])
+    found = False
+    for i, existing in enumerate(overrides):
+        if existing["athlete_id"] == override.athlete_id and existing["metric"] == override.metric:
+            overrides[i] = override.dict()
+            found = True
+            break
+    
+    if not found:
+        overrides.append(override.dict())
+    
+    await db.periodization_weeks.update_one(
+        {"_id": ObjectId(week_id)},
+        {"$set": {"athlete_overrides": overrides, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "Override updated successfully"}
+
+
+@api_router.get("/periodization/notifications")
+async def get_peak_value_notifications(
+    unread_only: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get notifications about peak value updates"""
+    query = {"coach_id": current_user["_id"]}
+    if unread_only:
+        query["read"] = False
+    
+    notifications = await db.peak_value_notifications.find(query).sort("created_at", -1).to_list(100)
+    
+    for n in notifications:
+        n["id"] = str(n.pop("_id"))
+    
+    return notifications
+
+
+@api_router.put("/periodization/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark a notification as read"""
+    await db.peak_value_notifications.update_one(
+        {"_id": ObjectId(notification_id), "coach_id": current_user["_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Notification marked as read"}
+
+
+@api_router.put("/periodization/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    await db.peak_value_notifications.update_many(
+        {"coach_id": current_user["_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "All notifications marked as read"}
+
+
 # ============= WELLNESS ROUTES =============
 
 def calculate_wellness_scores(data: WellnessQuestionnaireCreate) -> tuple:
