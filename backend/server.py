@@ -1118,7 +1118,7 @@ async def update_session_activity_type(
     # If marked as GAME, update peak values for the athlete
     peak_updated = False
     if data.activity_type == "game" and session_records:
-        athlete_id = session_records[0].get("athlete_id")
+        athlete_id = str(session_records[0].get("athlete_id"))
         session_date = session_records[0].get("date", "")
         
         # Get athlete name for notifications
@@ -1583,7 +1583,7 @@ async def get_calculated_prescriptions(
         "coach_id": current_user["_id"]
     }).to_list(500)
     
-    peak_values_map = {pv["athlete_id"]: pv for pv in peak_values}
+    peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}
     
     # Get athlete overrides map
     overrides_map = {}
