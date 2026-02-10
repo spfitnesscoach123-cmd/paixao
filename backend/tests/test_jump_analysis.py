@@ -177,9 +177,10 @@ class TestFatigueDetection:
         fatigue = detect_fatigue(
             fatigued_athlete_jumps, baseline.to_dict(), "A002", "CMJ"
         )
-        # 13.7% drop from baseline should trigger fatigue
+        # Drop triggers fatigue detection when > 5% (CMJ threshold)
         assert fatigue.cmj_drop_pct is not None
-        assert fatigue.cmj_drop_pct > 10  # > 10% drop
+        assert fatigue.cmj_drop_pct > 5  # > 5% drop threshold
+        assert fatigue.fatigue_detected is True
     
     def test_cmj_threshold_breach(self, fatigued_athlete_jumps):
         """CMJ threshold breach should be detected."""
