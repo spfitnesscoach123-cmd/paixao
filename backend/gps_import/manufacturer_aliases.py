@@ -567,6 +567,7 @@ MANUFACTURER_ALIASES: Dict[str, Dict[Manufacturer, List[str]]] = {
             "period name",
             "drill",
             "drill name",
+            "drill title",
             "activity",
             "activity name",
             "split name",
