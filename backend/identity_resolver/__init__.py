@@ -36,6 +36,8 @@ from .models import (
     AliasCreate,
     UnresolvedAthlete,
     ResolutionCandidate,
+    ConfirmAliasRequest,
+    BulkResolutionRequest,
 )
 
 
@@ -58,4 +60,6 @@ __all__ = [
     'AliasCreate',
     'UnresolvedAthlete',
     'ResolutionCandidate',
+    'ConfirmAliasRequest',
+    'BulkResolutionRequest',
 ]
