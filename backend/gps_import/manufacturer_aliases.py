@@ -103,7 +103,9 @@ MANUFACTURER_ALIASES: Dict[str, Dict[Manufacturer, List[str]]] = {
             "hid",
             "zone 3 distance",
             "high speed running",
-            "hsr"
+            "high speed running distance",
+            "hsr",
+            "hsr distance"
         ],
         Manufacturer.GPEXE: [
             "hir",
