@@ -8020,10 +8020,21 @@ async def preview_jump_csv(
         athlete_id = raw_row.get('athlete_id', '').strip()
         athlete_name = raw_row.get('athlete_name', '').strip()
         
-        if athlete_name and athlete_name in resolved_names:
-            raw_row['athlete_id'] = resolved_names[athlete_name]
-        elif athlete_id and athlete_id in resolved_names:
-            raw_row['athlete_id'] = resolved_names[athlete_id]
+        # Try to resolve athlete name to ID
+        resolved_athlete_id = None
+        if athlete_name:
+            if athlete_name in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_name]
+            elif athlete_name in name_to_athlete_id:
+                resolved_athlete_id = name_to_athlete_id[athlete_name]
+        elif athlete_id:
+            if athlete_id in existing_athlete_ids:
+                resolved_athlete_id = athlete_id
+            elif athlete_id in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_id]
+        
+        if resolved_athlete_id:
+            raw_row['athlete_id'] = resolved_athlete_id
         
         # Calculate derived metrics
         calculator.reset_tracking()
