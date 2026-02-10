@@ -184,10 +184,9 @@ class GPSCSVParser:
                 )
             
             original_headers = list(reader.fieldnames)
-            normalized_headers = [self._normalize_header(h) for h in original_headers]
             
-            # Step 4: Detect manufacturer
-            manufacturer = detect_manufacturer_from_columns(normalized_headers)
+            # Step 4: Detect manufacturer (using original headers — detection normalizes internally)
+            manufacturer = detect_manufacturer_from_columns(original_headers)
             logger.info(f"Detected manufacturer: {manufacturer.value}")
             
             # Step 5: Build column mapping
