@@ -6225,30 +6225,34 @@ async def import_wearable_csv(
     )
     normalized = normalizer.normalize_records(parse_result.records)
 
+    # Consolidate all rows into ONE document per activity
+    consolidated = consolidate_session(normalized)
+
     imported = []
-    skipped = []
     errors_list = []
 
-    for idx, doc in enumerate(normalized):
+    if consolidated:
         try:
-            await db.gps_data.insert_one(doc)
+            await db.gps_data.insert_one(consolidated)
             imported.append({
-                "row": doc.get("_row_number", idx + 2),
-                "date": doc.get("date"),
-                "total_distance": doc.get("total_distance", 0),
-                "hid": doc.get("high_intensity_distance", 0),
-                "sprints": doc.get("number_of_sprints", 0),
+                "date": consolidated.get("date"),
+                "total_distance": consolidated.get("total_distance", 0),
+                "hid": consolidated.get("high_intensity_distance", 0),
+                "sprints": consolidated.get("number_of_sprints", 0),
+                "has_session_total": consolidated.get("has_session_total", False),
+                "periods_count": len(consolidated.get("periods", [])),
             })
         except Exception as e:
-            errors_list.append({"row": idx + 2, "error": str(e)})
-
-    skipped_count = parse_result.total_rows - len(normalized)
+            errors_list.append({"error": str(e)})
 
     return {
-        "success": True,
+        "success": len(imported) > 0,
         "provider_detected": manufacturer.value,
         "records_imported": len(imported),
-        "records_skipped": skipped_count,
+        "records_from_csv": parse_result.total_rows,
+        "consolidated": True,
+        "has_session_total": consolidated.get("has_session_total", False) if consolidated else False,
+        "periods_count": len(consolidated.get("periods", [])) if consolidated else 0,
         "errors": len(errors_list) + len(parse_result.errors),
         "athlete_id": athlete_id,
         "session_id": normalizer.session_id,
@@ -6257,7 +6261,7 @@ async def import_wearable_csv(
         "parse_warnings": [w.to_dict() for w in parse_result.warnings[:10]],
         "parse_errors": [e.to_dict() for e in parse_result.errors[:10]],
         "import_details": {
-            "imported": imported[:5],
+            "imported": imported,
             "errors": errors_list[:5],
         },
     }
