@@ -7966,6 +7966,7 @@ async def import_jump_csv(
     Import validated jump data from CSV into database.
     
     Only imports valid records. Invalid rows are rejected with error messages.
+    BLOCKED if any athletes are unresolved - use preview first to resolve identities.
     
     Returns:
     - Total imported count
@@ -7979,12 +7980,17 @@ async def import_jump_csv(
     if not file_content:
         raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
     
-    # Get existing athlete IDs for this coach
+    # Get existing athletes for this coach
     athletes = await db.athletes.find(
         {"coach_id": current_user["_id"]},
-        {"_id": 1}
+        {"_id": 1, "name": 1}
     ).to_list(1000)
     existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
     
     # Parse CSV
     parser = JumpCSVParser()
@@ -7996,14 +8002,62 @@ async def import_jump_csv(
             detail=f"Nenhum dado válido encontrado no CSV. Erros: {[e.message for e in parse_errors]}"
         )
     
-    # Initialize validator and calculator
-    validator = JumpValidator(existing_athlete_ids)
+    # ========== IDENTITY RESOLUTION CHECK ==========
+    # Extract unique athlete names/IDs from CSV
+    athlete_names_from_csv = set()
+    for raw_row in raw_rows:
+        athlete_id = raw_row.get('athlete_id', '').strip()
+        athlete_name = raw_row.get('athlete_name', '').strip()
+        
+        if athlete_name:
+            athlete_names_from_csv.add(athlete_name)
+        elif athlete_id and athlete_id not in existing_athlete_ids:
+            athlete_names_from_csv.add(athlete_id)
+    
+    # Run identity resolution
+    identity_resolver = IdentityResolver()
+    resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+        names=list(athlete_names_from_csv),
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system="jump_data"
+    )
+    
+    # BLOCK import if there are unresolved athletes
+    if unresolved_athletes:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": f"Importação bloqueada: {len(unresolved_athletes)} atleta(s) não resolvido(s)",
+                "unresolved_count": len(unresolved_athletes),
+                "unresolved": [u.to_dict() for u in unresolved_athletes],
+                "action_required": "Use o endpoint /api/athletes/confirm-alias para confirmar as associações antes de importar"
+            }
+        )
+    
+    # ========== VALIDATION & IMPORT ==========
+    # Expand existing_athlete_ids with resolved names
+    resolved_ids = set(existing_athlete_ids)
+    for name, aid in resolved_names.items():
+        resolved_ids.add(aid)
+    
+    validator = JumpValidator(resolved_ids)
     calculator = JumpCalculator()
     
     valid_records = []
     all_errors = list(parse_errors)
     
     for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Resolve athlete_id from name if needed
+        athlete_id = raw_row.get('athlete_id', '').strip()
+        athlete_name = raw_row.get('athlete_name', '').strip()
+        
+        if athlete_name and athlete_name in resolved_names:
+            raw_row['athlete_id'] = resolved_names[athlete_name]
+        elif athlete_id and athlete_id in resolved_names:
+            raw_row['athlete_id'] = resolved_names[athlete_id]
+        
         # Calculate derived metrics
         row_with_metrics = calculator.calculate(raw_row)
         
@@ -8040,12 +8094,21 @@ async def import_jump_csv(
     result = await db.jump_data.insert_many(documents)
     created_ids = [str(id) for id in result.inserted_ids]
     
+    # Update last_used_at for aliases used
+    for name in resolved_names:
+        normalized = normalize_for_comparison(name)
+        await db.athlete_aliases.update_one(
+            {"coach_id": current_user["_id"], "alias_normalized": normalized},
+            {"$set": {"last_used_at": datetime.utcnow()}}
+        )
+    
     return {
         "success": True,
         "message": f"{len(created_ids)} registros de salto importados com sucesso",
         "imported_count": len(created_ids),
         "rejected_count": len(all_errors),
         "created_ids": created_ids,
+        "resolved_athletes": resolved_names,
         "errors": [e.model_dump() for e in all_errors] if all_errors else []
     }
 
