@@ -827,7 +827,16 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingVertical: 8,
     paddingHorizontal: 4,
-    width: 48,
+    width: 40,
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.primary,
+    textAlign: 'center',
+  },
+  percentSymbol: {
+    fontSize: 10,
+    color: colors.text.tertiary,
+    marginLeft: 2,
   },
   percentValue: {
     fontSize: 12,
