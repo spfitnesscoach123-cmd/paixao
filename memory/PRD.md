@@ -282,9 +282,110 @@ Score composto (0-100):
 - [x] API endpoint de comparação (/api/jumps/compare)
 - [x] 27 testes unitários
 
+### ✅ COMPLETO - Identity Resolver (Resolução de Identidade de Atletas)
+- [x] Módulo `identity_resolver/` com arquitetura limpa
+- [x] Normalização agressiva de nomes (acentos, pontuação, ordem)
+- [x] Fuzzy matching com threshold de 85% (thefuzz library)
+- [x] Persistência de aliases (`athlete_aliases` collection)
+- [x] API endpoints:
+  - `POST /api/athletes/resolve-name` - Resolver nome único
+  - `POST /api/athletes/resolve-bulk` - Resolver múltiplos nomes
+  - `POST /api/athletes/confirm-alias` - Confirmar associação
+  - `GET /api/athletes/{id}/aliases` - Listar aliases
+  - `DELETE /api/athletes/aliases/{id}` - Remover alias
+- [x] 19 testes unitários
+
+---
+
+## Módulo Identity Resolver
+
+### Problema Resolvido
+O mesmo atleta pode aparecer com nomes diferentes em CSVs de fontes distintas:
+- "João Vitor" / "JOAO VITOR" / "J. Vitor" / "Vitor, João"
+
+### Princípios Fundamentais
+1. **athlete_id é o ÚNICO identificador único** - O nome é apenas descritivo
+2. **Nunca criar atletas automaticamente** - Sempre exigir confirmação
+3. **Nunca sobrescrever aliases existentes** - Conflitos exigem ação manual
+4. **Auditoria completa** - Registrar quem criou cada associação
+
+### Fluxo de Resolução (3 Etapas)
+
+**Etapa 1 - Busca Exata**
+- CSV contém `athlete_id` explícito? → Usar diretamente
+- Alias já mapeado? → Usar athlete_id associado
+
+**Etapa 2 - Sugestão por Similaridade**
+- Normalizar nome do CSV
+- Comparar com nomes existentes
+- Se similaridade ≥ 85%: sugerir candidato
+- Se múltiplos candidatos: exigir escolha manual
+
+**Etapa 3 - Confirmação Obrigatória**
+- Coach escolhe: atleta existente OU criar novo
+- Decisão é persistida como alias
+- Reutilizada em futuros uploads
+
+### Estrutura do Módulo
+
+```
+backend/identity_resolver/
+├── __init__.py          # Exports públicos
+├── models.py            # Pydantic models (AthleteAlias, etc.)
+├── normalizer.py        # Normalização de nomes
+├── matcher.py           # Fuzzy matching (thefuzz)
+└── resolver.py          # Motor de resolução
+```
+
+### Schema: athlete_aliases
+
+```json
+{
+  "_id": "ObjectId",
+  "athlete_id": "string",
+  "coach_id": "string",
+  "alias_normalized": "string",
+  "alias_original": "string",
+  "source_system": "string",
+  "created_at": "datetime",
+  "last_used_at": "datetime",
+  "created_by": "string"
+}
+```
+
+### API Response: resolve-bulk
+
+```json
+{
+  "resolved": {"J. Vitor": "athlete_id_123"},
+  "resolved_count": 1,
+  "unresolved": [
+    {
+      "original_name": "JOAO VITOR",
+      "candidates": [
+        {
+          "athlete_id": "...",
+          "athlete_name": "João Vitor Silva",
+          "similarity_score": 93.8,
+          "match_reason": "tokens correspondentes"
+        }
+      ],
+      "suggested_action": "select_or_create"
+    }
+  ],
+  "can_import": false,
+  "message": "1 nome(s) pendente(s)"
+}
+```
+
 ---
 
 ## Próximos Passos (Backlog)
+
+### P1 - Integração com Pipelines de Upload
+- [ ] Aplicar resolução de identidade no preview de jump_import
+- [ ] Aplicar resolução de identidade no preview de gps_import
+- [ ] Bloquear importação se houver atletas não resolvidos
 
 ### P2 - Normalização Estatística
 - [ ] Correção por dispositivo (offsets de medição)
