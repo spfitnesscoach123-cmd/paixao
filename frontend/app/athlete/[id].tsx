@@ -329,7 +329,7 @@ export default function AthleteDetails() {
               <View style={styles.infoRow}>
                 <Ionicons name="calendar" size={20} color={colors.accent.primary} />
                 <Text style={styles.infoLabel}>{t('athletes.age')}:</Text>
-                <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} {t('common.years')}</Text>
+                <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} {t('athletes.years')}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="football" size={20} color={colors.accent.tertiary} />
