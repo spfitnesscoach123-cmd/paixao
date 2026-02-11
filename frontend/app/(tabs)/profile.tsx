@@ -9,8 +9,6 @@ import {
   Modal,
   FlatList,
   Switch,
-  TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,14 +18,11 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
 export default function ProfileScreen() {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout } = useAuth();
   const { t, locale, setLocale, languages } = useLanguage();
   const { colors, theme, toggleTheme, isDark } = useTheme();
   const router = useRouter();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
-  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
-  const [editName, setEditName] = useState(user?.name || '');
-  const [isUpdating, setIsUpdating] = useState(false);
   
   const styles = createProfileStyles(colors);
 
