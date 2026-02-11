@@ -327,9 +327,18 @@ const VelocityLossChart = ({ data, locale }: { data: any[], locale: string }) =>
 const BodyCompositionChart = ({ data, locale }: { data: any, locale: string }) => {
   if (!data || !data.latest) return null;
   
-  const { body_fat_percent, lean_mass_kg, fat_mass_kg } = data.latest;
+  // Ensure values are valid numbers
+  const parseNumber = (val: any): number => {
+    const num = Number(val);
+    return isNaN(num) ? 0 : num;
+  };
+  
+  const body_fat_percent = parseNumber(data.latest.body_fat_percent);
+  const lean_mass_kg = parseNumber(data.latest.lean_mass_kg);
+  const fat_mass_kg = parseNumber(data.latest.fat_mass_kg);
+  
   const total = lean_mass_kg + fat_mass_kg;
-  const leanPercent = (lean_mass_kg / total) * 100;
+  if (total === 0) return null;
   
   const size = 120;
   const strokeWidth = 12;
