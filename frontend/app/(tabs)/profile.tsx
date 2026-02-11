@@ -55,8 +55,10 @@ export default function ProfileScreen() {
   };
 
   const handleOpenEditProfile = () => {
+    console.log('Opening Edit Profile Modal');
     setEditName(user?.name || '');
     setShowEditProfileModal(true);
+    console.log('Modal state set to true');
   };
 
   const handleSaveProfile = async () => {
