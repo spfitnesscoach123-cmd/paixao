@@ -208,7 +208,11 @@
     "avgFatigue": "Fatiga Prom.",
     "avgMood": "Ánimo Prom.",
     "questionnaires": "Cuestionarios",
-    "noDataForCharts": "Añade cuestionarios para ver análisis"
+    "noDataForCharts": "Añade cuestionarios para ver análisis",
+    "physicalMentalState": "Estado Físico y Mental",
+    "sleepHydration": "Sueño e Hidratación",
+    "sleepHoursRequired": "Por favor, complete las horas de sueño",
+    "scoresAutoCalculated": "Los scores de Wellness y Preparación se calcularán automáticamente"
   },
   "assessments": {
     "title": "Evaluaciones",
