@@ -16,9 +16,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
 import api from '../services/api';
 import { colors } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function GenerateWellnessLink() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<{
     token: string;
@@ -29,10 +31,10 @@ export default function GenerateWellnessLink() {
 
   // Duration options in hours
   const DURATION_OPTIONS = [
-    { value: 0.5, label: '30 min', labelPt: '30 min' },
-    { value: 2, label: '2 hours', labelPt: '2 horas' },
-    { value: 8, label: '8 hours', labelPt: '8 horas' },
-    { value: 24, label: '24 hours', labelPt: '24 horas' },
+    { value: 0.5, label: '30 min' },
+    { value: 2, label: '2h' },
+    { value: 8, label: '8h' },
+    { value: 24, label: '24h' },
   ];
 
   const handleGenerateLink = async () => {
@@ -52,7 +54,7 @@ export default function GenerateWellnessLink() {
         shareUrl: fullUrl,
       });
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao gerar link');
+      Alert.alert(t('common.error'), error.response?.data?.detail || t('common.tryAgain'));
     } finally {
       setIsGenerating(false);
     }
@@ -61,7 +63,7 @@ export default function GenerateWellnessLink() {
   const handleCopyLink = async () => {
     if (generatedLink) {
       await Clipboard.setStringAsync(generatedLink.shareUrl);
-      Alert.alert('Copiado!', 'Link copiado para a área de transferência');
+      Alert.alert(t('common.success'), t('wellness.copy'));
     }
   };
 
@@ -69,8 +71,8 @@ export default function GenerateWellnessLink() {
     if (generatedLink) {
       try {
         await Share.share({
-          message: `Preencha seu questionário de bem-estar diário:\n\n${generatedLink.shareUrl}`,
-          title: 'Questionário de Bem-Estar',
+          message: `${t('wellness.fillDaily')}:\n\n${generatedLink.shareUrl}`,
+          title: t('wellness.questionnaire'),
         });
       } catch (error) {
         console.error('Error sharing:', error);
