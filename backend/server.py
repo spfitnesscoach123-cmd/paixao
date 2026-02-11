@@ -5403,9 +5403,9 @@ async def get_scientific_report_pdf(
             return {"low": "Baixo", "moderate": "Moderado", "high": "Alto"}.get(level, "Desconhecido")
         return level.title() if level else "Unknown"
     
-    # Calculate IMC
-    weight = athlete.get('weight', 0)
-    height_cm = athlete.get('height', 0)
+    # Calculate IMC - safely handle None values
+    weight = athlete.get('weight') or 0
+    height_cm = athlete.get('height') or 0
     imc = (weight / ((height_cm/100) ** 2)) if height_cm > 0 and weight > 0 else 0
     imc_class = ""
     if imc > 0:
