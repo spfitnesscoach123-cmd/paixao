@@ -551,6 +551,25 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
+class UpdateProfileRequest(BaseModel):
+    name: str
+
+@api_router.put("/auth/profile", response_model=UserResponse)
+async def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+    """Update user profile"""
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["_id"])},
+        {"$set": {"name": request.name}}
+    )
+    
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user["_id"])})
+    return UserResponse(
+        id=str(updated_user["_id"]),
+        email=updated_user["email"],
+        name=updated_user["name"],
+        created_at=updated_user["created_at"]
+    )
+
 # ============= PASSWORD RECOVERY =============
 
 class VerifyEmailRequest(BaseModel):
