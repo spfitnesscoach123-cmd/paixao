@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
+import { WebView } from 'react-native-webview';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
