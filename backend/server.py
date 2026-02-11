@@ -1171,6 +1171,103 @@ async def update_session_activity_type(
     }
 
 
+# Endpoint to get all GPS sessions grouped by session_id (for centralized classification)
+@api_router.get("/gps-data/sessions/all")
+async def get_all_gps_sessions(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all GPS sessions grouped by session_id for centralized classification"""
+    coach_id = str(current_user["_id"])
+    
+    # Aggregate to group by session_id
+    pipeline = [
+        {"$match": {"coach_id": coach_id, "session_id": {"$ne": None}}},
+        {"$group": {
+            "_id": "$session_id",
+            "date": {"$first": "$date"},
+            "activity_type": {"$first": "$activity_type"},
+            "athlete_ids": {"$addToSet": "$athlete_id"},
+            "total_records": {"$sum": 1},
+            "avg_distance": {"$avg": "$total_distance"},
+            "avg_hsr": {"$avg": "$high_speed_running"},
+            "total_distance_sum": {"$sum": "$total_distance"},
+        }},
+        {"$sort": {"date": -1}},
+        {"$limit": 100}
+    ]
+    
+    sessions = await db.gps_data.aggregate(pipeline).to_list(100)
+    
+    result = []
+    for s in sessions:
+        result.append({
+            "session_id": s["_id"],
+            "date": s.get("date"),
+            "activity_type": s.get("activity_type", "training"),
+            "athlete_count": len(s.get("athlete_ids", [])),
+            "total_records": s.get("total_records", 0),
+            "avg_distance": s.get("avg_distance", 0),
+            "avg_hsr": s.get("avg_hsr", 0),
+        })
+    
+    return result
+
+
+# Model for classifying all athletes at once
+class ClassifyAllRequest(BaseModel):
+    activity_type: str  # "game" or "training"
+
+
+@api_router.put("/gps-data/session/{session_id}/classify-all")
+async def classify_session_for_all_athletes(
+    session_id: str,
+    data: ClassifyAllRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Classify a session as game/training for ALL athletes and recalculate peaks"""
+    if data.activity_type not in ["game", "training"]:
+        raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
+    
+    coach_id = str(current_user["_id"])
+    
+    # Get all records for this session
+    session_records = await db.gps_data.find({
+        "session_id": session_id,
+        "coach_id": coach_id
+    }).to_list(1000)
+    
+    if not session_records:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Update all GPS records for this session (all athletes)
+    result = await db.gps_data.update_many(
+        {"session_id": session_id, "coach_id": coach_id},
+        {"$set": {"activity_type": data.activity_type}}
+    )
+    
+    # Get unique athlete IDs from this session
+    athlete_ids = list(set([str(r.get("athlete_id")) for r in session_records]))
+    
+    # Recalculate peak values for each athlete
+    peaks_updated = []
+    for athlete_id in athlete_ids:
+        try:
+            peak_updated = await update_athlete_peak_values(athlete_id, coach_id)
+            if peak_updated:
+                peaks_updated.append(athlete_id)
+        except Exception as e:
+            print(f"Error updating peaks for athlete {athlete_id}: {e}")
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "activity_type": data.activity_type,
+        "records_updated": result.modified_count,
+        "athletes_affected": len(athlete_ids),
+        "peaks_updated": len(peaks_updated)
+    }
+
+
 # ============= PERIODIZATION MODELS =============
 
 class DayClassification(str, Enum):
