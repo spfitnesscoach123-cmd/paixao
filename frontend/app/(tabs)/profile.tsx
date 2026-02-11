@@ -98,7 +98,7 @@ export default function ProfileScreen() {
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.account')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={handleOpenEditProfile} data-testid="edit-profile-btn">
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
                 <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
