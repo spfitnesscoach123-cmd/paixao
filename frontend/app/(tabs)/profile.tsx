@@ -9,7 +9,6 @@ import {
   Alert,
   Modal,
   FlatList,
-  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +20,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { t, locale, setLocale, languages } = useLanguage();
-  const { colors, theme, toggleTheme, isDark } = useTheme();
+  const { colors } = useTheme();
   const router = useRouter();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   
