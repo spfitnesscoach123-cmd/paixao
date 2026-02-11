@@ -117,12 +117,23 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       return 0.6 + (getIntensity(value) * 0.35);
     };
     
-    // Region percentage values
+    // Region percentage values - ensure they are valid numbers
+    const parseNumber = (val: any): number => {
+      const num = Number(val);
+      return isNaN(num) ? 0 : num;
+    };
+    
     const regionValues = {
-      upperArm: distribution.upper_arm || 0,
-      trunkFront: distribution.trunk_front || 0,
-      hipWaist: distribution.hip_waist || 0,
-      lowerBody: distribution.lower_body || 0,
+      upperArm: parseNumber(distribution.upper_arm),
+      trunkFront: parseNumber(distribution.trunk_front),
+      hipWaist: parseNumber(distribution.hip_waist),
+      lowerBody: parseNumber(distribution.lower_body),
+    };
+    
+    // Format value for display
+    const formatValue = (val: number): string => {
+      if (isNaN(val) || val === null || val === undefined) return '0.0';
+      return val.toFixed(1);
     };
     
     return (
