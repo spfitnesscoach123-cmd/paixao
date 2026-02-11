@@ -75,7 +75,15 @@ export default function ProfileScreen() {
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.account')}</Text>
           
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={handleOpenEditProfile} testID="edit-profile-btn">
+          <Pressable 
+            style={({ pressed }) => [
+              styles.menuItem, 
+              { backgroundColor: colors.dark.card },
+              pressed && { opacity: 0.7 }
+            ]} 
+            onPress={handleOpenEditProfile}
+            testID="edit-profile-btn"
+          >
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(0, 212, 255, 0.2)' }]}>
                 <Ionicons name="person-outline" size={22} color={colors.accent.primary} />
@@ -83,7 +91,7 @@ export default function ProfileScreen() {
               <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('athletes.editProfile')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-          </TouchableOpacity>
+          </Pressable>
 
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.menuItemContent}>
