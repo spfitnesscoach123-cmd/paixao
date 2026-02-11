@@ -518,15 +518,32 @@ export default function Subscription() {
                 </View>
               </View>
 
-              {/* Price */}
+              {/* Price - Fixed USD */}
               <View style={styles.priceContainer}>
-                <Text style={styles.priceValue}>{displayPrice}</Text>
+                <Text style={styles.priceValue}>$39.99</Text>
                 <Text style={styles.pricePeriod}>{t.perMonth}</Text>
               </View>
 
-              {/* Features List */}
+              {/* Features List - Fixed list */}
               <View style={styles.featuresContainer}>
-                {plan.features_list.map((feature, index) => (
+                {[
+                  locale === 'pt' ? 'Criação instantânea de perfis via arquivo CSV' : 'Instant profile creation via CSV file',
+                  locale === 'pt' ? 'Leitura de dados GPS via CSV' : 'GPS data reading via CSV',
+                  locale === 'pt' ? 'Análise e interpretação de métricas de GPS' : 'GPS metrics analysis and interpretation',
+                  locale === 'pt' ? 'Avaliação física e composição corporal' : 'Physical assessment and body composition',
+                  locale === 'pt' ? 'Análise de saltos: CMJ (Counter Movement Jump), DJ (Drop Jump), SL-CMJ (Single Leg - Counter Movement Jump)' : 'Jump analysis: CMJ (Counter Movement Jump), DJ (Drop Jump), SL-CMJ (Single Leg - Counter Movement Jump)',
+                  locale === 'pt' ? 'Análise de RSI' : 'RSI Analysis',
+                  locale === 'pt' ? 'Índice de Fadiga' : 'Fatigue Index',
+                  locale === 'pt' ? 'Acompanhamento histórico de RSI' : 'RSI historical tracking',
+                  locale === 'pt' ? 'Perfil de Potência-Velocidade' : 'Power-Velocity Profile',
+                  locale === 'pt' ? 'Análise da Curva de Força-Velocidade (VBT) – Carga Ótima' : 'Force-Velocity Curve Analysis (VBT) – Optimal Load',
+                  locale === 'pt' ? 'Classificação da Perda de Velocidade (VB)' : 'Velocity Loss Classification (VB)',
+                  locale === 'pt' ? 'Periodização' : 'Periodization',
+                  locale === 'pt' ? 'Planejamento de cargas semanais e diárias com base em dados do GPS' : 'Weekly and daily load planning based on GPS data',
+                  locale === 'pt' ? 'Acute-Chronic Work Ratio (ACWR)' : 'Acute-Chronic Work Ratio (ACWR)',
+                  locale === 'pt' ? 'Exportação de relatórios em PDF' : 'PDF report export',
+                  locale === 'pt' ? 'Página de análises científicas baseadas em insights de IA treinada em literatura científica especializada, gerando feedbacks e cruzamento de informações' : 'Scientific analysis page based on AI insights trained on specialized scientific literature, generating feedback and information cross-referencing',
+                ].map((feature, index) => (
                   <View key={index} style={styles.featureRow}>
                     <View style={styles.featureCheck}>
                       <Ionicons name="checkmark" size={14} color="#ffffff" />
@@ -561,33 +578,6 @@ export default function Subscription() {
               )}
             </View>
           )}
-
-          {/* Region Toggle */}
-          <View style={styles.regionToggle}>
-            <Text style={styles.regionLabel}>
-              {locale === 'pt' ? 'Mostrando preços para:' : 'Showing prices for:'}
-            </Text>
-            <View style={styles.regionButtons}>
-              <TouchableOpacity
-                style={[styles.regionButton, region === 'BR' && styles.regionButtonActive]}
-                onPress={() => setRegion('BR')}
-                data-testid="region-br"
-              >
-                <Text style={[styles.regionButtonText, region === 'BR' && styles.regionButtonTextActive]}>
-                  🇧🇷 Brasil (R$)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.regionButton, region !== 'BR' && styles.regionButtonActive]}
-                onPress={() => setRegion('US')}
-                data-testid="region-us"
-              >
-                <Text style={[styles.regionButtonText, region !== 'BR' && styles.regionButtonTextActive]}>
-                  🌎 International ($)
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {/* Management Options */}
           <View style={styles.managementSection}>
