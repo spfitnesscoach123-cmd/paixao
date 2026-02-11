@@ -208,7 +208,11 @@
     "avgFatigue": "Fadiga Média",
     "avgMood": "Humor Médio",
     "questionnaires": "Questionários",
-    "noDataForCharts": "Adicione questionários para ver análises"
+    "noDataForCharts": "Adicione questionários para ver análises",
+    "physicalMentalState": "Estado Físico e Mental",
+    "sleepHydration": "Sono e Hidratação",
+    "sleepHoursRequired": "Por favor, preencha as horas de sono",
+    "scoresAutoCalculated": "Os scores de Wellness e Prontidão serão calculados automaticamente"
   },
   "assessments": {
     "title": "Avaliações",
