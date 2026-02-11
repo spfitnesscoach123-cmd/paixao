@@ -53,24 +53,6 @@ export default function ProfileScreen() {
     router.push('/edit-profile');
   };
 
-  const handleSaveProfile = async () => {
-    if (!editName.trim()) {
-      Alert.alert(t('common.error'), t('auth.fillAllFields'));
-      return;
-    }
-
-    setIsUpdating(true);
-    try {
-      await updateProfile(editName.trim());
-      setShowEditProfileModal(false);
-      Alert.alert(t('common.success'), t('settings.profileUpdated'));
-    } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || t('common.tryAgain'));
-    } finally {
-      setIsUpdating(false);
-    }
-  };
-
   const currentLanguage = languages.find(l => l.code === locale);
 
   return (
