@@ -20,8 +20,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../../services/api';
 import { Athlete } from '../../../types';
 import { colors } from '../../../constants/theme';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function EditAthlete() {
+  const { t } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();

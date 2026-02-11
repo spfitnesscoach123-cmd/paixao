@@ -16,8 +16,10 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { GPSData } from '../../../types';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function AddGPS() {
+  const { t } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();

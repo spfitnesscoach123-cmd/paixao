@@ -16,8 +16,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { colors } from '../constants/theme';
+import { useLanguage } from '../contexts/LanguageContext';
 
 export default function ForgotPassword() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');

@@ -16,10 +16,12 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { PhysicalAssessment } from '../../../types';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 type AssessmentType = 'strength' | 'aerobic' | 'body_composition';
 
 export default function AddAssessment() {
+  const { t } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();

@@ -15,8 +15,10 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { Slider } from '../../../components/Slider';
 import { WellnessQuestionnaire } from '../../../types';
+import { useLanguage } from '../../../contexts/LanguageContext';
 
 export default function AddWellness() {
+  const { t } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
