@@ -100,24 +100,23 @@ export default function GenerateWellnessLink() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Link Wellness</Text>
+          <Text style={styles.headerTitle}>{t('wellness.generateLink')}</Text>
           <View style={{ width: 24 }} />
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
           <View style={styles.infoCard}>
             <Ionicons name="information-circle" size={48} color={colors.accent.primary} />
-            <Text style={styles.infoTitle}>Questionário para Atletas</Text>
+            <Text style={styles.infoTitle}>{t('wellness.questionnaire')}</Text>
             <Text style={styles.infoText}>
-              Gere um link compartilhável para que seus atletas preencham o questionário 
-              de bem-estar diretamente do celular, sem precisar de cadastro no app.
+              {t('wellness.fillDaily')}
             </Text>
           </View>
 
           {!generatedLink ? (
             <>
               <View style={styles.optionsCard}>
-                <Text style={styles.optionLabel}>Validade do Link:</Text>
+                <Text style={styles.optionLabel}>{t('wellness.linkExpires')}:</Text>
                 <View style={styles.daysSelector}>
                   {DURATION_OPTIONS.map((option) => (
                     <TouchableOpacity
@@ -134,7 +133,7 @@ export default function GenerateWellnessLink() {
                           expiresHours === option.value && styles.dayButtonTextActive,
                         ]}
                       >
-                        {option.labelPt}
+                        {option.label}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -158,7 +157,7 @@ export default function GenerateWellnessLink() {
                   ) : (
                     <>
                       <Ionicons name="link" size={24} color="#ffffff" />
-                      <Text style={styles.generateText}>Gerar Link</Text>
+                      <Text style={styles.generateText}>{t('wellness.generateLink')}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -168,7 +167,7 @@ export default function GenerateWellnessLink() {
             <View style={styles.resultCard}>
               <View style={styles.successHeader}>
                 <Ionicons name="checkmark-circle" size={32} color={colors.status.success} />
-                <Text style={styles.successTitle}>Link Gerado!</Text>
+                <Text style={styles.successTitle}>{t('wellness.linkGenerated')}</Text>
               </View>
 
               <View style={styles.linkBox}>
@@ -180,7 +179,7 @@ export default function GenerateWellnessLink() {
               <View style={styles.expiryInfo}>
                 <Ionicons name="time-outline" size={16} color={colors.text.secondary} />
                 <Text style={styles.expiryText}>
-                  Válido até: {formatDate(generatedLink.expiresAt)}
+                  {t('wellness.linkExpires')}: {formatDate(generatedLink.expiresAt)}
                 </Text>
               </View>
 
@@ -190,7 +189,7 @@ export default function GenerateWellnessLink() {
                   onPress={handleCopyLink}
                 >
                   <Ionicons name="copy-outline" size={22} color={colors.accent.primary} />
-                  <Text style={styles.actionButtonText}>Copiar</Text>
+                  <Text style={styles.actionButtonText}>{t('wellness.copy')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -202,7 +201,7 @@ export default function GenerateWellnessLink() {
                     style={styles.shareGradient}
                   >
                     <Ionicons name="share-outline" size={22} color="#ffffff" />
-                    <Text style={styles.shareButtonText}>Compartilhar</Text>
+                    <Text style={styles.shareButtonText}>{t('wellness.share')}</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -211,19 +210,19 @@ export default function GenerateWellnessLink() {
                 style={styles.newLinkButton}
                 onPress={() => setGeneratedLink(null)}
               >
-                <Text style={styles.newLinkText}>Gerar Novo Link</Text>
+                <Text style={styles.newLinkText}>{t('wellness.generateLink')}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           <View style={styles.instructionsCard}>
-            <Text style={styles.instructionsTitle}>Como Funciona:</Text>
+            <Text style={styles.instructionsTitle}>{t('wellness.recommendations')}:</Text>
             <View style={styles.instructionItem}>
               <View style={styles.instructionNumber}>
                 <Text style={styles.instructionNumberText}>1</Text>
               </View>
               <Text style={styles.instructionText}>
-                Compartilhe o link com seus atletas via WhatsApp, e-mail ou outro meio
+                {t('wellness.share')}
               </Text>
             </View>
             <View style={styles.instructionItem}>
@@ -231,7 +230,7 @@ export default function GenerateWellnessLink() {
                 <Text style={styles.instructionNumberText}>2</Text>
               </View>
               <Text style={styles.instructionText}>
-                O atleta acessa o link e seleciona seu nome da lista
+                {t('wellness.selectName')}
               </Text>
             </View>
             <View style={styles.instructionItem}>
@@ -239,7 +238,7 @@ export default function GenerateWellnessLink() {
                 <Text style={styles.instructionNumberText}>3</Text>
               </View>
               <Text style={styles.instructionText}>
-                Após preencher, os dados são automaticamente salvos no perfil do atleta
+                {t('wellness.submitQuestionnaire')}
               </Text>
             </View>
           </View>
