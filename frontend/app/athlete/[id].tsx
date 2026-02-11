@@ -464,57 +464,6 @@ export default function AthleteDetails() {
                       </View>
                     </TouchableOpacity>
 
-                    {/* Activity Type Classifier - Jogo/Treino */}
-                    <View style={styles.classifierContainer}>
-                      <Text style={styles.classifierLabel}>
-                        {locale === 'pt' ? 'Tipo:' : 'Type:'}
-                      </Text>
-                      <View style={styles.classifierButtons}>
-                        <TouchableOpacity
-                          style={[
-                            styles.classifierButton,
-                            session.activity_type === 'training' && styles.classifierButtonActive,
-                            session.activity_type === 'training' && styles.classifierButtonTraining,
-                          ]}
-                          onPress={() => handleClassifySession(session.session_id, 'training')}
-                          disabled={classifySessionMutation.isPending}
-                        >
-                          <Ionicons 
-                            name="fitness" 
-                            size={16} 
-                            color={session.activity_type === 'training' ? '#ffffff' : colors.text.secondary} 
-                          />
-                          <Text style={[
-                            styles.classifierButtonText,
-                            session.activity_type === 'training' && styles.classifierButtonTextActive,
-                          ]}>
-                            {locale === 'pt' ? 'Treino' : 'Training'}
-                          </Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[
-                            styles.classifierButton,
-                            session.activity_type === 'game' && styles.classifierButtonActive,
-                            session.activity_type === 'game' && styles.classifierButtonGame,
-                          ]}
-                          onPress={() => handleClassifySession(session.session_id, 'game')}
-                          disabled={classifySessionMutation.isPending}
-                        >
-                          <Ionicons 
-                            name="football" 
-                            size={16} 
-                            color={session.activity_type === 'game' ? '#ffffff' : colors.text.secondary} 
-                          />
-                          <Text style={[
-                            styles.classifierButtonText,
-                            session.activity_type === 'game' && styles.classifierButtonTextActive,
-                          ]}>
-                            {locale === 'pt' ? 'Jogo' : 'Game'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
                     {/* Session Totals - Shows selected period data or session totals */}
                     <View style={styles.sessionTotals}>
                       {(() => {
