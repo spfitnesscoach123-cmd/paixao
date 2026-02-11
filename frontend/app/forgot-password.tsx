@@ -116,12 +116,12 @@ export default function ForgotPassword() {
               </LinearGradient>
             </View>
             <Text style={styles.title}>
-              {step === 'email' ? 'Recuperar Senha' : 'Nova Senha'}
+              {step === 'email' ? t('auth.recoverPassword') : t('auth.newPassword')}
             </Text>
             <Text style={styles.subtitle}>
               {step === 'email' 
-                ? 'Informe seu email cadastrado' 
-                : 'Defina sua nova senha'}
+                ? t('auth.email') 
+                : t('auth.setNewPassword')}
             </Text>
             <View style={styles.spectralLine} />
           </View>
@@ -133,7 +133,7 @@ export default function ForgotPassword() {
                   <Ionicons name="mail-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Email cadastrado"
+                    placeholder={t('auth.email')}
                     placeholderTextColor={colors.text.tertiary}
                     value={email}
                     onChangeText={setEmail}
@@ -159,7 +159,7 @@ export default function ForgotPassword() {
                       <ActivityIndicator color="#ffffff" />
                     ) : (
                       <>
-                        <Text style={styles.buttonText}>Verificar Email</Text>
+                        <Text style={styles.buttonText}>{t('common.send')}</Text>
                         <Ionicons name="arrow-forward" size={20} color="#ffffff" />
                       </>
                     )}
@@ -177,7 +177,7 @@ export default function ForgotPassword() {
                   <Ionicons name="lock-closed-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Nova senha"
+                    placeholder={t('auth.newPassword')}
                     placeholderTextColor={colors.text.tertiary}
                     value={newPassword}
                     onChangeText={setNewPassword}
@@ -190,7 +190,7 @@ export default function ForgotPassword() {
                   <Ionicons name="shield-checkmark-outline" size={20} color={colors.accent.primary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Confirmar nova senha"
+                    placeholder={t('auth.confirmPassword')}
                     placeholderTextColor={colors.text.tertiary}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
@@ -215,7 +215,7 @@ export default function ForgotPassword() {
                       <ActivityIndicator color="#ffffff" />
                     ) : (
                       <>
-                        <Text style={styles.buttonText}>Redefinir Senha</Text>
+                        <Text style={styles.buttonText}>{t('auth.resetPassword')}</Text>
                         <Ionicons name="checkmark" size={20} color="#ffffff" />
                       </>
                     )}
@@ -227,7 +227,7 @@ export default function ForgotPassword() {
                   onPress={() => setStep('email')}
                 >
                   <Text style={styles.backToEmailText}>
-                    <Ionicons name="arrow-back" size={14} color={colors.text.secondary} /> Usar outro email
+                    <Ionicons name="arrow-back" size={14} color={colors.text.secondary} /> {t('common.back')}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -238,7 +238,7 @@ export default function ForgotPassword() {
               onPress={() => router.replace('/login')}
             >
               <Text style={styles.loginText}>
-                Lembrou a senha? <Text style={styles.loginTextBold}>Entrar</Text>
+                {t('auth.hasAccount')} <Text style={styles.loginTextBold}>{t('auth.login')}</Text>
               </Text>
             </TouchableOpacity>
           </View>
