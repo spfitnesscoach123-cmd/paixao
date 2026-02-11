@@ -543,6 +543,54 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 - Cálculos de periodização consideram corretamente apenas os atletas com sessões marcadas como "jogo"
 - Funciona retroativamente para perfis existentes e novos
 
+### ✅ Correção do Cálculo de Métricas para Prescrição Diária e Semanal (2026-02-18)
+**Solicitação:** Corrigir o cálculo de valores de pico para usar apenas o valor total da sessão de cada CSV, ignorando subperíodos (1º tempo, 2º tempo, etc.).
+
+**Problema Identificado:**
+1. **Incompatibilidade de tipos de ID:** Queries MongoDB usavam `ObjectId` para `coach_id`, mas os dados estavam armazenados como `string`. Isso causava falha nas buscas de atletas e peak values.
+2. **Chamada incorreta de função:** A função `update_athlete_peak_values` estava sendo chamada com parâmetros incorretos na classificação de sessões.
+
+**Alterações:**
+1. **server.py** - Normalização de tipos de ID:
+   - Todas as funções de periodização agora usam `coach_id_str = str(current_user["_id"])`
+   - Queries para `athletes`, `gps_data`, `athlete_peak_values` e `periodization_weeks` normalizadas
+   - Fallbacks adicionados para dados legados com ObjectId
+
+2. **server.py** - Função `recalculate_all_peak_values`:
+   - Corrigida para usar `coach_id_str` em todas as queries
+   - Adicionada validação de existência do atleta com fallback
+   - Logging melhorado para debug
+
+3. **server.py** - Função `classify_session_for_all_athletes`:
+   - Corrigida chamada para `update_athlete_peak_values` com todos os parâmetros necessários
+   - Agora extrai `session_metrics`, `session_date` e `athlete_name` corretamente
+
+4. **server.py** - Função `update_session_activity_type`:
+   - Normalizada para usar `coach_id_str`
+   - Removido uso de `ObjectId(data.athlete_id)` (dados já são string)
+
+**Função extract_gps_metrics_from_session:**
+A lógica de extração de métricas já estava correta:
+- Prioriza registro com `period_name` contendo "session", "total", "full", etc.
+- Exclui registros que também contenham "half", "1st", "2nd", etc.
+- Se não houver registro de sessão total, soma os períodos como fallback
+
+**Testes:**
+- 18 testes passando (8 unitários + 10 API)
+- `/app/backend/tests/test_peak_values.py` - Testes unitários da lógica de cálculo
+- `/app/backend/tests/test_peak_values_api.py` - Testes de integração da API
+
+**Resultado:**
+- Todos os coaches com dados de jogo agora têm peak values calculados corretamente
+- Prescrições diárias e semanais exibem valores baseados apenas no total da sessão
+- Sistema funciona para perfis existentes e novos
+
+**Exemplo de cálculo correto:**
+- CSV com: Session=12204m, 1ST HALF=5050m, 2ND HALF=5450m
+- Peak usado: 12204m (valor da sessão, NÃO 15500m = soma dos períodos)
+- Weekly target (1.3x): 15865m
+- Daily targets calculados corretamente por dia
+
 ---
 
 ## Referências Científicas
