@@ -842,10 +842,10 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       {/* Export PDF Button */}
       <TouchableOpacity 
         style={styles.exportButton}
-        onPress={() => setShowPdfPreview(true)}
-        disabled={generating}
+        onPress={loadReportPreview}
+        disabled={generating || loadingReport}
       >
-        {generating ? (
+        {(generating || loadingReport) ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
           <>
@@ -857,7 +857,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
         )}
       </TouchableOpacity>
 
-      {/* PDF Preview Modal - Uses WebView to show full report with charts */}
+      {/* PDF Preview Modal - Shows full report with charts */}
       <Modal
         visible={showPdfPreview}
         animationType="slide"
@@ -875,34 +875,41 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
               </TouchableOpacity>
             </View>
             
-            {/* WebView loads the full HTML report with charts from backend */}
-            {Platform.OS === 'web' ? (
-              <iframe
-                src={`${api.defaults.baseURL?.replace('/api', '')}/api/report/scientific/${athleteId}?lang=${locale}`}
-                style={{
-                  flex: 1,
-                  width: '100%',
-                  border: 'none',
-                  borderRadius: 8,
-                  backgroundColor: '#0f172a',
-                }}
-              />
+            {/* Render HTML report with charts */}
+            {reportHtml ? (
+              Platform.OS === 'web' ? (
+                <iframe
+                  srcDoc={reportHtml}
+                  style={{
+                    flex: 1,
+                    width: '100%',
+                    border: 'none',
+                    borderRadius: 8,
+                    backgroundColor: '#0f172a',
+                  }}
+                />
+              ) : (
+                <WebView
+                  source={{ html: reportHtml }}
+                  style={styles.webView}
+                  startInLoadingState={true}
+                  renderLoading={() => (
+                    <View style={styles.webViewLoading}>
+                      <ActivityIndicator size="large" color={colors.accent.primary} />
+                      <Text style={styles.loadingText}>
+                        {locale === 'pt' ? 'Carregando relatório...' : 'Loading report...'}
+                      </Text>
+                    </View>
+                  )}
+                />
+              )
             ) : (
-              <WebView
-                source={{ 
-                  uri: `${api.defaults.baseURL?.replace('/api', '')}/api/report/scientific/${athleteId}?lang=${locale}` 
-                }}
-                style={styles.webView}
-                startInLoadingState={true}
-                renderLoading={() => (
-                  <View style={styles.webViewLoading}>
-                    <ActivityIndicator size="large" color={colors.accent.primary} />
-                    <Text style={styles.loadingText}>
-                      {locale === 'pt' ? 'Carregando relatório...' : 'Loading report...'}
-                    </Text>
-                  </View>
-                )}
-              />
+              <View style={styles.webViewLoading}>
+                <ActivityIndicator size="large" color={colors.accent.primary} />
+                <Text style={styles.loadingText}>
+                  {locale === 'pt' ? 'Carregando relatório...' : 'Loading report...'}
+                </Text>
+              </View>
             )}
             
             <View style={styles.modalFooter}>
