@@ -1250,15 +1250,37 @@ async def classify_session_for_all_athletes(
     # Get unique athlete IDs from this session
     athlete_ids = list(set([str(r.get("athlete_id")) for r in session_records]))
     
-    # Recalculate peak values for each athlete
+    # Recalculate peak values for each athlete if marked as GAME
     peaks_updated = []
-    for athlete_id in athlete_ids:
-        try:
-            peak_updated = await update_athlete_peak_values(athlete_id, coach_id)
-            if peak_updated:
-                peaks_updated.append(athlete_id)
-        except Exception as e:
-            print(f"Error updating peaks for athlete {athlete_id}: {e}")
+    if data.activity_type == "game":
+        for athlete_id in athlete_ids:
+            try:
+                # Get this athlete's records from the session
+                athlete_records = [r for r in session_records if str(r.get("athlete_id")) == athlete_id]
+                if not athlete_records:
+                    continue
+                
+                session_date = athlete_records[0].get("date", "")
+                
+                # Get athlete name
+                athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id)})
+                athlete_name = athlete.get("name", "") if athlete else ""
+                
+                # Extract metrics from session
+                session_metrics = extract_gps_metrics_from_session(athlete_records)
+                
+                # Update peak values
+                peak_updated = await update_athlete_peak_values(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    session_metrics=session_metrics,
+                    session_date=session_date,
+                    athlete_name=athlete_name
+                )
+                if peak_updated:
+                    peaks_updated.append(athlete_id)
+            except Exception as e:
+                print(f"Error updating peaks for athlete {athlete_id}: {e}")
     
     return {
         "success": True,
