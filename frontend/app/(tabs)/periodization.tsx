@@ -212,7 +212,7 @@ export default function PeriodizationScreen() {
 
   return (
     <LinearGradient
-      colors={[colors.dark.background, colors.dark.secondary]}
+      colors={colors.gradients.background}
       style={styles.container}
     >
       {/* Header */}
