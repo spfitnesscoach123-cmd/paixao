@@ -391,7 +391,7 @@ export default function PeriodizationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   notificationButton: {
     position: 'relative',
     padding: 8,
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
   },
   notificationBadge: {
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   createButton: {
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   weekCard: {
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
   },
   emptyStateTitle: {
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   notificationsModal: {
-    backgroundColor: colors.dark.secondary,
+    backgroundColor: colors.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '70%',
@@ -651,7 +651,7 @@ const styles = StyleSheet.create({
   },
   notificationItem: {
     flexDirection: 'row',
-    backgroundColor: colors.dark.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
