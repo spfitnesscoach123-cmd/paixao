@@ -41,19 +41,19 @@ export default function AddWellness() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['wellness', id] });
       Alert.alert(
-        'Sucesso',
-        `Questionário registrado!\n\nWellness Score: ${data.wellness_score?.toFixed(1)}\nReadiness Score: ${data.readiness_score?.toFixed(1)}`
+        t('common.success'),
+        `${t('wellness.wellness')} Score: ${data.wellness_score?.toFixed(1)}\nReadiness Score: ${data.readiness_score?.toFixed(1)}`
       );
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao registrar questionário');
+      Alert.alert(t('common.error'), error.response?.data?.detail || t('common.tryAgain'));
     },
   });
 
   const handleSubmit = () => {
     if (!sleepHours) {
-      Alert.alert('Erro', 'Por favor, preencha as horas de sono');
+      Alert.alert(t('common.error'), t('wellness.sleepHoursRequired'));
       return;
     }
 
@@ -77,7 +77,7 @@ export default function AddWellness() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Questionário Wellness</Text>
+        <Text style={styles.headerTitle}>{t('wellness.wellness')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -86,9 +86,9 @@ export default function AddWellness() {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data</Text>
+          <Text style={styles.sectionTitle}>{t('common.date')}</Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Data</Text>
+            <Text style={styles.label}>{t('common.date')}</Text>
             <TextInput
               style={styles.input}
               placeholder="AAAA-MM-DD"
@@ -100,10 +100,10 @@ export default function AddWellness() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Estado Físico e Mental</Text>
+          <Text style={styles.sectionTitle}>{t('wellness.physicalMentalState')}</Text>
           
           <Slider
-            label="Fadiga"
+            label={t('wellness.fatigue')}
             value={fatigue}
             onValueChange={setFatigue}
             minimumValue={1}
@@ -111,7 +111,7 @@ export default function AddWellness() {
           />
 
           <Slider
-            label="Estresse"
+            label={t('wellness.stress')}
             value={stress}
             onValueChange={setStress}
             minimumValue={1}
@@ -119,7 +119,7 @@ export default function AddWellness() {
           />
 
           <Slider
-            label="Humor"
+            label={t('wellness.mood')}
             value={mood}
             onValueChange={setMood}
             minimumValue={1}
@@ -127,7 +127,7 @@ export default function AddWellness() {
           />
 
           <Slider
-            label="Dor Muscular"
+            label={t('wellness.muscleSoreness')}
             value={muscleSoreness}
             onValueChange={setMuscleSoreness}
             minimumValue={1}
@@ -136,10 +136,10 @@ export default function AddWellness() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Sono e Hidratação</Text>
+          <Text style={styles.sectionTitle}>{t('wellness.sleepHydration')}</Text>
           
           <Slider
-            label="Qualidade do Sono"
+            label={t('wellness.sleepQuality')}
             value={sleepQuality}
             onValueChange={setSleepQuality}
             minimumValue={1}
@@ -147,7 +147,7 @@ export default function AddWellness() {
           />
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Horas de Sono</Text>
+            <Text style={styles.label}>{t('wellness.sleepHours')}</Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 7.5"
@@ -158,7 +158,7 @@ export default function AddWellness() {
           </View>
 
           <Slider
-            label="Hidratação"
+            label={t('wellness.hydration')}
             value={hydration}
             onValueChange={setHydration}
             minimumValue={1}
@@ -167,11 +167,11 @@ export default function AddWellness() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Observações</Text>
+          <Text style={styles.sectionTitle}>{t('common.notes')}</Text>
           <View style={styles.inputGroup}>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Notas adicionais..."
+              placeholder={t('common.notes')}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -183,7 +183,7 @@ export default function AddWellness() {
         <View style={styles.infoBox}>
           <Ionicons name="information-circle" size={24} color="#2563eb" />
           <Text style={styles.infoText}>
-            Os scores de Wellness e Prontidão serão calculados automaticamente com base nas respostas.
+            {t('wellness.scoresAutoCalculated')}
           </Text>
         </View>
 
@@ -195,7 +195,7 @@ export default function AddWellness() {
           {createMutation.isPending ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.buttonText}>Registrar Questionário</Text>
+            <Text style={styles.buttonText}>{t('common.save')}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
