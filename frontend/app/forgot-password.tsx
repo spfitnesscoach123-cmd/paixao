@@ -29,7 +29,7 @@ export default function ForgotPassword() {
 
   const handleVerifyEmail = async () => {
     if (!email) {
-      Alert.alert('Erro', 'Por favor, informe seu email');
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
@@ -39,14 +39,14 @@ export default function ForgotPassword() {
       const response = await api.post('/auth/verify-email', { email });
       if (response.data.exists) {
         setStep('reset');
-        Alert.alert('Email Verificado', 'Agora você pode definir uma nova senha.');
+        Alert.alert(t('auth.emailVerified'), t('auth.setNewPassword'));
       } else {
-        Alert.alert('Email não encontrado', 'Este email não está cadastrado no sistema.');
+        Alert.alert(t('common.error'), t('auth.invalidCredentials'));
       }
     } catch (error: any) {
       // If endpoint doesn't exist, proceed anyway for demo
       setStep('reset');
-      Alert.alert('Aviso', 'Por questões de segurança, se o email estiver cadastrado, você poderá redefinir sua senha.');
+      Alert.alert(t('common.warning'), t('auth.setNewPassword'));
     } finally {
       setIsLoading(false);
     }
@@ -54,17 +54,17 @@ export default function ForgotPassword() {
 
   const handleResetPassword = async () => {
     if (!newPassword || !confirmPassword) {
-      Alert.alert('Erro', 'Por favor, preencha todos os campos');
+      Alert.alert(t('common.error'), t('auth.fillAllFields'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Erro', 'As senhas não coincidem');
+      Alert.alert(t('common.error'), t('auth.passwordsDoNotMatch'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Erro', 'A senha deve ter pelo menos 6 caracteres');
+      Alert.alert(t('common.error'), t('auth.passwordMinLength'));
       return;
     }
 
@@ -75,12 +75,12 @@ export default function ForgotPassword() {
         new_password: newPassword,
       });
       Alert.alert(
-        'Senha Redefinida!',
-        'Sua senha foi alterada com sucesso. Faça login com a nova senha.',
+        t('auth.passwordResetSuccess'),
+        t('auth.passwordResetSuccess'),
         [{ text: 'OK', onPress: () => router.replace('/login') }]
       );
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao redefinir senha. Tente novamente.');
+      Alert.alert(t('common.error'), error.response?.data?.detail || t('common.tryAgain'));
     } finally {
       setIsLoading(false);
     }
