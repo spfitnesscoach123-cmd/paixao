@@ -17,6 +17,8 @@ export default function DataScreen() {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
+  
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: athletes } = useQuery({
     queryKey: ['athletes'],
