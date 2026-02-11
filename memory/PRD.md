@@ -473,6 +473,29 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 - Cores e layout preservados
 - Nenhuma funcionalidade quebrada
 
+### ✅ Remoção de Idiomas Extras
+**Solicitação:** Manter apenas Português e Inglês como idiomas suportados.
+
+**Alterações:**
+1. **i18n/index.ts** - Atualizado para suportar apenas pt e en:
+   - Removidos imports de `es.json`, `fr.json`, `zh.json`, `ar.json`
+   - Array `languages` reduzido para 2 opções (pt e en)
+   - Objeto i18n simplificado
+   - `supportedLocales` atualizado para `['en', 'pt']`
+   - Default alterado para `pt` (Português)
+   - Função `isRTL()` sempre retorna `false` (não há mais árabe)
+
+2. **Arquivos removidos:**
+   - `/app/frontend/locales/ar.json`
+   - `/app/frontend/locales/es.json`
+   - `/app/frontend/locales/fr.json`
+   - `/app/frontend/locales/zh.json`
+
+**Resultado:**
+- Seletor de idioma mostra apenas Português e Inglês
+- Troca de idioma funciona corretamente entre os dois
+- Todas as traduções de pt e en preservadas intactas
+
 ---
 
 ## Referências Científicas
