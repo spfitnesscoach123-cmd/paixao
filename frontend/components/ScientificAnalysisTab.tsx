@@ -471,6 +471,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
   const { locale } = useLanguage();
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [reportHtml, setReportHtml] = useState<string | null>(null);
+  const [loadingReport, setLoadingReport] = useState(false);
 
   const { data: analysis, isLoading, error, refetch } = useQuery({
     queryKey: ['scientific-analysis', athleteId, locale],
