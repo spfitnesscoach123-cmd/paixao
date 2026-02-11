@@ -11,10 +11,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
-      "associatedDomains": [
-        "applinks:loadmanager.app",
-        "applinks:*.loadmanager.app"
-      ],
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Tire fotos dos atletas"
@@ -24,7 +20,7 @@
       "package": "com.loadmanager.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
