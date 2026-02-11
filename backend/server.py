@@ -1690,11 +1690,18 @@ async def update_periodization_week(
     current_user: dict = Depends(get_current_user)
 ):
     """Update a periodization week (only if not past)"""
+    coach_id_str = str(current_user["_id"])
     # Check if week exists and is editable
     existing_week = await db.periodization_weeks.find_one({
         "_id": ObjectId(week_id),
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     })
+    # Fallback for legacy
+    if not existing_week:
+        existing_week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
     
     if not existing_week:
         raise HTTPException(status_code=404, detail="Week not found")
@@ -1728,10 +1735,17 @@ async def delete_periodization_week(
     current_user: dict = Depends(get_current_user)
 ):
     """Delete a periodization week (only if not past)"""
+    coach_id_str = str(current_user["_id"])
     existing_week = await db.periodization_weeks.find_one({
         "_id": ObjectId(week_id),
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     })
+    # Fallback for legacy
+    if not existing_week:
+        existing_week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
     
     if not existing_week:
         raise HTTPException(status_code=404, detail="Week not found")
