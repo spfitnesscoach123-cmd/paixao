@@ -18,7 +18,9 @@
     "error": "Error",
     "success": "Success",
     "warning": "Warning",
-    "tryAgain": "Try Again"
+    "tryAgain": "Try Again",
+    "date": "Date",
+    "notes": "Notes"
   },
   "auth": {
     "login": "Login",
@@ -206,7 +208,11 @@
     "avgFatigue": "Avg Fatigue",
     "avgMood": "Avg Mood",
     "questionnaires": "Questionnaires",
-    "noDataForCharts": "Add questionnaires to see analysis"
+    "noDataForCharts": "Add questionnaires to see analysis",
+    "physicalMentalState": "Physical and Mental State",
+    "sleepHydration": "Sleep and Hydration",
+    "sleepHoursRequired": "Please fill in sleep hours",
+    "scoresAutoCalculated": "Wellness and Readiness scores will be calculated automatically"
   },
   "assessments": {
     "title": "Assessments",
