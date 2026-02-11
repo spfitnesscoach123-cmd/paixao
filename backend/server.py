@@ -1522,18 +1522,23 @@ async def update_athlete_peak_values(
 @api_router.post("/periodization/recalculate-peaks")
 async def recalculate_all_peak_values(current_user: dict = Depends(get_current_user)):
     """Recalculate peak values for all athletes based on existing GAME sessions.
-    This fixes missing peak values when GPS data was imported but peaks weren't calculated."""
+    This fixes missing peak values when GPS data was imported but peaks weren't calculated.
+    IMPORTANT: This will RESET all peak values first and then recalculate from scratch."""
     
     coach_id = current_user["_id"]
     
+    # STEP 1: Delete all existing peak values for this coach (to fix corrupted data)
+    delete_result = await db.athlete_peak_values.delete_many({"coach_id": str(coach_id)})
+    print(f"Deleted {delete_result.deleted_count} old peak values")
+    
     # Get all GPS sessions marked as GAME
     game_sessions = await db.gps_data.find({
-        "coach_id": coach_id,
+        "coach_id": str(coach_id),
         "activity_type": "game"
     }).to_list(5000)
     
     if not game_sessions:
-        return {"message": "No GAME sessions found", "athletes_updated": 0}
+        return {"message": "No GAME sessions found", "athletes_updated": 0, "peaks_deleted": delete_result.deleted_count}
     
     # Group by athlete_id and session_id
     sessions_by_athlete = {}
