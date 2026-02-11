@@ -105,32 +105,6 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
-
-          {/* Theme Toggle */}
-          <View style={[styles.menuItem, { backgroundColor: colors.dark.card }]}>
-            <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: isDark ? 'rgba(139, 92, 246, 0.2)' : 'rgba(245, 158, 11, 0.2)' }]}>
-                <Ionicons name={isDark ? "moon" : "sunny"} size={22} color={isDark ? colors.accent.primary : '#f59e0b'} />
-              </View>
-              <View>
-                <Text style={[styles.menuItemText, { color: colors.text.primary }]}>
-                  {t('settings.theme') || (locale === 'pt' ? 'Tema' : 'Theme')}
-                </Text>
-                <Text style={[styles.menuItemSubtext, { color: colors.text.tertiary }]}>
-                  {isDark 
-                    ? (locale === 'pt' ? 'Modo Escuro' : 'Dark Mode')
-                    : (locale === 'pt' ? 'Modo Claro' : 'Light Mode')
-                  }
-                </Text>
-              </View>
-            </View>
-            <Switch
-              value={!isDark}
-              onValueChange={toggleTheme}
-              trackColor={{ false: colors.accent.secondary, true: '#f59e0b' }}
-              thumbColor={isDark ? colors.accent.primary : '#ffffff'}
-            />
-          </View>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>

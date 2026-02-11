@@ -1,65 +1,22 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ThemeMode, getColors, getShadows, darkColors, lightColors } from '../constants/theme';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { ThemeMode, getShadows, darkColors } from '../constants/theme';
 
 interface ThemeContextType {
   theme: ThemeMode;
   colors: typeof darkColors;
   shadows: ReturnType<typeof getShadows>;
-  toggleTheme: () => void;
-  setTheme: (theme: ThemeMode) => void;
   isDark: boolean;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const THEME_STORAGE_KEY = '@app_theme';
-
 export const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<ThemeMode>('dark');
-
-  useEffect(() => {
-    // Load saved theme on mount
-    loadTheme();
-  }, []);
-
-  const loadTheme = async () => {
-    try {
-      const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-      if (savedTheme === 'light' || savedTheme === 'dark') {
-        setThemeState(savedTheme);
-      }
-    } catch (error) {
-      console.log('Error loading theme:', error);
-    }
-  };
-
-  const saveTheme = async (newTheme: ThemeMode) => {
-    try {
-      await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
-    } catch (error) {
-      console.log('Error saving theme:', error);
-    }
-  };
-
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setThemeState(newTheme);
-    saveTheme(newTheme);
-  };
-
-  const setTheme = (newTheme: ThemeMode) => {
-    setThemeState(newTheme);
-    saveTheme(newTheme);
-  };
-
+  // Always use dark theme
   const value: ThemeContextType = {
-    theme,
-    colors: getColors(theme),
-    shadows: getShadows(theme),
-    toggleTheme,
-    setTheme,
-    isDark: theme === 'dark',
+    theme: 'dark',
+    colors: darkColors,
+    shadows: getShadows('dark'),
+    isDark: true,
   };
 
   return (
