@@ -1104,6 +1104,7 @@ async def get_athlete_sessions(
 
 class ActivityTypeUpdate(BaseModel):
     activity_type: str  # "game" or "training"
+    athlete_id: str  # Required to update only for specific athlete
 
 
 @api_router.put("/gps-data/session/{session_id}/activity-type")
@@ -1112,23 +1113,28 @@ async def update_session_activity_type(
     data: ActivityTypeUpdate,
     current_user: dict = Depends(get_current_user)
 ):
-    """Update the activity type (game/training) for all periods in a session"""
+    """Update the activity type (game/training) for a specific athlete's session"""
     if data.activity_type not in ["game", "training"]:
         raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
     
-    # Get the session records first to get athlete info and metrics
+    if not data.athlete_id:
+        raise HTTPException(status_code=400, detail="athlete_id is required")
+    
+    # Get the session records for this specific athlete
     session_records = await db.gps_data.find({
         "session_id": session_id,
+        "athlete_id": ObjectId(data.athlete_id),
         "coach_id": current_user["_id"]
     }).to_list(100)
     
     if not session_records:
-        raise HTTPException(status_code=404, detail="Session not found")
+        raise HTTPException(status_code=404, detail="Session not found for this athlete")
     
-    # Update all GPS records with this session_id
+    # Update GPS records only for this specific athlete's session
     result = await db.gps_data.update_many(
         {
             "session_id": session_id,
+            "athlete_id": ObjectId(data.athlete_id),
             "coach_id": current_user["_id"]
         },
         {"$set": {"activity_type": data.activity_type}}
