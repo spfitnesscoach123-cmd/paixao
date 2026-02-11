@@ -1776,24 +1776,43 @@ async def get_calculated_prescriptions(
     week_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    """Get calculated prescriptions for all athletes based on peak values and multipliers"""
-    # Get the week
+    """Get calculated prescriptions for all athletes based on peak values and multipliers.
+    
+    Each athlete's daily and weekly prescription is calculated as:
+    - Peak value (max from all GAME sessions) × multiplier/percentage
+    
+    Peak values use only the TOTAL SESSION value from CSVs (not sum of sub-periods).
+    """
+    coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)
+    
+    # Get the week - try str first (standard), then ObjectId for legacy
     week = await db.periodization_weeks.find_one({
         "_id": ObjectId(week_id),
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     })
+    if not week:
+        week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": coach_id
+        })
     
     if not week:
         raise HTTPException(status_code=404, detail="Week not found")
     
-    # Get all athletes
+    # Get all athletes - coach_id stored as str
     athletes = await db.athletes.find({
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     }).to_list(500)
+    if not athletes:
+        # Fallback for legacy data with ObjectId
+        athletes = await db.athletes.find({
+            "coach_id": coach_id
+        }).to_list(500)
     
-    # Get all peak values
+    # Get all peak values - coach_id stored as str
     peak_values = await db.athlete_peak_values.find({
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     }).to_list(500)
     
     peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}
