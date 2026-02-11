@@ -878,4 +878,112 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 12,
   },
+  // Activity Classification Styles
+  classificationButton: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+  },
+  classificationButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  sessionCountBadge: {
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  sessionCountText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  activityModal: {
+    backgroundColor: colors.dark.secondary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '85%',
+    padding: 20,
+  },
+  activityModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  activityModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  activityModalSubtitle: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  activityList: {
+    flex: 1,
+  },
+  sessionCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sessionInfo: {
+    flex: 1,
+  },
+  sessionDate: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  sessionAthletes: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 2,
+  },
+  sessionMetrics: {
+    fontSize: 11,
+    color: colors.text.tertiary,
+  },
+  sessionClassifyButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  classifyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    backgroundColor: 'transparent',
+  },
+  classifyBtnTraining: {
+    backgroundColor: '#3b82f6',
+    borderColor: '#3b82f6',
+  },
+  classifyBtnGame: {
+    backgroundColor: '#22c55e',
+    borderColor: '#22c55e',
+  },
+  classifyBtnText: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: colors.text.secondary,
+  },
+  classifyBtnTextActive: {
+    color: '#ffffff',
+  },
 });
