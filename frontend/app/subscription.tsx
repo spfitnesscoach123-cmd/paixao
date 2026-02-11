@@ -880,40 +880,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-  regionToggle: {
-    marginBottom: 20,
-  },
-  regionLabel: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  regionButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  regionButton: {
-    flex: 1,
-    backgroundColor: colors.dark.card,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  regionButtonActive: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    borderColor: '#8b5cf6',
-  },
-  regionButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.secondary,
-  },
-  regionButtonTextActive: {
-    color: '#8b5cf6',
-  },
   managementSection: {
     gap: 12,
     marginBottom: 20,
