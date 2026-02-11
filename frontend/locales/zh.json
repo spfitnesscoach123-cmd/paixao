@@ -208,7 +208,11 @@
     "avgFatigue": "平均疲劳",
     "avgMood": "平均情绪",
     "questionnaires": "问卷",
-    "noDataForCharts": "添加问卷以查看分析"
+    "noDataForCharts": "添加问卷以查看分析",
+    "physicalMentalState": "身体和心理状态",
+    "sleepHydration": "睡眠和水分补充",
+    "sleepHoursRequired": "请填写睡眠时间",
+    "scoresAutoCalculated": "健康和准备度分数将自动计算"
   },
   "assessments": {
     "title": "评估",

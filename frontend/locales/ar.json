@@ -208,7 +208,11 @@
     "avgFatigue": "متوسط التعب",
     "avgMood": "متوسط المزاج",
     "questionnaires": "الاستبيانات",
-    "noDataForCharts": "أضف استبيانات لرؤية التحليلات"
+    "noDataForCharts": "أضف استبيانات لرؤية التحليلات",
+    "physicalMentalState": "الحالة الجسدية والعقلية",
+    "sleepHydration": "النوم والترطيب",
+    "sleepHoursRequired": "يرجى ملء ساعات النوم",
+    "scoresAutoCalculated": "سيتم حساب درجات الصحة والاستعداد تلقائياً"
   },
   "assessments": {
     "title": "التقييمات",

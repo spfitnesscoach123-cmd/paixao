@@ -208,7 +208,11 @@
     "avgFatigue": "Fatigue Moy.",
     "avgMood": "Humeur Moy.",
     "questionnaires": "Questionnaires",
-    "noDataForCharts": "Ajoutez des questionnaires pour voir les analyses"
+    "noDataForCharts": "Ajoutez des questionnaires pour voir les analyses",
+    "physicalMentalState": "État Physique et Mental",
+    "sleepHydration": "Sommeil et Hydratation",
+    "sleepHoursRequired": "Veuillez remplir les heures de sommeil",
+    "scoresAutoCalculated": "Les scores de Bien-être et Préparation seront calculés automatiquement"
   },
   "assessments": {
     "title": "Évaluations",
