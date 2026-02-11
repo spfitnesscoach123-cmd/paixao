@@ -520,6 +520,29 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 - PDF final abre em nova aba com todos os gráficos
 - Valores consistentes entre tela e PDF
 
+### ✅ Correção da Marcação Individual de "Jogo" por Atleta
+**Solicitação:** Corrigir lógica para que a marcação de "jogo" seja individual por atleta na página de periodização.
+
+**Problema Identificado:**
+- Session IDs eram compartilhados entre múltiplos atletas (até 22 atletas com mesmo session_id)
+- Ao marcar uma sessão como "jogo" para um atleta, TODOS os atletas eram marcados
+- Na página de periodização, apenas o primeiro atleta tinha cálculos corretos
+
+**Alterações:**
+1. **server.py** - Endpoint `/gps-data/session/{session_id}/activity-type`:
+   - Adicionado campo obrigatório `athlete_id` no modelo `ActivityTypeUpdate`
+   - Query de update agora filtra por `session_id` E `athlete_id`
+   - Apenas os registros do atleta específico são atualizados
+
+2. **athlete/[id].tsx** - Mutation `classifySessionMutation`:
+   - Agora envia `athlete_id: id` junto com `activity_type`
+   - Garante que apenas o atleta atual seja afetado
+
+**Resultado:**
+- Cada atleta pode ter sua sessão marcada individualmente como "jogo" ou "treino"
+- Cálculos de periodização consideram corretamente apenas os atletas com sessões marcadas como "jogo"
+- Funciona retroativamente para perfis existentes e novos
+
 ---
 
 ## Referências Científicas
