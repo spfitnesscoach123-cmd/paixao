@@ -1733,8 +1733,9 @@ async def delete_periodization_week(
 @api_router.get("/periodization/peak-values")
 async def get_all_peak_values(current_user: dict = Depends(get_current_user)):
     """Get peak values for all athletes"""
+    coach_id_str = str(current_user["_id"])
     peak_values = await db.athlete_peak_values.find({
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     }).to_list(500)
     
     for pv in peak_values:
@@ -1749,9 +1750,10 @@ async def get_athlete_peak_values(
     current_user: dict = Depends(get_current_user)
 ):
     """Get peak values for a specific athlete"""
+    coach_id_str = str(current_user["_id"])
     peak_values = await db.athlete_peak_values.find_one({
         "athlete_id": athlete_id,
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     })
     
     if not peak_values:
