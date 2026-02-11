@@ -826,7 +826,7 @@ export default function AthleteDetails() {
             size={20} 
             color={activeTab === 'info' ? '#2563eb' : '#9ca3af'} 
           />
-          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>Info</Text>
+          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>{t('athletes.info')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'gps' && styles.activeTab]}
@@ -837,7 +837,7 @@ export default function AthleteDetails() {
             size={20} 
             color={activeTab === 'gps' ? '#2563eb' : '#9ca3af'} 
           />
-          <Text style={[styles.tabText, activeTab === 'gps' && styles.activeTabText]}>GPS</Text>
+          <Text style={[styles.tabText, activeTab === 'gps' && styles.activeTabText]}>{t('gps.title')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'wellness' && styles.activeTab]}
@@ -848,7 +848,7 @@ export default function AthleteDetails() {
             size={20} 
             color={activeTab === 'wellness' ? '#2563eb' : '#9ca3af'} 
           />
-          <Text style={[styles.tabText, activeTab === 'wellness' && styles.activeTabText]}>Wellness</Text>
+          <Text style={[styles.tabText, activeTab === 'wellness' && styles.activeTabText]}>{t('wellness.wellness')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'assessments' && styles.activeTab]}
@@ -859,7 +859,7 @@ export default function AthleteDetails() {
             size={20} 
             color={activeTab === 'assessments' ? '#2563eb' : '#9ca3af'} 
           />
-          <Text style={[styles.tabText, activeTab === 'assessments' && styles.activeTabText]}>Avaliações</Text>
+          <Text style={[styles.tabText, activeTab === 'assessments' && styles.activeTabText]}>{t('athletes.assessments')}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'analysis' && styles.activeTab]}
@@ -870,7 +870,7 @@ export default function AthleteDetails() {
             size={20} 
             color={activeTab === 'analysis' ? '#2563eb' : '#9ca3af'} 
           />
-          <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>Análises</Text>
+          <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>{t('analysis.title')}</Text>
         </TouchableOpacity>
       </View>
 
