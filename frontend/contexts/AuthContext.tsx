@@ -107,6 +107,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
   };
 
+  const updateProfile = async (name: string) => {
+    try {
+      const response = await api.put('/auth/profile', { name });
+      setUser(response.data);
+    } catch (error: any) {
+      throw new Error(error.response?.data?.detail || 'Failed to update profile');
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -116,6 +125,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         login,
         register,
         logout,
+        updateProfile,
       }}
     >
       {children}
