@@ -1,171 +1,197 @@
 <analysis>**original_problem_statement:**
-The user initiated a series of high-priority bug fixes and improvements, superseding the original plan from the previous session. The requests were:
-
-1.  **Periodization Calculation Bug:** On the Periodização page, calculated goal values (weekly and daily) were appearing only for the first athlete in the list, while all others showed 0. The root cause was identified as a data issue: historical peak values were not being generated for most athletes.
-2.  **UI Contrast Bug:** The Voltar ao Menu Principal (Back to Main Menu) button on the periodization detail page had poor visual contrast, making it nearly invisible against the background.
-3.  **Global Theme Bug:** The light/dark theme toggle was not being applied consistently across all application screens. Many pages were using a static, hardcoded dark theme instead of the dynamic theme from the global context.
-4.  **Incomplete Translations:** The application's localization files for Spanish, French, Arabic, and Mandarin were incomplete, missing many translation keys present in the English and Portuguese files.
-5.  **Missing Analysis Charts:** On the Análises page, several charts were not being displayed. Furthermore, the generated PDF report for this analysis was also missing these charts, showing only text-based insights.
+The user provided a series of sequential tasks to modify and fix the application. The tasks were:
+1.  **Force Dark Theme:** Remove the theme-switching button and enforce a dark theme across the entire application.
+2.  **Simplify Languages:** Remove support for all languages except for Português (Portuguese) and English.
+3.  **Fix PDF Report Charts:** Ensure that the charts visible on the Análises (Analysis) page also appear in the PDF report preview and the final generated PDF.
+4.  **Update Subscription Page:** Remove the currency toggle, set a fixed price of 9.99 USD, and update the list of Pro features.
+5.  **Correct Fatigue Index Chart:** Update the risk classification labels (0-5% Normal, 6-12% Monitor, >13% High Risk) and ensure the displayed percentage is always a positive value.
+6.  **Fix Individual Game Marking:** Correct a bug where marking one athlete's activity as a game incorrectly applied the same status to all athletes sharing that session ID.
+7.  **Fix Dashboard Data Display:** Correct the Team Overview dashboard so that cards show zero or are hidden when there is no underlying data, instead of displaying default or stale values. Specifically, the Top Performer card was showing even with no GPS data.
+8.  **Centralize Activity Classification:** Remove the Game/Training classification UI from the athlete's profile (GPS Data tab) and create a new, centralized UI on the Periodization page for a coach to classify all sessions.
+9.  **Correct Periodization Metric Calculation:** Fix the logic that calculates peak metrics for an athlete's periodization plan. The system was incorrectly summing up values from sub-periods of a session (e.g., 1st Half + 2nd Half) instead of using only the single, total value for the entire session.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The backend contains modules for jump data import (), GPS data import (), data analysis (), and a centralized athlete identity resolution system ().
-
-The following fixes have been implemented in this session:
-- The periodization calculation bug was resolved by adding a new API endpoint () to backfill the missing historical  from existing GPS data marked as GAME.
-- The UI contrast issue for the Voltar button was fixed by applying new styles (background color, border, text color).
-- The global theme application was **partially fixed**. Several key screens were refactored to use the dynamic  hook, but many others still use static colors.
-- The localization files for Spanish, French, Arabic, and Mandarin have been fully populated with all required translation keys.
+The agent successfully completed the first eight tasks requested by the user. This included major UI and backend logic changes.
+-   The UI is now permanently in dark mode, and the theme toggle has been removed.
+-   The app now only supports and displays options for English and Portuguese.
+-   The PDF report preview now correctly displays charts by rendering the full HTML report (fetched from the backend) inside a WebView. A backend bug preventing report generation was also fixed.
+-   The subscription page was updated with the requested fixed price and new feature list.
+-   The Fatigue Index chart now uses the correct labels and displays the variation as an absolute (positive) value.
+-   Marking an activity as a game is now specific to an individual athlete, even if the session ID is shared.
+-   The Top Performer card on the dashboard is now correctly hidden when there is no GPS data.
+-   A new centralized UI for classifying GPS sessions as Game or Training has been implemented on the Periodization page, and the old UI on the athlete's profile has been removed. Backend endpoints were created to support this.
 
 **Last working item**:
-- **Last item agent was working**: Investigating why charts are missing from the Analysis page and the corresponding PDF report. The agent had determined that the backend PDF generation logic *does* support SVG charts but they were not appearing. The investigation was focused on the data source endpoint, , and its underlying function  in , to see why the necessary data for the charts was not being returned in the API response.
-- **Status**: IN PROGRESS
-- **Agent Testing Done**: N
-- **Which testing method agent to use?**: both
-- **User Testing Done**: N
+-   **Last item agent was working**: The agent was debugging the final user request: correcting the periodization metric calculation. It had identified that historical  were inflated due to incorrect logic that summed sub-periods. The agent implemented a new backend endpoint () to delete the old, incorrect peak values and recalculate them using the correct logic (). However, the recalculation was still producing incorrect results. The agent's final hypothesis was that there was an ID type mismatch (e.g.,  vs. ) in the database queries between the  and  collections, causing the lookup to fail.
+-   **Status**: IN PROGRESS
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: backend testing agent
+-   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Charts are missing from the Analysis page and PDF report. (P0)
--   **Issue 2**: The global theme-switching fix is incomplete. (P1)
+-   **Issue 1**: Fix the periodization peak value recalculation logic. (P0)
+-   **Issue 2**: Complete the internationalization of the  component. (P1)
+-   **Issue 3**: Internationalize the Avaliações (Assessments) page. (P1)
+-   **Issue 4**: Test the  pipeline's integration with the . (P2)
 
 **Issues Detail**:
--   **Issue 1: Charts are missing from the Analysis page and PDF report.**
-    -   **Attempted fixes**: The agent identified that the backend code for PDF generation can handle SVG charts, and the frontend code renders charts conditionally based on data availability. The investigation correctly shifted to the data source.
+-   **Issue 1: Fix the periodization peak value recalculation logic.**
+    -   **Attempted fixes**: The agent confirmed the function to extract metrics from a single session () works correctly. It then created a force-recalculation endpoint () that first deletes old peak values and then re-processes all game sessions. This still resulted in mismatches.
     -   **Next debug checklist**:
-        1.  Inspect the logic within the  function in .
-        2.  Check what data (e.g., , ) is being fetched and processed within that function for a given .
-        3.  Verify if the final  object being returned by the  endpoint contains the data structures required by the frontend chart components.
-        4.  If data is missing, trace back to the source collections (, , etc.) to ensure data exists for the test athlete.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a core feature of the application. Fixing it will ensure that coaches can view and export complete scientific analysis reports, including visual data representations, which is critical for decision-making.
+        1.  Investigate the agent's final hypothesis: is there an ID type mismatch between  and  (or their respective  fields)?
+        2.  Examine the queries in  in . Ensure that all lookups and aggregations correctly handle  and  types. It's likely that a  or  conversion is missing.
+        3.  Once the query logic is confirmed, re-run the force recalculation and verify that the newly stored  match the highest total session values from the  collection for that athlete.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is the final step of the user's requests. It will ensure that all periodization plans are calculated based on correct, non-inflated peak performance data for each athlete.
     -   **Status**: IN PROGRESS
     -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Both.
+    -   **Should Test frontend/backend/both after fix?**: Backend
     -   **Blocked on other issue**: None.
 
--   **Issue 2: The global theme-switching fix is incomplete.**
-    -   **Attempted fixes**: The agent successfully refactored several key files (, , ) to use the  hook instead of static color imports.
-    -   **Next debug checklist**:
-        1.  Refer to the list of files identified in Chat Message #194 that still import  statically.
-        2.  For each file, apply the same refactoring pattern: remove , add , and convert the static  object into a dynamic function or a  hook that depends on .
-    -   **Why fix this issue and what will be achieved with the fix?**: To provide a consistent and professional user experience. An incomplete theme makes the app appear broken and unfinished.
-    -   **Status**: IN PROGRESS
+-   **Issue 2: Complete the internationalization of the  component.**
+    -   **Attempted fixes**: None in this session. This was superseded by other user requests.
+    -   **Next debug checklist**: Scan  for hardcoded strings and replace them with  function calls. Add new keys to  and  if needed.
+    -   **Why fix this issue and what will be achieved with the fix?**: Fulfills a pending high-priority requirement from a previous session.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None.
+
+-   **Issue 3: Internationalize the Avaliações (Assessments) page.**
+    -   **Attempted fixes**: None.
+    -   **Next debug checklist**: Identify the components for the Avaliações page, find hardcoded strings, add translation keys, and replace the text with  calls.
+    -   **Why fix this issue and what will be achieved with the fix?**: Fulfills a pending user requirement.
+    -   **Status**: NOT STARTED
     -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend.
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None.
+
+-   **Issue 4: Test the  pipeline's integration with the .**
+    -   **Attempted fixes**: None. This task has been skipped for two consecutive sessions.
+    -   **Next debug checklist**: Review the purpose of the  and  pipeline from previous handoffs and design a test to verify their interaction.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical backend feature that has not been validated.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: Backend
     -   **Blocked on other issue**: None.
 
 **In progress Task List**:
-None. All current work is classified as bug fixing.
+-   **Task 1: Fix and validate the peak value recalculation logic.**
+    -   **Where to resume**: Debugging the  function in .
+    -   **What will be achieved with this?**: The periodization data for all athletes will be based on correct peak performance values.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: Backend
+    -   **Blocked on something**: None.
 
 **Upcoming and Future Tasks**
-- **Upcoming Tasks**:
-    - **P1**: Test the  pipeline's integration with the . This was the top priority from the previous handoff but was superseded and never completed. It is a critical task to prevent data integrity regressions.
-    - **P2** (Awaiting Specification): Integrate the identity resolution system into  and  pipelines. The user has clarified that these import modules do not exist yet and that implementation should wait for a formal specification.
-- **Future Tasks**:
-    - Build a frontend UI (modal) for the manual resolution of ambiguous athlete names during data import.
-    - Implement a feature for merging duplicate athlete profiles, initiated by a coach.
+-   **Upcoming Tasks**:
+    -   **P1**: Complete internationalization of  and the Avaliações page.
+    -   **P2**: Test the  pipeline's integration with the .
+-   **Future Tasks**:
+    -   Integrate identity resolution into  and .
+    -   Build a UI for manual resolution of ambiguous athlete names.
+    -   Implement a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
-- **Periodization Calculation Bug (FIXED)**:
-  - Identified the root cause as a data problem (missing ).
-  - Implemented a new endpoint  in  to backfill historical data.
-  - Verified that all athletes now show correctly calculated goals.
-- **UI Contrast Bug (FIXED)**:
-  - Modified styles in  to make the Back to Main Menu button clearly visible.
-- **Global Theme Application (PARTIALLY FIXED)**:
-  - Refactored key frontend screens (, , ) to use the global .
-- **Localization (FIXED)**:
-  - Completed the translation files for , , , and  in  by adding all missing keys.
-- **Documentation (UPDATED)**:
-  - Updated  with session notes.
+-   **Forced Dark Theme**: Removed theme toggle and hardcoded dark theme in .
+-   **Simplified Languages**: Removed Spanish, French, Arabic, and Mandarin locales and configurations in .
+-   **PDF Report Chart Fix**: Modified  to use a / to render the full HTML report from the backend. Fixed a  in the backend report generation logic in .
+-   **Subscription Page Update**: Hardcoded the new price and feature list in .
+-   **Fatigue Index Chart Fix**: Corrected classification labels and used  on the displayed value in  and .
+-   **Individual Game Marking Fix**: Modified the  endpoint in  and the frontend call in  to use both  and .
+-   **Dashboard Top Performer Fix**: Adjusted logic in  to only show the Top Performer card if .
+-   **Centralized Activity Classification**: Removed classification UI from  and added a new UI with backend endpoints (, ) to  and .
 
 **Earlier issues found/mentioned but not fixed**
-- The global theme switching is only partially complete. The agent identified a long list of files that still need refactoring (see Chat Message #194) but only fixed a few.
+-   **Incomplete Internationalization**: The tasks to fully translate the Analysis and Assessments pages, carried over from the previous session, were not worked on.
+-   ** pipeline testing**: A critical backend task from two sessions ago that was skipped again.
 
 **Known issue recurrence from previous fork**
-- **Issue**: The periodization calculation bug where only the first athlete showed values.
-- **Recurrence count**: 1. The user reported the issue again after an initial, incorrect fix was applied.
-- **Status**: RESOLVED. The true root cause (missing historical data) was identified and fixed by creating a backfill mechanism.
+-   **Issue**: Incomplete feature implementation (specifically localization). The agent prioritized new user requests over completing pending i18n tasks.
+-   **Recurrence count**: 3
+-   **Status**: NOT STARTED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend**: FastAPI, MongoDB
-- **Frontend**: React Native, Expo,  for localization, React Context for state management (Theme, Language).
-- **Debugging**: The session involved deep debugging of a data-related bug, requiring direct database inspection, API testing with , and creating a data backfill script.
-- **Refactoring**: A significant refactoring effort was started on the frontend to convert static  objects into dynamic style functions to support global theming.
+-   **Frontend**: React Native, Expo, , React Context (Theme, Language), React Query.
+-   **Backend**: FastAPI, MongoDB.
+-   **Data Integrity**: The last task highlighted a critical issue with data consistency in MongoDB, where different parts of the code may treat IDs as  or , leading to query failures. This requires careful debugging.
+-   **Refactoring**: A major refactoring was performed to centralize the Game/Training classification logic from a per-athlete UI to a global coach-level UI on the periodization page.
 
 **key DB schema**
-No changes were made to the database schema.
+No schema changes. The agent heavily interacted with  and  collections and discovered potential inconsistencies in how  and  are stored and queried (string vs. ObjectId).
 
 **changes in tech stack**
-None.
+-   The  library was identified and used.
 
 **All files of reference**
-- **Modified**:
-  - : Added the  endpoint and fixed an  string normalization issue.
-  - : Refactored for dynamic theming.
-  - : Refactored for dynamic theming.
-  - : Fixed UI contrast and refactored for dynamic theming.
-  - : All localization files were updated or completed.
-- **Referenced**:
-  - 
-  - 
+-   
+-   
+-   
+-   
+-   
+-   
+-   
+-   
+-   
+-   
 
 **Areas that need refactoring**:
-- **Critical**: All remaining frontend files listed in Chat Message #194 that use static  import must be refactored to use the  hook for the theme-switching feature to work globally.
+-   The  function in  needs to be fixed to handle ID types correctly. The delete-then-recalculate approach might also be inefficient for large datasets and could be improved.
 
 **key api endpoints**
-- **Added**: : Recalculates and backfills all athlete peak values from existing GAME sessions.
-- **Investigated**:
-  - 
-  - 
-  - 
+-   **Added**:
+    -   : Lists all unique GPS sessions for a coach to classify.
+    -   : Classifies a session as game or training for all athletes involved.
+    -   : Deletes and recalculates all peak values for a coach.
+-   **Modified**:
+    -   : Logic changed to be specific to an  within a .
+    -   : Now returns a full HTML page with embedded SVG charts.
 
 **Critical Info for New Agent**
-- **User Interaction**: The user frequently pivots to new, specific tasks with very strict constraints. You MUST read the user's instructions carefully and adhere to the specified scope.
-- **Current Task**: Your immediate priority is to continue debugging the missing charts on the Analysis page and PDF report. The investigation points to missing data in the response from . Start by examining the  function in .
-- **Incomplete Refactoring**: A large frontend refactoring task for theme-switching is in progress but incomplete. Once the chart bug is fixed, this should be the next priority for UI consistency.
-- **Pending Critical Task**: The original task from the previous session—**testing the  pipeline integration**—is still pending and is a high-priority risk that needs to be addressed.
+-   **Your immediate priority (P0) is to fix the periodization peak value calculation.** The last agent suspected an ID type mismatch (string vs. ObjectId) in the queries within  in . You must investigate and correct this to ensure lookups between  and  work correctly.
+-   Once the backend logic is fixed, you must use the  endpoint to backfill the correct data for existing users.
+-   After resolving the periodization issue, several high-priority tasks from previous sessions are still pending and should be addressed: full internationalization of the Analysis and Assessments pages, and testing the  pipeline.
 
 **documents and test reports created in this job**
--  (updated)
--  (overwritten)
--  (overwritten)
--  (overwritten)
--  (overwritten)
+-    (updated multiple times)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User Msg #332:** Reports a new bug: charts are missing from the Analysis page and the corresponding PDF report. (IN PROGRESS)
-2.  **User Msg #296:** Reports that app translations are incomplete for several languages. (COMPLETED)
-3.  **User Msg #295:** Agent confirms the theme fix is partial and needs to be applied to more files.
-4.  **User Msg #294:** Agent confirms no build errors after applying partial theme fix.
-5.  **User Msg #182:** Reports a new bug: the light/dark theme toggle does not work consistently across all screens. (IN PROGRESS)
-6.  **User Msg #87:** Re-reports the initial periodization calculation bug, indicating the first fix was not sufficient. (COMPLETED)
-7.  **User Msg #82:** Clarifies that  and  modules do not exist and instructs the agent to wait for specifications. (ACKNOWLEDGED)
-8.  **User Msg #72:** Approves the plan to integrate identity resolution into other pipelines (P2) and acknowledges future tasks (P3).
-9.  **User Msg #59:** Confirms the UI contrast fix for the Voltar button is accepted and considers the page complete. (COMPLETED)
-10. **User Msg #48:** Reports the UI contrast bug with the Voltar button. (COMPLETED)
+1.  **User Msg #574**: Request to fix periodization metric calculation to use the total session value, not the sum of sub-periods. (IN PROGRESS)
+2.  **User Msg #496**: Request to centralize Game/Training classification on the periodization page and remove it from the athlete profile. (COMPLETED)
+3.  **User Msg #442**: Request to fix dashboard cards to show real data, not defaults, especially when no data exists. (COMPLETED)
+4.  **User Msg #388**: Request to fix the logic for marking game sessions to be individual for each athlete. (COMPLETED)
+5.  **User Msg #273**: Request to correct the Fatigue Index chart's classification labels and ensure the value is always positive. (COMPLETED)
+6.  **User Msg #243**: Request to update the subscription page with a fixed price and new feature list. (COMPLETED)
+7.  **User Msg #106**: Request to fix the PDF report and its preview to include the charts visible on the analysis page. (COMPLETED)
+8.  **User Msg #65**: Request to remove all languages except Portuguese and English. (COMPLETED)
+9.  **User Msg #5**: Request to force a dark theme for the entire app and remove the toggle button. (COMPLETED)
+10. **User Msg #4**: User approved the initial plan (which was from the previous handoff).
 
 **Project Health Check:**
 -   **Broken**:
-    -   Analysis page and PDF report generation (missing charts).
-    -   Global theme switching is inconsistent across the application.
+    -   The core periodization calculation logic is incorrect due to historically inflated  in the database. The fix is in progress but blocked on a suspected data type mismatch issue.
 -   **Mocked**: None.
 
 **3rd Party Integrations**
-- , , : Used for fuzzy string matching in the  module.
+-   , , : For fuzzy string matching (identity resolution).
+-   : Used to render the HTML report preview on the frontend.
 
 **Testing status**
-- **Testing agent used after significant changes**: NO
-- **Troubleshoot agent used after agent stuck in loop**: NO
-- **Test files created**: []
-- **Known regressions**: None identified, but the untested  integration remains a risk.
+-   **Testing agent used after significant changes**: NO
+-   **Troubleshoot agent used after agent stuck in loop**: NO
+-   **Test files created**: []
+-   **Known regressions**: None identified, but many core logic changes were made without automated regression tests.
 
 **Credentials to test flow:**
-To test endpoints requiring authentication, use the user  with password , which was reset during the session.
+-   **User**:  | **Password**:  (This user was created for testing and has an athlete, but limited data).
+-   **User**:  | **Password**:  (This user has a significant amount of GPS and periodization data and was used to test the final features).
 
 **What agent forgot to execute**
-- The original P1 task from the handoff summary: **to create and run tests for the  data pipeline** to verify the identity resolution integration. This was completely skipped in favor of the user's new requests.
-- The agent did not complete the full refactoring for the global theme fix, leaving many pages in an inconsistent state.</analysis>
+-   The agent correctly prioritized the user's new, explicit requests. However, in doing so, it did not complete the pending tasks from the previous handoff summary:
+    -   Complete the internationalization of .
+    -   Internationalize the Avaliações (Assessments) page.
+    -   Test the  pipeline integration.</analysis>
