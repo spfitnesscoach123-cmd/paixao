@@ -421,7 +421,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   notificationButton: {
     position: 'relative',
     padding: 8,
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 12,
   },
   notificationBadge: {
@@ -451,7 +451,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -468,7 +468,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 4,
   },
   createButton: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
     padding: 16,
     flexDirection: 'row',
@@ -511,7 +511,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.primary,
   },
   weekCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
@@ -593,7 +593,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 16,
   },
   emptyStateTitle: {
@@ -615,7 +615,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'flex-end',
   },
   notificationsModal: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.dark.secondary,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '70%',
@@ -651,7 +651,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   notificationItem: {
     flexDirection: 'row',
-    backgroundColor: colors.card,
+    backgroundColor: colors.dark.card,
     borderRadius: 12,
     padding: 12,
     marginBottom: 12,
