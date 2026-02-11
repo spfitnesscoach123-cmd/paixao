@@ -408,7 +408,9 @@
     "logout": "退出登录",
     "theme": "主题",
     "darkMode": "深色模式",
-    "lightMode": "浅色模式"
+    "lightMode": "浅色模式",
+    "profileUpdated": "个人资料更新成功",
+    "emailCannotBeChanged": "电子邮件无法更改"
   },
   "features": {
     "aiAnalysis": "AI分析",

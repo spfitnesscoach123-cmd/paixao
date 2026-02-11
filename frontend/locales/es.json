@@ -408,7 +408,9 @@
     "logout": "Cerrar Sesión",
     "theme": "Tema",
     "darkMode": "Modo Oscuro",
-    "lightMode": "Modo Claro"
+    "lightMode": "Modo Claro",
+    "profileUpdated": "Perfil actualizado con éxito",
+    "emailCannotBeChanged": "El correo no puede ser cambiado"
   },
   "features": {
     "aiAnalysis": "Análisis con IA",

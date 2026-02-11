@@ -408,7 +408,9 @@
     "logout": "تسجيل الخروج",
     "theme": "المظهر",
     "darkMode": "الوضع الداكن",
-    "lightMode": "الوضع الفاتح"
+    "lightMode": "الوضع الفاتح",
+    "profileUpdated": "تم تحديث الملف الشخصي بنجاح",
+    "emailCannotBeChanged": "لا يمكن تغيير البريد الإلكتروني"
   },
   "features": {
     "aiAnalysis": "تحليل الذكاء الاصطناعي",

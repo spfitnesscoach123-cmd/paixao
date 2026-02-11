@@ -408,7 +408,9 @@
     "logout": "Déconnexion",
     "theme": "Thème",
     "darkMode": "Mode Sombre",
-    "lightMode": "Mode Clair"
+    "lightMode": "Mode Clair",
+    "profileUpdated": "Profil mis à jour avec succès",
+    "emailCannotBeChanged": "L'email ne peut pas être modifié"
   },
   "features": {
     "aiAnalysis": "Analyse IA",
