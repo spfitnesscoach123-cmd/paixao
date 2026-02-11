@@ -110,6 +110,41 @@ export default function PeriodizationScreen() {
     },
   });
 
+  // Fetch all GPS sessions for classification
+  const { data: gpsSessions, isLoading: sessionsLoading, refetch: refetchSessions } = useQuery({
+    queryKey: ['gps-sessions-classification'],
+    queryFn: async () => {
+      const response = await api.get('/gps-data/sessions/all');
+      return response.data;
+    },
+  });
+
+  // State for activity classification section
+  const [showActivityModal, setShowActivityModal] = useState(false);
+
+  // Mutation to classify session
+  const classifySessionMutation = useMutation({
+    mutationFn: async ({ sessionId, activityType }: { sessionId: string; activityType: string }) => {
+      await api.put(`/gps-data/session/${sessionId}/classify-all`, { 
+        activity_type: activityType 
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-weeks'] });
+      Alert.alert(
+        locale === 'pt' ? 'Sucesso' : 'Success',
+        locale === 'pt' ? 'Atividade classificada e peaks recalculados' : 'Activity classified and peaks recalculated'
+      );
+    },
+    onError: () => {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Não foi possível classificar a atividade' : 'Could not classify activity'
+      );
+    },
+  });
+
   // Mark notification as read
   const markReadMutation = useMutation({
     mutationFn: async (notificationId: string) => {
