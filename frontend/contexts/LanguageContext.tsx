@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import i18n, { loadSavedLanguage, saveLanguage, languages, isRTL } from '../i18n';
 
 interface LanguageContextType {
@@ -31,9 +31,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLocaleState(code);
   };
 
-  const t = (key: string, options?: object): string => {
+  // useCallback with locale dependency ensures t() triggers re-renders when locale changes
+  const t = useCallback((key: string, options?: object): string => {
     return i18n.t(key, options);
-  };
+  }, [locale]);
 
   return (
     <LanguageContext.Provider
