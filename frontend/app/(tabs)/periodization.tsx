@@ -327,6 +327,40 @@ export default function PeriodizationScreen() {
           <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
         </TouchableOpacity>
 
+        {/* Activity Classification Section */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Classificação de Atividades GPS' : 'GPS Activity Classification'}
+          </Text>
+        </View>
+        
+        <TouchableOpacity
+          style={styles.classificationButton}
+          onPress={() => setShowActivityModal(true)}
+          data-testid="classify-activities-button"
+        >
+          <View style={styles.classificationButtonContent}>
+            <View style={[styles.createButtonIcon, { backgroundColor: '#22c55e' }]}>
+              <Ionicons name="football" size={24} color="#ffffff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.createButtonTitle}>
+                {locale === 'pt' ? 'Classificar Atividades' : 'Classify Activities'}
+              </Text>
+              <Text style={styles.createButtonSubtitle}>
+                {locale === 'pt' 
+                  ? 'Marque sessões como Jogo ou Treino' 
+                  : 'Mark sessions as Game or Training'}
+              </Text>
+            </View>
+            <View style={styles.sessionCountBadge}>
+              <Text style={styles.sessionCountText}>
+                {gpsSessions?.length || 0}
+              </Text>
+            </View>
+          </View>
+        </TouchableOpacity>
+
         {/* Weeks List */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>
@@ -356,6 +390,117 @@ export default function PeriodizationScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Activity Classification Modal */}
+      <Modal
+        visible={showActivityModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowActivityModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.activityModal}>
+            <View style={styles.activityModalHeader}>
+              <Text style={styles.activityModalTitle}>
+                {locale === 'pt' ? 'Classificar Atividades' : 'Classify Activities'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowActivityModal(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.activityModalSubtitle}>
+              {locale === 'pt' 
+                ? 'Marque as sessões como Jogo para usar como base de cálculo das prescrições. O maior valor de cada métrica entre os jogos será usado para cada atleta.'
+                : 'Mark sessions as Game to use as calculation base for prescriptions. The highest value of each metric among games will be used for each athlete.'}
+            </Text>
+
+            <ScrollView style={styles.activityList}>
+              {sessionsLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.accent.primary} />
+                </View>
+              ) : gpsSessions && gpsSessions.length > 0 ? (
+                gpsSessions.map((session: any) => (
+                  <View key={session.session_id} style={styles.sessionCard}>
+                    <View style={styles.sessionInfo}>
+                      <Text style={styles.sessionDate}>
+                        {session.date ? format(parseISO(session.date), 'dd/MM/yyyy', { locale: dateLocale }) : 'N/A'}
+                      </Text>
+                      <Text style={styles.sessionAthletes}>
+                        {session.athlete_count} {locale === 'pt' ? 'atletas' : 'athletes'}
+                      </Text>
+                      <Text style={styles.sessionMetrics}>
+                        {((session.avg_distance || 0) / 1000).toFixed(1)}km | {session.avg_hsr || 0}m HSR
+                      </Text>
+                    </View>
+                    <View style={styles.sessionClassifyButtons}>
+                      <TouchableOpacity
+                        style={[
+                          styles.classifyBtn,
+                          session.activity_type === 'training' && styles.classifyBtnTraining,
+                        ]}
+                        onPress={() => classifySessionMutation.mutate({ 
+                          sessionId: session.session_id, 
+                          activityType: 'training' 
+                        })}
+                        disabled={classifySessionMutation.isPending}
+                      >
+                        <Ionicons 
+                          name="fitness" 
+                          size={16} 
+                          color={session.activity_type === 'training' ? '#fff' : colors.text.secondary} 
+                        />
+                        <Text style={[
+                          styles.classifyBtnText,
+                          session.activity_type === 'training' && styles.classifyBtnTextActive,
+                        ]}>
+                          {locale === 'pt' ? 'Treino' : 'Training'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.classifyBtn,
+                          session.activity_type === 'game' && styles.classifyBtnGame,
+                        ]}
+                        onPress={() => classifySessionMutation.mutate({ 
+                          sessionId: session.session_id, 
+                          activityType: 'game' 
+                        })}
+                        disabled={classifySessionMutation.isPending}
+                      >
+                        <Ionicons 
+                          name="football" 
+                          size={16} 
+                          color={session.activity_type === 'game' ? '#fff' : colors.text.secondary} 
+                        />
+                        <Text style={[
+                          styles.classifyBtnText,
+                          session.activity_type === 'game' && styles.classifyBtnTextActive,
+                        ]}>
+                          {locale === 'pt' ? 'Jogo' : 'Game'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <View style={styles.emptyState}>
+                  <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
+                  <Text style={styles.emptyStateTitle}>
+                    {locale === 'pt' ? 'Nenhuma sessão GPS' : 'No GPS sessions'}
+                  </Text>
+                  <Text style={styles.emptyStateText}>
+                    {locale === 'pt' 
+                      ? 'Importe dados GPS para classificar atividades.'
+                      : 'Import GPS data to classify activities.'}
+                  </Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Notifications Modal */}
       <Modal
