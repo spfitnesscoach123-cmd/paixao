@@ -5052,12 +5052,22 @@ async def get_scientific_analysis(
         
         if body_comp:
             latest = body_comp[0]
+            # Get body_fat_percentage - calculate from fat_mass_kg and weight if not present
+            body_fat_pct = latest.get("body_fat_percentage", None)
+            if body_fat_pct is None:
+                weight = latest.get("weight", 0)
+                fat_mass = latest.get("fat_mass_kg", 0)
+                if weight > 0:
+                    body_fat_pct = round((fat_mass / weight) * 100, 1)
+                else:
+                    body_fat_pct = 0
+            
             response.body_composition = {
                 "records_count": len(body_comp),
                 "latest": {
                     "date": latest.get("date", ""),
                     "protocol": latest.get("protocol", ""),
-                    "body_fat_percent": latest.get("body_fat_percent", 0),
+                    "body_fat_percent": body_fat_pct,
                     "lean_mass_kg": latest.get("lean_mass_kg", 0),
                     "fat_mass_kg": latest.get("fat_mass_kg", 0),
                     "weight_kg": latest.get("weight", 0),
@@ -5068,7 +5078,17 @@ async def get_scientific_analysis(
             
             if len(body_comp) >= 2:
                 prev = body_comp[1]
-                fat_change = latest.get("body_fat_percent", 0) - prev.get("body_fat_percent", 0)
+                # Calculate prev body fat percent if not present
+                prev_fat_pct = prev.get("body_fat_percentage", None)
+                if prev_fat_pct is None:
+                    prev_weight = prev.get("weight", 0)
+                    prev_fat_mass = prev.get("fat_mass_kg", 0)
+                    if prev_weight > 0:
+                        prev_fat_pct = round((prev_fat_mass / prev_weight) * 100, 1)
+                    else:
+                        prev_fat_pct = 0
+                
+                fat_change = body_fat_pct - prev_fat_pct
                 lean_change = latest.get("lean_mass_kg", 0) - prev.get("lean_mass_kg", 0)
                 response.body_composition["trend"] = {
                     "fat_percent_change": round(fat_change, 1),
