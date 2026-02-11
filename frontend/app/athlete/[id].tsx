@@ -233,29 +233,6 @@ export default function AthleteDetails() {
     };
   };
 
-  // Mutation to classify GPS session as game or training
-  const classifySessionMutation = useMutation({
-    mutationFn: async ({ sessionId, activityType }: { sessionId: string; activityType: string }) => {
-      await api.put(`/gps-data/session/${sessionId}/activity-type`, { 
-        activity_type: activityType,
-        athlete_id: id  // Include athlete_id to update only this athlete's session
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['gps', id] });
-    },
-    onError: () => {
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Não foi possível classificar a atividade' : 'Could not classify activity'
-      );
-    },
-  });
-
-  const handleClassifySession = (sessionId: string, activityType: string) => {
-    classifySessionMutation.mutate({ sessionId, activityType });
-  };
-
   const deleteMutation = useMutation({
     mutationFn: async () => {
       await api.delete(`/athletes/${id}`);
