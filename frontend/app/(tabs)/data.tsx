@@ -106,7 +106,9 @@ export default function DataScreen() {
       return { athlete, avgDistance: avgDist };
     });
 
-    const topPerformer = athleteDistances.sort((a, b) => b.avgDistance - a.avgDistance)[0];
+    // Only set topPerformer if there's actual GPS data (avgDistance > 0)
+    const sortedByDistance = athleteDistances.sort((a, b) => b.avgDistance - a.avgDistance);
+    const topPerformer = sortedByDistance[0]?.avgDistance > 0 ? sortedByDistance[0] : null;
 
     return {
       totalAthletes,
