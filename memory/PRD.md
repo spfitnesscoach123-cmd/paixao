@@ -424,6 +424,7 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 - [x] Sistema de notificações de novos picos
 - [x] Modo tabela e cards para visualização
 - [x] Contraste visual do botão "Voltar ao Menu Principal" corrigido
+- [x] Endpoint de recálculo de peak values (`POST /api/periodization/recalculate-peaks`)
 
 ### Bug Fix (2026-02-10)
 **Problema:** Valores calculados apareciam apenas para o 1º atleta; demais mostravam 0.
@@ -433,6 +434,20 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 **Correção aplicada:**
 1. Normalização para `str` na escrita: `athlete_id = str(session_records[0].get("athlete_id"))`
 2. Normalização para `str` na leitura: `peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}`
+
+### Bug Fix (2026-02-11)
+**Problema:** Mesmo após normalização, atletas ainda mostravam 0 porque não tinham peak_values.
+
+**Causa raiz:** Sessões GPS importadas como "game" não disparavam criação de peak_values. A função `update_athlete_peak_values` só era chamada no endpoint de reclassificação, não na importação.
+
+**Correção aplicada:**
+- Novo endpoint `POST /api/periodization/recalculate-peaks` que:
+  1. Busca todas as sessões GPS marcadas como "game"
+  2. Agrupa por atleta e sessão
+  3. Recalcula peak values para cada atleta com base no melhor valor de cada métrica
+  4. Atualiza a coleção `athlete_peak_values`
+
+**Resultado:** 22 atletas atualizados, todos com metas calculadas corretamente.
 
 ---
 
