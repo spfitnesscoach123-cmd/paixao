@@ -496,6 +496,30 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 - Troca de idioma funciona corretamente entre os dois
 - Todas as traduções de pt e en preservadas intactas
 
+### ✅ Preview de Relatório com Gráficos no PDF
+**Solicitação:** Garantir que os gráficos da página de Análises apareçam no preview e no PDF gerado.
+
+**Problema Identificado:**
+- O modal de preview mostrava apenas texto, sem gráficos
+- O endpoint `/api/report/scientific/{id}` retornava 500 para atletas sem peso/altura
+
+**Alterações:**
+1. **ScientificAnalysisTab.tsx** - Modificado para carregar HTML completo:
+   - Adicionado import `WebView` de `react-native-webview`
+   - Estados `reportHtml` e `loadingReport` adicionados
+   - Função `loadReportPreview()` busca HTML do backend via API autenticada
+   - Modal usa `iframe` (web) / `WebView` (mobile) para renderizar HTML com gráficos SVG
+   - Estilos `modalContentFull` e `webView` adicionados
+
+2. **server.py** - Corrigido bug de None vs int:
+   - Linha 5407-5408: `athlete.get('weight', 0)` → `athlete.get('weight') or 0`
+   - Mesma correção para `height`
+
+**Resultado:**
+- Preview do relatório exibe textos + gráficos (composição corporal donut, etc.)
+- PDF final abre em nova aba com todos os gráficos
+- Valores consistentes entre tela e PDF
+
 ---
 
 ## Referências Científicas
