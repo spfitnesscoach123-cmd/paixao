@@ -408,7 +408,9 @@
     "logout": "Logout",
     "theme": "Theme",
     "darkMode": "Dark Mode",
-    "lightMode": "Light Mode"
+    "lightMode": "Light Mode",
+    "profileUpdated": "Profile updated successfully",
+    "emailCannotBeChanged": "Email cannot be changed"
   },
   "features": {
     "aiAnalysis": "AI Analysis",
