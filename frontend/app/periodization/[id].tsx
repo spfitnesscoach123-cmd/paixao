@@ -45,9 +45,12 @@ const METRICS = [
 export default function PeriodizationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { locale } = useLanguage();
+  const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const dateLocale = locale === 'pt' ? ptBR : enUS;
+  
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
