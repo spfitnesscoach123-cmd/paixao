@@ -376,10 +376,10 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
             {/* Labels for side view */}
             <G>
               <SvgText x="100" y="145" fontSize="10" fill={getColor(regionValues.trunkFront)} fontWeight="bold" textAnchor="middle">
-                {regionValues.trunkFront.toFixed(0)}%
+                {Math.round(regionValues.trunkFront)}%
               </SvgText>
               <SvgText x="75" y="250" fontSize="9" fill={getColor(regionValues.lowerBody)} fontWeight="bold" textAnchor="middle">
-                {regionValues.lowerBody.toFixed(0)}%
+                {Math.round(regionValues.lowerBody)}%
               </SvgText>
             </G>
           </Svg>
