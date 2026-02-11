@@ -1523,17 +1523,22 @@ async def update_athlete_peak_values(
 async def recalculate_all_peak_values(current_user: dict = Depends(get_current_user)):
     """Recalculate peak values for all athletes based on existing GAME sessions.
     This fixes missing peak values when GPS data was imported but peaks weren't calculated.
-    IMPORTANT: This will RESET all peak values first and then recalculate from scratch."""
+    IMPORTANT: This will RESET all peak values first and then recalculate from scratch.
+    
+    The calculation uses only the TOTAL SESSION value from each CSV (ignoring sub-periods like 1st half, 2nd half).
+    For each athlete, the highest value per metric across all GAME sessions is stored as their peak.
+    """
     
     coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)  # Normalize to string for consistent queries
     
     # STEP 1: Delete all existing peak values for this coach (to fix corrupted data)
-    delete_result = await db.athlete_peak_values.delete_many({"coach_id": str(coach_id)})
+    delete_result = await db.athlete_peak_values.delete_many({"coach_id": coach_id_str})
     print(f"Deleted {delete_result.deleted_count} old peak values")
     
     # Get all GPS sessions marked as GAME
     game_sessions = await db.gps_data.find({
-        "coach_id": str(coach_id),
+        "coach_id": coach_id_str,
         "activity_type": "game"
     }).to_list(5000)
     
@@ -1560,35 +1565,46 @@ async def recalculate_all_peak_values(current_user: dict = Depends(get_current_u
     
     # Process each session and update peak values
     athletes_updated = set()
+    athletes_processed = set()
+    sessions_processed = 0
+    
     for session_data in sessions_by_athlete.values():
         athlete_id = session_data["athlete_id"]
         
-        # Verify athlete exists
+        # Verify athlete exists - use str for coach_id comparison since athletes.coach_id is stored as str
         try:
-            athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id})
+            athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id_str})
             if not athlete:
-                continue
-        except:
+                # Try with ObjectId coach_id as fallback for legacy data
+                athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id})
+                if not athlete:
+                    continue
+        except Exception as e:
+            print(f"Error finding athlete {athlete_id}: {e}")
             continue
         
-        # Extract metrics from session
+        athletes_processed.add(athlete_id)
+        
+        # Extract metrics from session - this function correctly uses only session total, not sum of periods
         session_metrics = extract_gps_metrics_from_session(session_data["records"])
         
-        # Update peak values (only if higher)
+        # Update peak values (only if higher than current peak)
         updated = await update_athlete_peak_values(
             athlete_id=athlete_id,
-            coach_id=coach_id,
+            coach_id=coach_id_str,  # Always pass as string for consistency
             session_metrics=session_metrics,
             session_date=session_data["date"],
             athlete_name=athlete.get("name", "")
         )
         
+        sessions_processed += 1
         if updated:
             athletes_updated.add(athlete_id)
     
     return {
-        "message": f"Peak values recalculated from {len(sessions_by_athlete)} GAME sessions",
+        "message": f"Peak values recalculated from {sessions_processed} GAME sessions",
         "peaks_deleted": delete_result.deleted_count,
+        "athletes_processed": len(athletes_processed),
         "athletes_updated": len(athletes_updated),
         "athlete_ids": list(athletes_updated)
     }
