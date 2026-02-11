@@ -839,7 +839,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
         )}
       </TouchableOpacity>
 
-      {/* PDF Preview Modal */}
+      {/* PDF Preview Modal - Uses WebView to show full report with charts */}
       <Modal
         visible={showPdfPreview}
         animationType="slide"
@@ -847,7 +847,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
         onRequestClose={() => setShowPdfPreview(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalContentFull}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {locale === 'pt' ? 'Preview do Relatório' : 'Report Preview'}
@@ -857,71 +857,35 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
               </TouchableOpacity>
             </View>
             
-            <ScrollView style={styles.previewScroll}>
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>
-                  {locale === 'pt' ? '📊 Análise Científica Completa' : '📊 Complete Scientific Analysis'}
-                </Text>
-                <Text style={styles.previewText}>{analysis.athlete_name} - {analysis.analysis_date}</Text>
-              </View>
-              
-              <View style={styles.previewSection}>
-                <Text style={styles.previewSectionTitle}>
-                  {locale === 'pt' ? '🎯 Nível de Risco' : '🎯 Risk Level'}
-                </Text>
-                <Text style={[styles.previewText, { color: getRiskColor(analysis.overall_risk_level) }]}>
-                  {getRiskLabel(analysis.overall_risk_level)}
-                </Text>
-                {analysis.injury_risk_factors.map((f, i) => (
-                  <Text key={i} style={styles.previewItem}>• {f}</Text>
-                ))}
-              </View>
-
-              {analysis.gps_summary && (
-                <View style={styles.previewSection}>
-                  <Text style={styles.previewSectionTitle}>📍 GPS</Text>
-                  <Text style={styles.previewItem}>
-                    {locale === 'pt' ? 'Distância Média' : 'Avg Distance'}: {(analysis.gps_summary.avg_distance_m / 1000).toFixed(1)} km
-                  </Text>
-                  <Text style={styles.previewItem}>
-                    {locale === 'pt' ? 'Alta Intensidade' : 'High Intensity'}: {analysis.gps_summary.avg_high_intensity_m.toFixed(0)} m
-                  </Text>
-                  <Text style={styles.previewItem}>
-                    Sprints: {analysis.gps_summary.avg_sprints.toFixed(1)}/sessão
-                  </Text>
-                </View>
-              )}
-
-              {analysis.jump_analysis && (
-                <View style={styles.previewSection}>
-                  <Text style={styles.previewSectionTitle}>🦘 {locale === 'pt' ? 'Avaliação de Salto' : 'Jump Assessment'}</Text>
-                  <Text style={styles.previewItem}>RSI: {analysis.jump_analysis.latest?.rsi?.toFixed(2)}</Text>
-                  <Text style={styles.previewItem}>
-                    {locale === 'pt' ? 'Altura' : 'Height'}: {analysis.jump_analysis.latest?.jump_height_cm?.toFixed(1)} cm
-                  </Text>
-                  <Text style={styles.previewItem}>Z-Score: {analysis.jump_analysis.historical?.z_score?.toFixed(2)}</Text>
-                </View>
-              )}
-
-              {analysis.vbt_analysis && (
-                <View style={styles.previewSection}>
-                  <Text style={styles.previewSectionTitle}>⚡ VBT</Text>
-                  <Text style={styles.previewItem}>
-                    1RM Estimado: {analysis.vbt_analysis.load_velocity_profile?.estimated_1rm_kg?.toFixed(0)} kg
-                  </Text>
-                  <Text style={styles.previewItem}>
-                    {locale === 'pt' ? 'Carga Ótima' : 'Optimal Load'}: {analysis.vbt_analysis.load_velocity_profile?.optimal_load_kg?.toFixed(0)} kg
-                  </Text>
-                </View>
-              )}
-
-              {analysis.scientific_insights && (
-                <View style={styles.previewSection}>
-                  <Text style={styles.previewSectionTitle}>🧠 {locale === 'pt' ? 'Insights Científicos' : 'Scientific Insights'}</Text>
-                  <Text style={styles.previewInsights}>{analysis.scientific_insights.substring(0, 500)}...</Text>
-                </View>
-              )}
-            </ScrollView>
+            {/* WebView loads the full HTML report with charts from backend */}
+            {Platform.OS === 'web' ? (
+              <iframe
+                src={`${api.defaults.baseURL?.replace('/api', '')}/api/report/scientific/${athleteId}?lang=${locale}`}
+                style={{
+                  flex: 1,
+                  width: '100%',
+                  border: 'none',
+                  borderRadius: 8,
+                  backgroundColor: '#0f172a',
+                }}
+              />
+            ) : (
+              <WebView
+                source={{ 
+                  uri: `${api.defaults.baseURL?.replace('/api', '')}/api/report/scientific/${athleteId}?lang=${locale}` 
+                }}
+                style={styles.webView}
+                startInLoadingState={true}
+                renderLoading={() => (
+                  <View style={styles.webViewLoading}>
+                    <ActivityIndicator size="large" color={colors.accent.primary} />
+                    <Text style={styles.loadingText}>
+                      {locale === 'pt' ? 'Carregando relatório...' : 'Loading report...'}
+                    </Text>
+                  </View>
+                )}
+              />
+            )}
             
             <View style={styles.modalFooter}>
               <TouchableOpacity 
@@ -929,7 +893,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
                 onPress={() => setShowPdfPreview(false)}
               >
                 <Text style={styles.modalCancelText}>
-                  {locale === 'pt' ? 'Cancelar' : 'Cancel'}
+                  {locale === 'pt' ? 'Fechar' : 'Close'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity 
@@ -941,7 +905,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
               >
                 <Ionicons name="print" size={20} color="#ffffff" />
                 <Text style={styles.modalPrintText}>
-                  {locale === 'pt' ? 'Imprimir PDF' : 'Print PDF'}
+                  {locale === 'pt' ? 'Abrir para Imprimir' : 'Open to Print'}
                 </Text>
               </TouchableOpacity>
             </View>
