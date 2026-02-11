@@ -328,25 +328,25 @@ export default function AthleteDetails() {
             <View style={styles.infoCard}>
               <View style={styles.infoRow}>
                 <Ionicons name="calendar" size={20} color={colors.accent.primary} />
-                <Text style={styles.infoLabel}>Idade:</Text>
-                <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} anos</Text>
+                <Text style={styles.infoLabel}>{t('athletes.age')}:</Text>
+                <Text style={styles.infoValue}>{calculateAge(athlete.birth_date)} {t('common.years')}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Ionicons name="football" size={20} color={colors.accent.tertiary} />
-                <Text style={styles.infoLabel}>Posição:</Text>
+                <Text style={styles.infoLabel}>{t('athletes.position')}:</Text>
                 <Text style={styles.infoValue}>{athlete.position}</Text>
               </View>
               {athlete.height && (
                 <View style={styles.infoRow}>
                   <Ionicons name="resize" size={20} color={colors.accent.blue} />
-                  <Text style={styles.infoLabel}>Altura:</Text>
+                  <Text style={styles.infoLabel}>{t('athletes.height')}:</Text>
                   <Text style={styles.infoValue}>{athlete.height} cm</Text>
                 </View>
               )}
               {athlete.weight && (
                 <View style={styles.infoRow}>
                   <Ionicons name="barbell" size={20} color={colors.accent.secondary} />
-                  <Text style={styles.infoLabel}>Peso:</Text>
+                  <Text style={styles.infoLabel}>{t('athletes.weight')}:</Text>
                   <Text style={styles.infoValue}>{athlete.weight} kg</Text>
                 </View>
               )}
