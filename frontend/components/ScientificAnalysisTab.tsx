@@ -1310,6 +1310,28 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: '85%',
   },
+  modalContentFull: {
+    backgroundColor: colors.dark.secondary,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '90%',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  webViewLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.dark.secondary,
+  },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
