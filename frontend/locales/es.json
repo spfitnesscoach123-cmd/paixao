@@ -18,7 +18,9 @@
     "error": "Error",
     "success": "Éxito",
     "warning": "Advertencia",
-    "tryAgain": "Intentar de Nuevo"
+    "tryAgain": "Intentar de Nuevo",
+    "date": "Fecha",
+    "notes": "Observaciones"
   },
   "auth": {
     "login": "Iniciar Sesión",

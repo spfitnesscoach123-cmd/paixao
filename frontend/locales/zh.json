@@ -18,7 +18,9 @@
     "error": "错误",
     "success": "成功",
     "warning": "警告",
-    "tryAgain": "重试"
+    "tryAgain": "重试",
+    "date": "日期",
+    "notes": "备注"
   },
   "auth": {
     "login": "登录",

@@ -18,7 +18,9 @@
     "error": "Erreur",
     "success": "Succès",
     "warning": "Avertissement",
-    "tryAgain": "Réessayer"
+    "tryAgain": "Réessayer",
+    "date": "Date",
+    "notes": "Observations"
   },
   "auth": {
     "login": "Connexion",
