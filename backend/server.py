@@ -1120,11 +1120,13 @@ async def update_session_activity_type(
     if not data.athlete_id:
         raise HTTPException(status_code=400, detail="athlete_id is required")
     
+    coach_id_str = str(current_user["_id"])
+    
     # Get the session records for this specific athlete
     session_records = await db.gps_data.find({
         "session_id": session_id,
-        "athlete_id": ObjectId(data.athlete_id),
-        "coach_id": current_user["_id"]
+        "athlete_id": data.athlete_id,
+        "coach_id": coach_id_str
     }).to_list(100)
     
     if not session_records:
@@ -1134,8 +1136,8 @@ async def update_session_activity_type(
     result = await db.gps_data.update_many(
         {
             "session_id": session_id,
-            "athlete_id": ObjectId(data.athlete_id),
-            "coach_id": current_user["_id"]
+            "athlete_id": data.athlete_id,
+            "coach_id": coach_id_str
         },
         {"$set": {"activity_type": data.activity_type}}
     )
@@ -1156,7 +1158,7 @@ async def update_session_activity_type(
         # Update peak values
         peak_updated = await update_athlete_peak_values(
             athlete_id=athlete_id,
-            coach_id=current_user["_id"],
+            coach_id=coach_id_str,
             session_metrics=session_metrics,
             session_date=session_date,
             athlete_name=athlete_name
