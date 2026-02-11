@@ -267,16 +267,16 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
           
           <View style={styles.fatigueScale}>
             <View style={[styles.fatigueScaleItem, { backgroundColor: '#10b98120' }]}>
-              <Text style={[styles.fatigueScaleLabel, { color: '#10b981' }]}>0 a -5%</Text>
+              <Text style={[styles.fatigueScaleLabel, { color: '#10b981' }]}>0 a 5%</Text>
               <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Normal' : 'Normal'}</Text>
             </View>
             <View style={[styles.fatigueScaleItem, { backgroundColor: '#f59e0b20' }]}>
-              <Text style={[styles.fatigueScaleLabel, { color: '#f59e0b' }]}>-6 a -12%</Text>
+              <Text style={[styles.fatigueScaleLabel, { color: '#f59e0b' }]}>6 a 12%</Text>
               <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Monitorar' : 'Monitor'}</Text>
             </View>
             <View style={[styles.fatigueScaleItem, { backgroundColor: '#ef444420' }]}>
-              <Text style={[styles.fatigueScaleLabel, { color: '#ef4444' }]}>&lt;-13%</Text>
-              <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Risco' : 'Risk'}</Text>
+              <Text style={[styles.fatigueScaleLabel, { color: '#ef4444' }]}>&gt;13%</Text>
+              <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Alto Risco' : 'High Risk'}</Text>
             </View>
           </View>
         </View>
