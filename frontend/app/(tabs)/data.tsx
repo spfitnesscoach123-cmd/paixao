@@ -15,6 +15,7 @@ export default function DataScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
 
   const { data: athletes } = useQuery({

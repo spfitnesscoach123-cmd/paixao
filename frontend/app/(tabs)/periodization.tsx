@@ -81,6 +81,7 @@ interface PeriodizationWeek {
 
 export default function PeriodizationScreen() {
   const { t, locale } = useLanguage();
+  const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const dateLocale = locale === 'pt' ? ptBR : enUS;
