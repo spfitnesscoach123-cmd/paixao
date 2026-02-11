@@ -1397,6 +1397,75 @@ async def update_athlete_peak_values(
     return len(updates) > 0
 
 
+@api_router.post("/periodization/recalculate-peaks")
+async def recalculate_all_peak_values(current_user: dict = Depends(get_current_user)):
+    """Recalculate peak values for all athletes based on existing GAME sessions.
+    This fixes missing peak values when GPS data was imported but peaks weren't calculated."""
+    
+    coach_id = current_user["_id"]
+    
+    # Get all GPS sessions marked as GAME
+    game_sessions = await db.gps_data.find({
+        "coach_id": coach_id,
+        "activity_type": "game"
+    }).to_list(5000)
+    
+    if not game_sessions:
+        return {"message": "No GAME sessions found", "athletes_updated": 0}
+    
+    # Group by athlete_id and session_id
+    sessions_by_athlete = {}
+    for record in game_sessions:
+        athlete_id = str(record.get("athlete_id", ""))
+        session_id = record.get("session_id", "")
+        if not athlete_id or not session_id:
+            continue
+        
+        key = f"{athlete_id}_{session_id}"
+        if key not in sessions_by_athlete:
+            sessions_by_athlete[key] = {
+                "athlete_id": athlete_id,
+                "session_id": session_id,
+                "date": record.get("date", ""),
+                "records": []
+            }
+        sessions_by_athlete[key]["records"].append(record)
+    
+    # Process each session and update peak values
+    athletes_updated = set()
+    for session_data in sessions_by_athlete.values():
+        athlete_id = session_data["athlete_id"]
+        
+        # Verify athlete exists
+        try:
+            athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id})
+            if not athlete:
+                continue
+        except:
+            continue
+        
+        # Extract metrics from session
+        session_metrics = extract_gps_metrics_from_session(session_data["records"])
+        
+        # Update peak values (only if higher)
+        updated = await update_athlete_peak_values(
+            athlete_id=athlete_id,
+            coach_id=coach_id,
+            session_metrics=session_metrics,
+            session_date=session_data["date"],
+            athlete_name=athlete.get("name", "")
+        )
+        
+        if updated:
+            athletes_updated.add(athlete_id)
+    
+    return {
+        "message": f"Peak values recalculated from {len(sessions_by_athlete)} GAME sessions",
+        "athletes_updated": len(athletes_updated),
+        "athlete_ids": list(athletes_updated)
+    }
+
+
 # ============= PERIODIZATION ROUTES =============
 
 @api_router.get("/periodization/weeks")
