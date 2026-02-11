@@ -451,6 +451,30 @@ Os seguintes pipelines foram mencionados como intenção futura, mas **não deve
 
 ---
 
+## Changelog (2026-02-11)
+
+### ✅ Tema Escuro Forçado
+**Solicitação:** Remover botão de alternância de tema e forçar tema escuro em todas as telas.
+
+**Alterações:**
+1. **ThemeContext.tsx** - Simplificado para sempre retornar tema escuro:
+   - Removido `useState`, `useEffect`, `AsyncStorage`
+   - Removidas funções `toggleTheme`, `setTheme`, `loadTheme`, `saveTheme`
+   - Contexto agora retorna valores fixos: `theme: 'dark'`, `isDark: true`, `colors: darkColors`
+
+2. **profile.tsx** - Removido bloco do Switch de tema:
+   - Removido import `Switch`
+   - Removidas variáveis `theme`, `toggleTheme`, `isDark` do destructuring
+   - Removido bloco JSX do "Theme Toggle" (linhas 109-133)
+
+**Resultado:** 
+- Botão de tema removido da página de Perfil
+- Todas as telas aplicam exclusivamente tema escuro
+- Cores e layout preservados
+- Nenhuma funcionalidade quebrada
+
+---
+
 ## Referências Científicas
 
 - Claudino et al. (2017) - CMJ monitoring in team sports
