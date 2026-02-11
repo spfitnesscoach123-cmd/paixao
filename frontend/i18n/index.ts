@@ -4,39 +4,27 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import en from '../locales/en.json';
 import pt from '../locales/pt.json';
-import es from '../locales/es.json';
-import fr from '../locales/fr.json';
-import zh from '../locales/zh.json';
-import ar from '../locales/ar.json';
 
 export const LANGUAGE_KEY = '@app_language';
 
 export const languages = [
-  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
   { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇧🇷' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español', flag: '🇪🇸' },
-  { code: 'fr', name: 'French', nativeName: 'Français', flag: '🇫🇷' },
-  { code: 'zh', name: 'Chinese', nativeName: '中文', flag: '🇨🇳' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦', rtl: true },
+  { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
 ];
 
 const i18n = new I18n({
   en,
   pt,
-  es,
-  fr,
-  zh,
-  ar,
 });
 
 // Set the initial locale
-i18n.defaultLocale = 'en';
+i18n.defaultLocale = 'pt';
 i18n.enableFallback = true;
 
 // Get device locale and set as default
-const deviceLocale = Localization.getLocales()[0]?.languageCode || 'en';
-const supportedLocales = ['en', 'pt', 'es', 'fr', 'zh', 'ar'];
-i18n.locale = supportedLocales.includes(deviceLocale) ? deviceLocale : 'en';
+const deviceLocale = Localization.getLocales()[0]?.languageCode || 'pt';
+const supportedLocales = ['en', 'pt'];
+i18n.locale = supportedLocales.includes(deviceLocale) ? deviceLocale : 'pt';
 
 // Function to load saved language
 export const loadSavedLanguage = async (): Promise<string> => {
@@ -62,9 +50,9 @@ export const saveLanguage = async (languageCode: string): Promise<void> => {
   }
 };
 
-// Function to check if current language is RTL
+// Function to check if current language is RTL (kept for compatibility, always returns false)
 export const isRTL = (): boolean => {
-  return i18n.locale === 'ar';
+  return false;
 };
 
 export default i18n;
