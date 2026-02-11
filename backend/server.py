@@ -1615,9 +1615,16 @@ async def recalculate_all_peak_values(current_user: dict = Depends(get_current_u
 @api_router.get("/periodization/weeks")
 async def get_periodization_weeks(current_user: dict = Depends(get_current_user)):
     """Get all periodization weeks for the coach"""
+    coach_id_str = str(current_user["_id"])
     weeks = await db.periodization_weeks.find({
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     }).sort("start_date", -1).to_list(100)
+    
+    # Fallback for legacy data with ObjectId
+    if not weeks:
+        weeks = await db.periodization_weeks.find({
+            "coach_id": current_user["_id"]
+        }).sort("start_date", -1).to_list(100)
     
     for week in weeks:
         week["id"] = str(week.pop("_id"))
@@ -1631,10 +1638,17 @@ async def get_periodization_week(
     current_user: dict = Depends(get_current_user)
 ):
     """Get a specific periodization week"""
+    coach_id_str = str(current_user["_id"])
     week = await db.periodization_weeks.find_one({
         "_id": ObjectId(week_id),
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id_str
     })
+    # Fallback for legacy
+    if not week:
+        week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
     
     if not week:
         raise HTTPException(status_code=404, detail="Week not found")
@@ -1649,8 +1663,9 @@ async def create_periodization_week(
     current_user: dict = Depends(get_current_user)
 ):
     """Create a new periodization week"""
+    coach_id_str = str(current_user["_id"])
     week_doc = {
-        "coach_id": current_user["_id"],
+        "coach_id": coach_id_str,  # Store as string for consistency
         "name": week_data.name,
         "start_date": week_data.start_date,
         "end_date": week_data.end_date,
