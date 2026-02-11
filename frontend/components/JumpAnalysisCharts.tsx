@@ -260,7 +260,7 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
             </View>
             <View style={[styles.variationBadge, { backgroundColor: fatigue.color + '20' }]}>
               <Text style={[styles.variationText, { color: fatigue.color }]}>
-                {fatigue.rsi_variation_percent > 0 ? '+' : ''}{fatigue.rsi_variation_percent.toFixed(1)}%
+                {Math.abs(fatigue.rsi_variation_percent).toFixed(1)}%
               </Text>
             </View>
           </View>
