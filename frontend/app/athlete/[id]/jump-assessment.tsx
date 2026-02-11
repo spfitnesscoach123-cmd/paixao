@@ -229,7 +229,7 @@ const FatigueStatusCard = ({ fatigue, locale }: { fatigue: JumpAnalysis['fatigue
         </View>
         <View style={[styles.variationBadge, { backgroundColor: fatigue.color + '20' }]}>
           <Text style={[styles.variationText, { color: fatigue.color }]}>
-            {fatigue.rsi_variation_percent > 0 ? '+' : ''}{fatigue.rsi_variation_percent.toFixed(1)}%
+            {Math.abs(fatigue.rsi_variation_percent).toFixed(1)}%
           </Text>
         </View>
       </View>
@@ -257,15 +257,15 @@ const FatigueStatusCard = ({ fatigue, locale }: { fatigue: JumpAnalysis['fatigue
       {/* Reference Scale */}
       <View style={styles.fatigueScale}>
         <View style={[styles.fatigueScaleItem, { backgroundColor: '#10b98120' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#10b981' }]}>0 a -5%</Text>
+          <Text style={[styles.fatigueScaleLabel, { color: '#10b981' }]}>0 a 5%</Text>
           <Text style={styles.fatigueScaleText}>Normal</Text>
         </View>
         <View style={[styles.fatigueScaleItem, { backgroundColor: '#f59e0b20' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#f59e0b' }]}>-6 a -12%</Text>
+          <Text style={[styles.fatigueScaleLabel, { color: '#f59e0b' }]}>6 a 12%</Text>
           <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Monitorar' : 'Monitor'}</Text>
         </View>
         <View style={[styles.fatigueScaleItem, { backgroundColor: '#ef444420' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#ef4444' }]}>&lt;-13%</Text>
+          <Text style={[styles.fatigueScaleLabel, { color: '#ef4444' }]}>&gt;13%</Text>
           <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Alto Risco' : 'High Risk'}</Text>
         </View>
       </View>
