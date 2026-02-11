@@ -523,6 +523,22 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
     }
   };
 
+  // Load report HTML for preview
+  const loadReportPreview = async () => {
+    setLoadingReport(true);
+    try {
+      const response = await api.get(`/report/scientific/${athleteId}?lang=${locale}`, {
+        responseType: 'text',
+      });
+      setReportHtml(response.data);
+      setShowPdfPreview(true);
+    } catch (error) {
+      console.error('Error loading report preview:', error);
+    } finally {
+      setLoadingReport(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
