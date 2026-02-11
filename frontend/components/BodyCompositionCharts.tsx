@@ -408,28 +408,28 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
             <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
               <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.upperArm * 2, 100)}%`, backgroundColor: getColor(regionValues.upperArm) }]} />
             </View>
-            <Text style={[styles.regionValue, { color: getColor(regionValues.upperArm) }]}>{regionValues.upperArm.toFixed(1)}%</Text>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.upperArm) }]}>{formatValue(regionValues.upperArm)}%</Text>
           </View>
           <View style={styles.regionRow}>
             <Text style={styles.regionLabel}>{t2.trunkFront}</Text>
             <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
               <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.trunkFront * 2, 100)}%`, backgroundColor: getColor(regionValues.trunkFront) }]} />
             </View>
-            <Text style={[styles.regionValue, { color: getColor(regionValues.trunkFront) }]}>{regionValues.trunkFront.toFixed(1)}%</Text>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.trunkFront) }]}>{formatValue(regionValues.trunkFront)}%</Text>
           </View>
           <View style={styles.regionRow}>
             <Text style={styles.regionLabel}>{t2.hipWaist}</Text>
             <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
               <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.hipWaist * 2, 100)}%`, backgroundColor: getColor(regionValues.hipWaist) }]} />
             </View>
-            <Text style={[styles.regionValue, { color: getColor(regionValues.hipWaist) }]}>{regionValues.hipWaist.toFixed(1)}%</Text>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.hipWaist) }]}>{formatValue(regionValues.hipWaist)}%</Text>
           </View>
           <View style={styles.regionRow}>
             <Text style={styles.regionLabel}>{t2.lowerBody}</Text>
             <View style={[styles.regionBar, { backgroundColor: colors.dark.secondary }]}>
               <View style={[styles.regionBarFill, { width: `${Math.min(regionValues.lowerBody * 2, 100)}%`, backgroundColor: getColor(regionValues.lowerBody) }]} />
             </View>
-            <Text style={[styles.regionValue, { color: getColor(regionValues.lowerBody) }]}>{regionValues.lowerBody.toFixed(1)}%</Text>
+            <Text style={[styles.regionValue, { color: getColor(regionValues.lowerBody) }]}>{formatValue(regionValues.lowerBody)}%</Text>
           </View>
         </View>
       </View>
