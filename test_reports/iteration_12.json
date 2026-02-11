@@ -1,0 +1,84 @@
+{
+  "summary": "Frontend localization testing for 6 languages (PT, EN, ES, FR, AR, ZH). Language switching UI works correctly on Profile page, but translations are NOT being applied to other pages after language change. Critical bug found in LanguageContext - the t() function doesn't trigger re-renders when locale changes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "critical": [
+      {
+        "component": "LanguageContext",
+        "issue": "Language switching does not persist or apply correctly across pages. The t() function in LanguageContext doesn't trigger re-renders when locale changes. Pages like generate-wellness-link.tsx, add-wellness.tsx, forgot-password.tsx show English texts even when Portuguese is selected.",
+        "selector": "N/A - Context issue",
+        "priority": "CRITICAL",
+        "root_cause": "The t() function in LanguageContext.tsx is created once and never changes reference. When locale changes, i18n.locale is updated but React doesn't know to re-render because the t function reference stays the same.",
+        "affected_pages": [
+          "/generate-wellness-link",
+          "/athlete/[id]/add-wellness",
+          "/forgot-password"
+        ],
+        "fix_suggestion": "Modify LanguageContext to make t() depend on locale state, or use useMemo/useCallback with locale as dependency to create a new function reference when locale changes"
+      }
+    ],
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/frontend/contexts/LanguageContext.tsx",
+    "/app/frontend/i18n/index.ts",
+    "/app/frontend/locales/pt.json",
+    "/app/frontend/locales/en.json"
+  ],
+  "action_items": [
+    "FIX CRITICAL: Update LanguageContext.tsx to make t() function trigger re-renders when locale changes. Suggested fix: wrap t function with useCallback and include locale as dependency, or create a new t function reference when locale changes",
+    "Verify all 6 locale files have complete translations for all keys used in the app",
+    "Test language persistence across page navigations after fix"
+  ],
+  "critical_code_review_comments": [
+    "LanguageContext.tsx line 34-36: The t() function is created once and never changes reference. This prevents React from re-rendering when locale changes.",
+    "Suggested fix: const t = useCallback((key: string, options?: object): string => { return i18n.t(key, options); }, [locale]);"
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A (frontend only testing)",
+    "frontend": "30% - Language switching UI works on Profile page, but translations don't apply to other pages"
+  },
+  "test_credentials": {
+    "email": "test@test.com",
+    "password": "test1234"
+  },
+  "seed_data_creation": "",
+  "retest_needed": true,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Language switching feature has a critical bug. The Profile page correctly shows language options and the UI updates when language is changed, but other pages (generate-wellness-link, add-wellness, forgot-password) do not reflect the language change. The root cause is in LanguageContext.tsx - the t() function doesn't trigger re-renders. All 6 locale files (pt, en, es, fr, ar, zh) have the required translation keys.",
+  "languages_tested": {
+    "English": "PASS - Default language works",
+    "Portuguese": "PARTIAL - Profile page works, other pages show English",
+    "Spanish": "PARTIAL - Profile page works, other pages show English",
+    "French": "PARTIAL - Profile page works, other pages show English",
+    "Chinese": "PARTIAL - Profile page works, other pages show English",
+    "Arabic": "PARTIAL - Profile page works, other pages show English"
+  },
+  "pages_tested": {
+    "/profile": "PASS - Language switching UI works, translations apply correctly",
+    "/generate-wellness-link": "FAIL - Shows English regardless of selected language",
+    "/athlete/[id]/add-wellness": "FAIL - Shows English regardless of selected language",
+    "/forgot-password": "FAIL - Shows English regardless of selected language",
+    "/team": "PASS - Bottom navigation translates correctly",
+    "/athletes": "PASS - Bottom navigation translates correctly"
+  },
+  "rca_of_the_issue": {
+    "issue": "Language translations not applying to pages after language change",
+    "root_cause": "LanguageContext.tsx creates the t() function once without dependencies. When setLocale() is called, it updates the locale state and i18n.locale, but the t function reference doesn't change, so React doesn't re-render components using t().",
+    "reproduction_steps": [
+      "1. Login with test@test.com / test1234",
+      "2. Navigate to Profile page",
+      "3. Click on Language and select Portuguese",
+      "4. Profile page shows Portuguese correctly",
+      "5. Navigate to Generate Wellness Link page",
+      "6. Page shows English texts instead of Portuguese"
+    ],
+    "mitigation": "Update LanguageContext.tsx to use useCallback with locale dependency for the t function, or force re-render when locale changes"
+  }
+}
