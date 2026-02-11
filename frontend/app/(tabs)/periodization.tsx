@@ -85,6 +85,8 @@ export default function PeriodizationScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const dateLocale = locale === 'pt' ? ptBR : enUS;
+  
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showWeekDetail, setShowWeekDetail] = useState<string | null>(null);
