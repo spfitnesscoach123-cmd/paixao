@@ -408,7 +408,9 @@
     "logout": "Sair da Conta",
     "theme": "Tema",
     "darkMode": "Modo Escuro",
-    "lightMode": "Modo Claro"
+    "lightMode": "Modo Claro",
+    "profileUpdated": "Perfil atualizado com sucesso",
+    "emailCannotBeChanged": "O email não pode ser alterado"
   },
   "features": {
     "aiAnalysis": "Análise com IA",
