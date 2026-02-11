@@ -240,60 +240,6 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Edit Profile Modal */}
-      <Modal
-        visible={showEditProfileModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowEditProfileModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('athletes.editProfile')}</Text>
-              <TouchableOpacity onPress={() => setShowEditProfileModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.editProfileForm}>
-              <Text style={styles.inputLabel}>{t('auth.fullName')}</Text>
-              <TextInput
-                style={styles.input}
-                value={editName}
-                onChangeText={setEditName}
-                placeholder={t('auth.fullName')}
-                placeholderTextColor={colors.text.tertiary}
-                autoCapitalize="words"
-              />
-              
-              <Text style={[styles.inputLabel, { marginTop: 16 }]}>{t('auth.email')}</Text>
-              <View style={styles.disabledInput}>
-                <Text style={styles.disabledInputText}>{user?.email}</Text>
-              </View>
-              <Text style={styles.inputHint}>{t('settings.emailCannotBeChanged')}</Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.saveButton, isUpdating && styles.saveButtonDisabled]}
-              onPress={handleSaveProfile}
-              disabled={isUpdating}
-            >
-              <LinearGradient
-                colors={colors.gradients.primary}
-                style={styles.saveButtonGradient}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.saveButtonText}>{t('common.save')}</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
