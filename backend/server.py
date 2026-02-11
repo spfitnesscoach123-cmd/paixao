@@ -1588,6 +1588,7 @@ async def recalculate_all_peak_values(current_user: dict = Depends(get_current_u
     
     return {
         "message": f"Peak values recalculated from {len(sessions_by_athlete)} GAME sessions",
+        "peaks_deleted": delete_result.deleted_count,
         "athletes_updated": len(athletes_updated),
         "athlete_ids": list(athletes_updated)
     }
