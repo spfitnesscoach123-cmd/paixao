@@ -188,7 +188,7 @@ export default function PeriodizationScreen() {
                 key={index}
                 style={[
                   styles.dayPreviewBadge,
-                  { backgroundColor: classification?.color || colors.card }
+                  { backgroundColor: classification?.color || colors.dark.card }
                 ]}
               >
                 <Text style={styles.dayPreviewText}>{classification?.label || '?'}</Text>
