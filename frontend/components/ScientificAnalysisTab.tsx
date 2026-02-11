@@ -67,7 +67,7 @@ const RSIEvolutionChart = ({ data, locale }: { data: any[], locale: string }) =>
   
   return (
     <View style={chartStyles.container}>
-      <Text style={chartStyles.title}>{locale === 'pt' ? 'Evolução RSI' : 'RSI Evolution'}</Text>
+      <Text style={chartStyles.title}>{t('analysis.rsiEvolution')}</Text>
       <Svg width={chartWidth} height={chartHeight}>
         {/* Grid lines */}
         {[0, 0.5, 1].map((ratio, i) => (
