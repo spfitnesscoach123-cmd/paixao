@@ -481,7 +481,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       return response.data;
     },
     enabled: !!athleteId,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 0, // Always fetch fresh data to ensure dynamic updates
+    refetchOnMount: 'always', // Refetch when component mounts
   });
 
   const getRiskColor = (level: string) => {
