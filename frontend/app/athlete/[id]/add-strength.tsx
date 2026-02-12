@@ -78,9 +78,9 @@ const EXERCISES = [
 ];
 
 const PROVIDERS = [
-  { id: 'push_band', name: 'PUSH Band 2.0', inputMethod: 'Bluetooth', icon: 'fitness', color: '#FF6B35' },
-  { id: 'vitruve', name: 'Vitruve', inputMethod: 'Bluetooth', icon: 'speedometer', color: '#00D4AA' },
-  { id: 'beast', name: 'Beast Sensor', inputMethod: 'Bluetooth', icon: 'flash', color: '#FFD700' },
+  { id: 'push_band', name: 'PUSH Band 2.0', inputMethod: 'Manual', icon: 'fitness', color: '#FF6B35' },
+  { id: 'vitruve', name: 'Vitruve', inputMethod: 'Manual', icon: 'speedometer', color: '#00D4AA' },
+  { id: 'beast', name: 'Beast Sensor', inputMethod: 'Manual', icon: 'flash', color: '#FFD700' },
   { id: 'manual', name: 'Manual', inputMethod: 'Manual', icon: 'create', color: colors.text.secondary },
 ];
 
