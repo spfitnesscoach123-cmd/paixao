@@ -269,6 +269,9 @@ export default function AthleteDetails() {
       queryClient.invalidateQueries({ queryKey: ['gps', id] }),
       queryClient.invalidateQueries({ queryKey: ['wellness', id] }),
       queryClient.invalidateQueries({ queryKey: ['assessments', id] }),
+      queryClient.invalidateQueries({ queryKey: ['jump-analysis'] }),
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] }),
+      queryClient.invalidateQueries({ queryKey: ['analysis'] }),
     ]);
     setRefreshing(false);
   };
