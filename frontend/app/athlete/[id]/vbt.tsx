@@ -80,9 +80,6 @@ const EXERCISES = [
 ];
 
 const PROVIDERS = [
-  { id: 'push_band', name: 'PUSH Band 2.0', icon: 'fitness', color: '#FF6B35' },
-  { id: 'vitruve', name: 'Vitruve', icon: 'speedometer', color: '#00D4AA' },
-  { id: 'beast', name: 'Beast Sensor', icon: 'flash', color: '#FFD700' },
   { id: 'manual', name: 'Manual', icon: 'create', color: colors.text.secondary },
 ];
 
