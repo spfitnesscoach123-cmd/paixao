@@ -14,7 +14,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Tire fotos dos atletas",
-        "NSBluetoothAlwaysUsageDescription": "O aplicativo pode utilizar Bluetooth caso o usuário conecte dispositivos externos de monitoramento de desempenho físico."
+        "NSBluetoothAlwaysUsageDescription": "LoadManager Pro may use Bluetooth to connect to external performance monitoring devices when authorized by the user.",
+        "NSBluetoothPeripheralUsageDescription": "LoadManager Pro may use Bluetooth to communicate with compatible external sports performance devices."
       }
     },
     "android": {
