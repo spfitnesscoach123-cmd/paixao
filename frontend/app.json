@@ -13,7 +13,8 @@
       "bundleIdentifier": "com.loadmanager.app",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
-        "NSCameraUsageDescription": "Tire fotos dos atletas"
+        "NSCameraUsageDescription": "Tire fotos dos atletas",
+        "NSBluetoothAlwaysUsageDescription": "O aplicativo pode utilizar Bluetooth caso o usuário conecte dispositivos externos de monitoramento de desempenho físico."
       }
     },
     "android": {
