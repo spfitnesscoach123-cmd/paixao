@@ -672,6 +672,8 @@ export default function JumpAssessment() {
       return res.data;
     },
     retry: false,
+    staleTime: 0, // Always fetch fresh data to ensure dynamic updates
+    refetchOnMount: 'always', // Refetch when component mounts
   });
   
   // Submit mutation
