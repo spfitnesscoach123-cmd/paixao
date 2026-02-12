@@ -41,6 +41,8 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
       return response.data;
     },
     enabled: !!athleteId,
+    staleTime: 0, // Always fetch fresh data to ensure dynamic updates
+    refetchOnMount: 'always', // Refetch when component mounts
   });
 
   const { data: acwrDetailed, isLoading: acwrLoading } = useQuery({
@@ -51,6 +53,8 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
     },
     enabled: !!athleteId,
     retry: false,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: 'always',
   });
 
   const generateMutation = useMutation({
