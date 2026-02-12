@@ -169,7 +169,9 @@ export default function ProfileScreen() {
               </View>
               <View>
                 <Text style={styles.menuItemText}>{t('settings.version')}</Text>
-                <Text style={styles.menuItemSubtext}>1.0.0</Text>
+                <Text style={styles.menuItemSubtext}>
+                  {appVersion}{buildNumber ? ` (${buildNumber})` : ''}
+                </Text>
               </View>
             </View>
           </View>
