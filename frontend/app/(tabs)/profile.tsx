@@ -25,6 +25,10 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   
+  // Get app version from native build (works with EAS autoIncrement)
+  const appVersion = Constants.nativeAppVersion || Constants.expoConfig?.version || '1.0.0';
+  const buildNumber = Constants.nativeBuildVersion || Constants.expoConfig?.ios?.buildNumber || '';
+  
   const styles = createProfileStyles(colors);
 
   const handleLogout = () => {
