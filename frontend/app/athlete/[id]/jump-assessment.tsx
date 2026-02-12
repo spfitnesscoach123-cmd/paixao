@@ -681,8 +681,15 @@ export default function JumpAssessment() {
       return res.data;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['jump-analysis', id] });
-      queryClient.invalidateQueries({ queryKey: ['jump-assessments', id] });
+      // Invalidate all jump-related queries to ensure charts update dynamically
+      queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['jump-assessments'] });
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      
+      // Force refetch the analysis data
+      refetchAnalysis();
       
       Alert.alert(
         locale === 'pt' ? 'Avaliação Salva!' : 'Assessment Saved!',
