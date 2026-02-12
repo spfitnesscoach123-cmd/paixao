@@ -96,7 +96,7 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
   const screenWidth = Dimensions.get('window').width;
   const chartWidth = Math.min(screenWidth - 64, 500);
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['jump-analysis', athleteId, locale],
     queryFn: async () => {
       const response = await api.get<JumpAnalysisData>(
@@ -105,6 +105,8 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
       return response.data;
     },
     retry: false,
+    staleTime: 0, // Always fetch fresh data
+    refetchOnMount: 'always', // Refetch when component mounts
   });
 
   const labels = useMemo(() => ({
