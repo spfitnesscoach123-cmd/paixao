@@ -5322,7 +5322,7 @@ async def generate_scientific_ai_insights(data: ScientificInsightsResponse, athl
     Generate AI-powered scientific insights based on comprehensive athlete data.
     Uses sports science terminology and evidence-based recommendations.
     """
-    from emergentintegrations.llm import LlmChat
+    from emergentintegrations.llm.chat import LlmChat
     
     llm_key = os.environ.get("EMERGENT_LLM_KEY")
     if not llm_key:
