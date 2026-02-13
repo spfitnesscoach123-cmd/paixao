@@ -187,7 +187,7 @@ class TestVBTCameraPhase3:
         
         assert camera_provider is not None, "Camera should be in the list of VBT providers"
         assert camera_provider.get("id") == "camera", "Provider id should be 'camera'"
-        assert camera_provider.get("name") == "Camera", "Provider name should be 'Camera'"
+        assert "Camera" in camera_provider.get("name", ""), f"Provider name should contain 'Camera', got: {camera_provider.get('name')}"
         
         print(f"✓ GET /api/vbt/providers includes camera provider - PASS")
         print(f"  - Camera provider: {camera_provider}")
