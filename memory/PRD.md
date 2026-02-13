@@ -162,6 +162,15 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2026-02-14 - Correção Crash TestFlight (VBT Camera)
+- **FIX CRÍTICO**: Crash do app no iOS quando o botão "VBT via Camera" era pressionado
+- **Causa**: Falta do plugin `expo-camera` na configuração de plugins do `app.json`
+- **Solução Aplicada**:
+  - Atualizada `NSCameraUsageDescription` para: "Precisamos acessar a câmera para capturar dados do VBT"
+  - Adicionado plugin `expo-camera` com permissão configurada corretamente
+  - Adicionado plugin `expo-image-picker` com permissões de câmera e fotos
+- **Próximo Passo**: Novo build (`eas build`) necessário para testar no TestFlight
+
 ### 2026-02-13 - Preparação para Build v1.1.0
 - **NOVA LOGO**: Atualização da logo do app em todas as telas
 - Logo atualizada em:
