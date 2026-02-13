@@ -13,7 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
