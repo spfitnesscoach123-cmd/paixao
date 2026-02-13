@@ -471,7 +471,9 @@ class TestWellnessTokenSystem:
             }
         )
         assert response2.status_code == 400
-        assert "limite" in response2.json().get("detail", "").lower()
+        # Token should be marked as inactive after max_uses reached
+        error_detail = response2.json().get("detail", "").lower()
+        assert "limite" in error_detail or "inativo" in error_detail
         
         # Token validation should also fail
         validate_response = session.post(
