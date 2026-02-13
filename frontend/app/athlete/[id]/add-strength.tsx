@@ -882,6 +882,33 @@ export default function AddStrengthAssessment() {
                 {' '}{locale === 'pt' ? 'Adicionar Dados VBT' : 'Add VBT Data'}
               </Text>
               
+              {/* Camera Button - New VBT via Camera Feature */}
+              <TouchableOpacity
+                style={styles.cameraVbtButton}
+                onPress={() => router.push(`/athlete/${id}/vbt-camera`)}
+                data-testid="vbt-camera-btn"
+              >
+                <LinearGradient colors={['#10b981', '#059669']} style={styles.cameraVbtGradient}>
+                  <Ionicons name="videocam" size={24} color="#ffffff" />
+                  <View style={styles.cameraVbtTextContainer}>
+                    <Text style={styles.cameraVbtText}>
+                      {locale === 'pt' ? 'VBT via Câmera' : 'VBT via Camera'}
+                    </Text>
+                    <Text style={styles.cameraVbtSubtext}>
+                      {locale === 'pt' ? 'Rastreamento em tempo real' : 'Real-time tracking'}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="rgba(255,255,255,0.7)" />
+                </LinearGradient>
+              </TouchableOpacity>
+              
+              {/* Divider */}
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>{locale === 'pt' ? 'ou entrada manual' : 'or manual entry'}</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              
               {/* Device Selection with Input Method Info */}
               <Text style={styles.label}>{labels.device}</Text>
               <View style={styles.providerGrid}>
