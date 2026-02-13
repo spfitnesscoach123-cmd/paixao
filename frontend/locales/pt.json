@@ -20,7 +20,9 @@
     "warning": "Aviso",
     "tryAgain": "Tentar Novamente",
     "date": "Data",
-    "notes": "Observações"
+    "notes": "Observações",
+    "copy": "Copiar",
+    "share": "Compartilhar"
   },
   "auth": {
     "login": "Entrar",
