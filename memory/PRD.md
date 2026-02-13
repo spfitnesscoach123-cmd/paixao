@@ -138,6 +138,20 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2026-02-13 - VBT via Camera (FASE 1)
+- **NOVA FUNCIONALIDADE**: Sistema de rastreamento VBT via câmera
+- Botão "VBT via Camera" na tela de Avaliação de Força (add-strength.tsx)
+- Nova tela de configuração de câmera (vbt-camera.tsx)
+- Inputs de configuração: altura da câmera, distância da barra, carga em kg
+- Seleção de exercício (Back Squat, Deadlift, etc.)
+- Feedback visual em tempo real (verde = OK, vermelho = queda >10%)
+- Contador de repetições e display de velocidade instantânea
+- Resumo da sessão com métricas (velocidade média, máxima, queda de velocidade)
+- Integração com backend: novo provider 'camera' no enum VBTProvider
+- API endpoint `/api/vbt/data` aceita dados com provider='camera'
+- **NOTA**: Funcionalidade de câmera requer app nativo (iOS/Android)
+- **TEST**: 100% taxa de sucesso backend (8/8) e frontend
+
 ### 2026-02-13 - Sistema de Token Wellness
 - **NOVA FUNCIONALIDADE**: Sistema completo de tokens para wellness
 - Tela de seleção de papel (Coach/Atleta) na abertura do app
