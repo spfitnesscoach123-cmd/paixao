@@ -166,8 +166,16 @@ export default function VBTCameraPage() {
   
   // Start recording - now uses the bar tracking hook
   const startRecording = async () => {
+    // Check if camera is ready before starting - prevents iOS crashes
+    if (!isCameraReady) {
+      Alert.alert(
+        locale === 'pt' ? 'Aguarde' : 'Please Wait',
+        locale === 'pt' ? 'A câmera está inicializando...' : 'Camera is initializing...'
+      );
+      return;
+    }
+    
     setRecordingTime(0);
-    setPhase('recording');
     
     // Start the bar tracking (uses simulation or real tracking)
     startTracking();
