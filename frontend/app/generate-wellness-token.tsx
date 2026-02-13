@@ -107,7 +107,7 @@ export default function GenerateWellnessToken() {
         style={styles.gradient}
       >
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} testID="back-button">
             <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
