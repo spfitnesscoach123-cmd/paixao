@@ -529,7 +529,7 @@ export default function VBTCameraPage() {
               {locale === 'pt' ? 'Detalhes por Repetição' : 'Rep Details'}
             </Text>
             
-            {setsData.map((set, index) => (
+            {repsData.map((set, index) => (
               <View key={index} style={styles.repDetailRow}>
                 <Text style={styles.repDetailNumber}>#{set.rep}</Text>
                 <View style={styles.repDetailData}>
@@ -550,9 +550,7 @@ export default function VBTCameraPage() {
             <TouchableOpacity
               style={styles.recordAgainButton}
               onPress={() => {
-                setSetsData([]);
-                setVelocityReadings([]);
-                setRepCount(0);
+                resetTracking();
                 setPhase('recording');
               }}
               data-testid="record-again-btn"
