@@ -8,23 +8,29 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
+const ROLE_SELECTED_KEY = 'role_selected';
 
 export default function RoleSelect() {
   const router = useRouter();
   const { t } = useLanguage();
 
-  const handleCoachSelect = () => {
+  const handleCoachSelect = async () => {
+    // Save role selection
+    await AsyncStorage.setItem(ROLE_SELECTED_KEY, 'coach');
     // Direct to existing login flow
     router.replace('/login');
   };
 
-  const handleAthleteSelect = () => {
+  const handleAthleteSelect = async () => {
+    // Save role selection
+    await AsyncStorage.setItem(ROLE_SELECTED_KEY, 'athlete');
     // Direct to token entry screen
     router.replace('/athlete-token');
   };
