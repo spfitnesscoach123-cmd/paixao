@@ -505,7 +505,7 @@ export default function VBTCameraPage() {
             {!isTracking && repsData.length > 0 && (
               <TouchableOpacity
                 style={styles.reviewButton}
-                onPress={() => setPhase('review')}
+                onPress={() => handlePhaseChange('review')}
                 data-testid="go-to-review-btn"
               >
                 <Text style={styles.reviewButtonText}>{labels.reviewData}</Text>
