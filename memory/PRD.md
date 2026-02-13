@@ -259,8 +259,9 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 - **Arquivos modificados**:
   - `frontend/app/athlete/[id]/vbt-camera.tsx` - Refatoração completa do ciclo de vida
   - `frontend/app.json` - Build number incrementado para 16
-- **Versão**: app.json buildNumber: 16
+- **Versão**: app.json buildNumber: 17
 - **STATUS**: Implementado - Aguardando validação do usuário via novo build TestFlight
+- **NOVO**: Preview da câmera na tela de configuração com indicador "Câmera OK"
 - **PRÓXIMO PASSO**: 
   1. Executar `eas build --platform ios --profile production`
   2. Upload para TestFlight
