@@ -43,13 +43,13 @@ export default function RoleSelect() {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
-          {/* Logo/Icon */}
+          {/* Logo */}
           <View style={styles.logoContainer}>
-            <View style={styles.iconWrapper}>
-              <Ionicons name="fitness" size={64} color={colors.accent.primary} />
-            </View>
-            <Text style={styles.appName}>Load Manager</Text>
-            <Text style={styles.subtitle}>Performance & Recovery</Text>
+            <Image
+              source={require('../assets/logo.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
           </View>
 
           {/* Question */}
