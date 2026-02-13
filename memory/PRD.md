@@ -120,7 +120,7 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Backlog
 
-### P0 - VBT via Camera
+### P0 - VBT via Camera ✅ COMPLETO
 - [x] **Fase 1**: UI e navegação (COMPLETA)
 - [x] **Fase 2**: Tracking de barbell (COMPLETA - 2026-02-13)
   - [x] Módulo de tracking com modelo físico (`services/vbt/barTracker.ts`)
@@ -130,10 +130,12 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
   - [x] Feedback visual (verde = OK, vermelho = queda >10%)
   - [x] Simulação para desenvolvimento (useSimulation: true)
   - [x] Documentação para integração com MediaPipe (build nativo)
-- [ ] **Fase 3**: Integração com gráficos
-  - [ ] Atualizar gráficos de Perda de Velocidade por Set
-  - [ ] Atualizar Perfil Carga x Velocidade
-  - [ ] Atualizar exportação de relatórios PDF
+- [x] **Fase 3**: Integração com gráficos (COMPLETA - 2026-02-13)
+  - [x] Gráficos de Perda de Velocidade por Set atualizados automaticamente
+  - [x] Perfil Carga x Velocidade integrado (requer cargas variadas para regressão)
+  - [x] Relatórios PDF incluem dados VBT da câmera
+  - [x] Invalidação de cache para atualização automática de todas as telas
+  - [x] Testes automatizados criados (`test_vbt_camera_phase3.py`)
 
 **NOTA**: Tracking real com MediaPipe requer build nativo iOS/Android com react-native-vision-camera + Frame Processors. A simulação atual funciona para testes e desenvolvimento.
 
