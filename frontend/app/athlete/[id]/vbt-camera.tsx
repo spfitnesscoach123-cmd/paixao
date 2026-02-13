@@ -399,9 +399,9 @@ export default function VBTCameraPage() {
               ]}>
                 {/* Recording indicator */}
                 <View style={styles.recordingIndicator}>
-                  <View style={[styles.recordingDot, isRecording && styles.recordingDotActive]} />
+                  <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
                   <Text style={styles.recordingText}>
-                    {isRecording ? labels.recording : ''} {formatTime(recordingTime)}
+                    {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
                   </Text>
                 </View>
                 
@@ -444,18 +444,18 @@ export default function VBTCameraPage() {
           {/* Controls */}
           <View style={styles.recordingControls}>
             <TouchableOpacity
-              style={[styles.recordButton, isRecording && styles.stopButton]}
-              onPress={isRecording ? stopRecording : startRecording}
+              style={[styles.recordButton, isTracking && styles.stopButton]}
+              onPress={isTracking ? stopRecording : startRecording}
               data-testid="record-toggle-btn"
             >
               <Ionicons 
-                name={isRecording ? 'stop' : 'play'} 
+                name={isTracking ? 'stop' : 'play'} 
                 size={32} 
                 color="#ffffff" 
               />
             </TouchableOpacity>
             
-            {!isRecording && setsData.length > 0 && (
+            {!isTracking && repsData.length > 0 && (
               <TouchableOpacity
                 style={styles.reviewButton}
                 onPress={() => setPhase('review')}
