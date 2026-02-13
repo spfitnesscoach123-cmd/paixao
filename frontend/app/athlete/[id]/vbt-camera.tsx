@@ -411,7 +411,7 @@ export default function VBTCameraPage() {
                 styles.startButton,
                 !cameraConfig.loadKg && styles.startButtonDisabled
               ]}
-              onPress={() => cameraConfig.loadKg ? setPhase('recording') : null}
+              onPress={() => cameraConfig.loadKg ? handlePhaseChange('recording') : null}
               disabled={!cameraConfig.loadKg}
               data-testid="start-recording-btn"
             >
