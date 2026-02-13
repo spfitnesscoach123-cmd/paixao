@@ -93,7 +93,9 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 ```
 /app
 ├── backend/
-│   └── server.py          # API FastAPI com endpoints wellness token
+│   ├── server.py          # API FastAPI com endpoints wellness token + VBT
+│   └── tests/
+│       └── test_vbt_camera.py  # Testes do VBT Camera
 ├── frontend/
 │   ├── app/
 │   │   ├── index.tsx           # Redirecionamento por role
@@ -102,13 +104,16 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 │   │   ├── athlete-wellness.tsx # Formulário wellness
 │   │   ├── generate-wellness-token.tsx # Coach gera token
 │   │   ├── _layout.tsx         # Rotas configuradas
-│   │   └── (tabs)/
-│   │       └── profile.tsx     # Menu do coach
+│   │   ├── (tabs)/
+│   │   │   └── profile.tsx     # Menu do coach
+│   │   └── athlete/[id]/
+│   │       ├── add-strength.tsx    # Avaliação de força (botão Camera)
+│   │       └── vbt-camera.tsx      # NOVO: VBT via câmera
 │   └── locales/
 │       ├── pt.json             # Traduções português
 │       └── en.json             # Traduções inglês
 └── test_reports/
-    └── iteration_14.json       # Relatório de testes
+    └── iteration_16.json       # Relatório de testes VBT Camera
 ```
 
 ---
