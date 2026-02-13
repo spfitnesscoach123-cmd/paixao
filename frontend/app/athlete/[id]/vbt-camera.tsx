@@ -136,6 +136,18 @@ export default function VBTCameraPage() {
   if (!permission.granted) {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
+        {/* Header with back button */}
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.backButton}
+            data-testid="vbt-camera-back-btn"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>{labels.title}</Text>
+          <View style={{ width: 40 }} />
+        </View>
         <View style={styles.permissionContainer}>
           <Ionicons name="camera-outline" size={64} color={colors.text.tertiary} />
           <Text style={styles.permissionText}>{labels.noPermission}</Text>
