@@ -216,7 +216,7 @@ export default function VBTCameraPage() {
   });
   
   const handleSaveData = () => {
-    if (setsData.length === 0) {
+    if (repsData.length === 0) {
       Alert.alert(
         locale === 'pt' ? 'Sem Dados' : 'No Data',
         locale === 'pt' ? 'Nenhum dado de repetição registrado' : 'No rep data recorded'
@@ -225,8 +225,8 @@ export default function VBTCameraPage() {
     }
     
     // Calculate summary statistics
-    const avgVelocity = setsData.reduce((sum, s) => sum + s.meanVelocity, 0) / setsData.length;
-    const maxVelocity = Math.max(...setsData.map(s => s.peakVelocity));
+    const avgVelocity = repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length;
+    const maxVelocity = Math.max(...repsData.map(s => s.peakVelocity));
     const maxPower = Math.round(cameraConfig.loadKg * avgVelocity * GRAVITY);
     
     // Format data for backend
@@ -235,7 +235,7 @@ export default function VBTCameraPage() {
       date: new Date().toISOString().split('T')[0],
       provider: 'camera',
       exercise: selectedExercise,
-      sets: setsData.map((s, i) => ({
+      sets: repsData.map((s) => ({
         reps: 1, // Each entry is a single rep
         mean_velocity: s.meanVelocity,
         peak_velocity: s.peakVelocity,
