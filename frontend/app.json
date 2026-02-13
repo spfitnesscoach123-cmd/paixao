@@ -21,9 +21,10 @@
     },
     "android": {
       "package": "com.loadmanager.app",
+      "versionCode": 15,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#000F1F"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
