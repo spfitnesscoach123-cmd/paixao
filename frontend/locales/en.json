@@ -457,5 +457,38 @@
     "avgHighInt": "Avg High Int.",
     "highestDist": "Highest Distance",
     "highestInt": "Highest High Int."
+  },
+  "role": {
+    "howAccess": "How would you like to access?",
+    "iAmCoach": "I am a Coach",
+    "iAmAthlete": "I am an Athlete",
+    "coachDescription": "Manage athletes and training",
+    "athleteDescription": "Answer wellness questionnaire",
+    "athleteInfo": "Athletes need a code from their coach"
+  },
+  "token": {
+    "generateToken": "Generate Wellness Token",
+    "tokenTitle": "Access Token",
+    "tokenDescription": "Generate a code for your athletes to fill out the wellness questionnaire directly in the app.",
+    "tokenGenerated": "Token Generated!",
+    "expiresIn": "Expiration time",
+    "maxUses": "Maximum number of uses",
+    "maxUsesLabel": "Maximum uses",
+    "expiresAt": "Expires at",
+    "generateNew": "Generate New Token",
+    "howItWorks": "How it works",
+    "step1": "Generate a token with duration and usage limit",
+    "step2": "Share the code with your athletes",
+    "step3": "Athletes enter the code in the app and answer the questionnaire",
+    "step4": "Each athlete can only use the token once",
+    "copied": "Token copied!",
+    "shareMessage": "Use this code to access the wellness questionnaire",
+    "shareTitle": "Wellness Code",
+    "enterTitle": "Enter your coach's code",
+    "enterSubtitle": "Ask your coach for the code to access the questionnaire",
+    "enterCode": "Enter your coach's code",
+    "invalidToken": "Invalid or expired token",
+    "validate": "Validate",
+    "infoText": "The code is provided by your coach and has limited validity"
   }
 }
