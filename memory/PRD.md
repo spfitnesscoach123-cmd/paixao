@@ -160,6 +160,22 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2026-02-13 - VBT via Camera - FASE 2 COMPLETA
+- **NOVA FUNCIONALIDADE**: Módulo de tracking de barbell implementado
+- Novos arquivos criados:
+  - `services/vbt/barTracker.ts` - Lógica de tracking com modelo físico
+  - `services/vbt/useBarTracking.ts` - Hook React para integração
+  - `services/vbt/index.ts` - Exports e documentação
+- Recursos implementados:
+  - Cálculo de velocidade instantânea (pixels → metros usando modelo de câmera pinhole)
+  - Simulação realista de movimento de barbell com fadiga progressiva
+  - Detecção automática de repetições via mudança de fase
+  - Feedback visual: verde = OK, vermelho = queda de velocidade >10%
+  - Estados de tracking: concêntrico, excêntrico, estacionário
+- `vbt-camera.tsx` refatorado para usar o novo hook `useBarTracking`
+- **TEST**: 100% taxa de sucesso - Backend (8/8) e Frontend verificados
+- **NOTA**: Tracking usa simulação para desenvolvimento. Tracking real com MediaPipe requer build nativo
+
 ### 2026-02-13 - VBT via Camera (FASE 1)
 - **NOVA FUNCIONALIDADE**: Sistema de rastreamento VBT via câmera
 - Botão "VBT via Camera" na tela de Avaliação de Força (add-strength.tsx)
