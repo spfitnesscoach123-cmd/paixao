@@ -162,6 +162,22 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2026-02-13 - VBT via Camera - FASE 3 COMPLETA
+- **INTEGRAÇÃO COM GRÁFICOS**: Dados da câmera agora atualizam automaticamente todos os gráficos
+- Modificações realizadas:
+  - `vbt-camera.tsx`: Adicionada invalidação de cache para todas as queries relacionadas:
+    - `vbt-analysis` (tela VBT)
+    - `scientific-analysis` (aba Analysis/ScientificAnalysisTab)
+    - `strength-analysis` (StrengthAnalysisCharts)
+- Verificações realizadas:
+  - ✅ Dados com `provider='camera'` salvos corretamente no backend
+  - ✅ Gráfico "Velocity Loss per Set" exibe dados da câmera
+  - ✅ Gráfico "Load-Velocity Profile" funciona (requer cargas variadas)
+  - ✅ Relatório PDF inclui dados VBT da câmera
+  - ✅ Aba "Analysis" (ScientificAnalysisTab) atualizada automaticamente
+- **TEST**: 100% taxa de sucesso - Backend (8/8) e Frontend verificados
+- **NOVO**: Arquivo de teste criado: `backend/tests/test_vbt_camera_phase3.py`
+
 ### 2026-02-13 - VBT via Camera - FASE 2 COMPLETA
 - **NOVA FUNCIONALIDADE**: Módulo de tracking de barbell implementado
 - Novos arquivos criados:
