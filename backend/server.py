@@ -7475,6 +7475,7 @@ class VBTProvider(str, Enum):
     BEAST = "beast"
     VITRUVE = "vitruve"
     MANUAL = "manual"
+    CAMERA = "camera"
 
 class VBTDataCreate(BaseModel):
     athlete_id: str
