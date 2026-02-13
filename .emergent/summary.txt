@@ -4,73 +4,45 @@ The user's primary goal is to completely refactor the Gerar Link Wellness (Gener
 PRODUCT REQUIREMENTS:
 1.  **New Initial Screen:** When the app is opened for the first time, it must present a screen with two choices: Sou Coach (I am a Coach) and Sou Atleta (I am an Athlete).
 2.  **Coach Flow:**
-    *   Selecting Sou Coach directs the user to the existing login flow, with no changes to authentication or subscription logic.
+    *   Selecting Sou Coach directs the user to the existing login flow.
     *   The Gerar Link Wellness feature is replaced with Gerar Token Wellness.
 3.  **Token Generation (Backend):**
-    *   A new  collection will store tokens with fields: , , , ,  (30m, 1h, 2h, 8h, 24h), and .
-    *   The backend generates a unique alphanumeric token and returns it to the coach to share manually. No URL generation.
+    *   A new  collection stores tokens with , , , ,  (30m, 1h, 2h, 8h, 24h), and .
+    *   The backend generates a unique alphanumeric token for the coach to share manually.
 4.  **Athlete Flow:**
-    *   Selecting Sou Atleta leads to a screen where the athlete must enter the token.
-    *   No account creation, email, or password is required for the athlete.
+    *   Selecting Sou Atleta leads to a screen where the athlete must enter the token. No account creation is required.
 5.  **Token Validation:**
-    *   The backend validates the token based on its existence, status, expiration, and usage count.
-    *   A valid token allows the athlete to proceed to a screen to select their name from a list of athletes associated with the coach.
+    *   The backend validates the token's existence, status, expiration, and usage.
+    *   A valid token allows the athlete to select their name from a list of athletes associated with the coach.
 6.  **Usage Control (Single Use Per Athlete):**
-    *   A new  collection tracks which athlete has used which token (, ).
-    *   The system must prevent an athlete from answering the same wellness questionnaire more than once with the same token.
+    *   A  collection tracks which athlete has used which token (, ) to prevent an athlete from answering the same questionnaire more than once with the same token.
 7.  **Wellness Form Submission:**
-    *   After the athlete selects their name and fills out the wellness form, the backend saves the data.
-    *   It records the usage in  and increments  in the  collection.
-    *   The token status is set to  if  is reached.
-8.  **Session End:** After submitting the form, the athlete is returned to the initial token entry screen, effectively ending their session. A new token is required for any subsequent access.
+    *   After submission, the backend records the usage in  and increments  in . The token status is updated if  is reached.
+8.  **Session End:** After submitting, the athlete is returned to the initial token entry screen.
+9.  **Back Button**: The user requested a back button on the athlete's token entry screen to return to the initial Coach/Athlete selection screen.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent has successfully resolved several critical issues, preparing the application for the next phase of development. Key accomplishments include:
--   **iOS Deployment Readiness**: A deep, step-by-step verification of the iOS build configuration (, ) was performed to resolve the  (Bluetooth) error. The project is now compliant for App Store submission.
--   **Data Caching and Leakage Fix**: A critical bug causing data from previous users to appear for new users was fixed. The solution involved clearing the React Query cache and AsyncStorage on logout, login, and registration within the .
--   **App Version Display**: The in-app version display was corrected to dynamically show the native build version from , ensuring it matches the version in TestFlight and App Store Connect. The agent also clarified the versioning behavior of EAS .
--   **UI/UX Fixes**: An empty state was implemented for the main dashboard for new users. A bug preventing dynamic updates of RSI and Fatigue Index charts was also fixed by improving React Query cache invalidation.
-The codebase is now stable, and the previous blockers have been addressed. The agent had just started analyzing the codebase to begin the Generate Wellness Token refactor requested by the user.
+The Generate Wellness Token feature has been fully implemented, tested, and verified. A critical unmatched route frontend error was definitively fixed by explicitly declaring all new routes in . The functionality of the Back buttons for both athlete and coach flows was confirmed. The entire feature passed a full end-to-end test run by the , with only a minor, low-priority cosmetic bug identified (an icon not rendering on the web).
+
+As a final step, per the user's request, the agent prepared the app for a new build by incrementing the version in  from  to . The application is now stable and ready for deployment.
 
 **Last working item**:
--   **Last item agent was working**: The agent was beginning the analysis phase for a major refactor of the Generate Wellness Link feature into a new, internal Generate Wellness Token system, as per a detailed user request. It was identifying relevant files and planning the implementation.
--   **Status**: NOT STARTED
--   **Agent Testing Done**: N
--   **Which testing method agent to use?**: both
--   **User Testing Done**: N
+-   **Last item agent was working**: Preparing the application for a new build by incrementing the version number in .
+-   **Status**: NONE
+-   **Agent Testing Done**: Y
+-   **Which testing method agent to use?**: NA
+-   **User Testing Done**: Y
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Implement the Generate Wellness Token refactor. (P0)
--   **Issue 2**: Complete the internationalization of the  component. (P1)
--   **Issue 3**: Internationalize the Avaliações (Assessments) page. (P1)
--   **Issue 4**: Test the  pipeline's integration with the . (P2)
+-   **Issue 1**: Complete the internationalization of the  component. (P1)
+-   **Issue 2**: Internationalize the Avaliações (Assessments) page. (P1)
+-   **Issue 3**: Test the  pipeline's integration with the . (P2)
+-   **Issue 4**: Back button icon not rendering on web. (P3)
 
 **Issues Detail**:
--   **Issue 1: Implement the Generate Wellness Token refactor.**
-    -   **Attempted fixes**: None. The task is new and implementation has not yet started.
-    -   **Next debug checklist**: Follow the user's detailed PRD.
-        -   **Frontend:**
-            1.  Create the initial role selection screen (Sou Coach / Sou Atleta).
-            2.  Modify  to render this screen first, before the login/tabs.
-            3.  Create the Enter Token screen for the athlete flow.
-            4.  Create the Select Athlete screen, which appears after token validation.
-            5.  Replace the Generate Wellness Link UI for the coach with a new Generate Wellness Token UI.
-            6.  Ensure the athlete is redirected to the token entry screen after submitting the wellness form.
-        -   **Backend ():**
-            1.  Define Pydantic models and create MongoDB collections for  and .
-            2.  Create endpoint  for the coach to generate tokens.
-            3.  Create endpoint  for the athlete to validate a token.
-            4.  Create endpoint  to list athletes associated with the token's coach.
-            5.  Modify the wellness submission endpoint to require a token, validate its usage per athlete, and update the token's .
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a complete overhaul of a core feature, moving from an insecure web link to a controlled, temporary, in-app token system, as mandated by the user.
-    -   **Status**: NOT STARTED
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Both
-    -   **Blocked on other issue**: None.
-
--   **Issue 2: Complete the internationalization of the  component.**
+-   **Issue 1: Complete the internationalization of the  component.**
     -   **Attempted fixes**: None. This is a carried-over task.
     -   **Next debug checklist**: Scan  for hardcoded strings and replace them with  function calls. Add new keys to translation files.
     -   **Why fix this issue and what will be achieved with the fix?**: Fulfills a pending high-priority requirement from a previous session.
@@ -79,7 +51,7 @@ The codebase is now stable, and the previous blockers have been addressed. The a
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None.
 
--   **Issue 3: Internationalize the Avaliações (Assessments) page.**
+-   **Issue 2: Internationalize the Avaliações (Assessments) page.**
     -   **Attempted fixes**: None.
     -   **Next debug checklist**: Identify the components for the Avaliações page, find hardcoded strings, add translation keys, and replace text with  calls.
     -   **Why fix this issue and what will be achieved with the fix?**: Fulfills a pending user requirement.
@@ -88,7 +60,7 @@ The codebase is now stable, and the previous blockers have been addressed. The a
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None.
 
--   **Issue 4: Test the  pipeline's integration with the .**
+-   **Issue 3: Test the  pipeline's integration with the .**
     -   **Attempted fixes**: None. This task has been skipped for several sessions.
     -   **Next debug checklist**: Review the purpose of the  and  pipeline and design a test to verify their interaction.
     -   **Why fix this issue and what will be achieved with the fix?**: This is a critical backend feature that has not been validated.
@@ -97,8 +69,17 @@ The codebase is now stable, and the previous blockers have been addressed. The a
     -   **Should Test frontend/backend/both after fix?**: Backend
     -   **Blocked on other issue**: None.
 
+-   **Issue 4: Back button icon not rendering on web.**
+    -   **Attempted fixes**: The agent identified this is a known issue with  on web builds and decided not to fix it as it's low priority and doesn't affect functionality.
+    -   **Next debug checklist**: Investigate alternative icon libraries or web-specific solutions if the cosmetic fix becomes a priority.
+    -   **Why fix this issue and what will be achieved with the fix?**: Provides a minor cosmetic improvement.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: N
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None.
+
 **In progress Task List**:
-None.
+-   None.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
@@ -110,177 +91,67 @@ None.
     -   Implement a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
--   **New User Data Leak Fix**: Resolved a critical bug where new users saw cached data from previous users by clearing the React Query cache and AsyncStorage on auth state changes in .
--   **App Version Display Correction**: Fixed the in-app version display to use  (), ensuring the version shown matches the native build version from TestFlight, and explained EAS versioning to the user.
--   **Dynamic Chart Update Fix**: Repaired a bug where RSI and Fatigue Index charts failed to update after new assessments by improving React Query cache invalidation strategies.
--   **iOS Deployment Compliance**: Performed a deep verification of iOS build settings (, - Creating native project directories (./ios and ./android) and updating .gitignore
-✔ Created native projects | /ios already created
-- Adding Metro bundler config
-⚠️  Skipped Metro config updates:
-› Existing Metro config found; not overwriting.
-› You will need to extend the default @expo/metro-config in your Metro config.
-  Learn more: https://docs.expo.dev/guides/customizing-metro
-
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file) to resolve the ITMS-90683 Bluetooth error, making the app ready for deployment.
--   **Empty Dashboard UI**: Implemented an empty state for the main dashboard for new users without data.
--   **Workspace Cleanup & Versioning**: Updated the app version in  to  and performed comprehensive cache cleaning (, 
-  Usage: expo [command] [options]
-
-  Options:
-  
-    -V, --version                     output the version number
-    --non-interactive                 Fail, if an interactive prompt would be required to continue.
-    -h, --help                        output usage information
-  
-  Commands:
-
-    init [name]                       Create a new Expo project
-    start [path]                      Start a local dev server for the app
-    start:web [path]                  Start a Webpack dev server for the web app
-    export [path]                     Export the static files of the app for hosting it on a web server
-    install [packages...]             Install a module or other package to a project
-    run:android [path]                Run the Android app binary locally
-    run:ios [path]                    Run the iOS app binary locally
-    send [path]                       Share the project's URL to an email address
-
-    login                             Login to an Expo account
-    logout                            Logout of an Expo account
-    register                          Sign up for a new Expo account
-    whoami                            Return the currently authenticated account
-
-    client:install:ios                Install Expo Go for iOS on the simulator
-    client:install:android            Install Expo Go for Android on a connected device or emulator
-
-    config [path]                     Show the project config
-    doctor [path]                     Diagnose issues with the project
-    upgrade [sdk-version]             Upgrade the project packages and config for the given SDK version
-
-    customize:web [path]              Eject the default web files for customization
-    prebuild [path]                   Create native iOS and Android project files before building natively.
-                                      Learn more: https://docs.expo.dev/workflow/customizing/
-
-    build:web [path]                  Build the web app for production
-
-    credentials:manager [path]        Superseded by eas credentials in eas-cli
-
-    url [path]                        Log a URL for opening the project in Expo Go
-    url:ipa [path]                    Log the download URL for the standalone iOS binary
-    url:apk [path]                    Log the download URL for the standalone Android binary
-
-    webhooks [path]                   List all webhooks for a project
-    webhooks:add [path]               Add a webhook to a project
-    webhooks:remove [path]            Delete a webhook
-    webhooks:update [path]            Update an existing webhook
-
-    build:ios [path]                  Superseded by eas build in eas-cli
-    build:android [path]              Superseded by eas build in eas-cli
-    build:status [path]               Superseded by eas build:list in eas-cli
-    eject [path]                      Superseded by expo prebuild
-    fetch:ios:certs [path]            Superseded by eas credentials in eas-cli
-    fetch:android:keystore [path]     Superseded by eas credentials in eas-cli
-    fetch:android:hashes [path]       Superseded by eas credentials in eas-cli
-    fetch:android:upload-cert [path]  Superseded by eas credentials in eas-cli
-    publish [path]                    Superseded by eas update in eas-cli
-    publish:set [path]                Superseded by eas update:republish in eas-cli
-    publish:rollback [path]           Superseded by eas update:republish in eas-cli
-    publish:history [path]            Superseded by eas update:list in eas-cli
-    publish:details [path]            Superseded by eas update:view in eas-cli
-    push:android:upload [path]        Superseded by eas credentials in eas-cli
-    push:android:show [path]          Superseded by eas credentials in eas-cli
-    push:android:clear [path]         Superseded by eas credentials in eas-cli
-    upload:android [path]             Superseded by eas submit in eas-cli
-    upload:ios [path]                 Superseded by eas submit in eas-cli
-    client:ios [path]                 Superseded by Expo Dev Clients
-
-[13:53:49]   Run a command with --help for more info 💡
-[13:53:49]     $ expo start --help
-[13:53:49], yarn install v1.22.22
-[1/4] Resolving packages...
-[2/4] Fetching packages...
-[3/4] Linking dependencies...
-[4/4] Building fresh packages...
-success Saved lockfile.
-Done in 10.48s.) to prepare for a clean build.
+-   **Critical Frontend Routing Fix**: Resolved the unmatched route error by explicitly adding all new screens to the Stack Navigator in .
+-   **Generate Wellness Token Feature Completion**: Verified the existence and functionality of the Back buttons, tested the backend API with , and ran a successful end-to-end test using the testing agent.
+-   **App Version Update**: Incremented the app version to  in  in preparation for a new build, as requested by the user.
 
 **Earlier issues found/mentioned but not fixed**
--   **Incomplete Internationalization**: The tasks to fully translate the Analysis and Assessments pages are still pending.
+-   **Incomplete Internationalization**: The tasks to fully translate  and the Avaliações pages are still pending.
 -   ** pipeline testing**: A critical backend testing task that remains unaddressed.
 
 **Known issue recurrence from previous fork**
--   **Issue recurrence in previous fork**: Incomplete feature implementation (localization). This task was deprioritized again in favor of critical bug fixes and new user-driven feature requests.
--   **Recurrence count**: 5
+-   **Issue recurrence in previous fork**: Incomplete feature implementation (localization). This task was deprioritized again in favor of critical bug fixes and the new token feature.
+-   **Recurrence count**: 7
 -   **Status**: NOT STARTED
 
 **Code Architecture**
-autoIncrement
+
 
 **Key Technical Concepts**
--   **Expo Build System (EAS)**: Deep understanding of  vs. , - Creating native project directories (./ios and ./android) and updating .gitignore
-✔ Created native projects | /android, /ios already created | gitignore already synced
-- Adding Metro bundler config
-⚠️  Skipped Metro config updates:
-› Existing Metro config found; not overwriting.
-› You will need to extend the default @expo/metro-config in your Metro config.
-  Learn more: https://docs.expo.dev/guides/customizing-metro
-
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file, and the management of  (Version) and  (Build), especially with .
--   **React Query Caching**: Mastery of the query cache, including clearing it on authentication changes () to prevent data leakage and forcing data freshness with  and .
--   **Expo Constants**: Correctly using  (, ) as the single source of truth for the compiled app's version information.
--   **iOS App Store Compliance**: Debugging specific iOS build rejection codes (ITMS-90683) by inspecting and modifying  configuration via .
+-   **Expo Router**: Debugging file-based routing by explicitly declaring routes in the main layout file () to ensure stability.
+-   **EAS Build Versioning**: Incrementing the  field in  to prepare for a new application build.
+-   **End-to-End Testing**: Using a combination of  for backend validation and the  for comprehensive user flow verification.
 
 **key DB schema**
--   **To be created for the new task:**
-    -   **wellness_tokens**: 
-    -   **token_usage**: 
+-   **wellness_tokens**: 
+-   **token_usage**: 
 
 **changes in tech stack**
 -   None.
 
 **All files of reference**
--    (To be modified)
--    (To be modified)
--    (Recently modified)
--    (Recently modified)
--    (Recently modified)
+-    (Critical fix)
+-    (Last change)
+-   
+-   
+-   
+-   
+-   
 
 **Areas that need refactoring**:
--   The entire Generate Wellness Link feature is the subject of the next major task and will be completely refactored into a token-based system.
-
-**key api endpoints**
--   **To be created:**
-    -   : Generates a new wellness token for a coach.
-    -   : Validates a token entered by an athlete.
-    -   : Lists athletes for a valid token.
--   **To be modified:**
-    -   The endpoint for submitting a wellness form will be updated to handle token validation and usage tracking.
-
-**Critical Info for New Agent**
--   **Your top priority (P0) is to implement the Generate Wellness Token feature refactor.** The user has provided an extremely detailed, step-by-step prompt that must be followed precisely. Do not deviate from the specified logic, UI flow, or backend structure.
--   **The old web-based link system must be completely removed.** The new system is 100% internal to the app, using temporary tokens.
--   **All previous critical bugs have been resolved.** The app is stable, compliant with iOS guidelines, and correctly handles data caching and version display. You have a clean slate to focus on this new feature.
--   Start by creating the initial role-selection screen (Sou Coach / Sou Atleta) and hooking it into the app's entry point ().
-
-**documents and test reports created in this job**
 -   None.
 
+**key api endpoints**
+-   
+-   
+-   
+-   
+
+**Critical Info for New Agent**
+-   The primary feature (Wellness Token) is complete, stable, and ready for deployment. The app version has been bumped to .
+-   The next set of tasks should focus on the pending items from the backlog: internationalization and backend testing ().
+-   A minor cosmetic bug (missing icon on a button on web) was found by the testing agent. It's low priority and can be addressed later.
+
+**documents and test reports created in this job**
+-   
+-    (updated)
+
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (latest)**: Requested a complete refactor of Generate Wellness Link into a new, internal token-based system with detailed requirements. (Status: NOT STARTED)
-2.  **User**: Requested a final cache cleanup and version bump to  (agent set ) to prepare for a new build. (Status: COMPLETED)
-3.  **User**: Requested a fix for the bug where new users see cached data from previous sessions, specifying the expected clean state. (Status: COMPLETED)
-4.  **User**: Asked the agent to call the Deployer Agent and run a health check for deployment readiness. (Status: COMPLETED)
-5.  **User**: Requested a fix to make the in-app version display match the native build version automatically. (Status: COMPLETED)
-6.  **User**: Provided screenshots of App Store Connect showing version  and asked for clarification. (Status: Agent explained EAS )
-7.  **User**: Asked why  showed version  when the App Store build was . (Status: Agent explained)
-8.  **User**: Asked for a detailed technical explanation of the version difference between App Store Connect () and TestFlight app (). (Status: COMPLETED)
-9.  **User**: Requested a fix for RSI and Fatigue Index charts not updating dynamically after new assessments. (Status: COMPLETED)
-10. **User**: Requested a deep technical verification of the iOS ITMS-90683 (Bluetooth) fix, providing explicit steps to follow. (Status: COMPLETED)
+1.  **User (latest)**: prepare for new build - deploy. (Status: COMPLETED)
+2.  **User**: Confirmed that the Back button was needed for both the athlete and coach screens. (Status: COMPLETED)
 
 **Project Health Check:**
--   **Broken**: None.
+-   **Broken**: None. The critical routing issue has been resolved. The app is stable.
 -   **Mocked**: None.
 
 **3rd Party Integrations**
@@ -289,15 +160,14 @@ autoIncrement
 -   : Used for LLM chat functionality.
 
 **Testing status**
--   **Testing agent used after significant changes**: NO
+-   **Testing agent used after significant changes**: YES
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: []
--   **Known regressions**: None.
+-   **Known regressions**: A minor cosmetic regression was identified: the back button icon in  does not render on the web. Functionality is unaffected.
 
 **Credentials to test flow:**
--   User accounts and data were wiped in a previous session. New accounts must be created for testing.
+-   **Coach**:  / 
+-   **Athletes**: , ,  (associated with the coach account)
 
 **What agent forgot to execute**
--   The agent did not work on the pending internationalization tasks for  and the Avaliações page.
--   The agent did not test the  pipeline integration.
--   These tasks were correctly deprioritized to focus on critical bug fixes and the new user-driven feature request.</analysis>
+-   Nothing. The agent successfully addressed all user requests and completed the main feature implementation. It consciously de-prioritized a minor cosmetic bug to focus on stability and the user's final request to prepare for deployment.</analysis>
