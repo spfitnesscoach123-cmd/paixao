@@ -20,14 +20,16 @@
     "GET /api/vbt/providers correctly returns 'camera' in providers list with proper metadata",
     "VBT via Camera button on add-strength.tsx correctly uses data-testid='vbt-camera-btn'",
     "Camera permission logic in vbt-camera.tsx works correctly - shows permission prompt on web",
-    "vbt-camera.tsx has proper data-testid attributes on key elements (vbt-camera-back-btn, start-recording-btn, etc.)"
+    "vbt-camera.tsx has proper data-testid attributes on key elements (vbt-camera-back-btn, start-recording-btn, etc.)",
+    "Fixed: Added header with back button to permission prompt screen"
   ],
   "updated_files": [
-    "/app/backend/tests/test_vbt_camera.py"
+    "/app/backend/tests/test_vbt_camera.py",
+    "/app/frontend/app/athlete/[id]/vbt-camera.tsx"
   ],
   "success_rate": {
     "backend": "100% (8/8 tests passed)",
-    "frontend": "95% (navigation works, camera page loads, permission prompt displayed - only missing back button on permission screen)"
+    "frontend": "100% (All features working - navigation, camera page loads, permission prompt with back button)"
   },
   "test_credentials": {
     "coach_email": "coach_test@test.com",
