@@ -197,8 +197,35 @@ export default function VBTCameraPage() {
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+      // Deactivate camera before unmount to prevent iOS crashes
+      setIsCameraActive(false);
     };
   }, []);
+  
+  // Camera ready handler - CRITICAL for iOS TestFlight stability
+  const handleCameraReady = useCallback(() => {
+    setIsCameraReady(true);
+  }, []);
+  
+  // Safe camera deactivation when leaving recording phase
+  const handlePhaseChange = useCallback((newPhase: 'config' | 'recording' | 'review') => {
+    if (phase === 'recording' && newPhase !== 'recording') {
+      // Deactivate camera before phase change
+      setIsCameraActive(false);
+      setIsCameraReady(false);
+      // Allow camera cleanup time before phase change
+      setTimeout(() => {
+        setPhase(newPhase);
+      }, 100);
+    } else if (newPhase === 'recording') {
+      // Re-activate camera when entering recording phase
+      setIsCameraReady(false);
+      setIsCameraActive(true);
+      setPhase(newPhase);
+    } else {
+      setPhase(newPhase);
+    }
+  }, [phase]);
   
   // VBT submission mutation
   const vbtMutation = useMutation({
