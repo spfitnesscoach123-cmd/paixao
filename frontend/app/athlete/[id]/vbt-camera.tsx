@@ -195,9 +195,9 @@ export default function VBTCameraPage() {
       recordingTimerRef.current = null;
     }
     
-    // Move to review phase if we have data
+    // Move to review phase if we have data - use safe phase change
     if (repsData.length > 0 || repCount > 0) {
-      setPhase('review');
+      handlePhaseChange('review');
     }
   };
   
