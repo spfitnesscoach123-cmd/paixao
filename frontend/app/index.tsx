@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../constants/theme';
@@ -9,8 +9,8 @@ const ROLE_SELECTED_KEY = 'role_selected';
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();
-  const router = useRouter();
-  const [checkingRole, setCheckingRole] = useState(true);
+  const [redirectTo, setRedirectTo] = useState<string | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
 
   useEffect(() => {
     checkRoleAndRedirect();
@@ -25,34 +25,40 @@ export default function Index() {
 
       if (!roleSelected) {
         // First time opening the app - show role selection
-        router.replace('/role-select');
+        setRedirectTo('/role-select');
         return;
       }
 
       // Role was selected before - check authentication
       if (isAuthenticated) {
-        router.replace('/(tabs)/athletes');
+        setRedirectTo('/(tabs)/athletes');
       } else {
         // If role is 'coach', go to login; if 'athlete', go to token entry
         if (roleSelected === 'coach') {
-          router.replace('/login');
+          setRedirectTo('/login');
         } else {
-          router.replace('/athlete-token');
+          setRedirectTo('/athlete-token');
         }
       }
     } catch (error) {
       // On error, default to role selection
-      router.replace('/role-select');
+      setRedirectTo('/role-select');
     } finally {
-      setCheckingRole(false);
+      setIsChecking(false);
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color={colors.accent.primary} />
-    </View>
-  );
+  // Show loading while checking
+  if (isLoading || isChecking || !redirectTo) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={colors.accent.primary} />
+      </View>
+    );
+  }
+
+  // Use Redirect component for navigation
+  return <Redirect href={redirectTo as any} />;
 }
 
 const styles = StyleSheet.create({
