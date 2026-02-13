@@ -51,14 +51,8 @@ export default function VBTCameraPage() {
     loadKg: 0,
   });
   
-  // Recording state
-  const [isRecording, setIsRecording] = useState(false);
+  // Recording time state
   const [recordingTime, setRecordingTime] = useState(0);
-  const [velocityReadings, setVelocityReadings] = useState<VelocityReading[]>([]);
-  const [currentVelocity, setCurrentVelocity] = useState(0);
-  const [feedbackColor, setFeedbackColor] = useState<'green' | 'red' | 'neutral'>('neutral');
-  const [repCount, setRepCount] = useState(0);
-  const [setsData, setSetsData] = useState<SetData[]>([]);
   
   // Review state
   const [showExerciseModal, setShowExerciseModal] = useState(false);
@@ -67,8 +61,28 @@ export default function VBTCameraPage() {
   // Refs
   const cameraRef = useRef<CameraView>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const velocitySimulatorRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const baselineVelocityRef = useRef<number | null>(null);
+  
+  // Bar tracking hook - manages all velocity tracking state
+  const {
+    isTracking,
+    currentVelocity,
+    peakVelocity,
+    meanVelocity,
+    velocityDrop,
+    repCount,
+    phase: trackingPhase,
+    feedbackColor,
+    repsData,
+    startTracking,
+    stopTracking,
+    resetTracking,
+    processFrame,
+  } = useBarTracking({
+    loadKg: cameraConfig.loadKg,
+    cameraHeight: cameraConfig.cameraHeight,
+    cameraDistance: cameraConfig.distanceFromBar,
+    useSimulation: true, // Set to false when using real MediaPipe tracking
+  });
   
   const EXERCISES = [
     'Back Squat', 'Front Squat', 'Bench Press', 'Deadlift',
