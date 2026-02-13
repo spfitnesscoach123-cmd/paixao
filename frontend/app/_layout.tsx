@@ -15,21 +15,7 @@ export default function RootLayout() {
           <AuthProvider>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
-              <Stack.Screen name="role-select" />
-              <Stack.Screen name="athlete-token" />
-              <Stack.Screen name="athlete-wellness" />
-              <Stack.Screen name="login" />
-              <Stack.Screen name="register" />
-              <Stack.Screen name="generate-wellness-token" />
               <Stack.Screen name="(tabs)" />
-              {/* Legacy public route - kept for backwards compatibility */}
-              <Stack.Screen 
-                name="wellness-form/[token]" 
-                options={{ 
-                  headerShown: false,
-                  presentation: 'fullScreenModal'
-                }} 
-              />
             </Stack>
           </AuthProvider>
         </LanguageProvider>
