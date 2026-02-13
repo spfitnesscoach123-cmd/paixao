@@ -243,3 +243,42 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 - **FIX**: Botões "Voltar" implementados nas telas athlete-token.tsx e generate-wellness-token.tsx
 - **TEST**: 95% taxa de sucesso no frontend (6/7 funcionalidades, 1 problema visual LOW priority)
 
+### 2026-02-XX - Fix Crash Câmera iOS TestFlight
+- **BUG FIX CRÍTICO**: Câmera VBT crashava no TestFlight iOS
+- **Causa raiz**: Problema de ciclo de vida do `CameraView` do `expo-camera`
+  - Callbacks sendo inicializados antes da câmera estar pronta
+  - Componentes sendo renderizados dentro do `CameraView` sem verificação de estado
+- **Solução implementada**:
+  1. Adicionado estado `isCameraReady` para controlar inicialização
+  2. Adicionado callback `onCameraReady` no `CameraView`
+  3. Implementado prop `active` para controle de ativação/desativação
+  4. Renderização condicional do overlay apenas quando câmera está pronta
+  5. Loading indicator enquanto câmera inicializa
+  6. Função `handlePhaseChange()` para transições seguras entre fases
+  7. Cleanup adequado no `useEffect` de unmount
+- **Arquivos modificados**:
+  - `frontend/app/athlete/[id]/vbt-camera.tsx` - Refatoração completa do ciclo de vida
+  - `frontend/app.json` - Build number incrementado para 16
+- **Versão**: app.json buildNumber: 16
+- **STATUS**: Implementado - Aguardando validação do usuário via novo build TestFlight
+- **PRÓXIMO PASSO**: 
+  1. Executar `eas build --platform ios --profile production`
+  2. Upload para TestFlight
+  3. Testar abertura da câmera VBT no dispositivo real
+
+---
+
+## Tarefas Pendentes (Por Prioridade)
+
+### P0 - Crítico
+- [AGUARDANDO] Validação do fix da câmera iOS no TestFlight
+
+### P1 - Alta
+- [ ] Completar internacionalização do `ScientificAnalysisTab.tsx`
+- [ ] Internacionalizar página "Avaliações" (Assessments)
+
+### P2 - Média
+- [ ] Testar pipeline `gps_import` com `identity_resolver`
+
+### P3 - Baixa
+- [ ] Fix ícone botão voltar no web
