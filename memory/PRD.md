@@ -120,7 +120,18 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Backlog
 
-### P1 - Pendente
+### P0 - VBT via Camera (Próximas Fases)
+- [ ] **Fase 2**: Processamento de vídeo com MediaPipe
+  - [ ] Integrar react-native-vision-camera com frame processors
+  - [ ] Implementar detecção de pose com MediaPipe
+  - [ ] Rastreamento real da barra em movimento
+  - [ ] Cálculo de velocidade frame a frame
+- [ ] **Fase 3**: Integração com gráficos
+  - [ ] Atualizar gráficos de Perda de Velocidade por Set
+  - [ ] Atualizar Perfil Carga x Velocidade
+  - [ ] Atualizar exportação de relatórios PDF
+
+### P1 - Internacionalização
 - [ ] Internacionalização completa de `ScientificAnalysisTab.tsx`
 - [ ] Internacionalização da página "Avaliações"
 
