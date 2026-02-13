@@ -437,47 +437,65 @@ export default function VBTCameraPage() {
               style={styles.camera}
               facing="back"
               mode="video"
+              active={isCameraActive}
+              onCameraReady={handleCameraReady}
             >
-              {/* Feedback Overlay */}
-              <View style={[
-                styles.feedbackOverlay,
-                feedbackColor === 'green' && styles.feedbackGreen,
-                feedbackColor === 'red' && styles.feedbackRed,
-              ]}>
-                {/* Recording indicator */}
-                <View style={styles.recordingIndicator}>
-                  <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
-                  <Text style={styles.recordingText}>
-                    {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
-                  </Text>
-                </View>
-                
-                {/* Velocity Display */}
-                <View style={styles.velocityDisplay}>
-                  <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                  <Text style={[
-                    styles.velocityValue,
-                    feedbackColor === 'red' && styles.velocityValueRed
-                  ]}>
-                    {currentVelocity.toFixed(2)} m/s
-                  </Text>
-                </View>
-                
-                {/* Rep Counter */}
-                <View style={styles.repCounter}>
-                  <Text style={styles.repLabel}>{labels.repCount}</Text>
-                  <Text style={styles.repValue}>{repCount}</Text>
-                </View>
-                
-                {/* Velocity Drop Status */}
+              {/* Only render overlay content when camera is ready - prevents iOS crashes */}
+              {isCameraReady ? (
                 <View style={[
-                  styles.statusBadge,
-                  feedbackColor === 'green' && styles.statusBadgeGreen,
-                  feedbackColor === 'red' && styles.statusBadgeRed,
+                  styles.feedbackOverlay,
+                  feedbackColor === 'green' && styles.feedbackGreen,
+                  feedbackColor === 'red' && styles.feedbackRed,
                 ]}>
-                  <Ionicons 
-                    name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
-                    size={16} 
+                  {/* Recording indicator */}
+                  <View style={styles.recordingIndicator}>
+                    <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
+                    <Text style={styles.recordingText}>
+                      {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
+                    </Text>
+                  </View>
+                  
+                  {/* Velocity Display */}
+                  <View style={styles.velocityDisplay}>
+                    <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
+                    <Text style={[
+                      styles.velocityValue,
+                      feedbackColor === 'red' && styles.velocityValueRed
+                    ]}>
+                      {currentVelocity.toFixed(2)} m/s
+                    </Text>
+                  </View>
+                  
+                  {/* Rep Counter */}
+                  <View style={styles.repCounter}>
+                    <Text style={styles.repLabel}>{labels.repCount}</Text>
+                    <Text style={styles.repValue}>{repCount}</Text>
+                  </View>
+                  
+                  {/* Velocity Drop Status */}
+                  <View style={[
+                    styles.statusBadge,
+                    feedbackColor === 'green' && styles.statusBadgeGreen,
+                    feedbackColor === 'red' && styles.statusBadgeRed,
+                  ]}>
+                    <Ionicons 
+                      name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                      size={16} 
+                      color="#ffffff" 
+                    />
+                    <Text style={styles.statusText}>
+                      {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.cameraLoadingOverlay}>
+                  <ActivityIndicator size="large" color={colors.accent.primary} />
+                  <Text style={styles.cameraLoadingText}>
+                    {locale === 'pt' ? 'Iniciando câmera...' : 'Initializing camera...'}
+                  </Text>
+                </View>
+              )} 
                     color="#ffffff" 
                   />
                   <Text style={styles.statusText}>
