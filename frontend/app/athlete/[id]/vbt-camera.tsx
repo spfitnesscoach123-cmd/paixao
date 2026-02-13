@@ -843,6 +843,17 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
+  cameraLoadingOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  cameraLoadingText: {
+    color: '#ffffff',
+    fontSize: 16,
+    marginTop: 12,
+  },
   feedbackOverlay: {
     flex: 1,
     padding: 16,
