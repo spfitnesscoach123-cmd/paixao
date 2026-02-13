@@ -7529,6 +7529,16 @@ async def get_vbt_providers():
                 "description_en": "Manual VBT data entry",
                 "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
                 "import_format": "form"
+            },
+            {
+                "id": "camera",
+                "name": "Camera Tracking",
+                "description_pt": "Rastreamento de velocidade via câmera em tempo real",
+                "description_en": "Real-time velocity tracking via camera",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "velocity_drop"],
+                "import_format": "camera",
+                "icon": "videocam",
+                "color": "#10b981"
             }
         ],
         "exercises": [
