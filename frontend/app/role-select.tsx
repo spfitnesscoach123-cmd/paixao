@@ -141,24 +141,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 48,
   },
-  iconWrapper: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-  },
-  appName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.text.secondary,
+  logo: {
+    width: 180,
+    height: 180,
+    borderRadius: 90,
   },
   questionContainer: {
     alignItems: 'center',
