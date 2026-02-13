@@ -203,7 +203,15 @@ export default function VBTCameraPage() {
       return response.data;
     },
     onSuccess: () => {
+      // Invalidate all VBT-related queries to ensure graphs update
       queryClient.invalidateQueries({ queryKey: ['vbt-analysis', athleteId] });
+      queryClient.invalidateQueries({ queryKey: ['vbt-analysis'] });
+      // Invalidate scientific analysis to update ScientificAnalysisTab graphs
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis', athleteId] });
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
+      // Invalidate strength analysis for StrengthAnalysisCharts
+      queryClient.invalidateQueries({ queryKey: ['strength-analysis', athleteId] });
+      
       Alert.alert(
         locale === 'pt' ? 'Sucesso' : 'Success',
         locale === 'pt' ? 'Dados VBT salvos com sucesso!' : 'VBT data saved successfully!',
