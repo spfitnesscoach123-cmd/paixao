@@ -131,7 +131,7 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 - **Coach**: testcoach@test.com / test123
 - **Token de teste**: YXPVUU (já usado por João Silva)
-- **API URL**: https://wellness-token-flow.preview.emergentagent.com
+- **API URL**: https://athlete-onboarding.preview.emergentagent.com
 
 ---
 
