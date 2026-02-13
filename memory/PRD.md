@@ -1,601 +1,144 @@
-# Jump Data Import System - PRD
+# Load Manager - PRD
 
 ## Overview
+Sistema de gerenciamento de carga de treinamento para futebol com análise de bem-estar, GPS, força e composição corporal.
 
-Sistema de importação de dados de saltos (jump data) via CSV, agnóstico ao hardware, com validação rigorosa, cálculo de métricas derivadas e conversão para um modelo canônico único.
-
-## Fabricantes Suportados
-
-| Fabricante | ID | Descrição |
-|------------|-----|-----------|
-| Generic | `generic` | Formato CSV padrão com colunas nomeadas |
-| Chronojump | `chronojump` | Sistema open-source Chronojump |
-| VALD Force Decks | `force_decks` | Plataformas de força VALD Performance |
-| Axon Jump | `axon_jump` | Tapete de contato Axon Jump |
-| Custom | `custom` | Mapeamento personalizado definido pelo usuário |
-
-## Modelo Canônico (JumpRecord)
-
-```json
-{
-  "athlete_id": "string (required)",
-  "athlete_external_id": "string | null",
-  "jump_type": "SJ | CMJ | DJ | RJ (required)",
-  "jump_height_cm": "float | null",
-  "flight_time_s": "float | null",
-  "contact_time_s": "float | null",
-  "reactive_strength_index": "float | null",
-  "peak_power_w": "float | null",
-  "takeoff_velocity_m_s": "float | null",
-  "load_kg": "float | null",
-  "jump_date": "datetime (required)",
-  "source_system": "string (required)",
-  "raw_row": "dict (audit trail)"
-}
-```
-
-## Tipos de Salto
-
-| Código | Nome | Descrição | contact_time_s |
-|--------|------|-----------|----------------|
-| SJ | Squat Jump | Salto estático | **Deve ser null** |
-| CMJ | Countermovement Jump | Salto com contramovimento | **Deve ser null** |
-| DJ | Drop Jump | Salto de queda | **Obrigatório** |
-| RJ | Reactive Jump | Saltos reativos/repetidos | **Obrigatório** |
-
-## Regras de Negócio
-
-### 1. Tratamento de Campos Vazios
-- Campos vazios no CSV → `null` (nunca zero)
-- Zero explícito no CSV → preservado como `0`
-
-### 2. Cálculo de Métricas Derivadas
-
-#### Jump Height (se não fornecido)
-```
-h = (g × t²) / 8
-```
-- `g` = 9.81 m/s²
-- `t` = flight_time_s
-- Resultado em centímetros
-
-#### Reactive Strength Index (RSI)
-```
-RSI = jump_height_cm / contact_time_s
-```
-- Só calculado quando ambos valores existem
-
-#### Takeoff Velocity
-```
-v = √(2gh)
-```
-- `h` = jump_height_cm / 100 (em metros)
-
-### 3. Validação de Atletas
-- `athlete_id` **deve** referenciar atleta existente
-- Nunca criar atletas automaticamente
-- Erro claro se atleta não existir
+## Problema Original
+Substituição completa do modelo de "Link Wellness" por um sistema de "Token Wellness" interno ao app:
+- Token alfanumérico de 6 caracteres (sem URL externa)
+- Limite de usos definido pelo coach
+- Expiração configurável (30min, 1h, 2h, 8h, 24h)
+- Uso único por atleta por token
+- Sem login para atleta
 
 ---
 
-## API Endpoints - Jump Import
+## Sistema de Token Wellness (IMPLEMENTADO - 2026-02-13)
 
-### GET /api/jumps/providers
-Lista fabricantes suportados.
+### Novo Fluxo de Acesso
 
-### POST /api/jumps/upload/preview
-Pré-visualização de importação (não salva dados).
+**Primeira abertura do app:**
+1. Tela de seleção: "Sou Coach" / "Sou Atleta"
+2. Coach → Login normal → Dashboard completo
+3. Atleta → Inserir token → Selecionar nome → Responder wellness → Fim
 
-**Request:** `multipart/form-data` com arquivo CSV
+### Backend Implementado
 
-**Response:**
-```json
-{
-  "success": true,
-  "total_rows": 8,
-  "valid_count": 8,
-  "error_count": 0,
-  "valid_records": [...],
-  "errors": [],
-  "detected_manufacturer": "generic",
-  "calculated_metrics": ["jump_height_cm", "takeoff_velocity_m_s"],
-  "athletes_not_found": [],
-  "jump_types_found": ["CMJ", "DJ"]
-}
-```
-
-### POST /api/jumps/upload/import
-Importa dados validados para o banco.
-
-### GET /api/jumps/athlete/{athlete_id}
-Recupera todos os saltos de um atleta.
-
-### GET /api/jumps/analysis/{athlete_id}
-Análise básica de performance de salto.
-
-### DELETE /api/jumps/{jump_id}
-Remove um registro de salto.
-
----
-
-## API Endpoints - Jump Analysis (NOVO)
-
-### GET /api/jumps/report/{athlete_id}
-Gera um relatório completo de performance de salto.
-
-**Query Parameters:**
-- `jump_type`: Tipo de salto (CMJ, SJ, DJ, RJ). Padrão: CMJ
-- `window_days`: Janela de análise em dias. Padrão: 14
-
-**Response:**
-```json
-{
-  "athlete_id": "...",
-  "athlete_name": "João Silva",
-  "generated_at": "2026-02-10T21:00:00",
-  "status": "ok|warning|alert|critical",
-  "readiness": "optimal|good|moderate|low|poor|unknown",
-  "readiness_score": 77,
-  "cmj_trend": -2.58,
-  "rsi_trend": null,
-  "fatigue_flag": false,
-  "status_emoji": "🟢",
-  "headline": "Prontidão normal - pode treinar conforme planejado",
-  "recommendation": "Atleta em bom estado...",
-  "training_load_modifier": 1.0,
-  "data_quality": "good",
-  "jumps_analyzed": 10,
-  "baseline": { ... },
-  "trends": { ... },
-  "fatigue": { ... },
-  "readiness_detail": { ... }
-}
-```
-
-### GET /api/jumps/compare
-Compara performance de múltiplos atletas.
-
-**Query Parameters:**
-- `athlete_ids`: IDs separados por vírgula (ex: "id1,id2,id3")
-- `jump_type`: Tipo de salto. Padrão: CMJ
-- `metric`: Métrica de comparação (z_height, pct_best_height, pct_career_height). Padrão: z_height
-
-**Response:**
-```json
-{
-  "jump_type": "CMJ",
-  "metric": "pct_best_height",
-  "athlete_count": 2,
-  "comparison": {
-    "athletes": [
-      {
-        "athlete_id": "...",
-        "athlete_name": "Pedro Santos",
-        "value": 98.73,
-        "raw_height_cm": 39.0,
-        "pct_best_height": 98.73,
-        "rank": 1,
-        "percentile": 100.0
-      },
-      ...
-    ],
-    "group_mean": 96.455,
-    "group_std": 3.217
+**Novas Coleções MongoDB:**
+- `wellness_tokens`: Armazena tokens gerados pelos coaches
+  ```json
+  {
+    "token_id": "YXPVUU",
+    "coach_id": "string",
+    "max_uses": 30,
+    "current_uses": 0,
+    "expires_at": "datetime",
+    "status": "active|inactive|expired"
   }
-}
+  ```
+- `token_usage`: Rastreia qual atleta usou qual token
+  ```json
+  {
+    "token_id": "YXPVUU",
+    "athlete_id": "string",
+    "used_at": "datetime"
+  }
+  ```
+
+**Endpoints Implementados:**
+- `POST /api/wellness/token` - Coach gera token (requer autenticação)
+- `POST /api/wellness/token/validate` - Atleta valida token (público)
+- `GET /api/wellness/token/{token_id}/athletes` - Lista atletas do coach (público)
+- `GET /api/wellness/token/{token_id}/check-athlete/{athlete_id}` - Verifica uso (público)
+- `POST /api/wellness/token/submit` - Submete questionário via token (público)
+- `GET /api/wellness/tokens` - Lista todos os tokens do coach (requer autenticação)
+
+### Frontend Implementado
+
+**Novas Telas:**
+1. `/app/role-select.tsx` - Tela inicial "Sou Coach" / "Sou Atleta"
+2. `/app/athlete-token.tsx` - Entrada de token pelo atleta
+3. `/app/athlete-wellness.tsx` - Formulário wellness para atleta
+4. `/app/generate-wellness-token.tsx` - Coach gera tokens
+
+**Modificações:**
+- `index.tsx` - Redirecionamento baseado em role persistido
+- `_layout.tsx` - Novas rotas adicionadas
+- `profile.tsx` - "Gerar Link" substituído por "Gerar Token"
+- `locales/pt.json` e `locales/en.json` - Novas chaves de tradução
+
+### Regras de Negócio
+
+1. **Token de 6 caracteres**: Letras maiúsculas + dígitos, sem O/0/I/1/L
+2. **Uso único por atleta**: Verificado via `token_usage` collection
+3. **Max uses**: Quando `current_uses >= max_uses`, status = "inactive"
+4. **Expiração**: Quando `now > expires_at`, status = "expired"
+5. **Sem sessão para atleta**: Após enviar, retorna à tela de token
+
+### Testes (19/19 passando)
+- Criação de token com valores padrão e customizados
+- Validação case-insensitive
+- Bloqueio de uso duplicado por atleta
+- Bloqueio quando max_uses atingido
+- Rejeição de token inválido/expirado
+- Cálculo correto de readiness score
+
+---
+
+## Arquitetura do Código
+
+```
+/app
+├── backend/
+│   └── server.py          # API FastAPI com endpoints wellness token
+├── frontend/
+│   ├── app/
+│   │   ├── index.tsx           # Redirecionamento por role
+│   │   ├── role-select.tsx     # Seleção Coach/Atleta
+│   │   ├── athlete-token.tsx   # Entrada de token
+│   │   ├── athlete-wellness.tsx # Formulário wellness
+│   │   ├── generate-wellness-token.tsx # Coach gera token
+│   │   ├── _layout.tsx         # Rotas configuradas
+│   │   └── (tabs)/
+│   │       └── profile.tsx     # Menu do coach
+│   └── locales/
+│       ├── pt.json             # Traduções português
+│       └── en.json             # Traduções inglês
+└── test_reports/
+    └── iteration_14.json       # Relatório de testes
 ```
 
 ---
 
-## Módulo Jump Analysis
+## Backlog
 
-### Estrutura
+### P1 - Pendente
+- [ ] Internacionalização completa de `ScientificAnalysisTab.tsx`
+- [ ] Internacionalização da página "Avaliações"
 
-```
-backend/jump_analysis/
-├── __init__.py        # Exports públicos
-├── baselines.py       # Cálculo de baselines (best, avg, CV%)
-├── trends.py          # Análise de tendências (slope, deltas)
-├── fatigue.py         # Detecção de fadiga neuromuscular
-├── readiness.py       # Avaliação de prontidão
-├── comparisons.py     # Comparações entre atletas/dispositivos
-└── report.py          # Geração de relatórios estruturados
-```
-
-### Funcionalidades
-
-#### 1. Baseline Calculator (`baselines.py`)
-- **Historical Best**: Melhor performance de todos os tempos
-- **Rolling Averages**: Médias de 7, 14 e 28 dias
-- **Career Average**: Média de carreira
-- **CV%**: Coeficiente de variação (consistência)
-
-#### 2. Trend Analysis (`trends.py`)
-- **Delta vs Baseline**: % mudança em relação à referência
-- **Weekly Slope**: Regressão linear (cm/semana)
-- **Direction**: improving, stable, declining
-
-#### 3. Fatigue Detection (`fatigue.py`)
-Baseado em evidência científica:
-- CMJ height drop ≥ 5% = threshold breach
-- RSI drop ≥ 10% = threshold breach
-- Sustained ≥ 2 sessões = fatigue confirmed
-
-**Níveis**: none, low, moderate, high, critical
-
-#### 4. Readiness Assessment (`readiness.py`)
-Score composto (0-100):
-- Fatigue Score: 50% peso
-- Trend Score: 30% peso
-- Consistency Score: 20% peso
-
-**Níveis**: optimal (≥85), good (≥70), moderate (≥55), low (≥40), poor (<40)
-
-#### 5. Comparisons (`comparisons.py`)
-- **Z-Score**: Normalização intra-atleta
-- **Percent of Best**: % do melhor pessoal
-- **Percentile**: Ranking entre grupo
-- **Device Correction**: Ajuste por dispositivo
+### P2 - Futuro
+- [ ] Testar pipeline `gps_import` com `identity_resolver`
+- [ ] Integrar identity resolution em outros imports
+- [ ] UI para resolução manual de nomes ambíguos
+- [ ] Funcionalidade de merge de atletas duplicados
 
 ---
 
-## Testes
+## Credenciais de Teste
 
-### Jump Import (30 testes)
-- Cálculos de métricas (altura, RSI, velocidade)
-- Validação por tipo de salto
-- Parsing de CSV
-- Detecção de fabricantes
-- Mapeamento de colunas
-
-### Jump Analysis (27 testes)
-- Cálculo de baselines
-- Análise de tendências
-- Detecção de fadiga
-- Avaliação de prontidão
-- Geração de relatórios
-- Comparação entre atletas
-- Análise de RSI
-
-**Total: 57 testes passando**
+- **Coach**: testcoach@test.com / test123
+- **Token de teste**: YXPVUU (já usado por João Silva)
+- **API URL**: https://wellness-token-flow.preview.emergentagent.com
 
 ---
 
-## Status da Implementação
-
-### ✅ COMPLETO - Jump Import
-- [x] Módulo `jump_import/` com separação de responsabilidades
-- [x] Mappers para 4 fabricantes + custom
-- [x] Cálculos de métricas derivadas
-- [x] Validação de regras de negócio
-- [x] API endpoints (preview, import, athlete, analysis, delete)
-- [x] 30 testes unitários
-
-### ✅ COMPLETO - Jump Analysis
-- [x] Módulo `jump_analysis/` com análise esportiva
-- [x] Cálculo de baselines (best, rolling, CV%)
-- [x] Análise de tendências (slope, direction)
-- [x] Detecção de fadiga neuromuscular
-- [x] Avaliação de prontidão (score 0-100)
-- [x] Comparação entre atletas (z-score, percentil)
-- [x] API endpoint de relatório (/api/jumps/report/{id})
-- [x] API endpoint de comparação (/api/jumps/compare)
-- [x] 27 testes unitários
-
-### ✅ COMPLETO - Identity Resolver (Resolução de Identidade de Atletas)
-- [x] Módulo `identity_resolver/` com arquitetura limpa
-- [x] Normalização agressiva de nomes (acentos, pontuação, ordem)
-- [x] Fuzzy matching com threshold de 85% (thefuzz library)
-- [x] Persistência de aliases (`athlete_aliases` collection)
-- [x] API endpoints:
-  - `POST /api/athletes/resolve-name` - Resolver nome único
-  - `POST /api/athletes/resolve-bulk` - Resolver múltiplos nomes
-  - `POST /api/athletes/confirm-alias` - Confirmar associação
-  - `GET /api/athletes/{id}/aliases` - Listar aliases
-  - `DELETE /api/athletes/aliases/{id}` - Remover alias
-- [x] 19 testes unitários
-
----
-
-## Módulo Identity Resolver
-
-### Problema Resolvido
-O mesmo atleta pode aparecer com nomes diferentes em CSVs de fontes distintas:
-- "João Vitor" / "JOAO VITOR" / "J. Vitor" / "Vitor, João"
-
-### Princípios Fundamentais
-1. **athlete_id é o ÚNICO identificador único** - O nome é apenas descritivo
-2. **Nunca criar atletas automaticamente** - Sempre exigir confirmação
-3. **Nunca sobrescrever aliases existentes** - Conflitos exigem ação manual
-4. **Auditoria completa** - Registrar quem criou cada associação
-
-### Fluxo de Resolução (3 Etapas)
-
-**Etapa 1 - Busca Exata**
-- CSV contém `athlete_id` explícito? → Usar diretamente
-- Alias já mapeado? → Usar athlete_id associado
-
-**Etapa 2 - Sugestão por Similaridade**
-- Normalizar nome do CSV
-- Comparar com nomes existentes
-- Se similaridade ≥ 85%: sugerir candidato
-- Se múltiplos candidatos: exigir escolha manual
-
-**Etapa 3 - Confirmação Obrigatória**
-- Coach escolhe: atleta existente OU criar novo
-- Decisão é persistida como alias
-- Reutilizada em futuros uploads
-
-### Estrutura do Módulo
-
-```
-backend/identity_resolver/
-├── __init__.py          # Exports públicos
-├── models.py            # Pydantic models (AthleteAlias, etc.)
-├── normalizer.py        # Normalização de nomes
-├── matcher.py           # Fuzzy matching (thefuzz)
-└── resolver.py          # Motor de resolução
-```
-
-### Schema: athlete_aliases
-
-```json
-{
-  "_id": "ObjectId",
-  "athlete_id": "string",
-  "coach_id": "string",
-  "alias_normalized": "string",
-  "alias_original": "string",
-  "source_system": "string",
-  "created_at": "datetime",
-  "last_used_at": "datetime",
-  "created_by": "string"
-}
-```
-
-### API Response: resolve-bulk
-
-```json
-{
-  "resolved": {"J. Vitor": "athlete_id_123"},
-  "resolved_count": 1,
-  "unresolved": [
-    {
-      "original_name": "JOAO VITOR",
-      "candidates": [
-        {
-          "athlete_id": "...",
-          "athlete_name": "João Vitor Silva",
-          "similarity_score": 93.8,
-          "match_reason": "tokens correspondentes"
-        }
-      ],
-      "suggested_action": "select_or_create"
-    }
-  ],
-  "can_import": false,
-  "message": "1 nome(s) pendente(s)"
-}
-```
-
----
-
-## Próximos Passos (Backlog)
-
-### ✅ P1 - Integração com Pipelines de Upload (COMPLETO)
-- [x] Aplicar resolução de identidade no preview de jump_import
-- [x] Aplicar resolução de identidade no preview de gps_import
-- [x] Bloquear importação se houver atletas não resolvidos (`can_import: false`)
-- [x] Atualizar `last_used_at` quando alias é usado em importação
-
-### ⏸️ P2 - Novos Pipelines de Importação (AGUARDANDO ESPECIFICAÇÃO)
-**Status:** Não autorizado para implementação sem especificação formal.
-
-Os seguintes pipelines foram mencionados como intenção futura, mas **não devem ser criados** até nova instrução:
-- [ ] `force_import` — Importação CSV de dados de plataformas de força
-- [ ] `wellness_import` — Importação CSV de questionários wellness em lote
-
-**Requisitos para aprovação:**
-- Definição explícita de formatos CSV suportados
-- Regras de identity resolution específicas para cada tipo
-- Critérios de bloqueio e auditoria
-
-### P3 - Interface Frontend
-- [ ] Upload de CSV com preview
-- [ ] Dashboard de atleta com gráficos
-- [ ] Indicadores visuais de prontidão
-- [ ] Comparação lado a lado
-- [ ] Modal de resolução de identidade durante upload
-
-### P4 - Merge de Atletas (FUTURO)
-- [ ] Funcionalidade para consolidar dois athlete_ids num único perfil
-- [ ] Migrar dados históricos automaticamente
-- [ ] Trilha de auditoria própria
-
----
-
-## Módulo Periodização
-
-### ✅ COMPLETO - Página Periodização
-- [x] Listagem de semanas de periodização
-- [x] Criação de nova semana com classificação de dias (MD, MD-1, etc.)
-- [x] Visualização de metas semanais e diárias por atleta
-- [x] Cálculo de metas baseado em peak values (máximos históricos de JOGO)
-- [x] Sistema de notificações de novos picos
-- [x] Modo tabela e cards para visualização
-- [x] Contraste visual do botão "Voltar ao Menu Principal" corrigido
-- [x] Endpoint de recálculo de peak values (`POST /api/periodization/recalculate-peaks`)
-
-### Bug Fix (2026-02-10)
-**Problema:** Valores calculados apareciam apenas para o 1º atleta; demais mostravam 0.
-
-**Causa raiz:** Inconsistência de tipo no `athlete_id` entre escrita (às vezes ObjectId) e leitura (sempre string) na coleção `athlete_peak_values`.
-
-**Correção aplicada:**
-1. Normalização para `str` na escrita: `athlete_id = str(session_records[0].get("athlete_id"))`
-2. Normalização para `str` na leitura: `peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}`
-
-### Bug Fix (2026-02-11)
-**Problema:** Mesmo após normalização, atletas ainda mostravam 0 porque não tinham peak_values.
-
-**Causa raiz:** Sessões GPS importadas como "game" não disparavam criação de peak_values. A função `update_athlete_peak_values` só era chamada no endpoint de reclassificação, não na importação.
-
-**Correção aplicada:**
-- Novo endpoint `POST /api/periodization/recalculate-peaks` que:
-  1. Busca todas as sessões GPS marcadas como "game"
-  2. Agrupa por atleta e sessão
-  3. Recalcula peak values para cada atleta com base no melhor valor de cada métrica
-  4. Atualiza a coleção `athlete_peak_values`
-
-**Resultado:** 22 atletas atualizados, todos com metas calculadas corretamente.
-
----
-
-## Changelog (2026-02-11)
-
-### ✅ Tema Escuro Forçado
-**Solicitação:** Remover botão de alternância de tema e forçar tema escuro em todas as telas.
-
-**Alterações:**
-1. **ThemeContext.tsx** - Simplificado para sempre retornar tema escuro:
-   - Removido `useState`, `useEffect`, `AsyncStorage`
-   - Removidas funções `toggleTheme`, `setTheme`, `loadTheme`, `saveTheme`
-   - Contexto agora retorna valores fixos: `theme: 'dark'`, `isDark: true`, `colors: darkColors`
-
-2. **profile.tsx** - Removido bloco do Switch de tema:
-   - Removido import `Switch`
-   - Removidas variáveis `theme`, `toggleTheme`, `isDark` do destructuring
-   - Removido bloco JSX do "Theme Toggle" (linhas 109-133)
-
-**Resultado:** 
-- Botão de tema removido da página de Perfil
-- Todas as telas aplicam exclusivamente tema escuro
-- Cores e layout preservados
-- Nenhuma funcionalidade quebrada
-
-### ✅ Remoção de Idiomas Extras
-**Solicitação:** Manter apenas Português e Inglês como idiomas suportados.
-
-**Alterações:**
-1. **i18n/index.ts** - Atualizado para suportar apenas pt e en:
-   - Removidos imports de `es.json`, `fr.json`, `zh.json`, `ar.json`
-   - Array `languages` reduzido para 2 opções (pt e en)
-   - Objeto i18n simplificado
-   - `supportedLocales` atualizado para `['en', 'pt']`
-   - Default alterado para `pt` (Português)
-   - Função `isRTL()` sempre retorna `false` (não há mais árabe)
-
-2. **Arquivos removidos:**
-   - `/app/frontend/locales/ar.json`
-   - `/app/frontend/locales/es.json`
-   - `/app/frontend/locales/fr.json`
-   - `/app/frontend/locales/zh.json`
-
-**Resultado:**
-- Seletor de idioma mostra apenas Português e Inglês
-- Troca de idioma funciona corretamente entre os dois
-- Todas as traduções de pt e en preservadas intactas
-
-### ✅ Preview de Relatório com Gráficos no PDF
-**Solicitação:** Garantir que os gráficos da página de Análises apareçam no preview e no PDF gerado.
-
-**Problema Identificado:**
-- O modal de preview mostrava apenas texto, sem gráficos
-- O endpoint `/api/report/scientific/{id}` retornava 500 para atletas sem peso/altura
-
-**Alterações:**
-1. **ScientificAnalysisTab.tsx** - Modificado para carregar HTML completo:
-   - Adicionado import `WebView` de `react-native-webview`
-   - Estados `reportHtml` e `loadingReport` adicionados
-   - Função `loadReportPreview()` busca HTML do backend via API autenticada
-   - Modal usa `iframe` (web) / `WebView` (mobile) para renderizar HTML com gráficos SVG
-   - Estilos `modalContentFull` e `webView` adicionados
-
-2. **server.py** - Corrigido bug de None vs int:
-   - Linha 5407-5408: `athlete.get('weight', 0)` → `athlete.get('weight') or 0`
-   - Mesma correção para `height`
-
-**Resultado:**
-- Preview do relatório exibe textos + gráficos (composição corporal donut, etc.)
-- PDF final abre em nova aba com todos os gráficos
-- Valores consistentes entre tela e PDF
-
-### ✅ Correção da Marcação Individual de "Jogo" por Atleta
-**Solicitação:** Corrigir lógica para que a marcação de "jogo" seja individual por atleta na página de periodização.
-
-**Problema Identificado:**
-- Session IDs eram compartilhados entre múltiplos atletas (até 22 atletas com mesmo session_id)
-- Ao marcar uma sessão como "jogo" para um atleta, TODOS os atletas eram marcados
-- Na página de periodização, apenas o primeiro atleta tinha cálculos corretos
-
-**Alterações:**
-1. **server.py** - Endpoint `/gps-data/session/{session_id}/activity-type`:
-   - Adicionado campo obrigatório `athlete_id` no modelo `ActivityTypeUpdate`
-   - Query de update agora filtra por `session_id` E `athlete_id`
-   - Apenas os registros do atleta específico são atualizados
-
-2. **athlete/[id].tsx** - Mutation `classifySessionMutation`:
-   - Agora envia `athlete_id: id` junto com `activity_type`
-   - Garante que apenas o atleta atual seja afetado
-
-**Resultado:**
-- Cada atleta pode ter sua sessão marcada individualmente como "jogo" ou "treino"
-- Cálculos de periodização consideram corretamente apenas os atletas com sessões marcadas como "jogo"
-- Funciona retroativamente para perfis existentes e novos
-
-### ✅ Correção do Cálculo de Métricas para Prescrição Diária e Semanal (2026-02-18)
-**Solicitação:** Corrigir o cálculo de valores de pico para usar apenas o valor total da sessão de cada CSV, ignorando subperíodos (1º tempo, 2º tempo, etc.).
-
-**Problema Identificado:**
-1. **Incompatibilidade de tipos de ID:** Queries MongoDB usavam `ObjectId` para `coach_id`, mas os dados estavam armazenados como `string`. Isso causava falha nas buscas de atletas e peak values.
-2. **Chamada incorreta de função:** A função `update_athlete_peak_values` estava sendo chamada com parâmetros incorretos na classificação de sessões.
-
-**Alterações:**
-1. **server.py** - Normalização de tipos de ID:
-   - Todas as funções de periodização agora usam `coach_id_str = str(current_user["_id"])`
-   - Queries para `athletes`, `gps_data`, `athlete_peak_values` e `periodization_weeks` normalizadas
-   - Fallbacks adicionados para dados legados com ObjectId
-
-2. **server.py** - Função `recalculate_all_peak_values`:
-   - Corrigida para usar `coach_id_str` em todas as queries
-   - Adicionada validação de existência do atleta com fallback
-   - Logging melhorado para debug
-
-3. **server.py** - Função `classify_session_for_all_athletes`:
-   - Corrigida chamada para `update_athlete_peak_values` com todos os parâmetros necessários
-   - Agora extrai `session_metrics`, `session_date` e `athlete_name` corretamente
-
-4. **server.py** - Função `update_session_activity_type`:
-   - Normalizada para usar `coach_id_str`
-   - Removido uso de `ObjectId(data.athlete_id)` (dados já são string)
-
-**Função extract_gps_metrics_from_session:**
-A lógica de extração de métricas já estava correta:
-- Prioriza registro com `period_name` contendo "session", "total", "full", etc.
-- Exclui registros que também contenham "half", "1st", "2nd", etc.
-- Se não houver registro de sessão total, soma os períodos como fallback
-
-**Testes:**
-- 18 testes passando (8 unitários + 10 API)
-- `/app/backend/tests/test_peak_values.py` - Testes unitários da lógica de cálculo
-- `/app/backend/tests/test_peak_values_api.py` - Testes de integração da API
-
-**Resultado:**
-- Todos os coaches com dados de jogo agora têm peak values calculados corretamente
-- Prescrições diárias e semanais exibem valores baseados apenas no total da sessão
-- Sistema funciona para perfis existentes e novos
-
-**Exemplo de cálculo correto:**
-- CSV com: Session=12204m, 1ST HALF=5050m, 2ND HALF=5450m
-- Peak usado: 12204m (valor da sessão, NÃO 15500m = soma dos períodos)
-- Weekly target (1.3x): 15865m
-- Daily targets calculados corretamente por dia
-
----
-
-## Referências Científicas
-
-- Claudino et al. (2017) - CMJ monitoring in team sports
-- Gathercole et al. (2015) - Neuromuscular fatigue markers
-- Taylor et al. (2012) - Jump testing for monitoring fatigue
-- Bosco et al. (1983) - Simple method for mechanical power measurement
+## Changelog
+
+### 2026-02-13 - Sistema de Token Wellness
+- **NOVA FUNCIONALIDADE**: Sistema completo de tokens para wellness
+- Tela de seleção de papel (Coach/Atleta) na abertura do app
+- Geração de tokens com limite de usos e expiração
+- Fluxo de atleta: inserir token → selecionar nome → responder → fim
+- Controle de uso único por atleta por token
+- 19 testes unitários passando
+- Substituição completa do sistema de links por tokens internos
