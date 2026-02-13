@@ -346,6 +346,31 @@ export default function VBTCameraPage() {
             
             <Text style={styles.configHint}>{labels.configHint}</Text>
             
+            {/* Camera Preview - Shows camera is working */}
+            <View style={styles.cameraPreviewContainer}>
+              <CameraView
+                style={styles.cameraPreview}
+                facing="back"
+                active={phase === 'config' && isCameraActive}
+                onCameraReady={handleCameraReady}
+              >
+                {isCameraReady ? (
+                  <View style={styles.cameraPreviewOverlay}>
+                    <View style={styles.cameraStatusBadge}>
+                      <Ionicons name="checkmark-circle" size={14} color="#10b981" />
+                      <Text style={styles.cameraStatusText}>
+                        {locale === 'pt' ? 'Câmera OK' : 'Camera OK'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.cameraPreviewLoading}>
+                    <ActivityIndicator size="small" color={colors.accent.primary} />
+                  </View>
+                )}
+              </CameraView>
+            </View>
+            
             {/* Camera Height */}
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>{labels.cameraHeight}</Text>
