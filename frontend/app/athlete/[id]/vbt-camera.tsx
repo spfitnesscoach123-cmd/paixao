@@ -786,6 +786,43 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 20,
   },
+  cameraPreviewContainer: {
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  cameraPreview: {
+    flex: 1,
+  },
+  cameraPreviewOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-start',
+    padding: 8,
+  },
+  cameraStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  cameraStatusText: {
+    color: '#10b981',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cameraPreviewLoading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
   inputGroup: {
     marginBottom: 16,
   },
