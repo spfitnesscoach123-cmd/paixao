@@ -14,7 +14,7 @@
       "buildNumber": "15",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
-        "NSCameraUsageDescription": "Tire fotos dos atletas e faça análise VBT em tempo real",
+        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT",
         "NSBluetoothAlwaysUsageDescription": "LoadManager Pro may use Bluetooth to connect to external performance monitoring devices when authorized by the user.",
         "NSBluetoothPeripheralUsageDescription": "LoadManager Pro may use Bluetooth to communicate with compatible external sports performance devices."
       }
@@ -70,6 +70,19 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Escolha fotos dos atletas",
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT"
         }
       ]
     ],
