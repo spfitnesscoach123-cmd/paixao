@@ -20,6 +20,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useBarTracking, RepData } from '../../../services/vbt';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -31,20 +32,6 @@ interface CameraConfig {
   cameraHeight: number; // cm
   distanceFromBar: number; // cm
   loadKg: number; // kg
-}
-
-interface SetData {
-  rep: number;
-  meanVelocity: number;
-  peakVelocity: number;
-  velocityDrop: number;
-  timestamp: number;
-}
-
-interface VelocityReading {
-  timestamp: number;
-  velocity: number;
-  isDropDetected: boolean;
 }
 
 export default function VBTCameraPage() {
