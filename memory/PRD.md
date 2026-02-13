@@ -147,7 +147,7 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 - **Coach**: testcoach@example.com / TestPass123!
 - **Token de teste**: 9UDZAX (expira em 1h após criação: 2026-02-13 15:41)
-- **API URL**: https://wellness-token.preview.emergentagent.com
+- **API URL**: https://barbell-velocity-ai.preview.emergentagent.com
 - **Atletas de teste**: Atleta Teste 1, Atleta Teste 2, Atleta Teste 3
 
 ---
