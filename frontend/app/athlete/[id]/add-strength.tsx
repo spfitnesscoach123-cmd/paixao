@@ -1466,4 +1466,44 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text.primary,
   },
+  // VBT Camera Button styles
+  cameraVbtButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  cameraVbtGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  cameraVbtTextContainer: {
+    flex: 1,
+  },
+  cameraVbtText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  cameraVbtSubtext: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.default,
+  },
+  dividerText: {
+    color: colors.text.tertiary,
+    fontSize: 12,
+  },
 });
