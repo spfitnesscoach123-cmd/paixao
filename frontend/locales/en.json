@@ -20,7 +20,9 @@
     "warning": "Warning",
     "tryAgain": "Try Again",
     "date": "Date",
-    "notes": "Notes"
+    "notes": "Notes",
+    "copy": "Copy",
+    "share": "Share"
   },
   "auth": {
     "login": "Login",
