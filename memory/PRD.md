@@ -15,6 +15,9 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Sistema de Token Wellness (IMPLEMENTADO - 2026-02-13)
 
+### Versão Atual
+**app.json version: 1.0.13** (pronto para novo build)
+
 ### Novo Fluxo de Acesso
 
 **Primeira abertura do app:**
