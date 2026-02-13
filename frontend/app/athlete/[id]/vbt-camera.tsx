@@ -495,14 +495,7 @@ export default function VBTCameraPage() {
                     {locale === 'pt' ? 'Iniciando câmera...' : 'Initializing camera...'}
                   </Text>
                 </View>
-              )} 
-                    color="#ffffff" 
-                  />
-                  <Text style={styles.statusText}>
-                    {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
-                  </Text>
-                </View>
-              </View>
+              )}
             </CameraView>
           </View>
           
