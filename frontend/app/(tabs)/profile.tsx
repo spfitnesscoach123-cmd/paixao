@@ -124,12 +124,12 @@ export default function ProfileScreen() {
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/generate-wellness-link')}>
+          <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/generate-wellness-token')}>
             <View style={styles.menuItemContent}>
               <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.2)' }]}>
-                <Ionicons name="link-outline" size={22} color={colors.status.success} />
+                <Ionicons name="key-outline" size={22} color={colors.status.success} />
               </View>
-              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('wellness.generateLink')}</Text>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('token.generateToken') || 'Gerar Token Wellness'}</Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
