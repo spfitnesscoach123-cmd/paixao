@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Load Manager",
+    "name": "LoadManager Pro",
     "slug": "loadmanager",
-    "version": "1.0.14",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "loadmanager",
@@ -11,9 +11,10 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
+      "buildNumber": "15",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
-        "NSCameraUsageDescription": "Tire fotos dos atletas",
+        "NSCameraUsageDescription": "Tire fotos dos atletas e faça análise VBT em tempo real",
         "NSBluetoothAlwaysUsageDescription": "LoadManager Pro may use Bluetooth to connect to external performance monitoring devices when authorized by the user.",
         "NSBluetoothPeripheralUsageDescription": "LoadManager Pro may use Bluetooth to communicate with compatible external sports performance devices."
       }
