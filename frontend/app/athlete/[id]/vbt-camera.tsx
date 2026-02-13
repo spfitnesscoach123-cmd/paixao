@@ -43,6 +43,10 @@ export default function VBTCameraPage() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
+  // Camera ready state - CRITICAL for iOS stability
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(true);
+  
   // State
   const [phase, setPhase] = useState<'config' | 'recording' | 'review'>('config');
   const [cameraConfig, setCameraConfig] = useState<CameraConfig>({
