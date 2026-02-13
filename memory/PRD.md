@@ -162,6 +162,20 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2026-02-13 - Preparação para Build v1.1.0
+- **NOVA LOGO**: Atualização da logo do app em todas as telas
+- Logo atualizada em:
+  - `role-select.tsx` (tela inicial)
+  - `login.tsx` (tela de login)
+  - Assets do app (icon.png, adaptive-icon.png, splash-image.png, favicon.png)
+- **App Store Connect Assets Criados**:
+  - iOS: Todos os tamanhos de ícones (20, 29, 40, 60, 76, 83.5, 1024)
+  - Android: Ícones adaptativos para todas as densidades (mdpi, hdpi, xhdpi, xxhdpi, xxxhdpi)
+- **Configuração de Build**:
+  - app.json atualizado: versão 1.1.0, buildNumber: 15, versionCode: 15
+  - Nome do app alterado para "LoadManager Pro"
+  - Cache limpo e preparado para novo build
+
 ### 2026-02-13 - VBT via Camera - FASE 3 COMPLETA
 - **INTEGRAÇÃO COM GRÁFICOS**: Dados da câmera agora atualizam automaticamente todos os gráficos
 - Modificações realizadas:
