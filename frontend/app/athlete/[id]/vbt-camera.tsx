@@ -237,57 +237,31 @@ export default function VBTCameraPage() {
     }
   };
   
+  // Start recording - now uses the bar tracking hook
   const startRecording = async () => {
-    setIsRecording(true);
     setRecordingTime(0);
-    setVelocityReadings([]);
-    setRepCount(0);
-    setSetsData([]);
-    baselineVelocityRef.current = null;
-    setFeedbackColor('neutral');
     setPhase('recording');
+    
+    // Start the bar tracking (uses simulation or real tracking)
+    startTracking();
     
     // Start recording timer
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime(prev => prev + 1);
     }, 1000);
-    
-    // Start velocity simulation (would be real frame processing)
-    velocitySimulatorRef.current = setInterval(() => {
-      simulateVelocityTracking();
-    }, 200);
-    
-    // Actually record video (optional - for review)
-    if (cameraRef.current && Platform.OS !== 'web') {
-      try {
-        // Note: expo-camera recordAsync may not work on all devices
-        // This is mainly for the real-time velocity display
-      } catch (error) {
-        console.log('Video recording not available:', error);
-      }
-    }
   };
   
+  // Stop recording - now uses the bar tracking hook
   const stopRecording = async () => {
-    setIsRecording(false);
+    stopTracking();
     
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
-    }
-    if (velocitySimulatorRef.current) {
-      clearInterval(velocitySimulatorRef.current);
-    }
-    
-    if (cameraRef.current && Platform.OS !== 'web') {
-      try {
-        cameraRef.current.stopRecording();
-      } catch (error) {
-        console.log('Stop recording error:', error);
-      }
+      recordingTimerRef.current = null;
     }
     
     // Move to review phase if we have data
-    if (setsData.length > 0 || repCount > 0) {
+    if (repsData.length > 0 || repCount > 0) {
       setPhase('review');
     }
   };
@@ -296,7 +270,6 @@ export default function VBTCameraPage() {
   useEffect(() => {
     return () => {
       if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      if (velocitySimulatorRef.current) clearInterval(velocitySimulatorRef.current);
     };
   }, []);
   
