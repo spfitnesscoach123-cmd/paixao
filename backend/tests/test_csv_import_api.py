@@ -7,7 +7,7 @@ import requests
 import os
 import io
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://vbt-camera-phase3.preview.emergentagent.com")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://ios-crash-patch.preview.emergentagent.com")
 
 # Test credentials
 TEST_USER = "test@test.com"
