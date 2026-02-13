@@ -145,3 +145,7 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 - Controle de uso único por atleta por token
 - 19 testes unitários passando
 - Substituição completa do sistema de links por tokens internos
+- **FIX**: Correção do erro "unmatched route" - rotas adicionadas ao _layout.tsx
+- **FIX**: Botões "Voltar" implementados nas telas athlete-token.tsx e generate-wellness-token.tsx
+- **TEST**: 95% taxa de sucesso no frontend (6/7 funcionalidades, 1 problema visual LOW priority)
+
