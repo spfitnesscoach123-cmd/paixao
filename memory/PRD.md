@@ -129,9 +129,10 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Credenciais de Teste
 
-- **Coach**: testcoach@test.com / test123
-- **Token de teste**: YXPVUU (já usado por João Silva)
+- **Coach**: testcoach@example.com / TestPass123!
+- **Token de teste**: 9UDZAX (expira em 1h após criação: 2026-02-13 15:41)
 - **API URL**: https://athlete-onboarding.preview.emergentagent.com
+- **Atletas de teste**: Atleta Teste 1, Atleta Teste 2, Atleta Teste 3
 
 ---
 
