@@ -598,7 +598,7 @@ export default function VBTCameraPage() {
               style={styles.recordAgainButton}
               onPress={() => {
                 resetTracking();
-                setPhase('recording');
+                handlePhaseChange('recording');
               }}
               data-testid="record-again-btn"
             >
