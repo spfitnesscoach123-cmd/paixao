@@ -120,16 +120,22 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Backlog
 
-### P0 - VBT via Camera (Próximas Fases)
-- [ ] **Fase 2**: Processamento de vídeo com MediaPipe
-  - [ ] Integrar react-native-vision-camera com frame processors
-  - [ ] Implementar detecção de pose com MediaPipe
-  - [ ] Rastreamento real da barra em movimento
-  - [ ] Cálculo de velocidade frame a frame
+### P0 - VBT via Camera
+- [x] **Fase 1**: UI e navegação (COMPLETA)
+- [x] **Fase 2**: Tracking de barbell (COMPLETA - 2026-02-13)
+  - [x] Módulo de tracking com modelo físico (`services/vbt/barTracker.ts`)
+  - [x] Hook React para integração (`services/vbt/useBarTracking.ts`)
+  - [x] Cálculo de velocidade instantânea, média e pico
+  - [x] Detecção automática de repetições
+  - [x] Feedback visual (verde = OK, vermelho = queda >10%)
+  - [x] Simulação para desenvolvimento (useSimulation: true)
+  - [x] Documentação para integração com MediaPipe (build nativo)
 - [ ] **Fase 3**: Integração com gráficos
   - [ ] Atualizar gráficos de Perda de Velocidade por Set
   - [ ] Atualizar Perfil Carga x Velocidade
   - [ ] Atualizar exportação de relatórios PDF
+
+**NOTA**: Tracking real com MediaPipe requer build nativo iOS/Android com react-native-vision-camera + Frame Processors. A simulação atual funciona para testes e desenvolvimento.
 
 ### P1 - Internacionalização
 - [ ] Internacionalização completa de `ScientificAnalysisTab.tsx`
