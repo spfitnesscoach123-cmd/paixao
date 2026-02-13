@@ -258,18 +258,18 @@ export default function VBTCameraPage() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Calculate session summary
+  // Calculate session summary (uses repsData from the tracking hook)
   const sessionSummary = {
-    avgVelocity: setsData.length > 0 
-      ? (setsData.reduce((sum, s) => sum + s.meanVelocity, 0) / setsData.length).toFixed(2)
+    avgVelocity: repsData.length > 0 
+      ? (repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length).toFixed(2)
       : '0.00',
-    maxVelocity: setsData.length > 0 
-      ? Math.max(...setsData.map(s => s.peakVelocity)).toFixed(2)
+    maxVelocity: repsData.length > 0 
+      ? Math.max(...repsData.map(s => s.peakVelocity)).toFixed(2)
       : '0.00',
-    totalReps: setsData.length,
-    fatigueDetected: setsData.some(s => s.velocityDrop > 10),
-    avgVelocityDrop: setsData.length > 0
-      ? (setsData.reduce((sum, s) => sum + s.velocityDrop, 0) / setsData.length).toFixed(1)
+    totalReps: repsData.length,
+    fatigueDetected: repsData.some(s => s.velocityDrop > 10),
+    avgVelocityDrop: repsData.length > 0
+      ? (repsData.reduce((sum, s) => sum + s.velocityDrop, 0) / repsData.length).toFixed(1)
       : '0',
   };
   
