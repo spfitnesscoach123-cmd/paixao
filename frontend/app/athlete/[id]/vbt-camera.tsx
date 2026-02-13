@@ -79,8 +79,8 @@ export default function VBTCameraPage() {
   
   // Refs
   const cameraRef = useRef<CameraView>(null);
-  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const velocitySimulatorRef = useRef<NodeJS.Timeout | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const velocitySimulatorRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const baselineVelocityRef = useRef<number | null>(null);
   
   const EXERCISES = [
