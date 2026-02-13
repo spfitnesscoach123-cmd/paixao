@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
@@ -48,6 +48,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     checkAuthStatus();
@@ -59,6 +60,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (token) {
         const response = await api.get('/auth/me');
         setUser(response.data);
+      } else {
+        // No token - ensure cache is clear for fresh start
+        queryClient.clear();
       }
     } catch (error) {
       console.error('Auth check failed:', error);
@@ -67,6 +71,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         // Ignore deletion errors
       }
+      // Clear cache on auth failure
+      queryClient.clear();
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +80,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (email: string, password: string) => {
     try {
+      // Clear any existing cache before login to ensure clean state
+      queryClient.clear();
+      
       const response = await api.post<AuthResponse>('/auth/login', {
         email,
         password,
@@ -87,6 +96,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const register = async (email: string, password: string, name: string) => {
     try {
+      // Clear any existing cache before registration to ensure clean state
+      queryClient.clear();
+      
       const response = await api.post<AuthResponse>('/auth/register', {
         email,
         password,
@@ -99,14 +111,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await storage.deleteItem('access_token');
     } catch (e) {
       // Ignore deletion errors
     }
+    
+    // CRITICAL: Clear ALL cached data to prevent data leakage between users
+    queryClient.clear();
+    
+    // Also clear AsyncStorage cache keys that might store user-specific data
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const userDataKeys = keys.filter(key => 
+        key.startsWith('athlete_') || 
+        key.startsWith('gps_') || 
+        key.startsWith('wellness_') ||
+        key.startsWith('assessment_') ||
+        key.startsWith('team_') ||
+        key.startsWith('dashboard_')
+      );
+      if (userDataKeys.length > 0) {
+        await AsyncStorage.multiRemove(userDataKeys);
+      }
+    } catch (e) {
+      // Ignore AsyncStorage errors
+    }
+    
     setUser(null);
-  };
+  }, [queryClient]);
 
   const updateProfile = async (name: string) => {
     try {
