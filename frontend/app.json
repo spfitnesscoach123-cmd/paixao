@@ -11,50 +11,27 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
-      "buildNumber": "18",
+      "buildNumber": "19",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT.",
-        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo.",
-        "NSBluetoothAlwaysUsageDescription": "LoadManager Pro may use Bluetooth to connect to external performance monitoring devices when authorized by the user.",
-        "NSBluetoothPeripheralUsageDescription": "LoadManager Pro may use Bluetooth to communicate with compatible external sports performance devices."
+        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo do VBT."
       }
     },
     "android": {
       "package": "com.loadmanager.app",
-      "versionCode": 17,
+      "versionCode": 19,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000F1F"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
+        "CAMERA",
+        "RECORD_AUDIO",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
-        "CAMERA",
         "READ_MEDIA_IMAGES"
-      ],
-      "intentFilters": [
-        {
-          "action": "VIEW",
-          "autoVerify": true,
-          "data": [
-            {
-              "scheme": "https",
-              "host": "loadmanager.app",
-              "pathPrefix": "/wellness-form"
-            },
-            {
-              "scheme": "https",
-              "host": "*.loadmanager.app",
-              "pathPrefix": "/wellness-form"
-            }
-          ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
-        }
       ]
     },
     "web": {
@@ -76,14 +53,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT"
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT.",
+          "microphonePermission": "Necessário para captura de vídeo do VBT.",
+          "recordAudioAndroid": true
         }
       ],
       [
         "expo-image-picker",
         {
           "photosPermission": "Escolha fotos dos atletas",
-          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT"
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT."
         }
       ]
     ],
