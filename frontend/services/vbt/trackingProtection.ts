@@ -465,6 +465,7 @@ export class TrackingPointManager {
 
   /**
    * Get the position of the tracking point from pose data
+   * CAMADA 3: Ponto de tracking definido pelo coach
    * Returns null if point not found or confidence too low
    */
   getTrackedPosition(pose: PoseData | null): {
@@ -478,7 +479,7 @@ export class TrackingPointManager {
         position: null,
         confidence: 0,
         isValid: false,
-        message: 'Tracking point not set by coach',
+        message: 'Ponto de tracking não definido pelo coach',
       };
     }
 
@@ -487,11 +488,11 @@ export class TrackingPointManager {
         position: null,
         confidence: 0,
         isValid: false,
-        message: 'No pose data available',
+        message: 'Sem dados de pose disponíveis',
       };
     }
 
-    // Find the specific keypoint
+    // Find the specific keypoint (LAYER 3: ONLY this point is used)
     const keypoint = pose.keypoints.find(kp => kp.name === this.trackingPoint.keypointName);
 
     if (!keypoint) {
@@ -499,7 +500,7 @@ export class TrackingPointManager {
         position: null,
         confidence: 0,
         isValid: false,
-        message: `Keypoint "${this.trackingPoint.keypointName}" not detected`,
+        message: `Ponto "${this.trackingPoint.keypointName}" não detectado`,
       };
     }
 
@@ -508,7 +509,7 @@ export class TrackingPointManager {
         position: null,
         confidence: keypoint.score,
         isValid: false,
-        message: `Keypoint confidence too low: ${(keypoint.score * 100).toFixed(0)}%`,
+        message: `Confiança do ponto muito baixa: ${(keypoint.score * 100).toFixed(0)}% (mín: 60%)`,
       };
     }
 
@@ -516,7 +517,7 @@ export class TrackingPointManager {
       position: { x: keypoint.x, y: keypoint.y },
       confidence: keypoint.score,
       isValid: true,
-      message: 'Tracking point detected',
+      message: 'Ponto de tracking detectado',
     };
   }
 
