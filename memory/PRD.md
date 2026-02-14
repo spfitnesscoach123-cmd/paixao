@@ -162,6 +162,29 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2025-12-XX - Preparação Build Final MediaPipe REAL v1.1.0 (Build 21)
+- **TASK COMPLETA**: Preparação do build nativo iOS/Android com MediaPipe REAL
+- **Ações executadas**:
+  1. ✅ Verificação de configurações: `newArchEnabled: true`, `jsEngine: "jsc"` (Hermes OFF)
+  2. ✅ Limpeza de cache: `node_modules/.cache`, `.expo` removidos
+  3. ✅ Remoção de diretórios nativos antigos: `ios/`, `android/` removidos
+  4. ✅ Execução de `npx expo prebuild --clean` - SUCESSO
+  5. ✅ Verificação do Podfile: Hermes DESATIVADO confirmado
+  6. ✅ Verificação do Android: `hermesEnabled=false` confirmado
+  7. ✅ Build web de teste via Metro: 0 erros, 2161+ módulos compilados
+- **Versão**: app.json buildNumber: 21, versionCode: 21
+- **Status MediaPipe**:
+  - `useSimulation: false` em `vbt-camera.tsx` (linha 127)
+  - `MediapipePoseView` integrado para plataformas nativas
+  - `@thinksys/react-native-mediapipe@0.0.19` instalado
+  - `react-native-vision-camera@4.7.3` instalado
+- **PRÓXIMOS PASSOS PARA O USUÁRIO**:
+  1. No macOS: `cd ios && pod install`
+  2. Build iOS: `eas build --platform ios --profile production`
+  3. Build Android: `eas build --platform android --profile production`
+  4. Upload para TestFlight/Play Store
+  5. Testar fluxo VBT completo no dispositivo real
+
 ### 2026-02-14 - Correção Crash TestFlight (VBT Camera)
 - **FIX CRÍTICO**: Crash do app no iOS quando o botão "VBT via Camera" era pressionado
 - **Causa**: Falta do plugin `expo-camera` na configuração de plugins do `app.json`
