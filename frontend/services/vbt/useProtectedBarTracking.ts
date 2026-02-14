@@ -7,6 +7,11 @@
  * - Layer 3: Coach-defined tracking point
  * 
  * This hook wraps the protection system with React state management.
+ * Supports both real MediaPipe pose detection and simulation for development.
+ * 
+ * INTEGRATION:
+ * - Real detection: Uses PoseDetector from services/pose
+ * - Simulation: Uses built-in BarPositionSimulator
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -29,6 +34,10 @@ import {
   createDefaultConfig,
   BarPosition,
 } from './barTracker';
+import {
+  PoseSimulator,
+  VBTPoseData,
+} from '../pose';
 
 // ============================================================================
 // TYPES
