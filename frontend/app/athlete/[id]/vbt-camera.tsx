@@ -404,7 +404,104 @@ export default function VBTCameraPage() {
   const handleSelectKeypoint = useCallback((keypointName: string) => {
     // Set tracking point at center of screen (will be tracked by name)
     setTrackingPoint(0.5, 0.5, keypointName);
-  }, [setTrackingPoint]);
+    setCoachMarkerPosition(null); // Clear visual marker
+    setShowMarkerInstruction(false);
+    
+    // Animate marker
+    Animated.sequence([
+      Animated.timing(markerAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(markerAnimation, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    console.log('[VBTCamera] Coach selected keypoint from list:', keypointName);
+  }, [setTrackingPoint, markerAnimation]);
+
+  // Handle coach marker tap directly on screen - finds nearest detected keypoint
+  const handleScreenTapForMarker = useCallback((event: GestureResponderEvent) => {
+    const { locationX, locationY } = event.nativeEvent;
+    const { width, height } = Dimensions.get('window');
+    
+    // Convert to normalized coordinates (0-1)
+    const normalizedX = locationX / width;
+    const normalizedY = locationY / height;
+    
+    console.log('[VBTCamera] Coach tap at screen: x=' + normalizedX.toFixed(3) + ', y=' + normalizedY.toFixed(3));
+    
+    // Find the nearest detected keypoint to the tap position
+    let nearestKeypoint: string | null = null;
+    let minDistance = Infinity;
+    
+    detectedKeypoints.forEach((pos, name) => {
+      // Only consider exercise-relevant keypoints
+      if (exerciseKeypoints.includes(name)) {
+        const distance = Math.sqrt(
+          Math.pow(pos.x - normalizedX, 2) + Math.pow(pos.y - normalizedY, 2)
+        );
+        
+        if (distance < minDistance && pos.score >= 0.5) {
+          minDistance = distance;
+          nearestKeypoint = name;
+        }
+      }
+    });
+    
+    // If a keypoint is found within reasonable distance (0.15 = 15% of screen)
+    if (nearestKeypoint && minDistance < 0.15) {
+      console.log('[VBTCamera] Nearest keypoint to tap: ' + nearestKeypoint + ' (distance: ' + minDistance.toFixed(3) + ')');
+      
+      // Set visual marker position
+      setCoachMarkerPosition({ x: locationX, y: locationY });
+      
+      // Set as tracking point
+      setTrackingPoint(normalizedX, normalizedY, nearestKeypoint);
+      setShowMarkerInstruction(false);
+      
+      // Animate marker
+      Animated.sequence([
+        Animated.timing(markerAnimation, {
+          toValue: 1.2,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(markerAnimation, {
+          toValue: 1,
+          duration: 100,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else if (detectedKeypoints.size === 0) {
+      Alert.alert(
+        locale === 'pt' ? 'Nenhuma Pose Detectada' : 'No Pose Detected',
+        locale === 'pt' 
+          ? 'Posicione o atleta na frente da câmera e aguarde a detecção' 
+          : 'Position the athlete in front of the camera and wait for detection'
+      );
+    } else {
+      // Show feedback that tap was too far from any keypoint
+      Alert.alert(
+        locale === 'pt' ? 'Ponto não encontrado' : 'Point not found',
+        locale === 'pt' 
+          ? 'Toque mais próximo de um ponto corporal detectado (indicados na tela)' 
+          : 'Tap closer to a detected body point (shown on screen)'
+      );
+    }
+  }, [detectedKeypoints, exerciseKeypoints, setTrackingPoint, locale, markerAnimation]);
+
+  // Function to change tracking point during session
+  const handleChangeTrackingPoint = useCallback(() => {
+    clearTrackingPoint();
+    setCoachMarkerPosition(null);
+    setShowMarkerInstruction(true);
+    console.log('[VBTCamera] Coach cleared tracking point for re-selection');
+  }, [clearTrackingPoint]);
 
   // Go to recording phase (after point selection)
   const goToRecording = useCallback(() => {
