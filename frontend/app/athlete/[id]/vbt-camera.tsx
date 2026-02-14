@@ -52,6 +52,12 @@ if (Platform.OS !== 'web') {
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
 
+// Tutorial storage key
+const TUTORIAL_COMPLETED_KEY = '@vbt_camera_tutorial_completed';
+
+// Tutorial steps
+type TutorialStep = 'welcome' | 'selectPoint' | 'pointSelected' | 'trackingStatus' | 'complete';
+
 interface CameraConfig {
   cameraHeight: number;
   distanceFromBar: number;
