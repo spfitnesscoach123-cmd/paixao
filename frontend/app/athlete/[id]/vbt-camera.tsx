@@ -209,9 +209,70 @@ export default function VBTCameraPage() {
     return (labels as any)[name] || name;
   };
 
+  // State for debug logging
+  const [debugLandmarks, setDebugLandmarks] = useState<string>('');
+  const frameCountRef = useRef(0);
+
   // Convert MediaPipe landmarks to VBT pose format
-  const convertMediapipeLandmarks = useCallback((landmarks: any[]): VBTPoseData | null => {
-    if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
+  // @thinksys/react-native-mediapipe returns landmarks as an object with body parts
+  const convertMediapipeLandmarks = useCallback((landmarkData: any): VBTPoseData | null => {
+    // Log raw data for debugging (every 30 frames to avoid spam)
+    frameCountRef.current++;
+    const shouldLog = frameCountRef.current % 30 === 0;
+    
+    if (shouldLog) {
+      console.log('[VBTCamera] Raw landmark data:', JSON.stringify(landmarkData).substring(0, 500));
+    }
+
+    // Handle different data formats from MediaPipe
+    let landmarks: any[] = [];
+    
+    // Format 1: Direct array of landmarks
+    if (Array.isArray(landmarkData)) {
+      landmarks = landmarkData;
+    }
+    // Format 2: Object with landmarks property
+    else if (landmarkData?.landmarks && Array.isArray(landmarkData.landmarks)) {
+      landmarks = landmarkData.landmarks;
+    }
+    // Format 3: Object with poseLandmarks property
+    else if (landmarkData?.poseLandmarks && Array.isArray(landmarkData.poseLandmarks)) {
+      landmarks = landmarkData.poseLandmarks;
+    }
+    // Format 4: @thinksys format with body part objects
+    else if (landmarkData && typeof landmarkData === 'object') {
+      // Convert body part format to landmark array
+      const bodyPartMapping: Record<string, number[]> = {
+        face: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        leftArm: [11, 13, 15, 17, 19, 21],
+        rightArm: [12, 14, 16, 18, 20, 22],
+        torso: [11, 12, 23, 24],
+        leftLeg: [23, 25, 27, 29, 31],
+        rightLeg: [24, 26, 28, 30, 32],
+      };
+      
+      // Try to extract coordinates from body parts
+      for (const [part, indices] of Object.entries(bodyPartMapping)) {
+        const partData = landmarkData[part];
+        if (partData && Array.isArray(partData)) {
+          partData.forEach((point: any, i: number) => {
+            if (point && indices[i] !== undefined) {
+              landmarks[indices[i]] = {
+                x: point.x ?? point[0] ?? 0,
+                y: point.y ?? point[1] ?? 0,
+                visibility: point.visibility ?? point.confidence ?? point[2] ?? 0.7,
+              };
+            }
+          });
+        }
+      }
+    }
+    
+    if (!landmarks || landmarks.length === 0) {
+      if (shouldLog) {
+        console.log('[VBTCamera] No landmarks extracted');
+        setDebugLandmarks('No landmarks');
+      }
       return null;
     }
     
@@ -223,13 +284,27 @@ export default function VBTCameraPage() {
       const landmark = landmarks[index];
       
       if (landmark) {
+        const x = landmark.x ?? landmark[0] ?? 0;
+        const y = landmark.y ?? landmark[1] ?? 0;
+        const score = landmark.visibility ?? landmark.confidence ?? landmark[2] ?? 0.5;
+        
         keypoints.push({
           name: name as string,
-          x: landmark.x ?? 0,
-          y: landmark.y ?? 0,
-          score: landmark.visibility ?? landmark.confidence ?? 0.5,
+          x,
+          y,
+          score,
         });
+        
+        if (shouldLog && name === 'left_hip') {
+          console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(2)}`);
+        }
       }
+    }
+    
+    if (shouldLog) {
+      const validCount = keypoints.filter(kp => kp.score >= 0.5).length;
+      setDebugLandmarks(`${validCount}/${keypoints.length} keypoints`);
+      console.log(`[VBTCamera] Converted ${keypoints.length} keypoints, ${validCount} valid`);
     }
     
     return {
@@ -238,31 +313,31 @@ export default function VBTCameraPage() {
     };
   }, []);
 
-  // Handle REAL pose detection from native MediaPipe
-  const handleMediapipePoseDetected = useCallback((event: any) => {
+  // Handle REAL pose detection from native MediaPipe (@thinksys/react-native-mediapipe)
+  // This is called via onLandmark prop
+  const handleMediapipeLandmark = useCallback((event: any) => {
     if (!isTracking) return;
     
     try {
-      // Extract landmarks from native event
-      const landmarks = event?.nativeEvent?.landmarks || 
-                       event?.nativeEvent?.poseLandmarks ||
-                       event?.landmarks ||
-                       event?.poseLandmarks ||
-                       event;
+      // @thinksys/react-native-mediapipe passes data directly or via nativeEvent
+      const landmarkData = event?.nativeEvent || event;
       
-      const vbtPose = convertMediapipeLandmarks(landmarks);
+      const vbtPose = convertMediapipeLandmarks(landmarkData);
       
       if (vbtPose && vbtPose.keypoints.length > 0) {
         // Pass REAL pose data to the VBT pipeline
         processPose(vbtPose);
       } else {
-        // No pose detected - pass null to trigger no-human state
+        // No pose detected - pass empty pose to trigger no-human state
         processPose({ keypoints: [], timestamp: Date.now() });
       }
     } catch (e) {
-      console.error('[VBTCamera] Error processing MediaPipe pose:', e);
+      console.error('[VBTCamera] Error processing MediaPipe landmark:', e);
     }
   }, [isTracking, convertMediapipeLandmarks, processPose]);
+
+  // Legacy handler name for compatibility
+  const handleMediapipePoseDetected = handleMediapipeLandmark;
 
   // Cleanup on unmount
   useEffect(() => {
