@@ -948,16 +948,6 @@ export default function VBTCameraPage() {
                     )}
                   </View>
                 </View>
-                      )}
-                    </View>
-                  ) : (
-                    <View style={styles.cameraLoadingOverlay}>
-                      <ActivityIndicator size="large" color={colors.accent.primary} />
-                      <Text style={styles.cameraLoadingText}>{labels.initializingCamera}</Text>
-                      <Text style={styles.mediapipeLoadingText}>Carregando MediaPipe...</Text>
-                    </View>
-                  )}
-                </MediapipePoseView>
               ) : (
                 /* Fallback to CameraView for web (simulation mode) */
                 <CameraView
