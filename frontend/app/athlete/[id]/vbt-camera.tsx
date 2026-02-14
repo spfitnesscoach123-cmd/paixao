@@ -163,11 +163,13 @@ export default function VBTCameraPage() {
     changePoint: locale === 'pt' ? 'Alterar Ponto' : 'Change Point',
     continueToRecording: locale === 'pt' ? 'Continuar para Gravação' : 'Continue to Recording',
     
-    // Protection state labels
-    noHuman: locale === 'pt' ? 'Sem Pessoa Detectada' : 'No Person Detected',
-    waitingStable: locale === 'pt' ? 'Aguardando Estabilização...' : 'Waiting for Stability...',
-    ready: locale === 'pt' ? 'Pronto' : 'Ready',
-    executing: locale === 'pt' ? 'Executando' : 'Executing',
+    // Protection state labels (3 CAMADAS DE PROTEÇÃO)
+    noHuman: locale === 'pt' ? 'SEM PESSOA - Bloqueado' : 'NO PERSON - Blocked',
+    waitingStable: locale === 'pt' ? 'Estabilizando Detecção...' : 'Stabilizing Detection...',
+    ready: locale === 'pt' ? 'PRONTO - Aguardando Movimento' : 'READY - Waiting for Movement',
+    executing: locale === 'pt' ? 'EXECUTANDO - Rastreando' : 'EXECUTING - Tracking',
+    blocked: locale === 'pt' ? 'BLOQUEADO - Ponto não detectado' : 'BLOCKED - Point not detected',
+    lowConfidence: locale === 'pt' ? 'Confiança Baixa - Bloqueado' : 'Low Confidence - Blocked',
     
     // Keypoint names
     left_hip: locale === 'pt' ? 'Quadril Esquerdo' : 'Left Hip',
