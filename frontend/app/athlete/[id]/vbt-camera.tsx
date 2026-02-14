@@ -11,6 +11,7 @@ import {
   Alert,
   Dimensions,
   Platform,
+  GestureResponderEvent,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -20,7 +21,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { useBarTracking, RepData } from '../../../services/vbt';
+import { 
+  useProtectedBarTracking, 
+  RECOMMENDED_TRACKING_POINTS,
+  EXERCISE_KEYPOINTS,
+} from '../../../services/vbt';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
@@ -37,13 +42,13 @@ export default function VBTCameraPage() {
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
   
-  // Permission state - MUST be checked before ANY camera render
+  // Permission state
   const [permission, requestPermission] = useCameraPermissions();
   
-  // Phase control - camera only exists in 'recording' phase
-  const [phase, setPhase] = useState<'config' | 'recording' | 'review'>('config');
+  // Phase control
+  const [phase, setPhase] = useState<'config' | 'pointSelection' | 'recording' | 'review'>('config');
   
-  // Camera mount control - separate from phase for safe lifecycle
+  // Camera mount control
   const [shouldMountCamera, setShouldMountCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   
@@ -61,23 +66,48 @@ export default function VBTCameraPage() {
   const cameraRef = useRef<CameraView>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
+  // Use the protected tracking hook with 3 layers
   const {
+    // Protection state
+    protectionState,
+    isHumanDetected,
+    isStable,
+    stabilityProgress,
+    canCalculate,
+    
+    // Tracking point (LAYER 3)
+    trackingPoint,
+    isTrackingPointSet,
+    recommendedTrackingPoint,
+    
+    // Velocity data
     isTracking,
     currentVelocity,
     peakVelocity,
     meanVelocity,
     velocityDrop,
+    
+    // Rep data
     repCount,
-    phase: trackingPhase,
-    feedbackColor,
+    repPhase,
     repsData,
+    
+    // Feedback
+    feedbackColor,
+    statusMessage,
+    
+    // Actions
+    setTrackingPoint,
+    clearTrackingPoint,
     startTracking,
     stopTracking,
     resetTracking,
-  } = useBarTracking({
+    processPose,
+  } = useProtectedBarTracking({
     loadKg: cameraConfig.loadKg,
     cameraHeight: cameraConfig.cameraHeight,
     cameraDistance: cameraConfig.distanceFromBar,
+    exercise: selectedExercise,
     useSimulation: true,
   });
   
@@ -121,8 +151,42 @@ export default function VBTCameraPage() {
       ? 'Configure a altura e distância para calibração precisa'
       : 'Configure height and distance for accurate calibration',
     initializingCamera: locale === 'pt' ? 'Iniciando câmera...' : 'Initializing camera...',
-    cameraOk: locale === 'pt' ? 'Câmera OK' : 'Camera OK',
     waitCamera: locale === 'pt' ? 'Aguarde a câmera inicializar' : 'Wait for camera to initialize',
+    
+    // New labels for protection system
+    selectTrackingPoint: locale === 'pt' ? 'Selecionar Ponto de Tracking' : 'Select Tracking Point',
+    tapToSelect: locale === 'pt' 
+      ? 'Toque no ponto que deseja rastrear (ex: quadril, punho)' 
+      : 'Tap on the point you want to track (e.g., hip, wrist)',
+    recommendedPoint: locale === 'pt' ? 'Ponto Recomendado' : 'Recommended Point',
+    trackingPointSet: locale === 'pt' ? 'Ponto Definido' : 'Tracking Point Set',
+    changePoint: locale === 'pt' ? 'Alterar Ponto' : 'Change Point',
+    continueToRecording: locale === 'pt' ? 'Continuar para Gravação' : 'Continue to Recording',
+    
+    // Protection state labels
+    noHuman: locale === 'pt' ? 'Sem Pessoa Detectada' : 'No Person Detected',
+    waitingStable: locale === 'pt' ? 'Aguardando Estabilização...' : 'Waiting for Stability...',
+    ready: locale === 'pt' ? 'Pronto' : 'Ready',
+    executing: locale === 'pt' ? 'Executando' : 'Executing',
+    
+    // Keypoint names
+    left_hip: locale === 'pt' ? 'Quadril Esquerdo' : 'Left Hip',
+    right_hip: locale === 'pt' ? 'Quadril Direito' : 'Right Hip',
+    left_knee: locale === 'pt' ? 'Joelho Esquerdo' : 'Left Knee',
+    right_knee: locale === 'pt' ? 'Joelho Direito' : 'Right Knee',
+    left_wrist: locale === 'pt' ? 'Punho Esquerdo' : 'Left Wrist',
+    right_wrist: locale === 'pt' ? 'Punho Direito' : 'Right Wrist',
+    left_shoulder: locale === 'pt' ? 'Ombro Esquerdo' : 'Left Shoulder',
+    right_shoulder: locale === 'pt' ? 'Ombro Direito' : 'Right Shoulder',
+    left_elbow: locale === 'pt' ? 'Cotovelo Esquerdo' : 'Left Elbow',
+    right_elbow: locale === 'pt' ? 'Cotovelo Direito' : 'Right Elbow',
+    left_ankle: locale === 'pt' ? 'Tornozelo Esquerdo' : 'Left Ankle',
+    right_ankle: locale === 'pt' ? 'Tornozelo Direito' : 'Right Ankle',
+  };
+
+  // Get localized keypoint name
+  const getKeypointLabel = (name: string): string => {
+    return (labels as any)[name] || name;
   };
 
   // Cleanup on unmount
@@ -141,8 +205,8 @@ export default function VBTCameraPage() {
     setCameraReady(true);
   }, []);
 
-  // Safe transition to recording phase
-  const goToRecording = useCallback(() => {
+  // Go to point selection phase
+  const goToPointSelection = useCallback(() => {
     if (!permission?.granted) {
       Alert.alert(
         locale === 'pt' ? 'Erro' : 'Error',
@@ -160,12 +224,29 @@ export default function VBTCameraPage() {
     
     setCameraReady(false);
     setShouldMountCamera(true);
-    setPhase('recording');
+    setPhase('pointSelection');
   }, [permission, cameraConfig.loadKg, locale]);
 
-  // Safe transition from recording
+  // Handle tracking point selection from keypoint list
+  const handleSelectKeypoint = useCallback((keypointName: string) => {
+    // Set tracking point at center of screen (will be tracked by name)
+    setTrackingPoint(0.5, 0.5, keypointName);
+  }, [setTrackingPoint]);
+
+  // Go to recording phase (after point selection)
+  const goToRecording = useCallback(() => {
+    if (!isTrackingPointSet) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Selecione um ponto de tracking' : 'Select a tracking point'
+      );
+      return;
+    }
+    setPhase('recording');
+  }, [isTrackingPointSet, locale]);
+
+  // Safe transition from recording to review
   const goToReview = useCallback(() => {
-    // Stop tracking first
     if (isTracking) {
       stopTracking();
     }
@@ -174,11 +255,9 @@ export default function VBTCameraPage() {
       recordingTimerRef.current = null;
     }
     
-    // Unmount camera before phase change
     setShouldMountCamera(false);
     setCameraReady(false);
     
-    // Small delay to allow camera cleanup
     setTimeout(() => {
       setPhase('review');
     }, 50);
@@ -191,13 +270,21 @@ export default function VBTCameraPage() {
       return;
     }
     
+    if (!isTrackingPointSet) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Ponto de tracking não definido' : 'Tracking point not set'
+      );
+      return;
+    }
+    
     setRecordingTime(0);
     startTracking();
     
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime(prev => prev + 1);
     }, 1000);
-  }, [cameraReady, startTracking, labels]);
+  }, [cameraReady, isTrackingPointSet, startTracking, labels, locale]);
 
   // Stop recording
   const handleStopRecording = useCallback(() => {
@@ -246,8 +333,6 @@ export default function VBTCameraPage() {
       return;
     }
     
-    const avgVelocity = repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length;
-    
     const vbtData = {
       athlete_id: athleteId,
       date: new Date().toISOString().split('T')[0],
@@ -264,6 +349,7 @@ export default function VBTCameraPage() {
       camera_config: {
         height_cm: cameraConfig.cameraHeight,
         distance_cm: cameraConfig.distanceFromBar,
+        tracking_point: trackingPoint?.keypointName || 'unknown',
       },
     };
     
@@ -290,7 +376,29 @@ export default function VBTCameraPage() {
       : '0',
   };
 
-  // LOADING STATE - permission not yet determined
+  // Get available keypoints for current exercise
+  const exerciseKeypoints = EXERCISE_KEYPOINTS[selectedExercise] || [];
+
+  // Protection state color
+  const getProtectionStateColor = () => {
+    switch (protectionState) {
+      case 'noHuman': return '#ef4444';
+      case 'ready': return '#f59e0b';
+      case 'executing': return '#10b981';
+      default: return '#6b7280';
+    }
+  };
+
+  const getProtectionStateLabel = () => {
+    switch (protectionState) {
+      case 'noHuman': return labels.noHuman;
+      case 'ready': return labels.ready;
+      case 'executing': return labels.executing;
+      default: return protectionState;
+    }
+  };
+
+  // LOADING STATE
   if (!permission) {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -304,7 +412,7 @@ export default function VBTCameraPage() {
     );
   }
 
-  // PERMISSION DENIED STATE
+  // PERMISSION DENIED
   if (!permission.granted) {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -334,14 +442,14 @@ export default function VBTCameraPage() {
     );
   }
 
-  // MAIN RENDER - permission granted
+  // MAIN RENDER
   return (
     <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => {
-            if (phase === 'recording') {
+            if (phase === 'recording' || phase === 'pointSelection') {
               if (isTracking) stopTracking();
               if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
               setShouldMountCamera(false);
@@ -422,9 +530,19 @@ export default function VBTCameraPage() {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.configWarning}>
-              <Ionicons name="information-circle" size={16} color={colors.accent.primary} />
-              <Text style={styles.configWarningText}>{labels.configWarning}</Text>
+            {/* Protection Info */}
+            <View style={styles.protectionInfoCard}>
+              <View style={styles.protectionInfoHeader}>
+                <Ionicons name="shield-checkmark" size={20} color="#10b981" />
+                <Text style={styles.protectionInfoTitle}>
+                  {locale === 'pt' ? 'Sistema de Proteção Ativo' : 'Protection System Active'}
+                </Text>
+              </View>
+              <Text style={styles.protectionInfoText}>
+                {locale === 'pt' 
+                  ? '✓ Validação de presença humana\n✓ Controle de estado\n✓ Ponto de tracking definido pelo coach'
+                  : '✓ Human presence validation\n✓ State control\n✓ Coach-defined tracking point'}
+              </Text>
             </View>
             
             {/* Start Button */}
@@ -433,27 +551,112 @@ export default function VBTCameraPage() {
                 styles.startButton,
                 !cameraConfig.loadKg && styles.startButtonDisabled
               ]}
-              onPress={goToRecording}
+              onPress={goToPointSelection}
               disabled={!cameraConfig.loadKg}
-              data-testid="start-recording-btn"
+              data-testid="go-to-point-selection-btn"
             >
               <LinearGradient 
                 colors={cameraConfig.loadKg ? ['#10b981', '#059669'] : ['#4b5563', '#374151']} 
                 style={styles.startButtonGradient}
               >
-                <Ionicons name="videocam" size={24} color="#ffffff" />
-                <Text style={styles.startButtonText}>{labels.startRecording}</Text>
+                <Ionicons name="locate" size={24} color="#ffffff" />
+                <Text style={styles.startButtonText}>{labels.selectTrackingPoint}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
         </ScrollView>
       )}
       
+      {/* POINT SELECTION PHASE */}
+      {phase === 'pointSelection' && (
+        <View style={styles.pointSelectionContainer}>
+          <View style={styles.cameraContainer}>
+            {shouldMountCamera && (
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing="back"
+                onCameraReady={handleCameraReady}
+              >
+                {/* Overlay for point selection */}
+                <View style={styles.pointSelectionOverlay}>
+                  {/* Instructions */}
+                  <View style={styles.pointInstructionsBanner}>
+                    <Ionicons name="information-circle" size={20} color="#ffffff" />
+                    <Text style={styles.pointInstructionsText}>{labels.tapToSelect}</Text>
+                  </View>
+                  
+                  {/* Current selection indicator */}
+                  {isTrackingPointSet && trackingPoint && (
+                    <View style={styles.selectedPointBadge}>
+                      <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                      <Text style={styles.selectedPointText}>
+                        {getKeypointLabel(trackingPoint.keypointName)}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </CameraView>
+            )}
+          </View>
+          
+          {/* Keypoint Selection List */}
+          <View style={styles.keypointSelectionPanel}>
+            <Text style={styles.keypointPanelTitle}>
+              {locale === 'pt' ? 'Selecione o Ponto de Tracking' : 'Select Tracking Point'}
+            </Text>
+            
+            <Text style={styles.recommendedText}>
+              {labels.recommendedPoint}: <Text style={styles.recommendedHighlight}>{getKeypointLabel(recommendedTrackingPoint)}</Text>
+            </Text>
+            
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.keypointScroll}>
+              {exerciseKeypoints.map((kp) => (
+                <TouchableOpacity
+                  key={kp}
+                  style={[
+                    styles.keypointButton,
+                    trackingPoint?.keypointName === kp && styles.keypointButtonSelected,
+                    kp === recommendedTrackingPoint && styles.keypointButtonRecommended,
+                  ]}
+                  onPress={() => handleSelectKeypoint(kp)}
+                  data-testid={`keypoint-${kp}`}
+                >
+                  <Text style={[
+                    styles.keypointButtonText,
+                    trackingPoint?.keypointName === kp && styles.keypointButtonTextSelected,
+                  ]}>
+                    {getKeypointLabel(kp)}
+                  </Text>
+                  {kp === recommendedTrackingPoint && (
+                    <Ionicons name="star" size={12} color="#f59e0b" style={styles.starIcon} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* Continue Button */}
+            <TouchableOpacity
+              style={[
+                styles.continueButton,
+                !isTrackingPointSet && styles.continueButtonDisabled
+              ]}
+              onPress={goToRecording}
+              disabled={!isTrackingPointSet}
+              data-testid="continue-to-recording-btn"
+            >
+              <Text style={styles.continueButtonText}>{labels.continueToRecording}</Text>
+              <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      
       {/* RECORDING PHASE */}
       {phase === 'recording' && (
         <View style={styles.recordingContainer}>
           <View style={styles.cameraContainer}>
-            {shouldMountCamera ? (
+            {shouldMountCamera && (
               <CameraView
                 ref={cameraRef}
                 style={styles.camera}
@@ -466,6 +669,21 @@ export default function VBTCameraPage() {
                     feedbackColor === 'green' && styles.feedbackGreen,
                     feedbackColor === 'red' && styles.feedbackRed,
                   ]}>
+                    {/* Protection State Banner */}
+                    <View style={[styles.protectionStateBanner, { backgroundColor: getProtectionStateColor() }]}>
+                      <Ionicons 
+                        name={protectionState === 'executing' ? 'radio-button-on' : 'radio-button-off'} 
+                        size={16} 
+                        color="#ffffff" 
+                      />
+                      <Text style={styles.protectionStateText}>{getProtectionStateLabel()}</Text>
+                      {protectionState === 'noHuman' && !isStable && (
+                        <Text style={styles.stabilityText}>
+                          ({Math.round(stabilityProgress * 100)}%)
+                        </Text>
+                      )}
+                    </View>
+                    
                     {/* Recording indicator */}
                     <View style={styles.recordingIndicator}>
                       <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
@@ -474,38 +692,60 @@ export default function VBTCameraPage() {
                       </Text>
                     </View>
                     
-                    {/* Velocity Display */}
-                    <View style={styles.velocityDisplay}>
-                      <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                      <Text style={[
-                        styles.velocityValue,
-                        feedbackColor === 'red' && styles.velocityValueRed
-                      ]}>
-                        {currentVelocity.toFixed(2)} m/s
-                      </Text>
+                    {/* Status Message */}
+                    <View style={styles.statusMessageContainer}>
+                      <Text style={styles.statusMessageText}>{statusMessage}</Text>
                     </View>
+                    
+                    {/* Tracking Point Indicator */}
+                    {trackingPoint && (
+                      <View style={styles.trackingPointIndicator}>
+                        <Ionicons name="locate" size={16} color={colors.accent.primary} />
+                        <Text style={styles.trackingPointText}>
+                          {getKeypointLabel(trackingPoint.keypointName)}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {/* Velocity Display - Only show when canCalculate */}
+                    {canCalculate && (
+                      <View style={styles.velocityDisplay}>
+                        <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
+                        <Text style={[
+                          styles.velocityValue,
+                          feedbackColor === 'red' && styles.velocityValueRed
+                        ]}>
+                          {currentVelocity.toFixed(2)} m/s
+                        </Text>
+                      </View>
+                    )}
                     
                     {/* Rep Counter */}
                     <View style={styles.repCounter}>
                       <Text style={styles.repLabel}>{labels.repCount}</Text>
                       <Text style={styles.repValue}>{repCount}</Text>
+                      {repPhase !== 'idle' && (
+                        <Text style={styles.repPhaseText}>{repPhase}</Text>
+                      )}
                     </View>
                     
                     {/* Status Badge */}
-                    <View style={[
-                      styles.statusBadge,
-                      feedbackColor === 'green' && styles.statusBadgeGreen,
-                      feedbackColor === 'red' && styles.statusBadgeRed,
-                    ]}>
-                      <Ionicons 
-                        name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
-                        size={16} 
-                        color="#ffffff" 
-                      />
-                      <Text style={styles.statusText}>
-                        {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
-                      </Text>
-                    </View>
+                    {canCalculate && (
+                      <View style={[
+                        styles.statusBadge,
+                        feedbackColor === 'green' && styles.statusBadgeGreen,
+                        feedbackColor === 'red' && styles.statusBadgeRed,
+                      ]}>
+                        <Ionicons 
+                          name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                          size={16} 
+                          color="#ffffff" 
+                        />
+                        <Text style={styles.statusText}>
+                          {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 ) : (
                   <View style={styles.cameraLoadingOverlay}>
@@ -514,10 +754,6 @@ export default function VBTCameraPage() {
                   </View>
                 )}
               </CameraView>
-            ) : (
-              <View style={styles.cameraPlaceholder}>
-                <ActivityIndicator size="large" color={colors.accent.primary} />
-              </View>
             )}
           </View>
           
@@ -588,17 +824,26 @@ export default function VBTCameraPage() {
             )}
           </View>
           
+          {/* Tracking Info */}
+          <View style={styles.trackingInfoCard}>
+            <View style={styles.trackingInfoRow}>
+              <Ionicons name="locate" size={18} color={colors.accent.primary} />
+              <Text style={styles.trackingInfoLabel}>
+                {locale === 'pt' ? 'Ponto Rastreado' : 'Tracked Point'}:
+              </Text>
+              <Text style={styles.trackingInfoValue}>
+                {trackingPoint ? getKeypointLabel(trackingPoint.keypointName) : '-'}
+              </Text>
+            </View>
+          </View>
+          
           {/* Exercise Info */}
           <View style={styles.exerciseInfoCard}>
             <Text style={styles.exerciseInfoLabel}>{labels.exercise}</Text>
-            <TouchableOpacity 
-              style={styles.exerciseInfoSelector}
-              onPress={() => setShowExerciseModal(true)}
-            >
+            <View style={styles.exerciseInfoSelector}>
               <Ionicons name="barbell" size={20} color={colors.accent.primary} />
               <Text style={styles.exerciseInfoText}>{selectedExercise}</Text>
-              <Ionicons name="chevron-down" size={16} color={colors.text.secondary} />
-            </TouchableOpacity>
+            </View>
             <Text style={styles.exerciseLoadText}>
               {labels.loadKg}: {cameraConfig.loadKg} kg
             </Text>
@@ -610,16 +855,16 @@ export default function VBTCameraPage() {
               {locale === 'pt' ? 'Detalhes por Repetição' : 'Rep Details'}
             </Text>
             
-            {repsData.map((set, index) => (
+            {repsData.map((rep, index) => (
               <View key={index} style={styles.repDetailRow}>
-                <Text style={styles.repDetailNumber}>#{set.rep}</Text>
+                <Text style={styles.repDetailNumber}>#{rep.rep}</Text>
                 <View style={styles.repDetailData}>
-                  <Text style={styles.repDetailVelocity}>{set.meanVelocity} m/s</Text>
+                  <Text style={styles.repDetailVelocity}>{rep.meanVelocity} m/s</Text>
                   <Text style={[
                     styles.repDetailDrop,
-                    set.velocityDrop > 10 && styles.repDetailDropWarning
+                    rep.velocityDrop > 10 && styles.repDetailDropWarning
                   ]}>
-                    {set.velocityDrop > 0 ? `-${set.velocityDrop}%` : '0%'}
+                    {rep.velocityDrop > 0 ? `-${rep.velocityDrop}%` : '0%'}
                   </Text>
                 </View>
               </View>
@@ -635,7 +880,7 @@ export default function VBTCameraPage() {
                 setRecordingTime(0);
                 setCameraReady(false);
                 setShouldMountCamera(true);
-                setPhase('recording');
+                setPhase('pointSelection');
               }}
               data-testid="record-again-btn"
             >
@@ -829,20 +1074,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text.primary,
   },
-  configWarning: {
+  protectionInfoCard: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  protectionInfoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 20,
+    marginBottom: 8,
   },
-  configWarningText: {
-    flex: 1,
+  protectionInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#10b981',
+  },
+  protectionInfoText: {
     fontSize: 12,
     color: colors.text.secondary,
-    lineHeight: 18,
+    lineHeight: 20,
   },
   startButton: {
     borderRadius: 12,
@@ -863,6 +1117,118 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  
+  // Point Selection Phase
+  pointSelectionContainer: {
+    flex: 1,
+  },
+  pointSelectionOverlay: {
+    flex: 1,
+    padding: 16,
+  },
+  pointInstructionsBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: 'center',
+  },
+  pointInstructionsText: {
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  selectedPointBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.9)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    alignSelf: 'center',
+    marginTop: 12,
+  },
+  selectedPointText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  keypointSelectionPanel: {
+    backgroundColor: colors.dark.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 32,
+  },
+  keypointPanelTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 8,
+  },
+  recommendedText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    marginBottom: 16,
+  },
+  recommendedHighlight: {
+    color: '#f59e0b',
+    fontWeight: '600',
+  },
+  keypointScroll: {
+    marginBottom: 16,
+  },
+  keypointButton: {
+    backgroundColor: colors.dark.secondary,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  keypointButtonSelected: {
+    backgroundColor: colors.accent.primary,
+    borderColor: colors.accent.primary,
+  },
+  keypointButtonRecommended: {
+    borderColor: '#f59e0b',
+  },
+  keypointButtonText: {
+    color: colors.text.secondary,
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  keypointButtonTextSelected: {
+    color: '#ffffff',
+  },
+  starIcon: {
+    marginLeft: 6,
+  },
+  continueButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.accent.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  continueButtonDisabled: {
+    opacity: 0.5,
+  },
+  continueButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Recording Phase
   recordingContainer: {
     flex: 1,
   },
@@ -872,12 +1238,6 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
-  },
-  cameraPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
   },
   cameraLoadingOverlay: {
     flex: 1,
@@ -900,6 +1260,24 @@ const styles = StyleSheet.create({
   },
   feedbackRed: {
     backgroundColor: 'rgba(239, 68, 68, 0.25)',
+  },
+  protectionStateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  protectionStateText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  stabilityText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
   },
   recordingIndicator: {
     flexDirection: 'row',
@@ -924,6 +1302,34 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  statusMessageContainer: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  statusMessageText: {
+    color: '#ffffff',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  trackingPointIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    position: 'absolute',
+    top: 60,
+    right: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  trackingPointText: {
+    color: '#ffffff',
+    fontSize: 12,
   },
   velocityDisplay: {
     alignSelf: 'center',
@@ -962,6 +1368,11 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  repPhaseText: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 10,
+    marginTop: 4,
   },
   statusBadge: {
     alignSelf: 'center',
@@ -1013,6 +1424,8 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
+  
+  // Review Phase
   reviewContainer: {
     flex: 1,
     padding: 16,
@@ -1070,6 +1483,28 @@ const styles = StyleSheet.create({
     color: '#ef4444',
     fontWeight: '600',
     fontSize: 13,
+  },
+  trackingInfoCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  trackingInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trackingInfoLabel: {
+    fontSize: 13,
+    color: colors.text.secondary,
+  },
+  trackingInfoValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
   },
   exerciseInfoCard: {
     backgroundColor: colors.dark.card,
