@@ -15,8 +15,17 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## VBT Camera - Coach Marker Feature (IMPLEMENTADO - 2025-12-XX) 
 
-### Build 23
+### Build 24 - Tutorial Interativo
 **Status**: IMPLEMENTADO - REQUER TESTE EM DISPOSITIVO NATIVO
+
+### Tutorial Interativo
+- **Aparece na primeira vez** que o coach abre a VBT Camera
+- **Passos guiados**: Welcome → Select Point → Point Selected → Tracking Status → Complete
+- **Botão "Pular Tutorial"** para encerrar imediatamente
+- **Botão "Começar Sessão"** para concluir
+- **Círculo pulsante** indicando onde tocar
+- **Feedback visual** de sucesso/erro na seleção de pontos
+- **Persistência** via AsyncStorage (`@vbt_camera_tutorial_completed`)
 
 ### Funcionalidades Implementadas
 
