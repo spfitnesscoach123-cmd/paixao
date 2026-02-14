@@ -243,6 +243,51 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 - **FIX**: Botões "Voltar" implementados nas telas athlete-token.tsx e generate-wellness-token.tsx
 - **TEST**: 95% taxa de sucesso no frontend (6/7 funcionalidades, 1 problema visual LOW priority)
 
+### 2026-02-XX - Sistema de 3 Camadas de Proteção VBT (IMPLEMENTADO)
+- **NOVA FUNCIONALIDADE CRÍTICA**: Sistema de proteção para tracking VBT
+- **Problema resolvido**: Contagem de repetições sem pessoa válida, cálculo de métricas com ruído, tracking funcionando sem ponto corretamente detectado
+
+**CAMADA 1 - Validação de Presença Humana**:
+- Exige detecção mínima de keypoints essenciais do exercício (ombro, quadril, joelho)
+- Cada keypoint deve ter score >= 0.6
+- Requer 5 frames consecutivos válidos antes de permitir cálculos
+- Se falhar: estado = "semPessoa" (noHuman)
+
+**CAMADA 2 - Sistema de Estado Controlado**:
+- Estados: "semPessoa" (noHuman), "pronto" (ready), "executando" (executing)
+- Transições controladas:
+  - noHuman → ready: quando keypoints válidos E estáveis
+  - ready → executing: quando movimento significativo detectado
+  - executing → ready: quando movimento para
+- Repetição só conta em estado "executando" após cruzar limiar e retornar
+
+**CAMADA 3 - Ponto de Tracking Definido pelo Coach**:
+- Coach DEVE definir manualmente o ponto de tracking antes de gravar
+- Sistema monitora EXCLUSIVAMENTE o landmark correspondente a esse ponto
+- Todos os cálculos (velocidade, deslocamento) usam SOMENTE esse ponto
+- Se ponto não detectado ou score < 0.6 → BLOQUEIA todos os cálculos
+
+**Filtro de Ruído**:
+- Moving average para suavização
+- Delta mínimo de movimento para ignorar micro-variações
+- Limiar angular configurável
+
+**Arquivos criados/modificados**:
+- `services/vbt/trackingProtection.ts` - Sistema completo de 3 camadas
+- `services/vbt/useProtectedBarTracking.ts` - Hook React com proteção
+- `services/vbt/index.ts` - Exports atualizados
+- `app/athlete/[id]/vbt-camera.tsx` - UI atualizada com feedback de estado
+- `services/vbt/__tests__/trackingProtection.test.ts` - Testes unitários
+
+**Mensagens em português** para feedback visual:
+- "SEM PESSOA - Bloqueado"
+- "Estabilizando Detecção... X%"
+- "PRONTO - Aguardando Movimento"
+- "EXECUTANDO - Rastreando"
+- "BLOQUEADO: [motivo específico]"
+
+**STATUS**: Implementado - Aguardando testes no dispositivo real
+
 ### 2026-02-XX - Fix Crash Câmera iOS TestFlight
 - **BUG FIX CRÍTICO**: Câmera VBT crashava no TestFlight iOS
 - **Causa raiz**: Problema de ciclo de vida do `CameraView` do `expo-camera`
