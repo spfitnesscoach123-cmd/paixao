@@ -1,4 +1,4 @@
-package com.loadmanagerpro
+package com.loadmanager.app
 
 import android.app.Application
 import android.content.res.Configuration
