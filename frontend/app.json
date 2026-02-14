@@ -77,11 +77,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "real-time-vbt"
-      }
     }
   }
 }
