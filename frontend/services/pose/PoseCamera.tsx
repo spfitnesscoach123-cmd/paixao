@@ -1,15 +1,14 @@
 /**
  * PoseCamera Component
  * 
- * Camera component with integrated pose detection.
- * Supports both native MediaPipe detection (via VisionCamera) and Expo Camera with simulation.
+ * Camera component with integrated REAL MediaPipe Pose Detection.
+ * Uses @thinksys/react-native-mediapipe for native pose detection.
  * 
  * ARCHITECTURE:
- * - For native builds: Uses react-native-vision-camera with MediaPipe frame processor
- * - For Expo Go/Web: Falls back to expo-camera with simulation
+ * - Native platforms: Uses @thinksys/react-native-mediapipe with Vision Camera
+ * - Web: Falls back to expo-camera with simulation
  * 
- * This component provides pose data to the VBT pipeline without modifying
- * any existing calculation, tracking, or visualization logic.
+ * This component provides REAL pose data to the VBT pipeline.
  */
 
 import React, { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
@@ -20,10 +19,41 @@ import {
   Text,
   Platform,
 } from 'react-native';
-import { CameraView, useCameraPermissions, CameraType } from 'expo-camera';
-import { VBTPoseData } from './types';
-import { usePoseDetection, UsePoseDetectionConfig } from './usePoseDetection';
+import { VBTPoseData, ProcessedKeypoint, LANDMARK_INDEX_TO_VBT_NAME } from './types';
+import { getPoseDetector, PoseDetectorStatus, PoseSimulator } from './poseDetector';
 import { colors } from '../../constants/theme';
+
+// ============================================================================
+// CONDITIONAL IMPORTS - Native MediaPipe only on iOS/Android
+// ============================================================================
+
+let MediapipePoseView: any = null;
+let MediapipeModule: any = null;
+
+// Only import native MediaPipe on iOS/Android
+if (Platform.OS !== 'web') {
+  try {
+    const mediapipe = require('@thinksys/react-native-mediapipe');
+    MediapipePoseView = mediapipe.MediapipePoseView;
+    MediapipeModule = mediapipe.default || mediapipe;
+  } catch (e) {
+    console.warn('[PoseCamera] MediaPipe not available, will use simulation fallback');
+  }
+}
+
+// Fallback for web
+let CameraView: any = null;
+let useCameraPermissions: any = null;
+
+if (Platform.OS === 'web' || !MediapipePoseView) {
+  try {
+    const expoCamera = require('expo-camera');
+    CameraView = expoCamera.CameraView;
+    useCameraPermissions = expoCamera.useCameraPermissions;
+  } catch (e) {
+    console.warn('[PoseCamera] expo-camera not available');
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -31,14 +61,14 @@ import { colors } from '../../constants/theme';
 
 export interface PoseCameraProps {
   /** Camera facing direction */
-  facing?: CameraType;
+  facing?: 'front' | 'back';
   /** Called when pose is detected */
   onPoseDetected?: (pose: VBTPoseData | null) => void;
   /** Called when camera is ready */
   onCameraReady?: () => void;
   /** Enable pose detection */
   enablePoseDetection?: boolean;
-  /** Use simulation mode (for development) */
+  /** Use simulation mode (for development/web) */
   useSimulation?: boolean;
   /** Tracking point name for simulation */
   trackingPointName?: string;
@@ -50,6 +80,8 @@ export interface PoseCameraProps {
   style?: any;
   /** Show debug info overlay */
   showDebugInfo?: boolean;
+  /** Minimum confidence threshold */
+  minConfidence?: number;
 }
 
 export interface PoseCameraRef {
@@ -63,6 +95,41 @@ export interface PoseCameraRef {
   getCurrentPose: () => VBTPoseData | null;
   /** Is detection active */
   isDetecting: () => boolean;
+}
+
+// ============================================================================
+// LANDMARK CONVERSION
+// ============================================================================
+
+/**
+ * Convert MediaPipe landmarks to VBT keypoints format
+ */
+function convertMediapipeLandmarksToVBT(landmarks: any[]): VBTPoseData {
+  const keypoints: ProcessedKeypoint[] = [];
+  
+  if (!landmarks || !Array.isArray(landmarks)) {
+    return { keypoints: [], timestamp: Date.now() };
+  }
+  
+  // Map MediaPipe 33 landmarks to VBT 17 keypoints
+  for (const [indexStr, name] of Object.entries(LANDMARK_INDEX_TO_VBT_NAME)) {
+    const index = parseInt(indexStr, 10);
+    const landmark = landmarks[index];
+    
+    if (landmark) {
+      keypoints.push({
+        name: name as string,
+        x: landmark.x ?? 0,
+        y: landmark.y ?? 0,
+        score: landmark.visibility ?? landmark.confidence ?? 0.5,
+      });
+    }
+  }
+  
+  return {
+    keypoints,
+    timestamp: Date.now(),
+  };
 }
 
 // ============================================================================
@@ -80,43 +147,120 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   overlay,
   style,
   showDebugInfo = false,
+  minConfidence = 0.6,
 }, ref) => {
-  // Camera state
-  const [permission, requestPermission] = useCameraPermissions();
+  // State
   const [isCameraReady, setIsCameraReady] = useState(false);
-  const cameraRef = useRef<CameraView>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [currentPose, setCurrentPose] = useState<VBTPoseData | null>(null);
+  const [fps, setFps] = useState(0);
+  const [status, setStatus] = useState<PoseDetectorStatus>('uninitialized');
+  const [error, setError] = useState<string | null>(null);
   
-  // Pose detection hook
-  const {
-    pose,
-    isDetecting,
-    status,
-    error,
-    fps,
-    isSimulation,
-    startDetection,
-    stopDetection,
-    processExternalPose,
-    reset,
-  } = usePoseDetection({
-    onPoseDetected,
-    useSimulation: useSimulation || Platform.OS === 'web',
-    trackingPointName,
-    loadKg,
-  });
+  // Refs
+  const simulatorRef = useRef<PoseSimulator | null>(null);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const frameCountRef = useRef(0);
+  const lastFpsTimeRef = useRef(Date.now());
+  const onPoseDetectedRef = useRef(onPoseDetected);
+  
+  // Determine if we should use native MediaPipe or simulation
+  const shouldUseNativeMediapipe = Platform.OS !== 'web' && MediapipePoseView && !useSimulation;
+  
+  // Keep callback ref updated
+  useEffect(() => {
+    onPoseDetectedRef.current = onPoseDetected;
+  }, [onPoseDetected]);
   
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
-    startDetection,
-    stopDetection,
-    reset,
-    getCurrentPose: () => pose,
+    startDetection: () => {
+      setIsDetecting(true);
+    },
+    stopDetection: () => {
+      setIsDetecting(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    },
+    reset: () => {
+      setCurrentPose(null);
+      setFps(0);
+      setIsDetecting(false);
+      if (simulatorRef.current) {
+        simulatorRef.current.reset();
+      }
+    },
+    getCurrentPose: () => currentPose,
     isDetecting: () => isDetecting,
-  }), [pose, isDetecting, startDetection, stopDetection, reset]);
+  }), [currentPose, isDetecting]);
+  
+  // Update FPS counter
+  const updateFps = useCallback(() => {
+    frameCountRef.current++;
+    const now = Date.now();
+    
+    if (now - lastFpsTimeRef.current >= 1000) {
+      setFps(frameCountRef.current);
+      frameCountRef.current = 0;
+      lastFpsTimeRef.current = now;
+    }
+  }, []);
+  
+  // Handle pose detection from native MediaPipe
+  const handleNativePoseDetected = useCallback((event: any) => {
+    if (!isDetecting || !enablePoseDetection) return;
+    
+    try {
+      // Extract landmarks from native event
+      const landmarks = event?.nativeEvent?.landmarks || 
+                       event?.nativeEvent?.poseLandmarks ||
+                       event?.landmarks ||
+                       event?.poseLandmarks ||
+                       event;
+      
+      if (landmarks && Array.isArray(landmarks) && landmarks.length > 0) {
+        const vbtPose = convertMediapipeLandmarksToVBT(landmarks);
+        
+        // Filter by minimum confidence
+        const validKeypoints = vbtPose.keypoints.filter(kp => kp.score >= minConfidence);
+        
+        if (validKeypoints.length > 0) {
+          const filteredPose: VBTPoseData = {
+            keypoints: vbtPose.keypoints, // Keep all but mark which are valid
+            timestamp: vbtPose.timestamp,
+          };
+          
+          setCurrentPose(filteredPose);
+          updateFps();
+          
+          if (onPoseDetectedRef.current) {
+            onPoseDetectedRef.current(filteredPose);
+          }
+        } else {
+          // No valid keypoints above threshold
+          setCurrentPose(null);
+          if (onPoseDetectedRef.current) {
+            onPoseDetectedRef.current(null);
+          }
+        }
+      } else {
+        // No landmarks detected
+        setCurrentPose(null);
+        if (onPoseDetectedRef.current) {
+          onPoseDetectedRef.current(null);
+        }
+      }
+    } catch (e) {
+      console.error('[PoseCamera] Error processing pose:', e);
+    }
+  }, [isDetecting, enablePoseDetection, minConfidence, updateFps]);
   
   // Handle camera ready
   const handleCameraReady = useCallback(() => {
     setIsCameraReady(true);
+    setStatus('ready');
     
     if (onCameraReady) {
       onCameraReady();
@@ -124,100 +268,178 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
     
     // Auto-start detection if enabled
     if (enablePoseDetection) {
-      startDetection();
+      setIsDetecting(true);
     }
-  }, [onCameraReady, enablePoseDetection, startDetection]);
+  }, [onCameraReady, enablePoseDetection]);
   
-  // Start/stop detection based on prop
+  // Initialize simulator for web/fallback
   useEffect(() => {
-    if (isCameraReady && enablePoseDetection && !isDetecting) {
-      startDetection();
-    } else if (!enablePoseDetection && isDetecting) {
-      stopDetection();
+    if (!shouldUseNativeMediapipe) {
+      simulatorRef.current = new PoseSimulator(loadKg);
+      setStatus('ready');
     }
-  }, [isCameraReady, enablePoseDetection, isDetecting, startDetection, stopDetection]);
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [shouldUseNativeMediapipe, loadKg]);
+  
+  // Simulation loop for web/fallback
+  useEffect(() => {
+    if (!shouldUseNativeMediapipe && isDetecting && simulatorRef.current) {
+      intervalRef.current = setInterval(() => {
+        if (!simulatorRef.current) return;
+        
+        const simPose = simulatorRef.current.getNextPose(trackingPointName);
+        setCurrentPose(simPose);
+        updateFps();
+        
+        if (onPoseDetectedRef.current) {
+          onPoseDetectedRef.current(simPose);
+        }
+      }, 33); // ~30 FPS
+    } else if (intervalRef.current && (!isDetecting || shouldUseNativeMediapipe)) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [shouldUseNativeMediapipe, isDetecting, trackingPointName, updateFps]);
   
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopDetection();
+      setIsDetecting(false);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
-  }, [stopDetection]);
+  }, []);
   
-  // Request permission if needed
-  useEffect(() => {
-    if (permission && !permission.granted && permission.canAskAgain) {
-      requestPermission();
-    }
-  }, [permission, requestPermission]);
+  // ============================================================================
+  // RENDER - Native MediaPipe Camera
+  // ============================================================================
   
-  // Loading state
-  if (!permission) {
+  if (shouldUseNativeMediapipe && MediapipePoseView) {
     return (
-      <View style={[styles.container, styles.centered, style]}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
-        <Text style={styles.statusText}>Verificando permissões...</Text>
+      <View style={[styles.container, style]}>
+        <MediapipePoseView
+          style={styles.camera}
+          cameraType={facing}
+          enablePoseDetection={enablePoseDetection && isDetecting}
+          minPoseDetectionConfidence={minConfidence}
+          minPosePresenceConfidence={minConfidence}
+          minTrackingConfidence={minConfidence}
+          onPoseDetected={handleNativePoseDetected}
+          onCameraReady={handleCameraReady}
+        >
+          {/* Custom Overlay */}
+          {overlay}
+          
+          {/* Debug Info Overlay */}
+          {showDebugInfo && (
+            <View style={styles.debugOverlay}>
+              <Text style={styles.debugText}>
+                Status: {status}
+              </Text>
+              <Text style={styles.debugText}>
+                FPS: {fps}
+              </Text>
+              <Text style={styles.debugText}>
+                Modo: REAL MediaPipe
+              </Text>
+              <Text style={styles.debugText}>
+                Detectando: {isDetecting ? 'Sim' : 'Não'}
+              </Text>
+              {currentPose && (
+                <Text style={styles.debugText}>
+                  Keypoints: {currentPose.keypoints.length}
+                </Text>
+              )}
+              {error && (
+                <Text style={[styles.debugText, styles.errorText]}>
+                  Erro: {error}
+                </Text>
+              )}
+            </View>
+          )}
+          
+          {/* Loading indicator */}
+          {!isCameraReady && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={colors.accent.primary} />
+              <Text style={styles.statusText}>Iniciando câmera com MediaPipe...</Text>
+            </View>
+          )}
+        </MediapipePoseView>
       </View>
     );
   }
   
-  // Permission denied
-  if (!permission.granted) {
+  // ============================================================================
+  // RENDER - Fallback (Web or Simulation)
+  // ============================================================================
+  
+  if (CameraView) {
     return (
-      <View style={[styles.container, styles.centered, style]}>
-        <Text style={styles.errorText}>Permissão de câmera necessária</Text>
+      <View style={[styles.container, style]}>
+        <CameraView
+          style={styles.camera}
+          facing={facing}
+          onCameraReady={handleCameraReady}
+        >
+          {/* Custom Overlay */}
+          {overlay}
+          
+          {/* Debug Info Overlay */}
+          {showDebugInfo && (
+            <View style={styles.debugOverlay}>
+              <Text style={styles.debugText}>
+                Status: {status}
+              </Text>
+              <Text style={styles.debugText}>
+                FPS: {fps}
+              </Text>
+              <Text style={styles.debugText}>
+                Modo: Simulação (Web/Fallback)
+              </Text>
+              <Text style={styles.debugText}>
+                Detectando: {isDetecting ? 'Sim' : 'Não'}
+              </Text>
+              {currentPose && (
+                <Text style={styles.debugText}>
+                  Keypoints: {currentPose.keypoints.length}
+                </Text>
+              )}
+            </View>
+          )}
+          
+          {/* Loading indicator */}
+          {!isCameraReady && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator size="large" color={colors.accent.primary} />
+              <Text style={styles.statusText}>Iniciando câmera...</Text>
+            </View>
+          )}
+        </CameraView>
       </View>
     );
   }
+  
+  // ============================================================================
+  // RENDER - No Camera Available
+  // ============================================================================
   
   return (
-    <View style={[styles.container, style]}>
-      {/* Camera View */}
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing={facing}
-        onCameraReady={handleCameraReady}
-      >
-        {/* Custom Overlay */}
-        {overlay}
-        
-        {/* Debug Info Overlay */}
-        {showDebugInfo && (
-          <View style={styles.debugOverlay}>
-            <Text style={styles.debugText}>
-              Status: {status}
-            </Text>
-            <Text style={styles.debugText}>
-              FPS: {fps}
-            </Text>
-            <Text style={styles.debugText}>
-              Modo: {isSimulation ? 'Simulação' : 'Real'}
-            </Text>
-            <Text style={styles.debugText}>
-              Detectando: {isDetecting ? 'Sim' : 'Não'}
-            </Text>
-            {pose && (
-              <Text style={styles.debugText}>
-                Keypoints: {pose.keypoints.length}
-              </Text>
-            )}
-            {error && (
-              <Text style={[styles.debugText, styles.errorText]}>
-                Erro: {error}
-              </Text>
-            )}
-          </View>
-        )}
-        
-        {/* Loading indicator */}
-        {!isCameraReady && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={colors.accent.primary} />
-            <Text style={styles.statusText}>Iniciando câmera...</Text>
-          </View>
-        )}
-      </CameraView>
+    <View style={[styles.container, styles.centered, style]}>
+      <Text style={styles.errorText}>Câmera não disponível</Text>
     </View>
   );
 });
