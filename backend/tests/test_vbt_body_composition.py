@@ -11,7 +11,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://mediapipe-vbt-build.preview.emergentagent.com')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://velocity-detect.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "test@test.com"

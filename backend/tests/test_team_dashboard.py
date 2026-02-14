@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://mediapipe-vbt-build.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://velocity-detect.preview.emergentagent.com')
 
 class TestTeamDashboard:
     """Team Dashboard endpoint tests"""

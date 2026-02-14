@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://mediapipe-vbt-build.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://velocity-detect.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "test@test.com"
