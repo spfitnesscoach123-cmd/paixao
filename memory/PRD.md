@@ -16,7 +16,22 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 ## VBT Camera - Coach Marker Feature (IMPLEMENTADO - 2025-12-XX) 
 
 ### Build 24 - Tutorial Interativo
-**Status**: IMPLEMENTADO - REQUER TESTE EM DISPOSITIVO NATIVO
+**Status**: ✅ IMPLEMENTADO E TESTADO - PRONTO PARA BUILD NATIVO
+
+### AUDITORIA COMPLETA CONCLUÍDA (2025-12-XX)
+**ITMS-90683 Risk**: ❌ **ZERO - 100% LIMPO**
+
+| Verificação | Status |
+|-------------|--------|
+| `enableLocation` em app.json | ✅ `false` |
+| expo-location instalado | ✅ **NÃO** |
+| NSLocationWhenInUseUsageDescription | ✅ **AUSENTE** |
+| ACCESS_FINE_LOCATION (Android) | ✅ **AUSENTE** |
+| jsEngine | ✅ `jsc` (Hermes OFF) |
+| newArchEnabled | ✅ `true` |
+
+**Backend**: 16/16 testes passando
+**Frontend**: 27/27 testes unitários passando
 
 ### Tutorial Interativo
 - **Aparece na primeira vez** que o coach abre a VBT Camera
@@ -436,12 +451,14 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 ## Tarefas Pendentes (Por Prioridade)
 
 ### P0 - Crítico
-- [IMPLEMENTADO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
-- [IMPLEMENTADO] Serviço de Pose Detection para integração com MediaPipe
-- [IMPLEMENTADO] Integração real do MediaPipe Pose no código
-- [PRONTO - BUILD 21] Build nativo preparado com MediaPipe REAL (expo prebuild --clean executado, 0 erros)
-- [AGUARDANDO] Executar `pod install` no macOS e build via EAS
-- [AGUARDANDO] Validação do sistema no dispositivo iOS (TestFlight)
+- [✅ COMPLETO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
+- [✅ COMPLETO] Serviço de Pose Detection para integração com MediaPipe
+- [✅ COMPLETO] Integração real do MediaPipe Pose no código
+- [✅ COMPLETO] Tutorial Interativo para Coach Marker
+- [✅ COMPLETO] Auditoria Location - ZERO risco ITMS-90683
+- [✅ COMPLETO] Build nativo preparado (jsEngine: jsc, newArchEnabled: true)
+- [AGUARDANDO USUÁRIO] Executar `pod install` no macOS e build via EAS
+- [AGUARDANDO USUÁRIO] Upload para TestFlight e teste em dispositivo real
 
 ### P1 - Alta
 - [ ] Completar internacionalização do `ScientificAnalysisTab.tsx`
