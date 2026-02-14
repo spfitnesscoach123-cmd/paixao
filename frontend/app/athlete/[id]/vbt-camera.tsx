@@ -232,6 +232,115 @@ export default function VBTCameraPage() {
   const [previewPoseData, setPreviewPoseData] = useState<VBTPoseData | null>(null);
   const [detectedKeypoints, setDetectedKeypoints] = useState<Map<string, {x: number, y: number, score: number}>>(new Map());
 
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState<TutorialStep>('welcome');
+  const [tutorialChecked, setTutorialChecked] = useState(false);
+  const [selectionFeedback, setSelectionFeedback] = useState<{type: 'success' | 'error', message: string, position?: {x: number, y: number}} | null>(null);
+  
+  // Tutorial animations
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const feedbackFadeAnim = useRef(new Animated.Value(0)).current;
+  
+  // Check if tutorial should show (first time user)
+  useEffect(() => {
+    const checkTutorialStatus = async () => {
+      try {
+        const completed = await AsyncStorage.getItem(TUTORIAL_COMPLETED_KEY);
+        if (!completed && phase === 'pointSelection' && !tutorialChecked) {
+          setShowTutorial(true);
+          setTutorialStep('welcome');
+          // Start pulse animation
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.3,
+                duration: 800,
+                easing: Easing.ease,
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1,
+                duration: 800,
+                easing: Easing.ease,
+                useNativeDriver: true,
+              }),
+            ])
+          ).start();
+          // Fade in tutorial
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }).start();
+        }
+        setTutorialChecked(true);
+      } catch (e) {
+        console.warn('[VBTCamera] Error checking tutorial status:', e);
+        setTutorialChecked(true);
+      }
+    };
+    
+    if (phase === 'pointSelection' && !tutorialChecked) {
+      checkTutorialStatus();
+    }
+  }, [phase, tutorialChecked]);
+  
+  // Skip tutorial
+  const handleSkipTutorial = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(TUTORIAL_COMPLETED_KEY, 'true');
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setShowTutorial(false);
+      });
+    } catch (e) {
+      console.warn('[VBTCamera] Error saving tutorial status:', e);
+      setShowTutorial(false);
+    }
+  }, [fadeAnim]);
+  
+  // Complete tutorial
+  const handleCompleteTutorial = useCallback(async () => {
+    try {
+      await AsyncStorage.setItem(TUTORIAL_COMPLETED_KEY, 'true');
+      setTutorialStep('complete');
+      setTimeout(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => {
+          setShowTutorial(false);
+        });
+      }, 1500);
+    } catch (e) {
+      console.warn('[VBTCamera] Error completing tutorial:', e);
+      setShowTutorial(false);
+    }
+  }, [fadeAnim]);
+  
+  // Show selection feedback
+  const showSelectionFeedback = useCallback((type: 'success' | 'error', message: string, position?: {x: number, y: number}) => {
+    setSelectionFeedback({ type, message, position });
+    feedbackFadeAnim.setValue(1);
+    
+    // Animate feedback out after delay
+    setTimeout(() => {
+      Animated.timing(feedbackFadeAnim, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start(() => {
+        setSelectionFeedback(null);
+      });
+    }, 2000);
+  }, [feedbackFadeAnim]);
+
   // Convert MediaPipe landmarks to VBT pose format
   // @thinksys/react-native-mediapipe returns landmarks as an object with body parts
   const convertMediapipeLandmarks = useCallback((landmarkData: any): VBTPoseData | null => {
