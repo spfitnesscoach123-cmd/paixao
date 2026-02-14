@@ -26,6 +26,22 @@ import {
   RECOMMENDED_TRACKING_POINTS,
   EXERCISE_KEYPOINTS,
 } from '../../../services/vbt';
+import { 
+  LANDMARK_INDEX_TO_VBT_NAME,
+  ProcessedKeypoint,
+  VBTPoseData,
+} from '../../../services/pose';
+
+// Conditional import for native MediaPipe
+let MediapipePoseView: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    const mediapipe = require('@thinksys/react-native-mediapipe');
+    MediapipePoseView = mediapipe.MediapipePoseView;
+  } catch (e) {
+    console.warn('[VBTCamera] MediaPipe not available');
+  }
+}
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
