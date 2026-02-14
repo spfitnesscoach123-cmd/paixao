@@ -8,6 +8,7 @@
     "scheme": "loadmanager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
