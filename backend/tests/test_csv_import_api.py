@@ -7,7 +7,7 @@ import requests
 import os
 import io
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://velocity-detect.preview.emergentagent.com")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://real-time-vbt.preview.emergentagent.com")
 
 # Test credentials
 TEST_USER = "test@test.com"

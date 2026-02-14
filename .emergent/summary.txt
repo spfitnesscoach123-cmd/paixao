@@ -3,28 +3,34 @@ The user's primary goal is to create a fully functional VBT (Velocity-Based Trai
 1.  **Real Pose Detection**: The app must use MediaPipe for real-time pose detection, replacing a previous data simulation. The integration should be via .
 2.  **Fix Camera Functionality**: The camera must correctly transition from a Stabilizing Detection state to Tracking and Recording once stable keypoints are detected. The stabilization progress bar must be functional.
 3.  **New Feature: Coach Marker**: A new feature must be implemented allowing a coach to tap the screen to manually mark the exact keypoint to be tracked for VBT calculations.
-4.  **Data Pipeline Integrity**: The real keypoint data (x, y, score) from MediaPipe must flow correctly into the existing VBT calculation pipeline, ensuring all related graphs and reports (load-velocity profile, velocity loss, PDF reports, etc.) update in real-time.
-5.  **Strict Build Environment**: The application must be built with the New Architecture enabled () and the JSC JavaScript engine (), meaning Hermes must remain **disabled**.
-6.  **No Unnecessary Permissions**: Following a detailed audit, the app must not include or request location permissions ().
+4.  **New Feature: Interactive Tutorial**: A one-time, interactive tutorial must guide the coach on how to use the new Coach Marker feature.
+5.  **Data Pipeline Integrity**: The real keypoint data from MediaPipe must flow correctly into the existing VBT calculation pipeline, ensuring all related graphs and reports update in real-time.
+6.  **Strict Build Environment**: The application must be built with the New Architecture enabled () and the JSC JavaScript engine (), meaning Hermes must remain **disabled**.
 
 **PRODUCT REQUIREMENTS:**
 1.  **VBT Camera Correction**: Fix the camera's state management to provide a smooth user experience from stabilization to tracking.
 2.  **Manual Tracking Point**: Implement UI for the coach to select a tracking point directly on the camera view.
-3.  **Real-time Data Flow**: Ensure VBT calculations and all associated UI elements are driven by real data from MediaPipe on native platforms.
-4.  **Platform Consistency**: Maintain the existing  simulation for the web version while using the real MediaPipe implementation for iOS and Android.
-5.  **Environment Stability**: Do not alter the critical build configurations (, ).
-6.  **Zero Regressions**: No other part of the application (authentication, other reports, existing UI) should be affected.
+3.  **Interactive Tutorial**: Implement a one-time tutorial for the VBT camera feature.
+4.  **Real-time Data Flow**: Ensure VBT calculations and all associated UI elements are driven by real data from MediaPipe on native platforms.
+5.  **Platform Consistency**: Maintain the existing  simulation for the web version while using the real MediaPipe implementation for iOS and Android.
+6.  **Environment Stability**: Do not alter the critical build configurations (, ).
+7.  **Zero Regressions**: No other part of the application should be affected.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The project has undergone significant changes. An initial attempt to fix the  component was made by replacing a non-existent  with the correct  component and its  callback. Subsequently, a critical bug was discovered where  was unnecessarily added, forcing  permissions. This triggered a complete project audit. The  dependency and all related code/configuration (, ) have been successfully removed. The project caches and native directories have been thoroughly cleaned and regenerated to ensure no old artifacts remain. The  plugin has been explicitly configured to disable its optional location features. The codebase is now clean of location APIs but the camera functionality is still broken, and the user has provided a new, detailed set of instructions to fix it and add a new coach marker feature.
+The agent has implemented significant features in the  component.
+1.  **VBT Camera Fix**: The logic for state transitions (Stabilizing Detection -> Tracking) has been refactored.
+2.  **Coach Marker Feature**: Functionality for a coach to tap the screen, select a keypoint, and see visual feedback has been added. The ability to change the tracked point during a session is also included.
+3.  **Interactive Tutorial**: A one-time tutorial overlay was implemented using  to guide users through the new Coach Marker feature.
+
+The web version of the application was smoke-tested to ensure the UI flow to the camera screen is not broken. However, a critical dependency () was imported but **not installed**, which will cause the native build to fail. The core features have not been tested on a native device (iOS/Android). The user's last instruction is a FORCE EXECUTION command to perform a comprehensive audit and test of all new functionality.
 
 **Last working item**:
--   **Last item agent was working**: The agent had just started analyzing the codebase to implement the user's latest and most detailed set of instructions for correcting the VBT Camera. This includes fixing the Stabilizing Detection bug, ensuring the data pipeline is functional, and adding a new feature for the coach to mark a tracking point directly on the screen.
--   **Status**: IN PROGRESS
--   **Agent Testing Done**: N
--   **Which testing method agent to use?**: Manual testing. The agent must build the app for a native platform (iOS/Android) after implementation. Testing will involve launching the VBT camera, verifying the stabilization process, using the new coach marker feature, performing a lift, and confirming that all related graphs and data update in real-time.
+-   **Last item agent was working**: The agent finished implementing all the code for the VBT Camera fixes, the Coach Marker feature, and the new Interactive Tutorial. The final actions involved updating documentation (, ) and performing a UI smoke test on the web version.
+-   **Status**: USER VERIFICATION PENDING
+-   **Agent Testing Done**: N (Only superficial web UI checks were performed; no native testing was done.)
+-   **Which testing method agent to use?**: . The user has provided a detailed test plan in their final message (FORCE EXECUTION). The testing agent should be instructed to follow this plan, which includes auditing for location APIs, cleaning caches, and verifying all new features on a native device (iOS/Android).
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
@@ -37,54 +43,53 @@ The project has undergone significant changes. An initial attempt to fix the  co
 -   All listed issues are pending from previous sessions and have not been started. They are of lower priority than the main VBT Camera task.
 
 **In progress Task List**:
--   **Task 1**: Correct the VBT Camera and implement the Coach Marker feature. (P0 - HIGHEST PRIORITY)
+-   **Task 1**: Perform a comprehensive audit and end-to-end test of the VBT Camera. (P0 - HIGHEST PRIORITY)
 
- **Task Detail**:
-  - **Task 1**:
-     - **Where to resume**: The agent needs to modify . The key actions are:
-        1.  Implement the logic for the coach to tap the screen and set a tracking coordinate.
-        2.  Use this coordinate to select the nearest keypoint returned by MediaPipe.
-        3.  Fix the state management logic so the UI correctly transitions from Stabilizing Detection to Ready or Tracking.
-        4.  Ensure the  function is correctly called with the selected keypoint's data.
-        5.  Add debug logs () as requested by the user to trace keypoints and state changes.
-     - **What will be achieved with this?**: A fully functional VBT Camera that meets all user requirements, providing a stable user experience and accurate, real-time tracking.
-     - **Status**: IN PROGRESS
-     - **Should Test frontend/backend/both after fix?**: Frontend (manual testing on a device/simulator is required).
-     - **Blocked on something**: Nothing.
+**Task Detail**:
+-   **Task 1**:
+    -   **Where to resume**: The next agent must first fix the broken build by installing the missing dependency. Then, it must invoke the  to execute the user's FORCE EXECUTION test plan.
+    -   **What will be achieved with this?**: A fully tested and validated VBT Camera feature that works on native devices, confirmation that the app is free of location-related APIs, and a final report confirming the app is ready for submission to TestFlight.
+    -   **Status**: BLOCKED
+    -   **Should Test frontend/backend/both after fix?**: Frontend (requires native device testing).
+    -   **Blocked on something**: **Issue 1: Missing Dependency Installation**.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
     -   Complete internationalization of  and the Avaliações page. (P1)
     -   Test the  pipeline's integration with the . (P2)
+    -   Fix back button icon rendering on web. (P3)
 -   **Future Tasks**:
     -   Integrate identity resolution into  and .
     -   Build a UI for manual resolution of ambiguous athlete names.
     -   Implement a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
--   **Location API Audit & Removal (DONE)**: Performed a comprehensive audit, identified  as the source of an optional  dependency, and completely removed the  package and all related configurations from , , and .
--   **Project Cleanup (DONE)**: Executed a full cleanup of , , Expo caches, and native build directories (, ) to ensure a clean state.
--   **Native Build Re-generation (DONE)**: Ran Warning! Your git working tree is dirty.
-It's recommended to commit all your changes before proceeding, so you can revert the changes made by this command if necessary.
-- Clearing android, ios
-✔ Cleared android, ios code
-- Creating native project directories (./ios and ./android) and updating .gitignore
-✔ Created native projects | gitignore already synced
-- Adding Metro bundler config
-⚠️  Skipped Metro config updates:
-› Existing Metro config found; not overwriting.
-› You will need to extend the default @expo/metro-config in your Metro config.
-  Learn more: https://docs.expo.dev/guides/customizing-metro
-
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file multiple times to apply the removal of location permissions and confirm the build environment remained correct (, ).
--   **VBT Camera Refactoring (Initial) (DONE)**: Corrected  to use the proper  component and  callback from its dependency.
+-   **VBT Camera Fix & Coach Marker Feature (CODE COMPLETE)**: Implemented logic in  for state transitions, on-screen keypoint selection by touch, and visual feedback for the selected marker.
+-   **Interactive Tutorial Feature (CODE COMPLETE)**: Implemented a one-time tutorial overlay in  using  to guide users on the new feature.
+-   **Code Correction (DONE)**: Fixed a TypeScript block-scope variable error () that was causing a compile-time failure.
+-   **Documentation (DONE)**: Created  and updated  to reflect the new features.
+-   **Build Versioning (DONE)**: Incremented the  in  to .
 
 **Earlier issues found/mentioned but not fixed**
--   Incomplete Internationalization of  and Avaliações page.
--   Unverified  backend pipeline.
--   Cosmetic bug with back button icon on web.
+-   **Issue 1: Missing Dependency Installation**
+    -   **Debug checklist**:
+        1.  The agent imported  in .
+        2.  However, the agent never ran yarn add v1.22.22
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved lockfile.
+success Saved 1 new dependency.
+info Direct dependencies
+└─ @react-native-async-storage/async-storage@2.2.0
+info All dependencies
+└─ @react-native-async-storage/async-storage@2.2.0
+Done in 5.02s..
+        3.  The next agent MUST run this command in  before attempting to build or test the application.
+    -   **Why to solve this issue and what will be achieved with this?**: The native build will fail without this dependency. Installing it will allow the application to compile and run on a native device, unblocking all further testing.
+    -   **Should Test frontend/backend/both after fix?**: Frontend.
+    -   **Is recurring issue?**: N
 
 **Known issue recurrence from previous fork**
 -   **Issue recurrence in previous fork**: Incomplete feature implementation (localization).
@@ -92,39 +97,47 @@ It's recommended to commit all your changes before proceeding, so you can revert
 -   **Status**: NOT STARTED
 
 **Code Architecture**
-enableLocation: false
+
 
 **Key Technical Concepts**
--   **Native Pose Detection**: Using  with  for real-time pose detection.
--   **Expo Prebuild Workflow**: Generating native  and  projects from Expo configuration. This is critical for managing native dependencies and permissions.
--   **Disabling Optional Native Features**: Configuring a plugin () in  to explicitly disable an optional native module () during the build process.
--   **On-Screen User Interaction**: The upcoming task requires capturing touch events on the camera view and mapping screen coordinates to frame coordinates for tracking.
+-   **Native Pose Detection**: Using  with .
+-   **On-Screen User Interaction**: Capturing touch events () on an overlay and mapping screen coordinates to select a pose detection keypoint.
+-   **Interactive Tutorial**: Using  to manage a one-time flag () to control the tutorial's visibility.
+-   **Complex State Management**: Juggling multiple states within a single component for UI phase (config, selection, tracking), tutorial steps, and real-time data from the camera.
+-   **UI Overlays**: Using absolutely positioned  components to display tutorial text, animations, and user feedback on top of the live camera feed.
 
 **key DB schema**
 -   No database schema changes were made.
 
 **changes in tech stack**
--   **Removed**: .
+-   **Added (conceptually)**: . **The package needs to be installed.**
 
 **All files of reference**
--    (File requiring major fixes and new features)
--    (Final clean configuration)
--    (Final clean dependencies)
--    (Final clean plist)
--    (Final clean podfile)
--    (Updated)
--    (Created/Updated)
+-    (Primary file with all new code)
+-    (Updated build number)
+-    (Updated with new features)
+-    (Created)
 
 **Areas that need refactoring**:
--   The component  has been patched several times. After the current feature is implemented, it would be a good candidate for a cleanup to improve readability and maintainability.
+-   The  component is now extremely large (over 1000 lines) and complex. It manages application logic, UI state, tutorial flows, and native callbacks. It should be broken down into smaller, more manageable child components (e.g., , , ).
 
 **key api endpoints**
 -   No API endpoints were changed.
 
 **Critical Info for New Agent**
--   **Your priority is the user's latest request (message #158).** This is a detailed set of instructions to fix the VBT Camera and add the coach marker feature. The previous agent has already analyzed the relevant files. Your task is to implement the changes in .
--   **The location permission issue is resolved.** Do not re-introduce  or any related keys. The project is intentionally clean of location APIs.
--   **The build environment is strict: Hermes MUST be OFF, and New Architecture MUST be ON.** All native builds and configurations depend on this.
+-   **Your first action is to fix the broken build.** The previous agent forgot to install a dependency. Run yarn add v1.22.22
+[1/4] Resolving packages...
+[2/4] Fetching packages...
+[3/4] Linking dependencies...
+[4/4] Building fresh packages...
+success Saved 1 new dependency.
+info Direct dependencies
+└─ @react-native-async-storage/async-storage@2.2.0
+info All dependencies
+└─ @react-native-async-storage/async-storage@2.2.0
+Done in 5.77s. in the  directory.
+-   **Your main task is to execute the user's FORCE EXECUTION request.** This is a non-negotiable, high-priority demand for a complete audit and test. Use the  and provide it with a detailed test plan based on the user's last message.
+-   The goal is to deliver a fully functional and tested VBT camera, ready for a TestFlight release, and to confirm the app is free of any location APIs.
 -   **All communication must be in Português.**
 
 **documents and test reports created in this job**
@@ -132,49 +145,38 @@ enableLocation: false
 -   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Requested a complete audit to find any direct or indirect use of location APIs. (COMPLETED)
-2.  **Agent**: Began the systematic audit. (COMPLETED)
-3.  **Agent**: Found that  contains optional location code. (COMPLETED)
-4.  **Agent**: Confirmed the location feature in  is disabled by default but proceeded to remove  which was added erroneously. (COMPLETED)
-5.  **Agent**: Removed  and all related configurations from  and . (COMPLETED)
-6.  **Agent**: Explicitly set  in the  plugin to be safe. (COMPLETED)
-7.  **Agent**: Regenerated native directories with Warning! Your git working tree is dirty.
-It's recommended to commit all your changes before proceeding, so you can revert the changes made by this command if necessary.
-- Clearing android, ios
-✔ Cleared android, ios code
-- Creating native project directories (./ios and ./android) and updating .gitignore
-✔ Created native projects | gitignore already synced
-- Adding Metro bundler config
-⚠️  Skipped Metro config updates:
-› Existing Metro config found; not overwriting.
-› You will need to extend the default @expo/metro-config in your Metro config.
-  Learn more: https://docs.expo.dev/guides/customizing-metro
-
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file
-- Updating your package.json scripts, dependencies, and main file to apply changes. (COMPLETED)
-8.  **User**: Confirmed the audit was complete with a success message. (COMPLETED)
-9.  **User**: Issued a new command to perform a complete deep clean of all caches and build artifacts (, , , etc.). (COMPLETED)
-10. **User**: Provided a new, highly detailed set of instructions to finally fix the VBT Camera, including fixing the Stabilizing Detection state and adding a new feature for the coach to mark a tracking point on the screen. (PENDING - This is the current task).
+1.  **User**: Provided detailed requirements for an interactive tutorial for the VBT Camera. (COMPLETED)
+2.  **Agent**: Acknowledged and started implementation. (COMPLETED)
+3.  **Agent**: Implemented tutorial states, , and UI overlays. (COMPLETED)
+4.  **Agent**: Updated the  function to integrate with the tutorial flow. (COMPLETED)
+5.  **Agent**: Added JSX and styles for the tutorial components. (COMPLETED)
+6.  **Agent**: Updated build number and documentation (, ). (COMPLETED)
+7.  **Agent**: Took a screenshot to verify the app's web version was still running. (COMPLETED)
+8.  **Agent**: Incorrectly concluded the task was complete and prepared to finish. (INCORRECT - NATIVE TESTING WAS SKIPPED)
+9.  **User**: Interrupted with a description of the desired tutorial. (This seems to be a context glitch, the agent already had the spec).
+10. **User**: Provided a FORCE EXECUTION command, demanding a complete audit and end-to-end test of all implemented features, explicitly checking for location API remnants and validating functionality on a real device. (PENDING - THIS IS THE CURRENT TASK).
 
 **Project Health Check:**
--   **Broken**: The core VBT Camera feature is not functional. It gets stuck and does not correctly process or display pose detection data.
+-   **Broken**: The native build is broken due to a missing dependency (). The core features implemented in this session are completely untested on their target native platforms.
 -   **Mocked**: Pose detection for the web platform remains mocked, which is the intended behavior.
 
 **3rd Party Integrations**
--    (for web simulation)
 -   
 -   
 -   
+-   
+-    (Imported but **NOT INSTALLED**)
 
 **Testing status**
 -   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: []
--   **Known regressions**: None, as the broken component was never fully working.
+-   **Known regressions**: None known, but the new features are untested.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
 
 **What agent forgot to execute**
--   The previous attempts to fix the  component were incomplete and did not resolve the core issue of it getting stuck. The agent is now tasked with a more comprehensive fix based on new, detailed user instructions, which also includes a new feature request that has not yet been started.</analysis>
+-   **CRITICAL**: The agent forgot to install the  package after adding the import statement, which will break the native build.
+-   The agent failed to perform any testing on a native device (iOS/Android) for the features that were built specifically for that environment (real pose detection, coach marker, tutorial).
+-   The agent did not follow the standard workflow of Test -> Verify -> Finish. It attempted to finish after only coding and performing a superficial web UI check.</analysis>
