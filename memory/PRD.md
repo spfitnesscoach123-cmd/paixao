@@ -162,6 +162,30 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2025-12-XX - Correção VBT Camera MediaPipe REAL (Build 22)
+- **CORREÇÃO CRÍTICA**: VBT Camera travada em "Stabilizing Detection"
+- **Causa raiz**: Import incorreto do componente MediaPipe e callback errado
+- **Correções aplicadas**:
+  1. ✅ Import corrigido: `RNMediapipe` (não `MediapipePoseView`)
+  2. ✅ Callback corrigido: `onLandmark` (não `onPoseDetected`)
+  3. ✅ Conversor de landmarks refatorado para suportar múltiplos formatos
+  4. ✅ Adicionada barra de progresso de estabilização visual
+  5. ✅ Debug visual com contagem de keypoints detectados
+  6. ✅ Logs de frame a cada 30 frames para diagnóstico
+- **Biblioteca MediaPipe**: `@thinksys/react-native-mediapipe@0.0.19`
+  - Exporta `RNMediapipe` component
+  - Props: `onLandmark`, `face`, `leftArm`, `rightArm`, `torso`, `leftLeg`, `rightLeg`, etc.
+  - `frameLimit` para controle de FPS
+- **Auditoria de Location**: COMPLETA
+  - `expo-location`: REMOVIDO (não era usado)
+  - `VCEnableLocation=false` no Podfile
+  - Nenhuma permissão de location no iOS/Android
+- **Status Build**:
+  - `newArchEnabled: true` ✅
+  - `jsEngine: "jsc"` (Hermes OFF) ✅
+  - Build web: SUCESSO ✅
+  - Prebuild nativo: SUCESSO ✅
+
 ### 2025-12-XX - Preparação Build Final MediaPipe REAL v1.1.0 (Build 21)
 - **TASK COMPLETA**: Preparação do build nativo iOS/Android com MediaPipe REAL
 - **Ações executadas**:
