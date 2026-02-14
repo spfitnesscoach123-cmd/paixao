@@ -328,28 +328,50 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       }
     }
     
-    // Start simulation if enabled
-    if (simulationEnabled && simulatorRef.current) {
-      simulatorRef.current.reset();
+    // Start simulation if enabled (development/testing mode)
+    // In production, real poses come from PoseCamera via processPose()
+    if (simulationEnabled) {
+      // Reset simulators
+      if (simulatorRef.current) {
+        simulatorRef.current.reset();
+      }
+      if (poseSimulatorRef.current) {
+        poseSimulatorRef.current.reset();
+      }
       
       intervalRef.current = setInterval(() => {
-        if (!simulatorRef.current || !protectionSystemRef.current || !trackerRef.current) return;
+        if (!protectionSystemRef.current || !trackerRef.current) return;
         
-        // Generate simulated pose with the tracking point
-        const simPosition = simulatorRef.current.getNextPosition();
         const trackingPointInfo = protectionSystemRef.current.getTrackingPoint();
+        let simulatedPose: PoseData;
         
-        // Create simulated pose data
-        const simulatedPose: PoseData = {
-          keypoints: generateSimulatedKeypoints(simPosition, trackingPointInfo.keypointName),
-          timestamp: Date.now(),
-        };
+        // Use PoseSimulator if available (better quality), fallback to BarPositionSimulator
+        if (poseSimulatorRef.current) {
+          // PoseSimulator generates full body keypoints with realistic movement
+          const vbtPose = poseSimulatorRef.current.getNextPose(trackingPointInfo.keypointName);
+          simulatedPose = {
+            keypoints: vbtPose.keypoints,
+            timestamp: vbtPose.timestamp,
+          };
+        } else if (simulatorRef.current) {
+          // Fallback: use bar position simulator
+          const simPosition = simulatorRef.current.getNextPosition();
+          simulatedPose = {
+            keypoints: generateSimulatedKeypoints(simPosition, trackingPointInfo.keypointName),
+            timestamp: Date.now(),
+          };
+        } else {
+          return;
+        }
         
         processPose(simulatedPose);
       }, TRACKING_INTERVAL);
     }
     
-    setStatusMessage('Tracking iniciado - Detectando presença humana...');
+    setStatusMessage(simulationEnabled 
+      ? 'Tracking iniciado (SIMULAÇÃO) - Detectando presença...'
+      : 'Tracking iniciado - Aguardando detecção real de pose...'
+    );
   }, [isTrackingPointSet, simulationEnabled, processPose]);
   
   /**
