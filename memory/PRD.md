@@ -318,6 +318,8 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ### P0 - Crítico
 - [IMPLEMENTADO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
+- [IMPLEMENTADO] Serviço de Pose Detection para integração com MediaPipe
+- [AGUARDANDO] Build nativo com MediaPipe para detecção real (requer `npx expo prebuild`)
 - [AGUARDANDO] Validação do sistema no dispositivo iOS (TestFlight)
 
 ### P1 - Alta
@@ -329,3 +331,67 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ### P3 - Baixa
 - [ ] Fix ícone botão voltar no web
+
+---
+
+## Sistema de Pose Detection (2025-12-XX)
+
+### Arquitetura Implementada
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              useProtectedBarTracking Hook                    │
+│    - Layer 1: Human Presence Validation                      │
+│    - Layer 2: State Machine Control                          │
+│    - Layer 3: Coach-Defined Tracking Point                   │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│              Pose Detection Service                          │
+│         (services/pose/)                                     │
+│                                                              │
+│   ┌─────────────────┐    ┌─────────────────┐               │
+│   │  PoseSimulator  │ OR │  Native Pose    │               │
+│   │  (Atual - Dev)  │    │  (MediaPipe)    │               │
+│   └─────────────────┘    └─────────────────┘               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Arquivos Criados
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `services/pose/types.ts` | Tipos e constantes para pose detection |
+| `services/pose/poseDetector.ts` | Serviço principal de detecção |
+| `services/pose/usePoseDetection.ts` | Hook React para pose detection |
+| `services/pose/PoseCamera.tsx` | Componente câmera com pose |
+| `services/pose/index.ts` | Exports do módulo |
+| `docs/MEDIAPIPE_INTEGRATION.md` | Guia para integração nativa |
+
+### Status de Integração
+
+| Componente | Status |
+|------------|--------|
+| expo-camera | ✅ Funcionando |
+| Sistema 3 camadas | ✅ Implementado |
+| PoseSimulator (dev) | ✅ Funcionando |
+| Interface VBTPoseData | ✅ Padronizada |
+| MediaPipe nativo | ⏳ Requer build nativo |
+
+### Próximos Passos para MediaPipe Real
+
+1. Instalar dependências:
+   ```bash
+   npm install @thinksys/react-native-mediapipe react-native-vision-camera
+   npx expo prebuild --clean
+   ```
+
+2. Atualizar app.json com plugin vision-camera
+
+3. Executar build nativo:
+   ```bash
+   npx expo run:ios --device
+   ```
+
+Consulte `docs/MEDIAPIPE_INTEGRATION.md` para guia completo.
