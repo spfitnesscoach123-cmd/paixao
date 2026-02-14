@@ -23,15 +23,12 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { useBarTracking, RepData } from '../../../services/vbt';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-// Constants for velocity calculation
-const GRAVITY = 9.81; // m/s²
-const VELOCITY_THRESHOLD = 0.10; // 10% drop threshold
+const GRAVITY = 9.81;
 
 interface CameraConfig {
-  cameraHeight: number; // cm
-  distanceFromBar: number; // cm
-  loadKg: number; // kg
+  cameraHeight: number;
+  distanceFromBar: number;
+  loadKg: number;
 }
 
 export default function VBTCameraPage() {
@@ -40,33 +37,30 @@ export default function VBTCameraPage() {
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
   
-  // Camera permissions
+  // Permission state - MUST be checked before ANY camera render
   const [permission, requestPermission] = useCameraPermissions();
   
-  // Camera ready state - CRITICAL for iOS stability
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const [isCameraActive, setIsCameraActive] = useState(true);
-  
-  // State
+  // Phase control - camera only exists in 'recording' phase
   const [phase, setPhase] = useState<'config' | 'recording' | 'review'>('config');
+  
+  // Camera mount control - separate from phase for safe lifecycle
+  const [shouldMountCamera, setShouldMountCamera] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  
+  // Config state
   const [cameraConfig, setCameraConfig] = useState<CameraConfig>({
-    cameraHeight: 100, // default 100cm
-    distanceFromBar: 150, // default 150cm
+    cameraHeight: 100,
+    distanceFromBar: 150,
     loadKg: 0,
   });
   
-  // Recording time state
   const [recordingTime, setRecordingTime] = useState(0);
-  
-  // Review state
   const [showExerciseModal, setShowExerciseModal] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState('Back Squat');
   
-  // Refs
   const cameraRef = useRef<CameraView>(null);
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   
-  // Bar tracking hook - manages all velocity tracking state
   const {
     isTracking,
     currentVelocity,
@@ -80,12 +74,11 @@ export default function VBTCameraPage() {
     startTracking,
     stopTracking,
     resetTracking,
-    processFrame,
   } = useBarTracking({
     loadKg: cameraConfig.loadKg,
     cameraHeight: cameraConfig.cameraHeight,
     cameraDistance: cameraConfig.distanceFromBar,
-    useSimulation: true, // Set to false when using real MediaPipe tracking
+    useSimulation: true,
   });
   
   const EXERCISES = [
@@ -127,67 +120,87 @@ export default function VBTCameraPage() {
     configWarning: locale === 'pt'
       ? 'Configure a altura e distância para calibração precisa'
       : 'Configure height and distance for accurate calibration',
+    initializingCamera: locale === 'pt' ? 'Iniciando câmera...' : 'Initializing camera...',
+    cameraOk: locale === 'pt' ? 'Câmera OK' : 'Camera OK',
+    waitCamera: locale === 'pt' ? 'Aguarde a câmera inicializar' : 'Wait for camera to initialize',
   };
-  
-  // Permission check
-  if (!permission) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
-      </View>
-    );
-  }
-  
-  if (!permission.granted) {
-    return (
-      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
-        {/* Header with back button */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
-            style={styles.backButton}
-            data-testid="vbt-camera-back-btn"
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.title}>{labels.title}</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.permissionContainer}>
-          <Ionicons name="camera-outline" size={64} color={colors.text.tertiary} />
-          <Text style={styles.permissionText}>{labels.noPermission}</Text>
-          <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-            <Text style={styles.permissionButtonText}>{labels.grantPermission}</Text>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    );
-  }
-  
-  // Start recording - now uses the bar tracking hook
-  const startRecording = async () => {
-    // Check if camera is ready before starting - prevents iOS crashes
-    if (!isCameraReady) {
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
+      setShouldMountCamera(false);
+    };
+  }, []);
+
+  // Handle camera ready callback
+  const handleCameraReady = useCallback(() => {
+    setCameraReady(true);
+  }, []);
+
+  // Safe transition to recording phase
+  const goToRecording = useCallback(() => {
+    if (!permission?.granted) {
       Alert.alert(
-        locale === 'pt' ? 'Aguarde' : 'Please Wait',
-        locale === 'pt' ? 'A câmera está inicializando...' : 'Camera is initializing...'
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Permissão de câmera necessária' : 'Camera permission required'
+      );
+      return;
+    }
+    if (!cameraConfig.loadKg) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Informe a carga na barra' : 'Enter the bar load'
       );
       return;
     }
     
-    setRecordingTime(0);
+    setCameraReady(false);
+    setShouldMountCamera(true);
+    setPhase('recording');
+  }, [permission, cameraConfig.loadKg, locale]);
+
+  // Safe transition from recording
+  const goToReview = useCallback(() => {
+    // Stop tracking first
+    if (isTracking) {
+      stopTracking();
+    }
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
     
-    // Start the bar tracking (uses simulation or real tracking)
+    // Unmount camera before phase change
+    setShouldMountCamera(false);
+    setCameraReady(false);
+    
+    // Small delay to allow camera cleanup
+    setTimeout(() => {
+      setPhase('review');
+    }, 50);
+  }, [isTracking, stopTracking]);
+
+  // Start recording
+  const handleStartRecording = useCallback(() => {
+    if (!cameraReady) {
+      Alert.alert(labels.title, labels.waitCamera);
+      return;
+    }
+    
+    setRecordingTime(0);
     startTracking();
     
-    // Start recording timer
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime(prev => prev + 1);
     }, 1000);
-  };
-  
-  // Stop recording - now uses the bar tracking hook
-  const stopRecording = async () => {
+  }, [cameraReady, startTracking, labels]);
+
+  // Stop recording
+  const handleStopRecording = useCallback(() => {
     stopTracking();
     
     if (recordingTimerRef.current) {
@@ -195,46 +208,11 @@ export default function VBTCameraPage() {
       recordingTimerRef.current = null;
     }
     
-    // Move to review phase if we have data - use safe phase change
     if (repsData.length > 0 || repCount > 0) {
-      handlePhaseChange('review');
+      goToReview();
     }
-  };
-  
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
-      // Deactivate camera before unmount to prevent iOS crashes
-      setIsCameraActive(false);
-    };
-  }, []);
-  
-  // Camera ready handler - CRITICAL for iOS TestFlight stability
-  const handleCameraReady = useCallback(() => {
-    setIsCameraReady(true);
-  }, []);
-  
-  // Safe camera deactivation when leaving recording phase
-  const handlePhaseChange = useCallback((newPhase: 'config' | 'recording' | 'review') => {
-    if (phase === 'recording' && newPhase !== 'recording') {
-      // Deactivate camera before phase change
-      setIsCameraActive(false);
-      setIsCameraReady(false);
-      // Allow camera cleanup time before phase change
-      setTimeout(() => {
-        setPhase(newPhase);
-      }, 100);
-    } else if (newPhase === 'recording') {
-      // Re-activate camera when entering recording phase
-      setIsCameraReady(false);
-      setIsCameraActive(true);
-      setPhase(newPhase);
-    } else {
-      setPhase(newPhase);
-    }
-  }, [phase]);
-  
+  }, [stopTracking, repsData.length, repCount, goToReview]);
+
   // VBT submission mutation
   const vbtMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -242,13 +220,10 @@ export default function VBTCameraPage() {
       return response.data;
     },
     onSuccess: () => {
-      // Invalidate all VBT-related queries to ensure graphs update
       queryClient.invalidateQueries({ queryKey: ['vbt-analysis', athleteId] });
       queryClient.invalidateQueries({ queryKey: ['vbt-analysis'] });
-      // Invalidate scientific analysis to update ScientificAnalysisTab graphs
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis', athleteId] });
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
-      // Invalidate strength analysis for StrengthAnalysisCharts
       queryClient.invalidateQueries({ queryKey: ['strength-analysis', athleteId] });
       
       Alert.alert(
@@ -261,7 +236,7 @@ export default function VBTCameraPage() {
       Alert.alert('Error', error.response?.data?.detail || 'Failed to save VBT data');
     },
   });
-  
+
   const handleSaveData = () => {
     if (repsData.length === 0) {
       Alert.alert(
@@ -271,19 +246,15 @@ export default function VBTCameraPage() {
       return;
     }
     
-    // Calculate summary statistics
     const avgVelocity = repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length;
-    const maxVelocity = Math.max(...repsData.map(s => s.peakVelocity));
-    const maxPower = Math.round(cameraConfig.loadKg * avgVelocity * GRAVITY);
     
-    // Format data for backend
     const vbtData = {
       athlete_id: athleteId,
       date: new Date().toISOString().split('T')[0],
       provider: 'camera',
       exercise: selectedExercise,
       sets: repsData.map((s) => ({
-        reps: 1, // Each entry is a single rep
+        reps: 1,
         mean_velocity: s.meanVelocity,
         peak_velocity: s.peakVelocity,
         load_kg: cameraConfig.loadKg,
@@ -298,14 +269,13 @@ export default function VBTCameraPage() {
     
     vbtMutation.mutate(vbtData);
   };
-  
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
-  
-  // Calculate session summary (uses repsData from the tracking hook)
+
   const sessionSummary = {
     avgVelocity: repsData.length > 0 
       ? (repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length).toFixed(2)
@@ -319,13 +289,65 @@ export default function VBTCameraPage() {
       ? (repsData.reduce((sum, s) => sum + s.velocityDrop, 0) / repsData.length).toFixed(1)
       : '0',
   };
-  
+
+  // LOADING STATE - permission not yet determined
+  if (!permission) {
+    return (
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={colors.accent.primary} />
+          <Text style={styles.loadingText}>
+            {locale === 'pt' ? 'Verificando permissões...' : 'Checking permissions...'}
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // PERMISSION DENIED STATE
+  if (!permission.granted) {
+    return (
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.backButton}
+            data-testid="vbt-camera-back-btn"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.title}>{labels.title}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.permissionContainer}>
+          <Ionicons name="camera-outline" size={64} color={colors.text.tertiary} />
+          <Text style={styles.permissionText}>{labels.noPermission}</Text>
+          <TouchableOpacity 
+            style={styles.permissionButton} 
+            onPress={requestPermission}
+            data-testid="grant-permission-btn"
+          >
+            <Text style={styles.permissionButtonText}>{labels.grantPermission}</Text>
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // MAIN RENDER - permission granted
   return (
     <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
-          onPress={() => router.back()} 
+          onPress={() => {
+            if (phase === 'recording') {
+              if (isTracking) stopTracking();
+              if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+              setShouldMountCamera(false);
+            }
+            router.back();
+          }} 
           style={styles.backButton}
           data-testid="vbt-camera-back-btn"
         >
@@ -335,7 +357,7 @@ export default function VBTCameraPage() {
         <View style={{ width: 40 }} />
       </View>
       
-      {/* Config Phase */}
+      {/* CONFIG PHASE */}
       {phase === 'config' && (
         <ScrollView style={styles.configContainer} showsVerticalScrollIndicator={false}>
           <View style={styles.configCard}>
@@ -345,31 +367,6 @@ export default function VBTCameraPage() {
             </View>
             
             <Text style={styles.configHint}>{labels.configHint}</Text>
-            
-            {/* Camera Preview - Shows camera is working */}
-            <View style={styles.cameraPreviewContainer}>
-              <CameraView
-                style={styles.cameraPreview}
-                facing="back"
-                active={phase === 'config' && isCameraActive}
-                onCameraReady={handleCameraReady}
-              >
-                {isCameraReady ? (
-                  <View style={styles.cameraPreviewOverlay}>
-                    <View style={styles.cameraStatusBadge}>
-                      <Ionicons name="checkmark-circle" size={14} color="#10b981" />
-                      <Text style={styles.cameraStatusText}>
-                        {locale === 'pt' ? 'Câmera OK' : 'Camera OK'}
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.cameraPreviewLoading}>
-                    <ActivityIndicator size="small" color={colors.accent.primary} />
-                  </View>
-                )}
-              </CameraView>
-            </View>
             
             {/* Camera Height */}
             <View style={styles.inputGroup}>
@@ -436,7 +433,7 @@ export default function VBTCameraPage() {
                 styles.startButton,
                 !cameraConfig.loadKg && styles.startButtonDisabled
               ]}
-              onPress={() => cameraConfig.loadKg ? handlePhaseChange('recording') : null}
+              onPress={goToRecording}
               disabled={!cameraConfig.loadKg}
               data-testid="start-recording-btn"
             >
@@ -452,83 +449,84 @@ export default function VBTCameraPage() {
         </ScrollView>
       )}
       
-      {/* Recording Phase */}
+      {/* RECORDING PHASE */}
       {phase === 'recording' && (
         <View style={styles.recordingContainer}>
-          {/* Camera View */}
           <View style={styles.cameraContainer}>
-            <CameraView
-              ref={cameraRef}
-              style={styles.camera}
-              facing="back"
-              mode="video"
-              active={isCameraActive}
-              onCameraReady={handleCameraReady}
-            >
-              {/* Only render overlay content when camera is ready - prevents iOS crashes */}
-              {isCameraReady ? (
-                <View style={[
-                  styles.feedbackOverlay,
-                  feedbackColor === 'green' && styles.feedbackGreen,
-                  feedbackColor === 'red' && styles.feedbackRed,
-                ]}>
-                  {/* Recording indicator */}
-                  <View style={styles.recordingIndicator}>
-                    <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
-                    <Text style={styles.recordingText}>
-                      {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
-                    </Text>
-                  </View>
-                  
-                  {/* Velocity Display */}
-                  <View style={styles.velocityDisplay}>
-                    <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                    <Text style={[
-                      styles.velocityValue,
-                      feedbackColor === 'red' && styles.velocityValueRed
-                    ]}>
-                      {currentVelocity.toFixed(2)} m/s
-                    </Text>
-                  </View>
-                  
-                  {/* Rep Counter */}
-                  <View style={styles.repCounter}>
-                    <Text style={styles.repLabel}>{labels.repCount}</Text>
-                    <Text style={styles.repValue}>{repCount}</Text>
-                  </View>
-                  
-                  {/* Velocity Drop Status */}
+            {shouldMountCamera ? (
+              <CameraView
+                ref={cameraRef}
+                style={styles.camera}
+                facing="back"
+                onCameraReady={handleCameraReady}
+              >
+                {cameraReady ? (
                   <View style={[
-                    styles.statusBadge,
-                    feedbackColor === 'green' && styles.statusBadgeGreen,
-                    feedbackColor === 'red' && styles.statusBadgeRed,
+                    styles.feedbackOverlay,
+                    feedbackColor === 'green' && styles.feedbackGreen,
+                    feedbackColor === 'red' && styles.feedbackRed,
                   ]}>
-                    <Ionicons 
-                      name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
-                      size={16} 
-                      color="#ffffff" 
-                    />
-                    <Text style={styles.statusText}>
-                      {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
-                    </Text>
+                    {/* Recording indicator */}
+                    <View style={styles.recordingIndicator}>
+                      <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
+                      <Text style={styles.recordingText}>
+                        {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
+                      </Text>
+                    </View>
+                    
+                    {/* Velocity Display */}
+                    <View style={styles.velocityDisplay}>
+                      <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
+                      <Text style={[
+                        styles.velocityValue,
+                        feedbackColor === 'red' && styles.velocityValueRed
+                      ]}>
+                        {currentVelocity.toFixed(2)} m/s
+                      </Text>
+                    </View>
+                    
+                    {/* Rep Counter */}
+                    <View style={styles.repCounter}>
+                      <Text style={styles.repLabel}>{labels.repCount}</Text>
+                      <Text style={styles.repValue}>{repCount}</Text>
+                    </View>
+                    
+                    {/* Status Badge */}
+                    <View style={[
+                      styles.statusBadge,
+                      feedbackColor === 'green' && styles.statusBadgeGreen,
+                      feedbackColor === 'red' && styles.statusBadgeRed,
+                    ]}>
+                      <Ionicons 
+                        name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                        size={16} 
+                        color="#ffffff" 
+                      />
+                      <Text style={styles.statusText}>
+                        {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <View style={styles.cameraLoadingOverlay}>
-                  <ActivityIndicator size="large" color={colors.accent.primary} />
-                  <Text style={styles.cameraLoadingText}>
-                    {locale === 'pt' ? 'Iniciando câmera...' : 'Initializing camera...'}
-                  </Text>
-                </View>
-              )}
-            </CameraView>
+                ) : (
+                  <View style={styles.cameraLoadingOverlay}>
+                    <ActivityIndicator size="large" color={colors.accent.primary} />
+                    <Text style={styles.cameraLoadingText}>{labels.initializingCamera}</Text>
+                  </View>
+                )}
+              </CameraView>
+            ) : (
+              <View style={styles.cameraPlaceholder}>
+                <ActivityIndicator size="large" color={colors.accent.primary} />
+              </View>
+            )}
           </View>
           
           {/* Controls */}
           <View style={styles.recordingControls}>
             <TouchableOpacity
               style={[styles.recordButton, isTracking && styles.stopButton]}
-              onPress={isTracking ? stopRecording : startRecording}
+              onPress={isTracking ? handleStopRecording : handleStartRecording}
+              disabled={!cameraReady}
               data-testid="record-toggle-btn"
             >
               <Ionicons 
@@ -541,7 +539,7 @@ export default function VBTCameraPage() {
             {!isTracking && repsData.length > 0 && (
               <TouchableOpacity
                 style={styles.reviewButton}
-                onPress={() => handlePhaseChange('review')}
+                onPress={goToReview}
                 data-testid="go-to-review-btn"
               >
                 <Text style={styles.reviewButtonText}>{labels.reviewData}</Text>
@@ -551,7 +549,7 @@ export default function VBTCameraPage() {
         </View>
       )}
       
-      {/* Review Phase */}
+      {/* REVIEW PHASE */}
       {phase === 'review' && (
         <ScrollView style={styles.reviewContainer} showsVerticalScrollIndicator={false}>
           {/* Summary Card */}
@@ -634,7 +632,10 @@ export default function VBTCameraPage() {
               style={styles.recordAgainButton}
               onPress={() => {
                 resetTracking();
-                handlePhaseChange('recording');
+                setRecordingTime(0);
+                setCameraReady(false);
+                setShouldMountCamera(true);
+                setPhase('recording');
               }}
               data-testid="record-again-btn"
             >
@@ -710,6 +711,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: colors.text.secondary,
+    marginTop: 16,
+    fontSize: 16,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -731,8 +742,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.text.primary,
   },
-  
-  // Permission styles
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -756,8 +765,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  
-  // Config styles
   configContainer: {
     flex: 1,
     padding: 16,
@@ -785,43 +792,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginBottom: 20,
     lineHeight: 20,
-  },
-  cameraPreviewContainer: {
-    height: 120,
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-  },
-  cameraPreview: {
-    flex: 1,
-  },
-  cameraPreviewOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'flex-start',
-    padding: 8,
-  },
-  cameraStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  cameraStatusText: {
-    color: '#10b981',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  cameraPreviewLoading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   inputGroup: {
     marginBottom: 16,
@@ -893,8 +863,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  
-  // Recording styles
   recordingContainer: {
     flex: 1,
   },
@@ -904,6 +872,12 @@ const styles = StyleSheet.create({
   },
   camera: {
     flex: 1,
+  },
+  cameraPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
   },
   cameraLoadingOverlay: {
     flex: 1,
@@ -1039,8 +1013,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: '600',
   },
-  
-  // Review styles
   reviewContainer: {
     flex: 1,
     padding: 16,
@@ -1210,8 +1182,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
