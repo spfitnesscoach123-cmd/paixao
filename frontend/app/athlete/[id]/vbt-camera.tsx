@@ -1327,11 +1327,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
+    maxWidth: '90%',
+  },
+  statusMessageBlocked: {
+    backgroundColor: 'rgba(239, 68, 68, 0.85)',
+    borderWidth: 1,
+    borderColor: '#ef4444',
   },
   statusMessageText: {
     color: '#ffffff',
     fontSize: 13,
     textAlign: 'center',
+  },
+  statusMessageTextBlocked: {
+    fontWeight: '700',
   },
   trackingPointIndicator: {
     flexDirection: 'row',
