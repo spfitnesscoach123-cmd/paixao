@@ -739,110 +739,226 @@ export default function VBTCameraPage() {
         <View style={styles.recordingContainer}>
           <View style={styles.cameraContainer}>
             {shouldMountCamera && (
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing="back"
-                onCameraReady={handleCameraReady}
-              >
-                {cameraReady ? (
-                  <View style={[
-                    styles.feedbackOverlay,
-                    feedbackColor === 'green' && styles.feedbackGreen,
-                    feedbackColor === 'red' && styles.feedbackRed,
-                  ]}>
-                    {/* Protection State Banner - 3 CAMADAS */}
-                    <View style={[styles.protectionStateBanner, { backgroundColor: getProtectionStateColor() }]}>
-                      <Ionicons 
-                        name={
-                          protectionState === 'executing' ? 'radio-button-on' : 
-                          protectionState === 'ready' ? 'checkmark-circle' :
-                          'alert-circle'
-                        } 
-                        size={16} 
-                        color="#ffffff" 
-                      />
-                      <Text style={styles.protectionStateText}>{getProtectionStateLabel()}</Text>
-                    </View>
-                    
-                    {/* Recording indicator */}
-                    <View style={styles.recordingIndicator}>
-                      <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
-                      <Text style={styles.recordingText}>
-                        {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
-                      </Text>
-                    </View>
-                    
-                    {/* Status Message - CRITICAL INFO */}
+              /* Use MediapipePoseView for REAL pose detection on native platforms */
+              Platform.OS !== 'web' && MediapipePoseView ? (
+                <MediapipePoseView
+                  style={styles.camera}
+                  cameraType="back"
+                  enablePoseDetection={true}
+                  minPoseDetectionConfidence={0.6}
+                  minPosePresenceConfidence={0.6}
+                  minTrackingConfidence={0.6}
+                  onPoseDetected={handleMediapipePoseDetected}
+                  onCameraReady={handleCameraReady}
+                >
+                  {cameraReady ? (
                     <View style={[
-                      styles.statusMessageContainer,
-                      !canCalculate && styles.statusMessageBlocked
+                      styles.feedbackOverlay,
+                      feedbackColor === 'green' && styles.feedbackGreen,
+                      feedbackColor === 'red' && styles.feedbackRed,
                     ]}>
-                      <Text style={[
-                        styles.statusMessageText,
-                        !canCalculate && styles.statusMessageTextBlocked
-                      ]}>
-                        {statusMessage}
-                      </Text>
-                    </View>
-                    
-                    {/* Tracking Point Indicator */}
-                    {trackingPoint && (
-                      <View style={styles.trackingPointIndicator}>
-                        <Ionicons name="locate" size={16} color={colors.accent.primary} />
-                        <Text style={styles.trackingPointText}>
-                          {getKeypointLabel(trackingPoint.keypointName)}
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {/* Velocity Display - Only show when canCalculate */}
-                    {canCalculate && (
-                      <View style={styles.velocityDisplay}>
-                        <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                        <Text style={[
-                          styles.velocityValue,
-                          feedbackColor === 'red' && styles.velocityValueRed
-                        ]}>
-                          {currentVelocity.toFixed(2)} m/s
-                        </Text>
-                      </View>
-                    )}
-                    
-                    {/* Rep Counter */}
-                    <View style={styles.repCounter}>
-                      <Text style={styles.repLabel}>{labels.repCount}</Text>
-                      <Text style={styles.repValue}>{repCount}</Text>
-                      {repPhase !== 'idle' && (
-                        <Text style={styles.repPhaseText}>{repPhase}</Text>
-                      )}
-                    </View>
-                    
-                    {/* Status Badge */}
-                    {canCalculate && (
-                      <View style={[
-                        styles.statusBadge,
-                        feedbackColor === 'green' && styles.statusBadgeGreen,
-                        feedbackColor === 'red' && styles.statusBadgeRed,
-                      ]}>
+                      {/* Protection State Banner - 3 CAMADAS */}
+                      <View style={[styles.protectionStateBanner, { backgroundColor: getProtectionStateColor() }]}>
                         <Ionicons 
-                          name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                          name={
+                            protectionState === 'executing' ? 'radio-button-on' : 
+                            protectionState === 'ready' ? 'checkmark-circle' :
+                            'alert-circle'
+                          } 
                           size={16} 
                           color="#ffffff" 
                         />
-                        <Text style={styles.statusText}>
-                          {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                        <Text style={styles.protectionStateText}>{getProtectionStateLabel()}</Text>
+                        <Text style={styles.protectionModeText}> (REAL MediaPipe)</Text>
+                      </View>
+                      
+                      {/* Recording indicator */}
+                      <View style={styles.recordingIndicator}>
+                        <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
+                        <Text style={styles.recordingText}>
+                          {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
                         </Text>
                       </View>
-                    )}
-                  </View>
-                ) : (
-                  <View style={styles.cameraLoadingOverlay}>
-                    <ActivityIndicator size="large" color={colors.accent.primary} />
-                    <Text style={styles.cameraLoadingText}>{labels.initializingCamera}</Text>
-                  </View>
-                )}
-              </CameraView>
+                      
+                      {/* Status Message - CRITICAL INFO */}
+                      <View style={[
+                        styles.statusMessageContainer,
+                        !canCalculate && styles.statusMessageBlocked
+                      ]}>
+                        <Text style={[
+                          styles.statusMessageText,
+                          !canCalculate && styles.statusMessageTextBlocked
+                        ]}>
+                          {statusMessage}
+                        </Text>
+                      </View>
+                      
+                      {/* Tracking Point Indicator */}
+                      {trackingPoint && (
+                        <View style={styles.trackingPointIndicator}>
+                          <Ionicons name="locate" size={16} color={colors.accent.primary} />
+                          <Text style={styles.trackingPointText}>
+                            {getKeypointLabel(trackingPoint.keypointName)}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Velocity Display - Only show when canCalculate */}
+                      {canCalculate && (
+                        <View style={styles.velocityDisplay}>
+                          <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
+                          <Text style={[
+                            styles.velocityValue,
+                            feedbackColor === 'red' && styles.velocityValueRed
+                          ]}>
+                            {currentVelocity.toFixed(2)} m/s
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Rep Counter */}
+                      <View style={styles.repCounter}>
+                        <Text style={styles.repLabel}>{labels.repCount}</Text>
+                        <Text style={styles.repValue}>{repCount}</Text>
+                        {repPhase !== 'idle' && (
+                          <Text style={styles.repPhaseText}>{repPhase}</Text>
+                        )}
+                      </View>
+                      
+                      {/* Status Badge */}
+                      {canCalculate && (
+                        <View style={[
+                          styles.statusBadge,
+                          feedbackColor === 'green' && styles.statusBadgeGreen,
+                          feedbackColor === 'red' && styles.statusBadgeRed,
+                        ]}>
+                          <Ionicons 
+                            name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                            size={16} 
+                            color="#ffffff" 
+                          />
+                          <Text style={styles.statusText}>
+                            {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.cameraLoadingOverlay}>
+                      <ActivityIndicator size="large" color={colors.accent.primary} />
+                      <Text style={styles.cameraLoadingText}>{labels.initializingCamera}</Text>
+                      <Text style={styles.mediapipeLoadingText}>Carregando MediaPipe...</Text>
+                    </View>
+                  )}
+                </MediapipePoseView>
+              ) : (
+                /* Fallback to CameraView for web (simulation mode) */
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.camera}
+                  facing="back"
+                  onCameraReady={handleCameraReady}
+                >
+                  {cameraReady ? (
+                    <View style={[
+                      styles.feedbackOverlay,
+                      feedbackColor === 'green' && styles.feedbackGreen,
+                      feedbackColor === 'red' && styles.feedbackRed,
+                    ]}>
+                      {/* Protection State Banner - 3 CAMADAS */}
+                      <View style={[styles.protectionStateBanner, { backgroundColor: getProtectionStateColor() }]}>
+                        <Ionicons 
+                          name={
+                            protectionState === 'executing' ? 'radio-button-on' : 
+                            protectionState === 'ready' ? 'checkmark-circle' :
+                            'alert-circle'
+                          } 
+                          size={16} 
+                          color="#ffffff" 
+                        />
+                        <Text style={styles.protectionStateText}>{getProtectionStateLabel()}</Text>
+                        <Text style={styles.protectionModeText}> (Simulação)</Text>
+                      </View>
+                      
+                      {/* Recording indicator */}
+                      <View style={styles.recordingIndicator}>
+                        <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
+                        <Text style={styles.recordingText}>
+                          {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
+                        </Text>
+                      </View>
+                      
+                      {/* Status Message - CRITICAL INFO */}
+                      <View style={[
+                        styles.statusMessageContainer,
+                        !canCalculate && styles.statusMessageBlocked
+                      ]}>
+                        <Text style={[
+                          styles.statusMessageText,
+                          !canCalculate && styles.statusMessageTextBlocked
+                        ]}>
+                          {statusMessage}
+                        </Text>
+                      </View>
+                      
+                      {/* Tracking Point Indicator */}
+                      {trackingPoint && (
+                        <View style={styles.trackingPointIndicator}>
+                          <Ionicons name="locate" size={16} color={colors.accent.primary} />
+                          <Text style={styles.trackingPointText}>
+                            {getKeypointLabel(trackingPoint.keypointName)}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Velocity Display - Only show when canCalculate */}
+                      {canCalculate && (
+                        <View style={styles.velocityDisplay}>
+                          <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
+                          <Text style={[
+                            styles.velocityValue,
+                            feedbackColor === 'red' && styles.velocityValueRed
+                          ]}>
+                            {currentVelocity.toFixed(2)} m/s
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Rep Counter */}
+                      <View style={styles.repCounter}>
+                        <Text style={styles.repLabel}>{labels.repCount}</Text>
+                        <Text style={styles.repValue}>{repCount}</Text>
+                        {repPhase !== 'idle' && (
+                          <Text style={styles.repPhaseText}>{repPhase}</Text>
+                        )}
+                      </View>
+                      
+                      {/* Status Badge */}
+                      {canCalculate && (
+                        <View style={[
+                          styles.statusBadge,
+                          feedbackColor === 'green' && styles.statusBadgeGreen,
+                          feedbackColor === 'red' && styles.statusBadgeRed,
+                        ]}>
+                          <Ionicons 
+                            name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
+                            size={16} 
+                            color="#ffffff" 
+                          />
+                          <Text style={styles.statusText}>
+                            {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.cameraLoadingOverlay}>
+                      <ActivityIndicator size="large" color={colors.accent.primary} />
+                      <Text style={styles.cameraLoadingText}>{labels.initializingCamera}</Text>
+                    </View>
+                  )}
+                </CameraView>
+              )
             )}
           </View>
           
