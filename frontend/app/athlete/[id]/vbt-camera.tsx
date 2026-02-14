@@ -214,6 +214,15 @@ export default function VBTCameraPage() {
   // State for debug logging
   const [debugLandmarks, setDebugLandmarks] = useState<string>('');
   const frameCountRef = useRef(0);
+  
+  // State for coach marker (direct touch on screen)
+  const [coachMarkerPosition, setCoachMarkerPosition] = useState<{x: number, y: number} | null>(null);
+  const [showMarkerInstruction, setShowMarkerInstruction] = useState(true);
+  const markerAnimation = useRef(new Animated.Value(0)).current;
+  
+  // State for pose detection even before tracking (for stabilization preview)
+  const [previewPoseData, setPreviewPoseData] = useState<VBTPoseData | null>(null);
+  const [detectedKeypoints, setDetectedKeypoints] = useState<Map<string, {x: number, y: number, score: number}>>(new Map());
 
   // Convert MediaPipe landmarks to VBT pose format
   // @thinksys/react-native-mediapipe returns landmarks as an object with body parts
