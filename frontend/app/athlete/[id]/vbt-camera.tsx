@@ -702,9 +702,17 @@ export default function VBTCameraPage() {
                       </Text>
                     </View>
                     
-                    {/* Status Message */}
-                    <View style={styles.statusMessageContainer}>
-                      <Text style={styles.statusMessageText}>{statusMessage}</Text>
+                    {/* Status Message - CRITICAL INFO */}
+                    <View style={[
+                      styles.statusMessageContainer,
+                      !canCalculate && styles.statusMessageBlocked
+                    ]}>
+                      <Text style={[
+                        styles.statusMessageText,
+                        !canCalculate && styles.statusMessageTextBlocked
+                      ]}>
+                        {statusMessage}
+                      </Text>
                     </View>
                     
                     {/* Tracking Point Indicator */}
