@@ -150,6 +150,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   const protectionSystemRef = useRef<TrackingProtectionSystem | null>(null);
   const trackerRef = useRef<BarTrackerState | null>(null);
   const simulatorRef = useRef<BarPositionSimulator | null>(null);
+  const poseSimulatorRef = useRef<PoseSimulator | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRepCountRef = useRef(0);
   
@@ -172,9 +173,10 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     });
     trackerRef.current = new BarTrackerState(trackerConfig);
     
-    // Create simulator if needed
+    // Create simulators if simulation mode is enabled
     if (simulationEnabled) {
       simulatorRef.current = new BarPositionSimulator(config.loadKg);
+      poseSimulatorRef.current = new PoseSimulator(config.loadKg);
     }
     
     return () => {
