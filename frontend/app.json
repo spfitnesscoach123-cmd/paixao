@@ -16,7 +16,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT.",
-        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo do VBT."
+        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo do VBT.",
+        "NSLocationWhenInUseUsageDescription": "LoadManager Pro uses device sensors only to ensure accurate motion tracking. Location is never stored."
       }
     },
     "android": {
@@ -42,6 +43,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "LoadManager Pro uses device sensors only to ensure accurate motion tracking. Location is never stored."
+        }
+      ],
       [
         "expo-splash-screen",
         {
