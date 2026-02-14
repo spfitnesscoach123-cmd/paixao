@@ -1177,6 +1177,153 @@ export default function VBTCameraPage() {
               <Ionicons name="arrow-forward" size={20} color="#ffffff" />
             </TouchableOpacity>
           </View>
+          
+          {/* Selection Feedback Overlay */}
+          {selectionFeedback && (
+            <Animated.View 
+              style={[
+                styles.selectionFeedbackOverlay,
+                { opacity: feedbackFadeAnim },
+                selectionFeedback.position && {
+                  left: selectionFeedback.position.x - 100,
+                  top: selectionFeedback.position.y - 60,
+                }
+              ]}
+            >
+              <View style={[
+                styles.selectionFeedbackBox,
+                selectionFeedback.type === 'success' ? styles.feedbackSuccess : styles.feedbackError
+              ]}>
+                <Ionicons 
+                  name={selectionFeedback.type === 'success' ? 'checkmark-circle' : 'alert-circle'} 
+                  size={24} 
+                  color={selectionFeedback.type === 'success' ? '#10b981' : '#ef4444'} 
+                />
+                <Text style={[
+                  styles.selectionFeedbackText,
+                  selectionFeedback.type === 'success' ? styles.feedbackTextSuccess : styles.feedbackTextError
+                ]}>
+                  {selectionFeedback.message}
+                </Text>
+              </View>
+            </Animated.View>
+          )}
+          
+          {/* Tutorial Overlay */}
+          {showTutorial && (
+            <Animated.View style={[styles.tutorialOverlay, { opacity: fadeAnim }]}>
+              {/* Skip Button */}
+              <TouchableOpacity 
+                style={styles.tutorialSkipButton}
+                onPress={handleSkipTutorial}
+                data-testid="tutorial-skip-btn"
+              >
+                <Text style={styles.tutorialSkipText}>
+                  {locale === 'pt' ? 'Pular Tutorial' : 'Skip Tutorial'}
+                </Text>
+                <Ionicons name="close" size={20} color="#ffffff" />
+              </TouchableOpacity>
+              
+              {/* Tutorial Content based on step */}
+              {tutorialStep === 'welcome' && (
+                <View style={styles.tutorialContent}>
+                  <View style={styles.tutorialMessageBox}>
+                    <Ionicons name="hand-left" size={28} color={colors.accent.primary} />
+                    <Text style={styles.tutorialTitle}>
+                      {locale === 'pt' ? 'Bem-vindo ao Coach Marker!' : 'Welcome to Coach Marker!'}
+                    </Text>
+                    <Text style={styles.tutorialMessage}>
+                      {locale === 'pt' 
+                        ? 'Toque no ponto do corpo que deseja rastrear para cálculos de velocidade.'
+                        : 'Tap on the body point you want to track for velocity calculations.'}
+                    </Text>
+                  </View>
+                  
+                  {/* Pulsing Circle Indicator */}
+                  <Animated.View style={[
+                    styles.tutorialPulseCircle,
+                    { transform: [{ scale: pulseAnim }] }
+                  ]}>
+                    <Ionicons name="finger-print" size={40} color={colors.accent.primary} />
+                  </Animated.View>
+                  
+                  <Text style={styles.tutorialHint}>
+                    {locale === 'pt' 
+                      ? 'Os pontos verdes indicam articulações detectadas'
+                      : 'Green dots indicate detected joints'}
+                  </Text>
+                </View>
+              )}
+              
+              {tutorialStep === 'pointSelected' && (
+                <View style={styles.tutorialContent}>
+                  <View style={styles.tutorialMessageBox}>
+                    <Ionicons name="checkmark-circle" size={28} color="#10b981" />
+                    <Text style={styles.tutorialTitle}>
+                      {locale === 'pt' ? 'Ponto Selecionado!' : 'Point Selected!'}
+                    </Text>
+                    <Text style={styles.tutorialMessage}>
+                      {locale === 'pt' 
+                        ? 'Ótimo! O sistema vai rastrear este ponto durante o exercício.'
+                        : 'Great! The system will track this point during the exercise.'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+              
+              {tutorialStep === 'trackingStatus' && (
+                <View style={styles.tutorialContent}>
+                  <View style={styles.tutorialMessageBox}>
+                    <Ionicons name="pulse" size={28} color={colors.accent.primary} />
+                    <Text style={styles.tutorialTitle}>
+                      {locale === 'pt' ? 'Status de Tracking' : 'Tracking Status'}
+                    </Text>
+                    <Text style={styles.tutorialMessage}>
+                      {locale === 'pt' 
+                        ? 'A barra de estabilização mostra quando o sistema está pronto. Use "🔄 Trocar ponto" para re-selecionar.'
+                        : 'The stabilization bar shows when the system is ready. Use "🔄 Change point" to re-select.'}
+                    </Text>
+                  </View>
+                  
+                  {/* Tutorial Change Point Button Demo */}
+                  <View style={styles.tutorialButtonDemo}>
+                    <Ionicons name="refresh" size={20} color="#ffffff" />
+                    <Text style={styles.tutorialButtonDemoText}>
+                      {locale === 'pt' ? 'Trocar ponto' : 'Change point'}
+                    </Text>
+                  </View>
+                  
+                  {/* Complete Tutorial Button */}
+                  <TouchableOpacity 
+                    style={styles.tutorialCompleteButton}
+                    onPress={handleCompleteTutorial}
+                    data-testid="tutorial-complete-btn"
+                  >
+                    <Text style={styles.tutorialCompleteText}>
+                      {locale === 'pt' ? 'Começar Sessão' : 'Start Session'}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={20} color="#ffffff" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              
+              {tutorialStep === 'complete' && (
+                <View style={styles.tutorialContent}>
+                  <View style={styles.tutorialMessageBox}>
+                    <Ionicons name="rocket" size={28} color="#10b981" />
+                    <Text style={styles.tutorialTitle}>
+                      {locale === 'pt' ? 'Pronto!' : 'Ready!'}
+                    </Text>
+                    <Text style={styles.tutorialMessage}>
+                      {locale === 'pt' 
+                        ? 'Agora você pode rastrear qualquer ponto do corpo em tempo real.'
+                        : 'Now you can track any body point in real-time.'}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </Animated.View>
+          )}
         </View>
       )}
       
