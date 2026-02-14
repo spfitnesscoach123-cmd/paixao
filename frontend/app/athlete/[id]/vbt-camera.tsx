@@ -851,35 +851,150 @@ export default function VBTCameraPage() {
         <View style={styles.pointSelectionContainer}>
           <View style={styles.cameraContainer}>
             {shouldMountCamera && (
-              <CameraView
-                ref={cameraRef}
-                style={styles.camera}
-                facing="back"
-                onCameraReady={handleCameraReady}
-              >
-                {/* Overlay for point selection */}
-                <View style={styles.pointSelectionOverlay}>
-                  {/* Instructions */}
-                  <View style={styles.pointInstructionsBanner}>
-                    <Ionicons name="information-circle" size={20} color="#ffffff" />
-                    <Text style={styles.pointInstructionsText}>{labels.tapToSelect}</Text>
-                  </View>
+              Platform.OS !== 'web' && RNMediapipe ? (
+                /* Native platform: Use RNMediapipe for real-time pose detection */
+                <View style={styles.camera}>
+                  <RNMediapipe
+                    style={StyleSheet.absoluteFill}
+                    height={screenHeight}
+                    width={screenWidth}
+                    onLandmark={handleMediapipeLandmark}
+                    face={true}
+                    leftArm={true}
+                    rightArm={true}
+                    leftWrist={true}
+                    rightWrist={true}
+                    torso={true}
+                    leftLeg={true}
+                    rightLeg={true}
+                    leftAnkle={true}
+                    rightAnkle={true}
+                    frameLimit={30}
+                  />
                   
-                  {/* Current selection indicator */}
-                  {isTrackingPointSet && trackingPoint && (
-                    <View style={styles.selectedPointBadge}>
-                      <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                      <Text style={styles.selectedPointText}>
-                        {getKeypointLabel(trackingPoint.keypointName)}
+                  {/* Touchable overlay for coach marker */}
+                  <TouchableOpacity
+                    style={StyleSheet.absoluteFill}
+                    onPress={handleScreenTapForMarker}
+                    activeOpacity={1}
+                  >
+                    {/* Overlay for point selection */}
+                    <View style={styles.pointSelectionOverlay}>
+                      {/* Instructions Banner */}
+                      {showMarkerInstruction && (
+                        <View style={styles.pointInstructionsBanner}>
+                          <Ionicons name="hand-left" size={20} color="#ffffff" />
+                          <Text style={styles.pointInstructionsText}>
+                            {locale === 'pt' 
+                              ? 'Toque no ponto do corpo que deseja rastrear' 
+                              : 'Tap on the body point you want to track'}
+                          </Text>
+                        </View>
+                      )}
+                      
+                      {/* Detected keypoints visualization */}
+                      {Array.from(detectedKeypoints.entries()).map(([name, pos]) => {
+                        if (!exerciseKeypoints.includes(name)) return null;
+                        return (
+                          <View
+                            key={name}
+                            style={[
+                              styles.keypointDot,
+                              {
+                                left: `${pos.x * 100}%`,
+                                top: `${pos.y * 100}%`,
+                                backgroundColor: pos.score >= 0.6 ? '#10b981' : '#f59e0b',
+                                borderColor: trackingPoint?.keypointName === name ? '#ffffff' : 'transparent',
+                                borderWidth: trackingPoint?.keypointName === name ? 3 : 0,
+                              },
+                            ]}
+                          >
+                            {trackingPoint?.keypointName === name && (
+                              <View style={styles.keypointDotInner} />
+                            )}
+                          </View>
+                        );
+                      })}
+                      
+                      {/* Coach marker position indicator */}
+                      {coachMarkerPosition && (
+                        <Animated.View
+                          style={[
+                            styles.coachMarker,
+                            {
+                              left: coachMarkerPosition.x - 25,
+                              top: coachMarkerPosition.y - 25,
+                              transform: [{ scale: markerAnimation }],
+                            },
+                          ]}
+                        >
+                          <Ionicons name="locate" size={30} color={colors.accent.primary} />
+                        </Animated.View>
+                      )}
+                      
+                      {/* Current selection indicator */}
+                      {isTrackingPointSet && trackingPoint && (
+                        <View style={styles.selectedPointBadge}>
+                          <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                          <Text style={styles.selectedPointText}>
+                            {getKeypointLabel(trackingPoint.keypointName)}
+                          </Text>
+                          <TouchableOpacity 
+                            onPress={handleChangeTrackingPoint}
+                            style={styles.changePointButton}
+                          >
+                            <Ionicons name="refresh" size={16} color="#ffffff" />
+                          </TouchableOpacity>
+                        </View>
+                      )}
+                      
+                      {/* Debug info: detected keypoints count */}
+                      <View style={styles.debugOverlay}>
+                        <Text style={styles.debugOverlayText}>
+                          {detectedKeypoints.size > 0 
+                            ? `${detectedKeypoints.size} pontos detectados`
+                            : 'Aguardando detecção...'}
+                        </Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                /* Web fallback: Use CameraView without real pose detection */
+                <CameraView
+                  ref={cameraRef}
+                  style={styles.camera}
+                  facing="back"
+                  onCameraReady={handleCameraReady}
+                >
+                  {/* Overlay for point selection */}
+                  <View style={styles.pointSelectionOverlay}>
+                    {/* Instructions */}
+                    <View style={styles.pointInstructionsBanner}>
+                      <Ionicons name="information-circle" size={20} color="#ffffff" />
+                      <Text style={styles.pointInstructionsText}>
+                        {locale === 'pt' 
+                          ? 'Web: Selecione o ponto na lista abaixo' 
+                          : 'Web: Select the point from the list below'}
                       </Text>
                     </View>
-                  )}
-                </View>
-              </CameraView>
+                    
+                    {/* Current selection indicator */}
+                    {isTrackingPointSet && trackingPoint && (
+                      <View style={styles.selectedPointBadge}>
+                        <Ionicons name="checkmark-circle" size={20} color="#10b981" />
+                        <Text style={styles.selectedPointText}>
+                          {getKeypointLabel(trackingPoint.keypointName)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </CameraView>
+              )
             )}
           </View>
           
-          {/* Keypoint Selection List */}
+          {/* Keypoint Selection List (fallback/additional option) */}
           <View style={styles.keypointSelectionPanel}>
             <Text style={styles.keypointPanelTitle}>
               {locale === 'pt' ? 'Selecione o Ponto de Tracking' : 'Select Tracking Point'}
