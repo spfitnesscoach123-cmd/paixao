@@ -319,7 +319,8 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 ### P0 - Crítico
 - [IMPLEMENTADO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
 - [IMPLEMENTADO] Serviço de Pose Detection para integração com MediaPipe
-- [AGUARDANDO] Build nativo com MediaPipe para detecção real (requer `npx expo prebuild`)
+- [IMPLEMENTADO] Integração real do MediaPipe Pose no código
+- [PRONTO] Build nativo com MediaPipe para detecção real (dependências instaladas, código integrado)
 - [AGUARDANDO] Validação do sistema no dispositivo iOS (TestFlight)
 
 ### P1 - Alta
@@ -334,13 +335,32 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ---
 
-## Sistema de Pose Detection (2025-12-XX)
+## Sistema de Pose Detection (2025-12-XX) - ATUALIZADO
+
+### MUDANÇA CRÍTICA: MediaPipe REAL Integrado
+
+**DEPENDÊNCIAS INSTALADAS:**
+- `@thinksys/react-native-mediapipe@0.0.19`
+- `react-native-vision-camera@4.7.3`
+
+**CONFIGURAÇÃO DE BUILD PRESERVADA:**
+- `newArchEnabled: true` ✅
+- `jsEngine: "jsc"` ✅ (Hermes OFF)
+- Plugin `react-native-vision-camera` adicionado ao `app.json`
 
 ### Arquitetura Implementada
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
+│              vbt-camera.tsx                                  │
+│    - MediapipePoseView (iOS/Android) ou CameraView (web)    │
+│    - handleMediapipePoseDetected() → processPose()          │
+└───────────────────────────┬─────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
 │              useProtectedBarTracking Hook                    │
+│    - useSimulation: FALSE (modo REAL ativado)               │
 │    - Layer 1: Human Presence Validation                      │
 │    - Layer 2: State Machine Control                          │
 │    - Layer 3: Coach-Defined Tracking Point                   │
@@ -348,50 +368,57 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Pose Detection Service                          │
-│         (services/pose/)                                     │
-│                                                              │
-│   ┌─────────────────┐    ┌─────────────────┐               │
-│   │  PoseSimulator  │ OR │  Native Pose    │               │
-│   │  (Atual - Dev)  │    │  (MediaPipe)    │               │
-│   └─────────────────┘    └─────────────────┘               │
+│              VBT Calculation Pipeline (NÃO MODIFICADO)       │
+│    - Velocity calculation                                    │
+│    - Rep detection                                           │
+│    - Graphs & Reports                                        │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Arquivos Criados
+### Arquivos Modificados
 
-| Arquivo | Descrição |
-|---------|-----------|
-| `services/pose/types.ts` | Tipos e constantes para pose detection |
-| `services/pose/poseDetector.ts` | Serviço principal de detecção |
-| `services/pose/usePoseDetection.ts` | Hook React para pose detection |
-| `services/pose/PoseCamera.tsx` | Componente câmera com pose |
-| `services/pose/index.ts` | Exports do módulo |
-| `docs/MEDIAPIPE_INTEGRATION.md` | Guia para integração nativa |
+| Arquivo | Modificação |
+|---------|-------------|
+| `app.json` | Plugin vision-camera adicionado |
+| `package.json` | Dependências MediaPipe adicionadas |
+| `vbt-camera.tsx` | MediapipePoseView integrado, `useSimulation: false` |
+| `services/pose/PoseCamera.tsx` | Suporte nativo MediaPipe |
 
-### Status de Integração
+### Status de Integração ATUALIZADO
 
 | Componente | Status |
 |------------|--------|
-| expo-camera | ✅ Funcionando |
+| expo-camera | ✅ Mantido (fallback web) |
 | Sistema 3 camadas | ✅ Implementado |
-| PoseSimulator (dev) | ✅ Funcionando |
-| Interface VBTPoseData | ✅ Padronizada |
-| MediaPipe nativo | ⏳ Requer build nativo |
+| MediaPipe nativo | ✅ **INTEGRADO** |
+| useSimulation | ❌ **DESATIVADO** (modo real) |
+| Hermes | ❌ **OFF** (mantido jsc) |
 
-### Próximos Passos para MediaPipe Real
+### Próximos Passos para Build Nativo
 
-1. Instalar dependências:
+O código está **100% pronto**. Para ativar no dispositivo:
+
+1. Gerar código nativo:
    ```bash
-   npm install @thinksys/react-native-mediapipe react-native-vision-camera
+   cd frontend
    npx expo prebuild --clean
    ```
 
-2. Atualizar app.json com plugin vision-camera
+2. Verificar Podfile (Hermes OFF):
+   ```ruby
+   :hermes_enabled => false
+   ```
 
-3. Executar build nativo:
+3. Instalar pods:
+   ```bash
+   cd ios && pod install && cd ..
+   ```
+
+4. Build e deploy:
    ```bash
    npx expo run:ios --device
+   # ou
+   eas build --platform ios
    ```
 
 Consulte `docs/MEDIAPIPE_INTEGRATION.md` para guia completo.
