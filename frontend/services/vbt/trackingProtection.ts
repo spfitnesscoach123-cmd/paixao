@@ -39,6 +39,10 @@ export interface TrackingPoint {
   isSet: boolean;
 }
 
+// Estados em português conforme especificação do usuário
+// 'noHuman' = 'semPessoa'
+// 'ready' = 'pronto'  
+// 'executing' = 'executando'
 export type TrackingState = 'noHuman' | 'ready' | 'executing';
 
 export interface ProtectionConfig {
