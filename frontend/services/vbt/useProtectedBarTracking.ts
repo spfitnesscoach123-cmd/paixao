@@ -417,6 +417,9 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     if (simulatorRef.current) {
       simulatorRef.current.reset();
     }
+    if (poseSimulatorRef.current) {
+      poseSimulatorRef.current.reset();
+    }
     
     // Also clear tracking point on full reset
     setIsTrackingPointSet(false);
