@@ -11,10 +11,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
-      "buildNumber": "17",
+      "buildNumber": "18",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
-        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT",
+        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT.",
+        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo.",
         "NSBluetoothAlwaysUsageDescription": "LoadManager Pro may use Bluetooth to connect to external performance monitoring devices when authorized by the user.",
         "NSBluetoothPeripheralUsageDescription": "LoadManager Pro may use Bluetooth to communicate with compatible external sports performance devices."
       }
