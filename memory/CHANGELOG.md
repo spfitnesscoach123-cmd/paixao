@@ -1,5 +1,37 @@
 # LoadManager Pro - Changelog
 
+## [Build 24] - 2025-12-XX
+
+### Tutorial Interativo - Coach Marker
+
+#### Novos Recursos
+- **Tutorial na Primeira Utilização**: Modal overlay que aparece apenas na primeira vez que o coach abre a VBT Camera
+- **6 Passos Guiados**:
+  1. **Welcome**: Mensagem de boas-vindas com círculo pulsante animado indicando onde tocar
+  2. **Select Point**: Instrução para selecionar ponto na tela
+  3. **Point Selected**: Feedback visual de confirmação com animação
+  4. **Tracking Status**: Explicação da barra de estabilização e botão "Trocar ponto"
+  5. **Complete**: Mensagem de encerramento
+- **Botão "Pular Tutorial"**: Disponível no canto superior direito para encerrar imediatamente
+- **Botão "Começar Sessão"**: Para concluir o tutorial e iniciar a sessão VBT
+
+#### Feedback Visual de Seleção
+- **Sucesso**: Caixa verde com mensagem "Ponto selecionado!" na posição do toque
+- **Erro**: Caixa vermelha com mensagem informando proximidade necessária a articulação
+- **Animação Fade**: Feedback desaparece automaticamente após 2 segundos
+
+#### Mudanças Técnicas
+- Uso de `AsyncStorage` para persistir estado do tutorial (key: `@vbt_camera_tutorial_completed`)
+- Estados: `showTutorial`, `tutorialStep`, `selectionFeedback`
+- Animações: `pulseAnim` (círculo pulsante), `fadeAnim` (overlay), `feedbackFadeAnim` (feedback)
+- Integração com `handleScreenTapForMarker` para avançar tutorial automaticamente
+
+#### Arquivos Modificados
+- `app/athlete/[id]/vbt-camera.tsx` - Tutorial interativo completo
+- `app.json` - Build 24
+
+---
+
 ## [Build 23] - 2025-12-XX
 
 ### Correção VBT Camera + Coach Marker Feature
