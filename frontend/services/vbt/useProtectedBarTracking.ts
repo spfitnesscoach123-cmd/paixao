@@ -352,7 +352,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       intervalRef.current = null;
     }
     
-    setStatusMessage('Tracking stopped');
+    setStatusMessage('Tracking parado');
   }, []);
   
   /**
@@ -388,7 +388,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // Also clear tracking point on full reset
     setIsTrackingPointSet(false);
     setTrackingPointState(null);
-    setStatusMessage('Reset complete - select tracking point');
+    setStatusMessage('Reset completo - selecione ponto de tracking');
   }, [stopTracking]);
   
   /**
