@@ -435,13 +435,16 @@ export default function VBTCameraPage() {
     
     console.log('[VBTCamera] Coach tap at screen: x=' + normalizedX.toFixed(3) + ', y=' + normalizedY.toFixed(3));
     
+    // Get exercise-relevant keypoints
+    const relevantKeypoints = EXERCISE_KEYPOINTS[selectedExercise] || [];
+    
     // Find the nearest detected keypoint to the tap position
     let nearestKeypoint: string | null = null;
     let minDistance = Infinity;
     
     detectedKeypoints.forEach((pos, name) => {
       // Only consider exercise-relevant keypoints
-      if (exerciseKeypoints.includes(name)) {
+      if (relevantKeypoints.includes(name)) {
         const distance = Math.sqrt(
           Math.pow(pos.x - normalizedX, 2) + Math.pow(pos.y - normalizedY, 2)
         );
@@ -493,7 +496,7 @@ export default function VBTCameraPage() {
           : 'Tap closer to a detected body point (shown on screen)'
       );
     }
-  }, [detectedKeypoints, exerciseKeypoints, setTrackingPoint, locale, markerAnimation]);
+  }, [detectedKeypoints, selectedExercise, setTrackingPoint, locale, markerAnimation]);
 
   // Function to change tracking point during session
   const handleChangeTrackingPoint = useCallback(() => {
