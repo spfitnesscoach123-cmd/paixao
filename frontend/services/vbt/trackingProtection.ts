@@ -677,16 +677,13 @@ export class TrackingProtectionSystem {
 
   /**
    * Process a frame through all 3 protection layers
+   * 
+   * LAYER 1: Human Presence Validation
+   * LAYER 2: State Machine Control  
+   * LAYER 3: Coach-Defined Tracking Point
    */
   processFrame(pose: PoseData | null): ProtectionResult {
-    // LAYER 1: Validate human presence
-    const humanValidation = this.humanValidator.validateKeypoints(pose);
-    const humanStable = this.humanValidator.isStable();
-
-    // LAYER 3: Get tracking point position
-    const trackingResult = this.trackingPointManager.getTrackedPosition(pose);
-    
-    // If tracking point not set, block everything
+    // LAYER 3: FIRST - Check if tracking point is set (MANDATORY)
     if (!this.trackingPointManager.isSet()) {
       return {
         state: 'noHuman',
@@ -696,11 +693,48 @@ export class TrackingProtectionSystem {
         trackingPoint: null,
         smoothedPosition: null,
         velocity: 0,
-        message: 'Coach must set tracking point before recording',
+        message: 'BLOQUEADO: Coach deve definir ponto de tracking antes de gravar',
       };
     }
 
-    // If tracking point not valid, block
+    // LAYER 1: Validate human presence (keypoints with score >= 0.6)
+    const humanValidation = this.humanValidator.validateKeypoints(pose);
+    const humanStable = this.humanValidator.isStable();
+    
+    // If no valid human keypoints, block everything
+    if (!humanValidation.isValid) {
+      this.stateMachine.transition(false, false, 0, null);
+      return {
+        state: 'noHuman',
+        isValid: false,
+        canCalculate: false,
+        canCountRep: false,
+        trackingPoint: this.trackingPointManager.getTrackingPoint(),
+        smoothedPosition: null,
+        velocity: 0,
+        message: `BLOQUEADO: ${humanValidation.message}`,
+      };
+    }
+    
+    // If not stable (5 consecutive valid frames), block calculations
+    if (!humanStable) {
+      const progress = Math.round(this.humanValidator.getStabilityProgress() * 100);
+      return {
+        state: 'noHuman',
+        isValid: true,
+        canCalculate: false,
+        canCountRep: false,
+        trackingPoint: this.trackingPointManager.getTrackingPoint(),
+        smoothedPosition: null,
+        velocity: 0,
+        message: `Estabilizando detecção... ${progress}% (${this.config.requiredStableFrames} frames necessários)`,
+      };
+    }
+
+    // LAYER 3: Get tracking point position from pose
+    const trackingResult = this.trackingPointManager.getTrackedPosition(pose);
+    
+    // If tracking point not detected or low confidence, block
     if (!trackingResult.isValid) {
       return {
         state: 'noHuman',
@@ -710,14 +744,14 @@ export class TrackingProtectionSystem {
         trackingPoint: this.trackingPointManager.getTrackingPoint(),
         smoothedPosition: null,
         velocity: 0,
-        message: trackingResult.message,
+        message: `BLOQUEADO: ${trackingResult.message}`,
       };
     }
 
-    // Get smoothed position
+    // Get smoothed position (moving average)
     const smoothedPosition = this.trackingPointManager.getSmoothedPosition(trackingResult.position);
     
-    // Get filtered movement delta
+    // Get filtered movement delta (ignore micro-variations)
     const rawDelta = this.trackingPointManager.getMovementDelta();
     const filteredDelta = this.noiseFilter.filterMovement(rawDelta);
     
@@ -733,7 +767,7 @@ export class TrackingProtectionSystem {
       smoothedPosition
     );
 
-    // Determine what's allowed
+    // Determine what's allowed based on state
     const canCalculate = stateResult.newState !== 'noHuman' && trackingResult.isValid;
     const canCountRep = stateResult.newState === 'executing' && stateResult.repCompleted;
 
