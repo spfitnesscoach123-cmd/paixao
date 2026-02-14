@@ -113,7 +113,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   const [isStable, setIsStable] = useState(false);
   const [stabilityProgress, setStabilityProgress] = useState(0);
   const [canCalculate, setCanCalculate] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('Waiting for tracking point selection...');
+  const [statusMessage, setStatusMessage] = useState('Aguardando seleção de ponto de tracking...');
   
   // Tracking point state
   const [trackingPoint, setTrackingPointState] = useState<TrackingPoint | null>(null);
