@@ -392,6 +392,15 @@ export default function VBTCameraPage() {
   };
 
   const getProtectionStateLabel = () => {
+    if (!isTrackingPointSet) {
+      return locale === 'pt' ? 'PONTO NÃO DEFINIDO' : 'POINT NOT SET';
+    }
+    
+    // Se não está estável, mostrar progresso
+    if (!isStable && protectionState === 'noHuman') {
+      return `${labels.waitingStable} (${Math.round(stabilityProgress * 100)}%)`;
+    }
+    
     switch (protectionState) {
       case 'noHuman': return labels.noHuman;
       case 'ready': return labels.ready;
