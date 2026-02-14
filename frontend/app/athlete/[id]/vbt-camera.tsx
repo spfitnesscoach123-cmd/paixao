@@ -1240,14 +1240,21 @@ export default function VBTCameraPage() {
                         </Text>
                       </View>
                       
-                      {/* Tracking Point Indicator */}
+                      {/* Tracking Point Indicator with Change Button */}
                       {trackingPoint && (
-                        <View style={styles.trackingPointIndicator}>
+                        <TouchableOpacity 
+                          style={styles.trackingPointIndicator}
+                          onPress={handleChangeTrackingPoint}
+                          disabled={isTracking}
+                        >
                           <Ionicons name="locate" size={16} color={colors.accent.primary} />
                           <Text style={styles.trackingPointText}>
                             {getKeypointLabel(trackingPoint.keypointName)}
                           </Text>
-                        </View>
+                          {!isTracking && (
+                            <Ionicons name="refresh" size={14} color={colors.text.secondary} style={{marginLeft: 4}} />
+                          )}
+                        </TouchableOpacity>
                       )}
                       
                       {/* Velocity Display - Only show when canCalculate */}
