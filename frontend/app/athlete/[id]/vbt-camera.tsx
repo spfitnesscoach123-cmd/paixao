@@ -33,13 +33,15 @@ import {
 } from '../../../services/pose';
 
 // Conditional import for native MediaPipe
-let MediapipePoseView: any = null;
+// @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
+let RNMediapipe: any = null;
 if (Platform.OS !== 'web') {
   try {
     const mediapipe = require('@thinksys/react-native-mediapipe');
-    MediapipePoseView = mediapipe.MediapipePoseView;
+    RNMediapipe = mediapipe.RNMediapipe;
+    console.log('[VBTCamera] MediaPipe loaded successfully');
   } catch (e) {
-    console.warn('[VBTCamera] MediaPipe not available');
+    console.warn('[VBTCamera] MediaPipe not available:', e);
   }
 }
 
