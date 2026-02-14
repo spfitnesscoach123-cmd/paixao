@@ -317,7 +317,8 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 ## Tarefas Pendentes (Por Prioridade)
 
 ### P0 - Crítico
-- [AGUARDANDO] Validação do fix da câmera iOS no TestFlight
+- [IMPLEMENTADO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
+- [AGUARDANDO] Validação do sistema no dispositivo iOS (TestFlight)
 
 ### P1 - Alta
 - [ ] Completar internacionalização do `ScientificAnalysisTab.tsx`
