@@ -243,6 +243,11 @@ export class TrackingStateMachine {
 
   /**
    * Attempt state transition based on conditions
+   * 
+   * States (seguindo nomenclatura do usuário):
+   * - 'noHuman' = 'semPessoa'
+   * - 'ready' = 'pronto'
+   * - 'executing' = 'executando'
    */
   transition(
     humanValid: boolean,
@@ -254,42 +259,42 @@ export class TrackingStateMachine {
     let repCompleted = false;
     let message = '';
 
-    // STATE: noHuman
+    // STATE: noHuman (semPessoa)
     if (!humanValid) {
       if (this.currentState !== 'noHuman') {
-        this.transitionTo('noHuman', 'Lost human detection');
+        this.transitionTo('noHuman', 'Detecção de pessoa perdida');
       }
       this.resetMovementTracking();
-      return { newState: 'noHuman', repCompleted: false, message: 'No valid human detected' };
+      return { newState: 'noHuman', repCompleted: false, message: 'SEM PESSOA - Nenhuma pessoa válida detectada' };
     }
 
-    // STATE: ready (waiting for stable detection)
+    // STATE: Aguardando estabilidade (5 frames consecutivos)
     if (!humanStable) {
       if (this.currentState !== 'noHuman') {
-        this.transitionTo('noHuman', 'Unstable detection');
+        this.transitionTo('noHuman', 'Detecção instável');
       }
-      return { newState: 'noHuman', repCompleted: false, message: 'Waiting for stable detection...' };
+      return { newState: 'noHuman', repCompleted: false, message: 'Aguardando detecção estável...' };
     }
 
-    // Human is valid and stable - can be "ready" or "executing"
+    // Human is valid and stable - can transition to "ready" or "executing"
     if (this.currentState === 'noHuman') {
-      this.transitionTo('ready', 'Human detected and stable');
+      this.transitionTo('ready', 'Pessoa detectada e estável');
       
       // Set baseline position
       if (currentPosition) {
         this.baselinePosition = { ...currentPosition };
       }
-      return { newState: 'ready', repCompleted: false, message: 'Ready - waiting for movement' };
+      return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando início do movimento' };
     }
 
     // STATE: ready -> executing (movement detected)
     if (this.currentState === 'ready' && currentPosition) {
       if (movementDelta >= this.config.minMovementDelta) {
-        this.transitionTo('executing', 'Significant movement detected');
+        this.transitionTo('executing', 'Movimento significativo detectado');
         this.repPhase = 'descending';
-        return { newState: 'executing', repCompleted: false, message: 'Movement detected - tracking...' };
+        return { newState: 'executing', repCompleted: false, message: 'EXECUTANDO - Movimento detectado, rastreando...' };
       }
-      return { newState: 'ready', repCompleted: false, message: 'Ready - waiting for movement' };
+      return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando movimento' };
     }
 
     // STATE: executing (tracking movement)
@@ -305,13 +310,13 @@ export class TrackingStateMachine {
         // Bottom reached, now ascending
         this.repPhase = 'ascending';
         this.peakPosition = { ...currentPosition };
-        message = 'Ascending phase';
+        message = 'Fase concêntrica (subindo)';
       } else if (this.repPhase === 'ascending' && 
                  Math.abs(currentPosition.y - this.baselinePosition.y) < this.config.minMovementDelta) {
         // Returned to start position - rep complete
         this.repPhase = 'completed';
         repCompleted = true;
-        message = 'Rep completed!';
+        message = 'REPETIÇÃO COMPLETA!';
         
         // Reset for next rep
         setTimeout(() => {
@@ -325,14 +330,21 @@ export class TrackingStateMachine {
 
       // Check if movement stopped (return to ready)
       if (movementDelta < this.config.minMovementDelta / 2 && this.repPhase === 'idle') {
-        this.transitionTo('ready', 'Movement stopped');
-        return { newState: 'ready', repCompleted, message: message || 'Movement stopped' };
+        this.transitionTo('ready', 'Movimento parou');
+        return { newState: 'ready', repCompleted, message: message || 'Movimento parou - aguardando' };
       }
 
-      return { newState: 'executing', repCompleted, message: message || `Tracking: ${this.repPhase}` };
+      const phaseLabel = {
+        'idle': 'Aguardando',
+        'descending': 'Fase excêntrica',
+        'ascending': 'Fase concêntrica',
+        'completed': 'Completa'
+      }[this.repPhase] || this.repPhase;
+
+      return { newState: 'executing', repCompleted, message: message || `EXECUTANDO: ${phaseLabel}` };
     }
 
-    return { newState: this.currentState, repCompleted, message: 'Unknown state' };
+    return { newState: this.currentState, repCompleted, message: 'Estado desconhecido' };
   }
 
   /**
