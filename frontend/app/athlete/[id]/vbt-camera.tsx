@@ -14,12 +14,14 @@ import {
   GestureResponderEvent,
   PanResponder,
   Animated,
+  Easing,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
