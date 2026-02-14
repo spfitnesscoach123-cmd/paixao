@@ -162,6 +162,22 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ## Changelog
 
+### 2025-12-XX - VBT Camera Coach Marker + Stabilization Fix (Build 23)
+- **NOVA FUNCIONALIDADE**: Coach Marker - coach pode tocar diretamente na tela para selecionar ponto de tracking
+- **FIX**: "Stabilizing Detection" não fica mais travado - callback `handleMediapipeLandmark` processa frames durante seleção de pontos
+- **MELHORIA**: Visualização de keypoints detectados na tela durante seleção
+- **MELHORIA**: Barra de progresso de estabilização funcional com porcentagem
+- **MELHORIA**: Possibilidade de trocar ponto de tracking antes de gravar
+- **Arquivos modificados**:
+  - `app/athlete/[id]/vbt-camera.tsx` - Refatoração completa
+  - `app.json` - Build 23
+- **Componentes adicionados**:
+  - Estado `detectedKeypoints` para visualização
+  - Estado `coachMarkerPosition` para animação
+  - Função `handleScreenTapForMarker` para captura de toque
+  - Função `handleChangeTrackingPoint` para re-seleção
+- **Status**: PRONTO PARA TESTE no dispositivo iOS/Android
+
 ### 2025-12-XX - Correção VBT Camera MediaPipe REAL (Build 22)
 - **CORREÇÃO CRÍTICA**: VBT Camera travada em "Stabilizing Detection"
 - **Causa raiz**: Import incorreto do componente MediaPipe e callback errado
