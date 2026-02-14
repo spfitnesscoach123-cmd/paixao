@@ -125,6 +125,7 @@ export class HumanPresenceValidator {
 
   /**
    * Validate that required keypoints are present with sufficient confidence
+   * CAMADA 1: Validação rígida de presença humana
    */
   validateKeypoints(pose: PoseData | null): {
     isValid: boolean;
@@ -139,7 +140,7 @@ export class HumanPresenceValidator {
         isValid: false,
         validKeypoints: [],
         missingKeypoints: this.config.exerciseKeypoints,
-        message: 'No pose detected',
+        message: 'Nenhuma pose detectada na câmera',
       };
     }
 
@@ -153,7 +154,7 @@ export class HumanPresenceValidator {
       if (!keypoint) {
         missingKeypoints.push(requiredName);
       } else if (keypoint.score < this.config.minKeypointScore) {
-        missingKeypoints.push(`${requiredName} (low confidence: ${keypoint.score.toFixed(2)})`);
+        missingKeypoints.push(`${requiredName} (confiança baixa: ${(keypoint.score * 100).toFixed(0)}%)`);
       } else {
         validKeypoints.push(keypoint);
       }
@@ -175,8 +176,8 @@ export class HumanPresenceValidator {
       validKeypoints,
       missingKeypoints,
       message: allValid 
-        ? `Valid pose: ${validKeypoints.length} keypoints detected`
-        : `Missing/invalid keypoints: ${missingKeypoints.join(', ')}`,
+        ? `Pose válida: ${validKeypoints.length} keypoints detectados`
+        : `Pontos faltando/inválidos: ${missingKeypoints.slice(0, 3).join(', ')}${missingKeypoints.length > 3 ? '...' : ''}`,
     };
   }
 
