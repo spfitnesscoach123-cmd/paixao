@@ -202,13 +202,13 @@ export class PoseDetector {
    * Notify all subscribers
    */
   private notifyCallbacks(pose: VBTPoseData | null): void {
-    for (const callback of this.callbacks) {
+    this.callbacks.forEach((callback) => {
       try {
         callback(pose);
       } catch (error) {
         console.error('[PoseDetector] Callback error:', error);
       }
-    }
+    });
   }
   
   /**
