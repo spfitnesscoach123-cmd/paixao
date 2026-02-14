@@ -680,19 +680,18 @@ export default function VBTCameraPage() {
                     feedbackColor === 'green' && styles.feedbackGreen,
                     feedbackColor === 'red' && styles.feedbackRed,
                   ]}>
-                    {/* Protection State Banner */}
+                    {/* Protection State Banner - 3 CAMADAS */}
                     <View style={[styles.protectionStateBanner, { backgroundColor: getProtectionStateColor() }]}>
                       <Ionicons 
-                        name={protectionState === 'executing' ? 'radio-button-on' : 'radio-button-off'} 
+                        name={
+                          protectionState === 'executing' ? 'radio-button-on' : 
+                          protectionState === 'ready' ? 'checkmark-circle' :
+                          'alert-circle'
+                        } 
                         size={16} 
                         color="#ffffff" 
                       />
                       <Text style={styles.protectionStateText}>{getProtectionStateLabel()}</Text>
-                      {protectionState === 'noHuman' && !isStable && (
-                        <Text style={styles.stabilityText}>
-                          ({Math.round(stabilityProgress * 100)}%)
-                        </Text>
-                      )}
                     </View>
                     
                     {/* Recording indicator */}
