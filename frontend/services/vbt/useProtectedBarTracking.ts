@@ -256,7 +256,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   }, [meanVelocity, peakVelocity, velocityDrop]);
   
   /**
-   * Set tracking point (LAYER 3)
+   * Set tracking point (LAYER 3 - CAMADA 3)
    */
   const setTrackingPoint = useCallback((x: number, y: number, keypointName: string) => {
     if (protectionSystemRef.current) {
@@ -268,7 +268,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
         keypointName,
         isSet: true,
       });
-      setStatusMessage(`Tracking point set: ${keypointName}`);
+      setStatusMessage(`Ponto de tracking definido: ${keypointName}`);
     }
   }, []);
   
@@ -280,7 +280,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       protectionSystemRef.current.clearTrackingPoint();
       setIsTrackingPointSet(false);
       setTrackingPointState(null);
-      setStatusMessage('Tracking point cleared - select new point');
+      setStatusMessage('Ponto de tracking removido - selecione novo ponto');
     }
   }, []);
   
