@@ -23,12 +23,17 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 | Verificação | Status |
 |-------------|--------|
-| `enableLocation` em app.json | ✅ `false` |
-| expo-location instalado | ✅ **NÃO** |
-| NSLocationWhenInUseUsageDescription | ✅ **AUSENTE** |
-| ACCESS_FINE_LOCATION (Android) | ✅ **AUSENTE** |
+| `enableLocation` em app.json | ✅ `false` (linha 74) |
+| `$VCEnableLocation=false` no Podfile | ✅ Configurado (linha 1) |
+| expo-location instalado | ✅ **NÃO** (0 referências) |
+| NSLocationWhenInUseUsageDescription | ✅ **AUSENTE** no Info.plist |
+| ACCESS_FINE_LOCATION (Android) | ✅ **AUSENTE** no AndroidManifest.xml |
+| CoreLocation no código iOS | ✅ **0 referências** (exceto node_modules) |
 | jsEngine | ✅ `jsc` (Hermes OFF) |
 | newArchEnabled | ✅ `true` |
+
+**Limpeza executada**: node_modules, lockfiles, .expo, ios/build, ios/Pods, ios/Podfile.lock, android builds
+**Prebuild**: `npx expo prebuild --clean` ✅ SUCESSO
 
 **Backend**: 16/16 testes passando
 **Frontend**: 27/27 testes unitários passando
