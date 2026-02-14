@@ -14,7 +14,7 @@ from datetime import datetime
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = "https://three-layer-vbt.preview.emergentagent.com"
+    BASE_URL = "https://mediapipe-vbt-build.preview.emergentagent.com"
 
 # Test credentials
 COACH_EMAIL = "coach_test@test.com"

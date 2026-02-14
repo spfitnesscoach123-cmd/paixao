@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # Use public URL for testing
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://three-layer-vbt.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://mediapipe-vbt-build.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "coach_test@test.com"
