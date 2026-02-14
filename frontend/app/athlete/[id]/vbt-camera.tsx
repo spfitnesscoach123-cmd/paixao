@@ -207,6 +207,61 @@ export default function VBTCameraPage() {
     return (labels as any)[name] || name;
   };
 
+  // Convert MediaPipe landmarks to VBT pose format
+  const convertMediapipeLandmarks = useCallback((landmarks: any[]): VBTPoseData | null => {
+    if (!landmarks || !Array.isArray(landmarks) || landmarks.length === 0) {
+      return null;
+    }
+    
+    const keypoints: ProcessedKeypoint[] = [];
+    
+    // Map MediaPipe 33 landmarks to VBT 17 keypoints
+    for (const [indexStr, name] of Object.entries(LANDMARK_INDEX_TO_VBT_NAME)) {
+      const index = parseInt(indexStr, 10);
+      const landmark = landmarks[index];
+      
+      if (landmark) {
+        keypoints.push({
+          name: name as string,
+          x: landmark.x ?? 0,
+          y: landmark.y ?? 0,
+          score: landmark.visibility ?? landmark.confidence ?? 0.5,
+        });
+      }
+    }
+    
+    return {
+      keypoints,
+      timestamp: Date.now(),
+    };
+  }, []);
+
+  // Handle REAL pose detection from native MediaPipe
+  const handleMediapipePoseDetected = useCallback((event: any) => {
+    if (!isTracking) return;
+    
+    try {
+      // Extract landmarks from native event
+      const landmarks = event?.nativeEvent?.landmarks || 
+                       event?.nativeEvent?.poseLandmarks ||
+                       event?.landmarks ||
+                       event?.poseLandmarks ||
+                       event;
+      
+      const vbtPose = convertMediapipeLandmarks(landmarks);
+      
+      if (vbtPose && vbtPose.keypoints.length > 0) {
+        // Pass REAL pose data to the VBT pipeline
+        processPose(vbtPose);
+      } else {
+        // No pose detected - pass null to trigger no-human state
+        processPose({ keypoints: [], timestamp: Date.now() });
+      }
+    } catch (e) {
+      console.error('[VBTCamera] Error processing MediaPipe pose:', e);
+    }
+  }, [isTracking, convertMediapipeLandmarks, processPose]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
