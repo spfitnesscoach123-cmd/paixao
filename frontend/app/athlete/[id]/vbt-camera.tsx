@@ -12,6 +12,8 @@ import {
   Dimensions,
   Platform,
   GestureResponderEvent,
+  PanResponder,
+  Animated,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
