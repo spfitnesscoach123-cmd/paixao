@@ -343,7 +343,8 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 - [IMPLEMENTADO] Sistema de 3 Camadas de Proteção VBT (Validação de Presença, Estado Controlado, Ponto do Coach)
 - [IMPLEMENTADO] Serviço de Pose Detection para integração com MediaPipe
 - [IMPLEMENTADO] Integração real do MediaPipe Pose no código
-- [PRONTO] Build nativo com MediaPipe para detecção real (dependências instaladas, código integrado)
+- [PRONTO - BUILD 21] Build nativo preparado com MediaPipe REAL (expo prebuild --clean executado, 0 erros)
+- [AGUARDANDO] Executar `pod install` no macOS e build via EAS
 - [AGUARDANDO] Validação do sistema no dispositivo iOS (TestFlight)
 
 ### P1 - Alta
