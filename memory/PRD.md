@@ -13,6 +13,53 @@ Substituição completa do modelo de "Link Wellness" por um sistema de "Token We
 
 ---
 
+## VBT Camera - Coach Marker Feature (IMPLEMENTADO - 2025-12-XX) 
+
+### Build 23
+**Status**: IMPLEMENTADO - REQUER TESTE EM DISPOSITIVO NATIVO
+
+### Funcionalidades Implementadas
+
+#### 1. Coach Marker - Toque Direto na Tela
+- Coach pode tocar diretamente na tela durante fase de seleção de pontos
+- Sistema encontra o keypoint mais próximo do toque (raio de 15% da tela)
+- Feedback visual com animação do marcador
+- Alertas se não encontrar keypoint próximo
+
+#### 2. Visualização de Keypoints Detectados
+- Pontos corporais detectados pelo MediaPipe exibidos como círculos coloridos
+- Verde: alta confiança (score >= 0.6)
+- Amarelo: média confiança (score < 0.6)
+- Borda branca indica ponto selecionado
+
+#### 3. Troca de Ponto Durante Sessão
+- Botão de refresh no indicador de tracking point
+- Permite re-seleção antes de iniciar gravação
+
+#### 4. Correção Stabilizing Detection
+- `handleMediapipeLandmark` agora processa frames mesmo antes de `isTracking`
+- Estado `previewPoseData` armazena dados para visualização durante seleção
+- Estado `detectedKeypoints` para overlay visual
+
+#### 5. Logs de Debug
+- `[VBTCamera]` prefix para todos os logs
+- Rastreia: keypoints detectados, status de estabilização, ponto de tracking atual
+
+### Compatibilidade de Plataformas
+- **Web**: Usa `expo-camera` com simulação (comportamento esperado)
+- **iOS/Android**: Usa `RNMediapipe` com detecção REAL via `onLandmark`
+
+### Arquivos Modificados
+- `app/athlete/[id]/vbt-camera.tsx` - Refatoração completa
+- `app.json` - Build 23
+
+### Configuração de Build
+- `newArchEnabled: true`
+- `jsEngine: "jsc"` (Hermes OFF)
+- Sem permissões de localização
+
+---
+
 ## Sistema de Token Wellness (IMPLEMENTADO - 2026-02-13)
 
 ### Versão Atual
