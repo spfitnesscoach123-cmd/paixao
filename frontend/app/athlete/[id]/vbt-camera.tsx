@@ -584,6 +584,21 @@ export default function VBTCameraPage() {
       setTrackingPoint(normalizedX, normalizedY, nearestKeypoint);
       setShowMarkerInstruction(false);
       
+      // Show success feedback
+      showSelectionFeedback(
+        'success',
+        locale === 'pt' ? 'Ponto selecionado!' : 'Point selected!',
+        { x: locationX, y: locationY }
+      );
+      
+      // Advance tutorial if active
+      if (showTutorial && tutorialStep === 'welcome') {
+        setTutorialStep('pointSelected');
+        setTimeout(() => {
+          setTutorialStep('trackingStatus');
+        }, 2000);
+      }
+      
       // Animate marker
       Animated.sequence([
         Animated.timing(markerAnimation, {
@@ -598,22 +613,21 @@ export default function VBTCameraPage() {
         }),
       ]).start();
     } else if (detectedKeypoints.size === 0) {
-      Alert.alert(
-        locale === 'pt' ? 'Nenhuma Pose Detectada' : 'No Pose Detected',
-        locale === 'pt' 
-          ? 'Posicione o atleta na frente da câmera e aguarde a detecção' 
-          : 'Position the athlete in front of the camera and wait for detection'
+      // Show error feedback
+      showSelectionFeedback(
+        'error',
+        locale === 'pt' ? 'Nenhuma pose detectada. Aguarde...' : 'No pose detected. Please wait...'
       );
     } else {
       // Show feedback that tap was too far from any keypoint
-      Alert.alert(
-        locale === 'pt' ? 'Ponto não encontrado' : 'Point not found',
+      showSelectionFeedback(
+        'error',
         locale === 'pt' 
-          ? 'Toque mais próximo de um ponto corporal detectado (indicados na tela)' 
-          : 'Tap closer to a detected body point (shown on screen)'
+          ? 'Toque mais próximo de uma articulação visível' 
+          : 'Tap closer to a visible joint'
       );
     }
-  }, [detectedKeypoints, selectedExercise, setTrackingPoint, locale, markerAnimation]);
+  }, [detectedKeypoints, selectedExercise, setTrackingPoint, locale, markerAnimation, showTutorial, tutorialStep, showSelectionFeedback]);
 
   // Function to change tracking point during session
   const handleChangeTrackingPoint = useCallback(() => {
