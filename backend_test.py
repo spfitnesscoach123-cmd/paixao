@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 
 # Configuration
-BASE_URL = "https://pose-guard-system.preview.emergentagent.com/api"
+BASE_URL = "https://three-layer-vbt.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "coach.testbackend@footballsystem.com"
 TEST_USER_PASSWORD = "TestCoach2025#"
 TEST_USER_NAME = "Backend Test Coach"

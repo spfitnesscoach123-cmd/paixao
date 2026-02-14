@@ -7,7 +7,7 @@ import requests
 import os
 import io
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://pose-guard-system.preview.emergentagent.com")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://three-layer-vbt.preview.emergentagent.com")
 
 # Test credentials
 TEST_USER = "test@test.com"
