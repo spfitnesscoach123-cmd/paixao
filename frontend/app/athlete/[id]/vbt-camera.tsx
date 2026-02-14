@@ -1480,6 +1480,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  protectionModeText: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  mediapipeLoadingText: {
+    color: colors.accent.primary,
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: '500',
+  },
   stabilityText: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
