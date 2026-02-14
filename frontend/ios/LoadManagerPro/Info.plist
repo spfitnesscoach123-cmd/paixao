@@ -51,6 +51,8 @@
     <string>Allow $(PRODUCT_NAME) to use Face ID</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Necessário para captura de vídeo do VBT.</string>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>LoadManager Pro uses device sensors only to ensure accurate motion tracking. Location is never stored.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Escolha fotos dos atletas</string>
     <key>NSUserActivityTypes</key>
