@@ -288,6 +288,7 @@ export default function VBTCameraPage() {
     }
     
     const keypoints: ProcessedKeypoint[] = [];
+    const detectedKps = new Map<string, {x: number, y: number, score: number}>();
     
     // Map MediaPipe 33 landmarks to VBT 17 keypoints
     for (const [indexStr, name] of Object.entries(LANDMARK_INDEX_TO_VBT_NAME)) {
@@ -306,11 +307,17 @@ export default function VBTCameraPage() {
           score,
         });
         
+        // Store for visual overlay
+        detectedKps.set(name as string, { x, y, score });
+        
         if (shouldLog && name === 'left_hip') {
           console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(2)}`);
         }
       }
     }
+    
+    // Update detected keypoints state for UI overlay
+    setDetectedKeypoints(detectedKps);
     
     if (shouldLog) {
       const validCount = keypoints.filter(kp => kp.score >= 0.5).length;
@@ -325,27 +332,32 @@ export default function VBTCameraPage() {
   }, []);
 
   // Handle REAL pose detection from native MediaPipe (@thinksys/react-native-mediapipe)
-  // This is called via onLandmark prop
+  // This is called via onLandmark prop - processes BOTH during tracking AND point selection
   const handleMediapipeLandmark = useCallback((event: any) => {
-    if (!isTracking) return;
-    
     try {
       // @thinksys/react-native-mediapipe passes data directly or via nativeEvent
       const landmarkData = event?.nativeEvent || event;
       
       const vbtPose = convertMediapipeLandmarks(landmarkData);
       
-      if (vbtPose && vbtPose.keypoints.length > 0) {
-        // Pass REAL pose data to the VBT pipeline
-        processPose(vbtPose);
-      } else {
-        // No pose detected - pass empty pose to trigger no-human state
-        processPose({ keypoints: [], timestamp: Date.now() });
+      // Store preview pose data for stabilization visualization
+      setPreviewPoseData(vbtPose);
+      
+      // If tracking is active, send to VBT pipeline
+      if (isTracking) {
+        if (vbtPose && vbtPose.keypoints.length > 0) {
+          // Pass REAL pose data to the VBT pipeline
+          processPose(vbtPose);
+          console.log('[VBTCamera] Frame processed: state=' + protectionState + ', stable=' + isStable + ', canCalc=' + canCalculate);
+        } else {
+          // No pose detected - pass empty pose to trigger no-human state
+          processPose({ keypoints: [], timestamp: Date.now() });
+        }
       }
     } catch (e) {
       console.error('[VBTCamera] Error processing MediaPipe landmark:', e);
     }
-  }, [isTracking, convertMediapipeLandmarks, processPose]);
+  }, [isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate]);
 
   // Legacy handler name for compatibility
   const handleMediapipePoseDetected = handleMediapipeLandmark;
