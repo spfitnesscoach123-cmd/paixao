@@ -70,7 +70,8 @@
         "react-native-vision-camera",
         {
           "cameraPermissionText": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
-          "enableMicrophonePermission": false
+          "enableMicrophonePermission": false,
+          "enableLocation": false
         }
       ]
     ],
