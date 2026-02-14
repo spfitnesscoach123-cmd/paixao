@@ -288,9 +288,9 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
    * Start tracking
    */
   const startTracking = useCallback(() => {
-    // Check if tracking point is set
+    // CAMADA 3: Check if tracking point is set - MANDATORY
     if (!isTrackingPointSet) {
-      setStatusMessage('ERROR: Set tracking point before starting');
+      setStatusMessage('ERRO: Defina ponto de tracking antes de iniciar');
       return;
     }
     
@@ -338,7 +338,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       }, TRACKING_INTERVAL);
     }
     
-    setStatusMessage('Tracking started - waiting for human detection...');
+    setStatusMessage('Tracking iniciado - Detectando presença humana...');
   }, [isTrackingPointSet, simulationEnabled, processPose]);
   
   /**
