@@ -108,7 +108,7 @@ export default function VBTCameraPage() {
     cameraHeight: cameraConfig.cameraHeight,
     cameraDistance: cameraConfig.distanceFromBar,
     exercise: selectedExercise,
-    useSimulation: true,
+    useSimulation: false,
   });
   
   const EXERCISES = [
