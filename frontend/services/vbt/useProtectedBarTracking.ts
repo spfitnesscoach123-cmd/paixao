@@ -263,6 +263,11 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
    * 
    * If we only process when isTracking === true, the system will remain stuck
    * showing "N/A" for trackingPoint, humanPresence, and stability = 0
+   * 
+   * BUG FIXES:
+   * - BUG 3: Velocity calculated with VelocityCalculator.update() each frame
+   * - BUG 4: Rep detection uses RepDetector with full cycle detection
+   * - BUG 5: Tracking point is read from landmark by INDEX, confidence checked
    */
   const processPose = useCallback((pose: PoseData | null) => {
     // Only check for protection system, NOT isTracking
@@ -288,24 +293,94 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // Stability and human detection should work in all phases
     if (isTracking) {
       // Only process velocity if allowed (Stage 3+ is trackable)
-      if (result.canCalculate && result.validationFlags.frameTrackable && result.smoothedPosition && trackerRef.current) {
-        const barPosition: BarPosition = {
-          x: result.smoothedPosition.x,
-          y: result.smoothedPosition.y,
-          confidence: 1,
-          timestamp: Date.now(),
-        };
+      if (result.canCalculate && result.validationFlags.frameTrackable && result.smoothedPosition) {
         
-        const velocityData = trackerRef.current.processPosition(barPosition);
-        processVelocityData(velocityData, result.trackingPoint?.keypointName || '');
-      }
-      
-      // Handle rep completion from protection system
-      if (result.canCountRep) {
-        handleRepCompletion(result.trackingPoint?.keypointName || '');
+        // ========================================
+        // BUG 3 FIX: Calculate velocity using VelocityCalculator
+        // Velocity is calculated inside the pose loop with smoothing
+        // Formula: velocity = deltaPosition / deltaTime
+        // Smoothing: Moving average over last 5 frames
+        // ========================================
+        if (velocityCalculatorRef.current) {
+          const velocityResult = velocityCalculatorRef.current.update({
+            x: result.smoothedPosition.x,
+            y: result.smoothedPosition.y,
+            timestamp: pose?.timestamp || Date.now(),
+          });
+          
+          // Update velocity state
+          setCurrentVelocity(velocityResult.smoothedVelocity);
+          
+          // Update peak velocity
+          if (velocityResult.smoothedVelocity > peakVelocity) {
+            setPeakVelocity(velocityResult.smoothedVelocity);
+          }
+          
+          // Calculate mean from all valid velocities
+          const velocityBuffer = velocityCalculatorRef.current.getVelocityBuffer();
+          if (velocityBuffer.length > 0) {
+            const mean = velocityBuffer.reduce((a, b) => a + b, 0) / velocityBuffer.length;
+            setMeanVelocity(mean);
+          }
+          
+          // ========================================
+          // BUG 4 FIX: Detect reps using RepDetector
+          // Full rep cycle: eccentric -> transition -> concentric -> completion
+          // Prevents false positives with thresholds
+          // ========================================
+          if (repDetectorRef.current) {
+            const repResult = repDetectorRef.current.update(
+              velocityResult.smoothedVelocity,
+              velocityResult.direction
+            );
+            
+            // Update rep phase
+            setRepPhase(repResult.phase);
+            
+            // Handle rep completion
+            if (repResult.repCompleted && repResult.currentRep) {
+              const newRepCount = repResult.repCount;
+              setRepCount(newRepCount);
+              setVelocityDrop(repResult.currentRep.velocityDrop);
+              
+              // Add to reps data
+              const newRepData: ProtectedRepData = {
+                rep: newRepCount,
+                meanVelocity: repResult.currentRep.meanVelocity,
+                peakVelocity: repResult.currentRep.peakVelocity,
+                velocityDrop: repResult.currentRep.velocityDrop,
+                timestamp: repResult.currentRep.timestamp,
+                trackingPointUsed: result.trackingPoint?.keypointName || '',
+              };
+              setRepsData(prev => [...prev, newRepData]);
+              
+              console.log(`[VBT] Rep ${newRepCount} completed! Mean: ${repResult.currentRep.meanVelocity.toFixed(3)} m/s`);
+            }
+            
+            // Update feedback color based on velocity drop
+            if (repResult.currentRep && repResult.currentRep.velocityDrop > VELOCITY_DROP_THRESHOLD) {
+              setFeedbackColor('red');
+            } else if (velocityResult.smoothedVelocity > 0.1) {
+              setFeedbackColor('green');
+            } else {
+              setFeedbackColor('neutral');
+            }
+          }
+        }
+        
+        // Legacy: Also update old tracker for backward compatibility
+        if (trackerRef.current) {
+          const barPosition: BarPosition = {
+            x: result.smoothedPosition.x,
+            y: result.smoothedPosition.y,
+            confidence: 1,
+            timestamp: Date.now(),
+          };
+          trackerRef.current.processPosition(barPosition);
+        }
       }
     }
-  }, [isTracking]);
+  }, [isTracking, peakVelocity]);
   
   /**
    * Process velocity data
