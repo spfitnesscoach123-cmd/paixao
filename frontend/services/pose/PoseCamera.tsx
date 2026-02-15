@@ -227,7 +227,7 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
     toggleCamera: handleToggleCamera,
     getCurrentPose: () => currentPose,
     isDetecting: () => isDetecting,
-  }), [currentPose, isDetecting]);
+  }), [currentPose, isDetecting, handleToggleCamera]);
   
   // Update FPS counter
   const updateFps = useCallback(() => {
