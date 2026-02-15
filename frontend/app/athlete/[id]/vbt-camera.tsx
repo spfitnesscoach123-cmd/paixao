@@ -914,7 +914,24 @@ export default function VBTCameraPage() {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>{labels.title}</Text>
-        <View style={{ width: 40 }} />
+        
+        {/* Camera Toggle Button - Only show during camera phases */}
+        {(phase === 'pointSelection' || phase === 'recording') ? (
+          <TouchableOpacity 
+            onPress={toggleCamera}
+            style={styles.cameraToggleButton}
+            data-testid="camera-toggle-btn"
+            disabled={isTracking} // Disable during active recording
+          >
+            <Ionicons 
+              name={cameraFacing === 'back' ? 'camera-reverse-outline' : 'camera-reverse'} 
+              size={24} 
+              color={isTracking ? colors.text.tertiary : colors.text.primary} 
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
       
       {/* CONFIG PHASE */}
