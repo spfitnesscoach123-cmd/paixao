@@ -49,9 +49,9 @@ export interface RepDetectorResult {
 }
 
 const DEFAULT_CONFIG: RepDetectorConfig = {
-  minVelocityThreshold: 0.05,    // 5cm/s minimum
-  minPhaseDuration: 200,          // 200ms minimum phase
-  directionChangeThreshold: 0.02, // 2cm/s direction change threshold
+  minVelocityThreshold: 0.03,    // 3cm/s minimum - lowered to detect slower movements
+  minPhaseDuration: 150,          // 150ms minimum phase - lowered for faster reps
+  directionChangeThreshold: 0.05, // 5cm/s - INCREASED to be less sensitive to micro-changes
   repLockoutDuration: 300,        // 300ms lockout after rep
   maxRepDuration: 10000,          // 10s maximum rep duration
 };
