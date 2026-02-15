@@ -130,6 +130,7 @@ export class HumanPresenceValidator {
   /**
    * Validate that required keypoints are present with sufficient confidence
    * CAMADA 1: Validação rígida de presença humana
+   * INSTRUMENTED: Logs all validation checks
    */
   validateKeypoints(pose: PoseData | null): {
     isValid: boolean;
@@ -140,6 +141,19 @@ export class HumanPresenceValidator {
     if (!pose || !pose.keypoints || pose.keypoints.length === 0) {
       this.consecutiveValidFrames = 0;
       this.lastValidationResult = false;
+      
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logHumanPresenceCheck(
+        false, // poseExists
+        0, // keypointsCount
+        this.config.exerciseKeypoints, // requiredKeypoints
+        [], // validKeypoints
+        this.config.exerciseKeypoints, // missingKeypoints
+        this.config.minKeypointScore, // minScore
+        0, // lowestScore
+        false // passed
+      );
+      
       return {
         isValid: false,
         validKeypoints: [],
@@ -150,6 +164,7 @@ export class HumanPresenceValidator {
 
     const validKeypoints: Keypoint[] = [];
     const missingKeypoints: string[] = [];
+    let lowestValidScore = 1.0;
 
     // Check each required keypoint
     for (const requiredName of this.config.exerciseKeypoints) {
@@ -159,8 +174,10 @@ export class HumanPresenceValidator {
         missingKeypoints.push(requiredName);
       } else if (keypoint.score < this.config.minKeypointScore) {
         missingKeypoints.push(`${requiredName} (confiança baixa: ${(keypoint.score * 100).toFixed(0)}%)`);
+        lowestValidScore = Math.min(lowestValidScore, keypoint.score);
       } else {
         validKeypoints.push(keypoint);
+        lowestValidScore = Math.min(lowestValidScore, keypoint.score);
       }
     }
 
@@ -174,6 +191,18 @@ export class HumanPresenceValidator {
     }
 
     this.lastValidationResult = allValid;
+    
+    // DIAGNOSTIC LOG
+    vbtDiagnostics.logHumanPresenceCheck(
+      true, // poseExists
+      pose.keypoints.length, // keypointsCount
+      this.config.exerciseKeypoints, // requiredKeypoints
+      validKeypoints.map(kp => kp.name), // validKeypoints
+      missingKeypoints, // missingKeypoints
+      this.config.minKeypointScore, // minScore
+      lowestValidScore === 1.0 ? 0 : lowestValidScore, // lowestScore
+      allValid // passed
+    );
 
     return {
       isValid: allValid,
@@ -187,9 +216,19 @@ export class HumanPresenceValidator {
 
   /**
    * Check if we have stable detection (required frames met)
+   * INSTRUMENTED: Logs stability check
    */
   isStable(): boolean {
-    return this.consecutiveValidFrames >= this.config.requiredStableFrames;
+    const stable = this.consecutiveValidFrames >= this.config.requiredStableFrames;
+    
+    // DIAGNOSTIC LOG
+    vbtDiagnostics.logStabilityCheck(
+      this.consecutiveValidFrames,
+      this.config.requiredStableFrames,
+      stable
+    );
+    
+    return stable;
   }
 
   /**
