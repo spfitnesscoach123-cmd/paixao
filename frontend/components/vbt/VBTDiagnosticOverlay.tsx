@@ -73,6 +73,29 @@ export const VBTDiagnosticOverlay: React.FC<DiagnosticOverlayProps> = ({
   if (compact) {
     return (
       <View style={styles.compactContainer}>
+        {/* MediaPipe Status Row - CRITICAL */}
+        <View style={styles.compactRow}>
+          <Text style={[styles.compactLabel, { color: mediapipeStatusColor }]}>
+            MP: {mediapipeAvailable ? '✓' : '✗'}
+          </Text>
+          <Text style={[styles.compactValue, { color: frameStatusColor }]}>
+            FRM: {isReceivingFrames ? frameCount : '0 ⚠️'}
+          </Text>
+          <Text style={[styles.compactValue, { color: '#9ca3af' }]}>
+            {currentPlatform.toUpperCase()}
+          </Text>
+        </View>
+        
+        {/* Warning if no frames */}
+        {!isReceivingFrames && (
+          <View style={[styles.compactBlockedRow, { backgroundColor: 'rgba(239, 68, 68, 0.4)' }]}>
+            <Text style={styles.compactBlockedText}>
+              ⚠️ NO FRAMES - Use Dev Build, not Expo Go
+            </Text>
+          </View>
+        )}
+        
+        {/* State Row */}
         <View style={styles.compactRow}>
           <Text style={[styles.compactLabel, { color: getStateColor(overlayData.currentState) }]}>
             {overlayData.currentState.toUpperCase()}
