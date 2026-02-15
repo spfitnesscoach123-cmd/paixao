@@ -32,6 +32,7 @@ import {
   Keypoint,
   EXERCISE_KEYPOINTS,
   RECOMMENDED_TRACKING_POINTS,
+  EXERCISE_START_DIRECTION,
   ProtectionConfig,
 } from './trackingProtection';
 import { recordingController } from './recordingController';
