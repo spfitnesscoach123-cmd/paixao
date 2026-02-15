@@ -496,6 +496,16 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       }
     }
     
+    // ========================================
+    // BUG 3 & 4 FIX: Reset new velocity and rep modules
+    // ========================================
+    if (velocityCalculatorRef.current) {
+      velocityCalculatorRef.current.reset();
+    }
+    if (repDetectorRef.current) {
+      repDetectorRef.current.reset();
+    }
+    
     // SINGLE SOURCE OF TRUTH: Call recordingController.start()
     // The state machine will automatically transition to RECORDING when appropriate
     recordingController.start();
