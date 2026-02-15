@@ -15,7 +15,7 @@
       "buildNumber": "24",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
-        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT.",
+        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
         "NSMicrophoneUsageDescription": "Necessário para captura de vídeo do VBT."
       }
     },
@@ -28,11 +28,11 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "CAMERA",
-        "RECORD_AUDIO",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
       ]
     },
     "web": {
@@ -77,6 +77,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f4714b6a-260d-41fa-9c24-a4e0e6f28b6d"
+      }
+    },
+    "owner": "paixaofit"
   }
 }
