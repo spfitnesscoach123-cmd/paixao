@@ -277,6 +277,9 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // We need to process frames in all phases for stability and human detection
     if (!protectionSystemRef.current) return;
     
+    // Increment frame counter for debug logging
+    frameCountRef.current++;
+    
     const result = protectionSystemRef.current.processFrame(pose);
     
     // Update protection state with NEW progressive fields
