@@ -1,21 +1,19 @@
 /**
- * VBT Tracking Protection System
+ * VBT Tracking Protection System - PROGRESSIVE VALIDATION ARCHITECTURE
  * 
- * Implements 3 layers of protection for accurate rep counting:
+ * Implements 5-STAGE PROGRESSIVE VALIDATION PIPELINE to eliminate
+ * circular dependencies between stabilization and tracking validation.
  * 
- * LAYER 1: Human Presence Validation
- * - Requires minimum keypoints with confidence >= 0.6
- * - 5 consecutive valid frames before tracking
+ * STAGE 1: FRAME_USABLE - Minimum entry requirement
+ * STAGE 2: FRAME_STABLE - Temporal stabilization (INDEPENDENT of tracking)
+ * STAGE 3: FRAME_TRACKABLE - Tracking eligibility (AFTER stabilization)
+ * STAGE 4: FRAME_VALID - Movement validation
+ * STAGE 5: FRAME_COUNTABLE - Rep counting eligibility
  * 
- * LAYER 2: State Machine Control
- * - States: "noHuman" | "ready" | "executing"
- * - Strict transitions prevent false positives
+ * CRITICAL: Stabilization depends ONLY on pose detection, NOT tracking point.
+ * This breaks the circular dependency that caused infinite stabilization loops.
  * 
- * LAYER 3: Coach-Defined Tracking Point
- * - Manual point selection on screen
- * - All calculations use ONLY this point
- * 
- * DIAGNOSTIC INSTRUMENTATION: Added for debugging pipeline blockers
+ * STATE MACHINE: INITIALIZING → STABILIZING → READY → TRACKING → RECORDING
  */
 
 import { vbtDiagnostics } from './diagnostics';
@@ -43,22 +41,41 @@ export interface TrackingPoint {
   isSet: boolean;
 }
 
-// Estados em português conforme especificação do usuário
-// 'noHuman' = 'semPessoa'
-// 'ready' = 'pronto'  
-// 'executing' = 'executando'
+// NEW: Progressive validation states
+export type ValidationStage = 
+  | 'INITIALIZING'   // No pose detected yet
+  | 'STABILIZING'    // Pose detected, accumulating stable frames
+  | 'READY'          // Stabilization complete, waiting for tracking point
+  | 'TRACKING'       // Tracking point valid, ready for movement
+  | 'RECORDING';     // Active recording with valid movement
+
+// Legacy state mapping for backward compatibility
 export type TrackingState = 'noHuman' | 'ready' | 'executing';
+
+// NEW: Progressive validation flags
+export interface ValidationFlags {
+  frameUsable: boolean;      // Stage 1: Pose exists with keypoints
+  frameStable: boolean;      // Stage 2: Enough stable frames accumulated
+  frameTrackable: boolean;   // Stage 3: Tracking point valid
+  frameValid: boolean;       // Stage 4: Movement detected
+  frameCountable: boolean;   // Stage 5: Ready for rep counting
+}
 
 export interface ProtectionConfig {
   minKeypointScore: number;           // Minimum confidence for keypoints (default 0.6)
+  minUsableScore: number;             // NEW: Minimum score for frame_usable (default 0.3)
+  trackingConfidenceThreshold: number; // NEW: Threshold for tracking point (default 0.5)
   requiredStableFrames: number;       // Consecutive valid frames needed (default 5)
+  stabilityDecayRate: number;         // NEW: How fast stability decays (default 1)
   minMovementDelta: number;           // Minimum movement to detect (default 0.02)
   movingAverageWindow: number;        // Frames for smoothing (default 5)
   angularThreshold: number;           // Minimum angle change (default 5 degrees)
+  velocityThreshold: number;          // NEW: Minimum velocity for countable (default 0.05)
   exerciseKeypoints: string[];        // Required keypoints for current exercise
 }
 
 export interface ProtectionResult {
+  // Legacy fields
   state: TrackingState;
   isValid: boolean;
   canCalculate: boolean;
@@ -67,6 +84,12 @@ export interface ProtectionResult {
   smoothedPosition: { x: number; y: number } | null;
   velocity: number;
   message: string;
+  
+  // NEW: Progressive validation fields
+  validationStage: ValidationStage;
+  validationFlags: ValidationFlags;
+  stableFrameCount: number;
+  stabilityProgress: number;
 }
 
 // ============================================================================
@@ -107,15 +130,173 @@ export const RECOMMENDED_TRACKING_POINTS: Record<string, string> = {
 
 const DEFAULT_CONFIG: ProtectionConfig = {
   minKeypointScore: 0.6,
+  minUsableScore: 0.3,              // NEW: Lower threshold for frame_usable
+  trackingConfidenceThreshold: 0.5, // NEW: Separate threshold for tracking
   requiredStableFrames: 5,
+  stabilityDecayRate: 1,            // NEW: Decay by 1 per unusable frame
   minMovementDelta: 0.02,
   movingAverageWindow: 5,
   angularThreshold: 5,
+  velocityThreshold: 0.05,          // NEW: For frame_countable
   exerciseKeypoints: [],
 };
 
 // ============================================================================
-// LAYER 1: HUMAN PRESENCE VALIDATION
+// STAGE 1 & 2: FRAME USABILITY & STABILITY VALIDATOR
+// ============================================================================
+
+/**
+ * FrameStabilityValidator - Handles STAGE 1 (FRAME_USABLE) and STAGE 2 (FRAME_STABLE)
+ * 
+ * CRITICAL: Stability depends ONLY on pose detection, NOT tracking point validation.
+ * This breaks the circular dependency that caused infinite stabilization loops.
+ */
+export class FrameStabilityValidator {
+  private config: ProtectionConfig;
+  private stableFrameCount: number = 0;
+  private consecutiveMissingFrames: number = 0;
+  private lastFrameUsable: boolean = false;
+
+  constructor(config: Partial<ProtectionConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * STAGE 1: Check if frame is USABLE (minimum entry requirement)
+   * 
+   * Criteria:
+   * - pose !== null
+   * - pose.keypoints exists
+   * - pose.keypoints.length > 0
+   * 
+   * DOES NOT require:
+   * - trackingPoint.isSet
+   * - confidence >= 0.6
+   * - movement thresholds
+   * - velocity thresholds
+   */
+  checkFrameUsable(pose: PoseData | null): {
+    frameUsable: boolean;
+    keypointsCount: number;
+    hasAnyKeypoint: boolean;
+    message: string;
+  } {
+    // Frame is usable if pose exists with any keypoints
+    const poseExists = pose !== null;
+    const hasKeypoints = poseExists && pose.keypoints && pose.keypoints.length > 0;
+    
+    // Check if at least some keypoints have minimal confidence
+    let hasAnyUsableKeypoint = false;
+    if (hasKeypoints) {
+      hasAnyUsableKeypoint = pose.keypoints.some(kp => kp.score >= this.config.minUsableScore);
+    }
+    
+    const frameUsable = poseExists && hasKeypoints && hasAnyUsableKeypoint;
+    this.lastFrameUsable = frameUsable;
+    
+    // Track consecutive missing frames
+    if (!frameUsable) {
+      this.consecutiveMissingFrames++;
+    } else {
+      this.consecutiveMissingFrames = 0;
+    }
+
+    return {
+      frameUsable,
+      keypointsCount: hasKeypoints ? pose.keypoints.length : 0,
+      hasAnyKeypoint: hasAnyUsableKeypoint,
+      message: frameUsable 
+        ? `Frame usável: ${pose!.keypoints.length} keypoints detectados`
+        : 'Frame não usável: pose não detectada ou sem keypoints válidos',
+    };
+  }
+
+  /**
+   * STAGE 2: Update stability counter and check if STABLE
+   * 
+   * CRITICAL CHANGE: Uses gradual increment/decrement instead of hard reset
+   * 
+   * if (frameUsable)
+   *    stableFrames += 1
+   * else
+   *    stableFrames = Math.max(stableFrames - stabilityDecayRate, 0)
+   * 
+   * This prevents infinite stabilization loops.
+   */
+  updateStability(frameUsable: boolean): {
+    frameStable: boolean;
+    stableFrameCount: number;
+    requiredFrames: number;
+    stabilityProgress: number;
+    message: string;
+  } {
+    // PROGRESSIVE STABILITY: Increment or decay, never hard reset
+    if (frameUsable) {
+      this.stableFrameCount++;
+    } else {
+      // Gradual decay instead of hard reset
+      this.stableFrameCount = Math.max(this.stableFrameCount - this.config.stabilityDecayRate, 0);
+    }
+    
+    // Only hard reset if pose missing for many consecutive frames
+    if (this.consecutiveMissingFrames > this.config.requiredStableFrames * 2) {
+      this.stableFrameCount = 0;
+    }
+    
+    const frameStable = this.stableFrameCount >= this.config.requiredStableFrames;
+    const stabilityProgress = Math.min(1, this.stableFrameCount / this.config.requiredStableFrames);
+    
+    // DIAGNOSTIC LOG
+    vbtDiagnostics.logStabilityCheck(
+      this.stableFrameCount,
+      this.config.requiredStableFrames,
+      frameStable
+    );
+
+    return {
+      frameStable,
+      stableFrameCount: this.stableFrameCount,
+      requiredFrames: this.config.requiredStableFrames,
+      stabilityProgress,
+      message: frameStable
+        ? 'Estabilização completa'
+        : `Estabilizando... ${Math.round(stabilityProgress * 100)}%`,
+    };
+  }
+
+  /**
+   * Get current stability progress (0-1)
+   */
+  getStabilityProgress(): number {
+    return Math.min(1, this.stableFrameCount / this.config.requiredStableFrames);
+  }
+
+  /**
+   * Get current stable frame count
+   */
+  getStableFrameCount(): number {
+    return this.stableFrameCount;
+  }
+
+  /**
+   * Reset stability state
+   */
+  reset(): void {
+    this.stableFrameCount = 0;
+    this.consecutiveMissingFrames = 0;
+    this.lastFrameUsable = false;
+  }
+
+  /**
+   * Update config
+   */
+  updateConfig(config: Partial<ProtectionConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+}
+
+// ============================================================================
+// LEGACY: HUMAN PRESENCE VALIDATOR (for backward compatibility)
 // ============================================================================
 
 export class HumanPresenceValidator {
@@ -129,35 +310,29 @@ export class HumanPresenceValidator {
 
   /**
    * Validate that required keypoints are present with sufficient confidence
-   * CAMADA 1: Validação rígida de presença humana
-   * INSTRUMENTED: Logs all validation checks
+   * NOTE: This is now used for TRACKING validation (Stage 3), not stabilization
    */
   validateKeypoints(pose: PoseData | null): {
     isValid: boolean;
     validKeypoints: Keypoint[];
     missingKeypoints: string[];
+    lowestScore: number;
     message: string;
   } {
     if (!pose || !pose.keypoints || pose.keypoints.length === 0) {
       this.consecutiveValidFrames = 0;
       this.lastValidationResult = false;
       
-      // DIAGNOSTIC LOG
       vbtDiagnostics.logHumanPresenceCheck(
-        false, // poseExists
-        0, // keypointsCount
-        this.config.exerciseKeypoints, // requiredKeypoints
-        [], // validKeypoints
-        this.config.exerciseKeypoints, // missingKeypoints
-        this.config.minKeypointScore, // minScore
-        0, // lowestScore
-        false // passed
+        false, 0, this.config.exerciseKeypoints, [], 
+        this.config.exerciseKeypoints, this.config.minKeypointScore, 0, false
       );
       
       return {
         isValid: false,
         validKeypoints: [],
         missingKeypoints: this.config.exerciseKeypoints,
+        lowestScore: 0,
         message: 'Nenhuma pose detectada na câmera',
       };
     }
@@ -166,14 +341,13 @@ export class HumanPresenceValidator {
     const missingKeypoints: string[] = [];
     let lowestValidScore = 1.0;
 
-    // Check each required keypoint
     for (const requiredName of this.config.exerciseKeypoints) {
       const keypoint = pose.keypoints.find(kp => kp.name === requiredName);
       
       if (!keypoint) {
         missingKeypoints.push(requiredName);
       } else if (keypoint.score < this.config.minKeypointScore) {
-        missingKeypoints.push(`${requiredName} (confiança baixa: ${(keypoint.score * 100).toFixed(0)}%)`);
+        missingKeypoints.push(`${requiredName} (${(keypoint.score * 100).toFixed(0)}%)`);
         lowestValidScore = Math.min(lowestValidScore, keypoint.score);
       } else {
         validKeypoints.push(keypoint);
@@ -187,68 +361,42 @@ export class HumanPresenceValidator {
     if (allValid) {
       this.consecutiveValidFrames++;
     } else {
-      this.consecutiveValidFrames = 0;
+      // Gradual decay for consistency with new architecture
+      this.consecutiveValidFrames = Math.max(this.consecutiveValidFrames - 1, 0);
     }
 
     this.lastValidationResult = allValid;
     
-    // DIAGNOSTIC LOG
     vbtDiagnostics.logHumanPresenceCheck(
-      true, // poseExists
-      pose.keypoints.length, // keypointsCount
-      this.config.exerciseKeypoints, // requiredKeypoints
-      validKeypoints.map(kp => kp.name), // validKeypoints
-      missingKeypoints, // missingKeypoints
-      this.config.minKeypointScore, // minScore
-      lowestValidScore === 1.0 ? 0 : lowestValidScore, // lowestScore
-      allValid // passed
+      true, pose.keypoints.length, this.config.exerciseKeypoints,
+      validKeypoints.map(kp => kp.name), missingKeypoints,
+      this.config.minKeypointScore, lowestValidScore === 1.0 ? 0 : lowestValidScore, allValid
     );
 
     return {
       isValid: allValid,
       validKeypoints,
       missingKeypoints,
+      lowestScore: lowestValidScore === 1.0 ? 0 : lowestValidScore,
       message: allValid 
-        ? `Pose válida: ${validKeypoints.length} keypoints detectados`
-        : `Pontos faltando/inválidos: ${missingKeypoints.slice(0, 3).join(', ')}${missingKeypoints.length > 3 ? '...' : ''}`,
+        ? `Pose válida: ${validKeypoints.length} keypoints`
+        : `Keypoints insuficientes: ${missingKeypoints.slice(0, 2).join(', ')}`,
     };
   }
 
-  /**
-   * Check if we have stable detection (required frames met)
-   * INSTRUMENTED: Logs stability check
-   */
   isStable(): boolean {
-    const stable = this.consecutiveValidFrames >= this.config.requiredStableFrames;
-    
-    // DIAGNOSTIC LOG
-    vbtDiagnostics.logStabilityCheck(
-      this.consecutiveValidFrames,
-      this.config.requiredStableFrames,
-      stable
-    );
-    
-    return stable;
+    return this.consecutiveValidFrames >= this.config.requiredStableFrames;
   }
 
-  /**
-   * Get stability progress (0-1)
-   */
   getStabilityProgress(): number {
     return Math.min(1, this.consecutiveValidFrames / this.config.requiredStableFrames);
   }
 
-  /**
-   * Reset validation state
-   */
   reset(): void {
     this.consecutiveValidFrames = 0;
     this.lastValidationResult = false;
   }
 
-  /**
-   * Update exercise keypoints
-   */
   setExercise(exercise: string): void {
     this.config.exerciseKeypoints = EXERCISE_KEYPOINTS[exercise] || [];
     this.reset();
@@ -256,165 +404,184 @@ export class HumanPresenceValidator {
 }
 
 // ============================================================================
-// LAYER 2: STATE MACHINE
+// PROGRESSIVE STATE MACHINE
 // ============================================================================
 
 export type StateTransition = {
-  from: TrackingState;
-  to: TrackingState;
+  from: ValidationStage;
+  to: ValidationStage;
   condition: string;
+  timestamp: number;
 };
 
-export class TrackingStateMachine {
-  private currentState: TrackingState = 'noHuman';
-  private lastStateChange: number = 0;
-  private stateHistory: StateTransition[] = [];
+/**
+ * ProgressiveStateMachine - New state machine with 5-stage validation
+ * 
+ * States: INITIALIZING → STABILIZING → READY → TRACKING → RECORDING
+ * 
+ * CRITICAL: STABILIZING depends ONLY on frameUsable and stableFrames
+ * NOT on trackingPoint.isSet or tracking keypoint confidence
+ */
+export class ProgressiveStateMachine {
+  private currentStage: ValidationStage = 'INITIALIZING';
+  private lastStageChange: number = 0;
+  private stageHistory: StateTransition[] = [];
   
-  // Movement tracking for state transitions
+  // Movement tracking
   private baselinePosition: { x: number; y: number } | null = null;
   private peakPosition: { x: number; y: number } | null = null;
   private movementDirection: 'up' | 'down' | 'stationary' = 'stationary';
   private repPhase: 'idle' | 'descending' | 'ascending' | 'completed' = 'idle';
+  private isRecordingActive: boolean = false;
 
   constructor(private config: ProtectionConfig) {}
 
   /**
-   * Get current state
+   * Get current validation stage
    */
-  getState(): TrackingState {
-    return this.currentState;
+  getStage(): ValidationStage {
+    return this.currentStage;
   }
 
   /**
-   * Attempt state transition based on conditions
-   * INSTRUMENTED: Logs all transition attempts and blocking conditions
-   * 
-   * States (seguindo nomenclatura do usuário):
-   * - 'noHuman' = 'semPessoa'
-   * - 'ready' = 'pronto'
-   * - 'executing' = 'executando'
+   * Map new stage to legacy state for backward compatibility
    */
-  transition(
-    humanValid: boolean,
-    humanStable: boolean,
-    movementDelta: number,
-    currentPosition: { x: number; y: number } | null
-  ): { newState: TrackingState; repCompleted: boolean; message: string } {
-    const previousState = this.currentState;
+  getLegacyState(): TrackingState {
+    switch (this.currentStage) {
+      case 'INITIALIZING':
+      case 'STABILIZING':
+        return 'noHuman';
+      case 'READY':
+      case 'TRACKING':
+        return 'ready';
+      case 'RECORDING':
+        return 'executing';
+      default:
+        return 'noHuman';
+    }
+  }
+
+  /**
+   * Get rep phase
+   */
+  getRepPhase(): string {
+    return this.repPhase;
+  }
+
+  /**
+   * Set recording active state
+   */
+  setRecordingActive(active: boolean): void {
+    this.isRecordingActive = active;
+    if (active && this.currentStage === 'TRACKING') {
+      this.transitionTo('RECORDING', 'Recording started');
+    }
+  }
+
+  /**
+   * Update state based on validation flags
+   * 
+   * CRITICAL: State transitions follow strict hierarchy:
+   * - STABILIZING depends ONLY on frameUsable
+   * - READY requires frameStable
+   * - TRACKING requires frameTrackable (tracking point valid)
+   * - RECORDING requires active recording + movement
+   */
+  updateState(
+    flags: ValidationFlags,
+    currentPosition: { x: number; y: number } | null,
+    movementDelta: number
+  ): {
+    stage: ValidationStage;
+    legacyState: TrackingState;
+    repCompleted: boolean;
+    message: string;
+  } {
+    const previousStage = this.currentStage;
     let repCompleted = false;
     let message = '';
-    let blocked = false;
-    let blockReason: string | null = null;
 
-    // STATE: noHuman (semPessoa)
-    if (!humanValid) {
-      if (this.currentState !== 'noHuman') {
-        this.transitionTo('noHuman', 'Detecção de pessoa perdida');
+    // STAGE TRANSITIONS (strictly hierarchical)
+    
+    // If no usable frame → INITIALIZING
+    if (!flags.frameUsable) {
+      if (this.currentStage !== 'INITIALIZING') {
+        this.transitionTo('INITIALIZING', 'No usable frame');
       }
       this.resetMovementTracking();
-      blocked = true;
-      blockReason = 'humanValid === false';
+      message = 'Aguardando detecção de pose...';
       
-      // DIAGNOSTIC LOG
       vbtDiagnostics.logStateMachineTransition(
-        previousState,
-        'noHuman',
-        humanValid,
-        humanStable,
-        movementDelta,
-        this.config.minMovementDelta,
-        blocked,
-        blockReason
+        previousStage, 'INITIALIZING', false, false, 0,
+        this.config.minMovementDelta, true, 'frameUsable === false'
       );
       
-      return { newState: 'noHuman', repCompleted: false, message: 'SEM PESSOA - Nenhuma pessoa válida detectada' };
+      return { stage: 'INITIALIZING', legacyState: 'noHuman', repCompleted: false, message };
     }
 
-    // STATE: Aguardando estabilidade (5 frames consecutivos)
-    if (!humanStable) {
-      if (this.currentState !== 'noHuman') {
-        this.transitionTo('noHuman', 'Detecção instável');
+    // Frame usable but not stable → STABILIZING
+    if (!flags.frameStable) {
+      if (this.currentStage !== 'STABILIZING') {
+        this.transitionTo('STABILIZING', 'Pose detected, stabilizing');
       }
-      blocked = true;
-      blockReason = 'humanStable === false';
+      message = 'Estabilizando detecção...';
       
-      // DIAGNOSTIC LOG
       vbtDiagnostics.logStateMachineTransition(
-        previousState,
-        'noHuman',
-        humanValid,
-        humanStable,
-        movementDelta,
-        this.config.minMovementDelta,
-        blocked,
-        blockReason
+        previousStage, 'STABILIZING', true, false, movementDelta,
+        this.config.minMovementDelta, true, 'frameStable === false'
       );
       
-      return { newState: 'noHuman', repCompleted: false, message: 'Aguardando detecção estável...' };
+      return { stage: 'STABILIZING', legacyState: 'noHuman', repCompleted: false, message };
     }
 
-    // Human is valid and stable - can transition to "ready" or "executing"
-    if (this.currentState === 'noHuman') {
-      this.transitionTo('ready', 'Pessoa detectada e estável');
+    // Frame stable but not trackable → READY
+    // This is where we BREAK THE CIRCULAR DEPENDENCY
+    // System can reach READY without tracking point being set
+    if (!flags.frameTrackable) {
+      if (this.currentStage !== 'READY' && this.currentStage !== 'STABILIZING' && this.currentStage !== 'INITIALIZING') {
+        // Allow transition back to READY if tracking lost
+        this.transitionTo('READY', 'Tracking point not valid');
+      } else if (this.currentStage === 'STABILIZING' || this.currentStage === 'INITIALIZING') {
+        this.transitionTo('READY', 'Stabilization complete');
+      }
       
-      // Set baseline position
       if (currentPosition) {
         this.baselinePosition = { ...currentPosition };
       }
       
-      // DIAGNOSTIC LOG
+      message = 'PRONTO - Defina o ponto de tracking para iniciar';
+      
       vbtDiagnostics.logStateMachineTransition(
-        previousState,
-        'ready',
-        humanValid,
-        humanStable,
-        movementDelta,
-        this.config.minMovementDelta,
-        false,
-        null
+        previousStage, 'READY', true, true, movementDelta,
+        this.config.minMovementDelta, false, null
       );
       
-      return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando início do movimento' };
+      return { stage: 'READY', legacyState: 'ready', repCompleted: false, message };
     }
 
-    // STATE: ready -> executing (movement detected)
-    if (this.currentState === 'ready' && currentPosition) {
-      if (movementDelta >= this.config.minMovementDelta) {
-        this.transitionTo('executing', 'Movimento significativo detectado');
-        this.repPhase = 'descending';
-        
-        // DIAGNOSTIC LOG
-        vbtDiagnostics.logStateMachineTransition(
-          previousState,
-          'executing',
-          humanValid,
-          humanStable,
-          movementDelta,
-          this.config.minMovementDelta,
-          false,
-          null
-        );
-        
-        return { newState: 'executing', repCompleted: false, message: 'EXECUTANDO - Movimento detectado, rastreando...' };
+    // Frame trackable → TRACKING (or RECORDING if active)
+    if (!this.isRecordingActive) {
+      if (this.currentStage !== 'TRACKING') {
+        this.transitionTo('TRACKING', 'Tracking point valid');
       }
+      message = 'TRACKING - Ponto de tracking válido, pronto para gravar';
       
-      // DIAGNOSTIC LOG - waiting for movement
       vbtDiagnostics.logStateMachineTransition(
-        previousState,
-        'ready',
-        humanValid,
-        humanStable,
-        movementDelta,
-        this.config.minMovementDelta,
-        true,
-        `movementDelta (${movementDelta.toFixed(4)}) < minMovementDelta (${this.config.minMovementDelta})`
+        previousStage, 'TRACKING', true, true, movementDelta,
+        this.config.minMovementDelta, false, null
       );
       
-      return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando movimento' };
+      return { stage: 'TRACKING', legacyState: 'ready', repCompleted: false, message };
     }
 
-    // STATE: executing (tracking movement)
-    if (this.currentState === 'executing' && currentPosition && this.baselinePosition) {
+    // Recording active with valid tracking → RECORDING
+    if (this.currentStage !== 'RECORDING') {
+      this.transitionTo('RECORDING', 'Recording with valid tracking');
+      this.repPhase = 'idle';
+    }
+
+    // Process movement during recording
+    if (currentPosition && this.baselinePosition) {
       const deltaY = currentPosition.y - this.baselinePosition.y;
       
       // Detect movement direction
@@ -422,14 +589,15 @@ export class TrackingStateMachine {
                           deltaY < -this.config.minMovementDelta ? 'up' : 'stationary';
 
       // Rep phase detection
-      if (this.repPhase === 'descending' && newDirection === 'up') {
-        // Bottom reached, now ascending
+      if (this.repPhase === 'idle' && Math.abs(deltaY) >= this.config.minMovementDelta) {
+        this.repPhase = 'descending';
+        message = 'Movimento detectado (fase excêntrica)';
+      } else if (this.repPhase === 'descending' && newDirection === 'up') {
         this.repPhase = 'ascending';
         this.peakPosition = { ...currentPosition };
         message = 'Fase concêntrica (subindo)';
       } else if (this.repPhase === 'ascending' && 
                  Math.abs(currentPosition.y - this.baselinePosition.y) < this.config.minMovementDelta) {
-        // Returned to start position - rep complete
         this.repPhase = 'completed';
         repCompleted = true;
         message = 'REPETIÇÃO COMPLETA!';
@@ -443,88 +611,56 @@ export class TrackingStateMachine {
       }
 
       this.movementDirection = newDirection;
-
-      // Check if movement stopped (return to ready)
-      if (movementDelta < this.config.minMovementDelta / 2 && this.repPhase === 'idle') {
-        this.transitionTo('ready', 'Movimento parou');
-        
-        // DIAGNOSTIC LOG
-        vbtDiagnostics.logStateMachineTransition(
-          previousState,
-          'ready',
-          humanValid,
-          humanStable,
-          movementDelta,
-          this.config.minMovementDelta,
-          false,
-          null
-        );
-        
-        return { newState: 'ready', repCompleted, message: message || 'Movimento parou - aguardando' };
-      }
-
-      const phaseLabel = {
-        'idle': 'Aguardando',
-        'descending': 'Fase excêntrica',
-        'ascending': 'Fase concêntrica',
-        'completed': 'Completa'
-      }[this.repPhase] || this.repPhase;
-
-      // DIAGNOSTIC LOG
-      vbtDiagnostics.logStateMachineTransition(
-        previousState,
-        'executing',
-        humanValid,
-        humanStable,
-        movementDelta,
-        this.config.minMovementDelta,
-        false,
-        null
-      );
-
-      return { newState: 'executing', repCompleted, message: message || `EXECUTANDO: ${phaseLabel}` };
+    } else if (currentPosition) {
+      this.baselinePosition = { ...currentPosition };
     }
 
-    // DIAGNOSTIC LOG - unknown state
+    const phaseLabel = {
+      'idle': 'Aguardando movimento',
+      'descending': 'Fase excêntrica',
+      'ascending': 'Fase concêntrica',
+      'completed': 'Completa'
+    }[this.repPhase] || this.repPhase;
+
     vbtDiagnostics.logStateMachineTransition(
-      previousState,
-      this.currentState,
-      humanValid,
-      humanStable,
-      movementDelta,
-      this.config.minMovementDelta,
-      true,
-      'Unknown state condition'
+      previousStage, 'RECORDING', true, true, movementDelta,
+      this.config.minMovementDelta, false, null
     );
 
-    return { newState: this.currentState, repCompleted, message: 'Estado desconhecido' };
+    return { 
+      stage: 'RECORDING', 
+      legacyState: 'executing', 
+      repCompleted, 
+      message: message || `GRAVANDO: ${phaseLabel}` 
+    };
   }
 
   /**
-   * Internal transition helper
+   * Transition to new stage
    */
-  private transitionTo(newState: TrackingState, condition: string): void {
-    if (this.currentState === newState) return;
-
-    this.stateHistory.push({
-      from: this.currentState,
-      to: newState,
-      condition,
-    });
-
-    // Keep only last 20 transitions
-    if (this.stateHistory.length > 20) {
-      this.stateHistory.shift();
+  private transitionTo(newStage: ValidationStage, condition: string): void {
+    if (this.currentStage !== newStage) {
+      const transition: StateTransition = {
+        from: this.currentStage,
+        to: newStage,
+        condition,
+        timestamp: Date.now(),
+      };
+      this.stageHistory.push(transition);
+      if (this.stageHistory.length > 50) {
+        this.stageHistory.shift();
+      }
+      
+      console.log(`[VBT_STATE] ${this.currentStage} → ${newStage}: ${condition}`);
+      this.currentStage = newStage;
+      this.lastStageChange = Date.now();
     }
-
-    this.currentState = newState;
-    this.lastStateChange = Date.now();
   }
 
   /**
    * Reset movement tracking
    */
-  private resetMovementTracking(): void {
+  resetMovementTracking(): void {
     this.baselinePosition = null;
     this.peakPosition = null;
     this.movementDirection = 'stationary';
@@ -532,32 +668,175 @@ export class TrackingStateMachine {
   }
 
   /**
-   * Get state history for debugging
+   * Get transition history
    */
-  getStateHistory(): StateTransition[] {
-    return [...this.stateHistory];
+  getHistory(): StateTransition[] {
+    return [...this.stageHistory];
   }
 
   /**
-   * Full reset
+   * Reset state machine
    */
   reset(): void {
-    this.currentState = 'noHuman';
-    this.lastStateChange = 0;
-    this.stateHistory = [];
+    this.currentStage = 'INITIALIZING';
+    this.lastStageChange = Date.now();
+    this.stageHistory = [];
     this.resetMovementTracking();
-  }
-
-  /**
-   * Get current rep phase
-   */
-  getRepPhase(): string {
-    return this.repPhase;
+    this.isRecordingActive = false;
   }
 }
 
 // ============================================================================
-// LAYER 3: COACH-DEFINED TRACKING POINT
+// LEGACY STATE MACHINE (for backward compatibility)
+// ============================================================================
+
+export class TrackingStateMachine {
+  private currentState: TrackingState = 'noHuman';
+  private lastStateChange: number = 0;
+  private stateHistory: Array<{ from: TrackingState; to: TrackingState; condition: string }> = [];
+  
+  private baselinePosition: { x: number; y: number } | null = null;
+  private peakPosition: { x: number; y: number } | null = null;
+  private movementDirection: 'up' | 'down' | 'stationary' = 'stationary';
+  private repPhase: 'idle' | 'descending' | 'ascending' | 'completed' = 'idle';
+
+  constructor(private config: ProtectionConfig) {}
+
+  getState(): TrackingState {
+    return this.currentState;
+  }
+
+  getRepPhase(): string {
+    return this.repPhase;
+  }
+
+  transition(
+    humanValid: boolean,
+    humanStable: boolean,
+    movementDelta: number,
+    currentPosition: { x: number; y: number } | null
+  ): { newState: TrackingState; repCompleted: boolean; message: string } {
+    const previousState = this.currentState;
+    let repCompleted = false;
+    let message = '';
+
+    if (!humanValid) {
+      if (this.currentState !== 'noHuman') {
+        this.transitionTo('noHuman', 'Human detection lost');
+      }
+      this.resetMovementTracking();
+      
+      vbtDiagnostics.logStateMachineTransition(
+        previousState, 'noHuman', humanValid, humanStable, movementDelta,
+        this.config.minMovementDelta, true, 'humanValid === false'
+      );
+      
+      return { newState: 'noHuman', repCompleted: false, message: 'SEM PESSOA' };
+    }
+
+    if (!humanStable) {
+      if (this.currentState !== 'noHuman') {
+        this.transitionTo('noHuman', 'Detection unstable');
+      }
+      
+      vbtDiagnostics.logStateMachineTransition(
+        previousState, 'noHuman', humanValid, humanStable, movementDelta,
+        this.config.minMovementDelta, true, 'humanStable === false'
+      );
+      
+      return { newState: 'noHuman', repCompleted: false, message: 'Estabilizando...' };
+    }
+
+    if (this.currentState === 'noHuman') {
+      this.transitionTo('ready', 'Human stable');
+      if (currentPosition) {
+        this.baselinePosition = { ...currentPosition };
+      }
+      
+      vbtDiagnostics.logStateMachineTransition(
+        previousState, 'ready', humanValid, humanStable, movementDelta,
+        this.config.minMovementDelta, false, null
+      );
+      
+      return { newState: 'ready', repCompleted: false, message: 'PRONTO' };
+    }
+
+    if (this.currentState === 'ready' && currentPosition) {
+      if (movementDelta >= this.config.minMovementDelta) {
+        this.transitionTo('executing', 'Movement detected');
+        this.repPhase = 'descending';
+        
+        vbtDiagnostics.logStateMachineTransition(
+          previousState, 'executing', humanValid, humanStable, movementDelta,
+          this.config.minMovementDelta, false, null
+        );
+        
+        return { newState: 'executing', repCompleted: false, message: 'EXECUTANDO' };
+      }
+      return { newState: 'ready', repCompleted: false, message: 'PRONTO' };
+    }
+
+    if (this.currentState === 'executing' && currentPosition && this.baselinePosition) {
+      const deltaY = currentPosition.y - this.baselinePosition.y;
+      const newDirection = deltaY > this.config.minMovementDelta ? 'down' : 
+                          deltaY < -this.config.minMovementDelta ? 'up' : 'stationary';
+
+      if (this.repPhase === 'descending' && newDirection === 'up') {
+        this.repPhase = 'ascending';
+        this.peakPosition = { ...currentPosition };
+        message = 'Fase concêntrica';
+      } else if (this.repPhase === 'ascending' && 
+                 Math.abs(currentPosition.y - this.baselinePosition.y) < this.config.minMovementDelta) {
+        this.repPhase = 'completed';
+        repCompleted = true;
+        message = 'REP COMPLETA!';
+        
+        setTimeout(() => {
+          this.repPhase = 'idle';
+          this.baselinePosition = currentPosition ? { ...currentPosition } : null;
+          this.peakPosition = null;
+        }, 100);
+      }
+
+      this.movementDirection = newDirection;
+
+      if (movementDelta < this.config.minMovementDelta / 2 && this.repPhase === 'idle') {
+        this.transitionTo('ready', 'Movement stopped');
+        return { newState: 'ready', repCompleted, message: message || 'PRONTO' };
+      }
+
+      return { newState: 'executing', repCompleted, message: message || 'EXECUTANDO' };
+    }
+
+    return { newState: this.currentState, repCompleted, message: '' };
+  }
+
+  private transitionTo(newState: TrackingState, condition: string): void {
+    if (this.currentState !== newState) {
+      this.stateHistory.push({ from: this.currentState, to: newState, condition });
+      if (this.stateHistory.length > 50) this.stateHistory.shift();
+      this.currentState = newState;
+      this.lastStateChange = Date.now();
+    }
+  }
+
+  resetMovementTracking(): void {
+    this.baselinePosition = null;
+    this.peakPosition = null;
+    this.movementDirection = 'stationary';
+    this.repPhase = 'idle';
+  }
+
+  reset(): void {
+    this.currentState = 'noHuman';
+    this.lastStateChange = Date.now();
+    this.stateHistory = [];
+    this.resetMovementTracking();
+  }
+}
+
+// ============================================================================
+// STAGE 3: TRACKING POINT MANAGER
 // ============================================================================
 
 export class TrackingPointManager {
@@ -570,58 +849,122 @@ export class TrackingPointManager {
   
   private positionHistory: Array<{ x: number; y: number; timestamp: number }> = [];
   private config: ProtectionConfig;
+  private lastValidPosition: { x: number; y: number } | null = null;
+  private lastVelocity: number = 0;
 
   constructor(config: Partial<ProtectionConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
-  /**
-   * Set the tracking point (coach selection)
-   */
   setTrackingPoint(x: number, y: number, keypointName: string): void {
-    this.trackingPoint = {
-      x,
-      y,
-      keypointName,
-      isSet: true,
-    };
+    this.trackingPoint = { x, y, keypointName, isSet: true };
     this.positionHistory = [];
-    console.log(`[VBT_DIAG][LAYER3] Tracking point SET: ${keypointName} at (${x.toFixed(3)}, ${y.toFixed(3)})`);
+    this.lastValidPosition = null;
+    this.lastVelocity = 0;
+    console.log(`[VBT_TRACKING] Point SET: ${keypointName} at (${x.toFixed(3)}, ${y.toFixed(3)})`);
   }
 
-  /**
-   * Clear the tracking point
-   */
   clearTrackingPoint(): void {
-    console.log(`[VBT_DIAG][LAYER3] Tracking point CLEARED (was: ${this.trackingPoint.keypointName})`);
-    this.trackingPoint = {
-      x: 0,
-      y: 0,
-      keypointName: '',
-      isSet: false,
-    };
+    console.log(`[VBT_TRACKING] Point CLEARED (was: ${this.trackingPoint.keypointName})`);
+    this.trackingPoint = { x: 0, y: 0, keypointName: '', isSet: false };
     this.positionHistory = [];
+    this.lastValidPosition = null;
+    this.lastVelocity = 0;
   }
 
-  /**
-   * Get current tracking point
-   */
   getTrackingPoint(): TrackingPoint {
     return { ...this.trackingPoint };
   }
 
-  /**
-   * Check if tracking point is set
-   */
   isSet(): boolean {
     return this.trackingPoint.isSet;
   }
 
   /**
-   * Get the position of the tracking point from pose data
-   * CAMADA 3: Ponto de tracking definido pelo coach
-   * INSTRUMENTED: Logs all tracking point checks
-   * Returns null if point not found or confidence too low
+   * STAGE 3: Check if frame is TRACKABLE
+   * 
+   * This is called AFTER stabilization is achieved.
+   * Uses separate trackingConfidenceThreshold (lower than strict validation).
+   */
+  checkFrameTrackable(pose: PoseData | null): {
+    frameTrackable: boolean;
+    position: { x: number; y: number } | null;
+    confidence: number;
+    message: string;
+  } {
+    if (!this.trackingPoint.isSet) {
+      vbtDiagnostics.logTrackingPointCheck(
+        false, null, false, 0, this.config.trackingConfidenceThreshold, false
+      );
+      
+      return {
+        frameTrackable: false,
+        position: null,
+        confidence: 0,
+        message: 'Ponto de tracking não definido pelo coach',
+      };
+    }
+
+    if (!pose || !pose.keypoints) {
+      vbtDiagnostics.logTrackingPointCheck(
+        true, this.trackingPoint.keypointName, false, 0, 
+        this.config.trackingConfidenceThreshold, false
+      );
+      
+      return {
+        frameTrackable: false,
+        position: null,
+        confidence: 0,
+        message: 'Sem dados de pose',
+      };
+    }
+
+    const keypoint = pose.keypoints.find(kp => kp.name === this.trackingPoint.keypointName);
+
+    if (!keypoint) {
+      vbtDiagnostics.logTrackingPointCheck(
+        true, this.trackingPoint.keypointName, false, 0,
+        this.config.trackingConfidenceThreshold, false
+      );
+      
+      return {
+        frameTrackable: false,
+        position: null,
+        confidence: 0,
+        message: `Ponto "${this.trackingPoint.keypointName}" não detectado`,
+      };
+    }
+
+    // Use trackingConfidenceThreshold (lower than minKeypointScore)
+    if (keypoint.score < this.config.trackingConfidenceThreshold) {
+      vbtDiagnostics.logTrackingPointCheck(
+        true, this.trackingPoint.keypointName, true, keypoint.score,
+        this.config.trackingConfidenceThreshold, false
+      );
+      
+      return {
+        frameTrackable: false,
+        position: { x: keypoint.x, y: keypoint.y }, // Still return position for reference
+        confidence: keypoint.score,
+        message: `Confiança baixa: ${(keypoint.score * 100).toFixed(0)}% (mín: ${(this.config.trackingConfidenceThreshold * 100).toFixed(0)}%)`,
+      };
+    }
+
+    vbtDiagnostics.logTrackingPointCheck(
+      true, this.trackingPoint.keypointName, true, keypoint.score,
+      this.config.trackingConfidenceThreshold, true
+    );
+
+    return {
+      frameTrackable: true,
+      position: { x: keypoint.x, y: keypoint.y },
+      confidence: keypoint.score,
+      message: 'Ponto de tracking detectado',
+    };
+  }
+
+  /**
+   * Legacy method for backward compatibility
    */
   getTrackedPosition(pose: PoseData | null): {
     position: { x: number; y: number } | null;
@@ -629,579 +972,198 @@ export class TrackingPointManager {
     isValid: boolean;
     message: string;
   } {
-    if (!this.trackingPoint.isSet) {
-      // DIAGNOSTIC LOG
-      vbtDiagnostics.logTrackingPointCheck(
-        false, // isSet
-        null, // keypointName
-        false, // keypointFound
-        0, // confidence
-        this.config.minKeypointScore, // minConfidence
-        false // passed
-      );
-      
-      return {
-        position: null,
-        confidence: 0,
-        isValid: false,
-        message: 'Ponto de tracking não definido pelo coach',
-      };
-    }
-
-    if (!pose || !pose.keypoints) {
-      // DIAGNOSTIC LOG
-      vbtDiagnostics.logTrackingPointCheck(
-        true, // isSet
-        this.trackingPoint.keypointName, // keypointName
-        false, // keypointFound
-        0, // confidence
-        this.config.minKeypointScore, // minConfidence
-        false // passed
-      );
-      
-      return {
-        position: null,
-        confidence: 0,
-        isValid: false,
-        message: 'Sem dados de pose disponíveis',
-      };
-    }
-
-    // Find the specific keypoint (LAYER 3: ONLY this point is used)
-    const keypoint = pose.keypoints.find(kp => kp.name === this.trackingPoint.keypointName);
-
-    if (!keypoint) {
-      // DIAGNOSTIC LOG
-      vbtDiagnostics.logTrackingPointCheck(
-        true, // isSet
-        this.trackingPoint.keypointName, // keypointName
-        false, // keypointFound
-        0, // confidence
-        this.config.minKeypointScore, // minConfidence
-        false // passed
-      );
-      
-      return {
-        position: null,
-        confidence: 0,
-        isValid: false,
-        message: `Ponto "${this.trackingPoint.keypointName}" não detectado`,
-      };
-    }
-
-    if (keypoint.score < this.config.minKeypointScore) {
-      // DIAGNOSTIC LOG
-      vbtDiagnostics.logTrackingPointCheck(
-        true, // isSet
-        this.trackingPoint.keypointName, // keypointName
-        true, // keypointFound
-        keypoint.score, // confidence
-        this.config.minKeypointScore, // minConfidence
-        false // passed
-      );
-      
-      return {
-        position: null,
-        confidence: keypoint.score,
-        isValid: false,
-        message: `Confiança do ponto muito baixa: ${(keypoint.score * 100).toFixed(0)}% (mín: 60%)`,
-      };
-    }
-
-    // DIAGNOSTIC LOG - SUCCESS
-    vbtDiagnostics.logTrackingPointCheck(
-      true, // isSet
-      this.trackingPoint.keypointName, // keypointName
-      true, // keypointFound
-      keypoint.score, // confidence
-      this.config.minKeypointScore, // minConfidence
-      true // passed
-    );
-
+    const result = this.checkFrameTrackable(pose);
     return {
-      position: { x: keypoint.x, y: keypoint.y },
-      confidence: keypoint.score,
-      isValid: true,
-      message: 'Ponto de tracking detectado',
+      position: result.position,
+      confidence: result.confidence,
+      isValid: result.frameTrackable,
+      message: result.message,
     };
   }
 
   /**
-   * Apply moving average smoothing to position
+   * Get smoothed position using moving average
    */
   getSmoothedPosition(currentPosition: { x: number; y: number } | null): { x: number; y: number } | null {
-    if (!currentPosition) {
-      return null;
-    }
+    if (!currentPosition) return this.lastValidPosition;
 
-    // Add to history
-    this.positionHistory.push({
-      x: currentPosition.x,
-      y: currentPosition.y,
-      timestamp: Date.now(),
-    });
+    const now = Date.now();
+    this.positionHistory.push({ ...currentPosition, timestamp: now });
 
-    // Keep only window size
+    // Keep only recent positions
+    const maxAge = 500; // ms
+    this.positionHistory = this.positionHistory.filter(p => now - p.timestamp < maxAge);
+
+    // Limit to window size
     while (this.positionHistory.length > this.config.movingAverageWindow) {
       this.positionHistory.shift();
     }
 
+    if (this.positionHistory.length === 0) return currentPosition;
+
     // Calculate moving average
-    if (this.positionHistory.length < 2) {
-      return currentPosition;
-    }
-
-    const sumX = this.positionHistory.reduce((sum, pos) => sum + pos.x, 0);
-    const sumY = this.positionHistory.reduce((sum, pos) => sum + pos.y, 0);
-
-    return {
+    const sumX = this.positionHistory.reduce((sum, p) => sum + p.x, 0);
+    const sumY = this.positionHistory.reduce((sum, p) => sum + p.y, 0);
+    
+    this.lastValidPosition = {
       x: sumX / this.positionHistory.length,
       y: sumY / this.positionHistory.length,
     };
+
+    return this.lastValidPosition;
   }
 
   /**
-   * Calculate movement delta from last position
+   * Calculate movement delta from position history
    */
   getMovementDelta(): number {
-    if (this.positionHistory.length < 2) {
-      return 0;
-    }
-
-    const prev = this.positionHistory[this.positionHistory.length - 2];
-    const curr = this.positionHistory[this.positionHistory.length - 1];
-
-    const deltaX = curr.x - prev.x;
-    const deltaY = curr.y - prev.y;
-
+    if (this.positionHistory.length < 2) return 0;
+    
+    const latest = this.positionHistory[this.positionHistory.length - 1];
+    const previous = this.positionHistory[this.positionHistory.length - 2];
+    
+    const deltaX = latest.x - previous.x;
+    const deltaY = latest.y - previous.y;
+    
     return Math.sqrt(deltaX * deltaX + deltaY * deltaY);
   }
 
   /**
-   * Calculate velocity (units per second)
+   * Calculate velocity from position history
    */
   getVelocity(): number {
-    if (this.positionHistory.length < 2) {
-      return 0;
-    }
-
-    const prev = this.positionHistory[this.positionHistory.length - 2];
-    const curr = this.positionHistory[this.positionHistory.length - 1];
-
-    const timeDelta = (curr.timestamp - prev.timestamp) / 1000; // seconds
-    if (timeDelta <= 0) return 0;
-
-    const deltaY = curr.y - prev.y;
+    if (this.positionHistory.length < 2) return 0;
     
-    // Negative because Y increases downward, but we want upward movement to be positive
-    return -deltaY / timeDelta;
+    const latest = this.positionHistory[this.positionHistory.length - 1];
+    const previous = this.positionHistory[this.positionHistory.length - 2];
+    
+    const deltaY = latest.y - previous.y;
+    const deltaTime = (latest.timestamp - previous.timestamp) / 1000; // Convert to seconds
+    
+    if (deltaTime <= 0) return this.lastVelocity;
+    
+    this.lastVelocity = Math.abs(deltaY) / deltaTime;
+    return this.lastVelocity;
   }
 
-  /**
-   * Reset position history
-   */
   reset(): void {
     this.positionHistory = [];
+    this.lastValidPosition = null;
+    this.lastVelocity = 0;
+  }
+
+  updateConfig(config: Partial<ProtectionConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 }
 
 // ============================================================================
-// NOISE FILTER
+// STAGE 4 & 5: MOVEMENT & VELOCITY FILTER
 // ============================================================================
 
 export class NoiseFilter {
   private config: ProtectionConfig;
-  private lastValidValue: number = 0;
+  private lastValidMovement: number = 0;
+  private lastValidVelocity: number = 0;
 
   constructor(config: Partial<ProtectionConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
   }
 
   /**
-   * Filter out micro-movements (noise)
-   * INSTRUMENTED: Logs filtering decisions
+   * STAGE 4: Check if frame has VALID movement
    */
-  filterMovement(delta: number): number {
-    // Ignore movements smaller than threshold
-    const passed = Math.abs(delta) >= this.config.minMovementDelta;
+  checkFrameValid(movementDelta: number): {
+    frameValid: boolean;
+    filteredMovement: number;
+  } {
+    const passed = Math.abs(movementDelta) >= this.config.minMovementDelta;
     
-    // DIAGNOSTIC LOG
     vbtDiagnostics.logNoiseFilter(
-      delta,
-      passed ? delta : 0,
-      this.config.minMovementDelta,
-      passed
+      movementDelta, passed ? movementDelta : 0, this.config.minMovementDelta, passed
     );
     
-    if (!passed) {
-      return 0;
+    if (passed) {
+      this.lastValidMovement = movementDelta;
     }
     
-    this.lastValidValue = delta;
-    return delta;
-  }
-
-  /**
-   * Filter velocity value
-   * INSTRUMENTED: Logs filtering decisions
-   */
-  filterVelocity(velocity: number): number {
-    const threshold = 0.05; // 5cm/s threshold
-    const passed = Math.abs(velocity) >= threshold;
-    
-    // DIAGNOSTIC LOG
-    vbtDiagnostics.logVelocityFilter(
-      velocity,
-      passed ? velocity : 0,
-      threshold,
-      passed
-    );
-    
-    // Ignore micro-velocities
-    if (!passed) {
-      return 0;
-    }
-    return velocity;
-  }
-
-  /**
-   * Check if angular change is significant
-   */
-  isSignificantAngleChange(angleDelta: number): boolean {
-    return Math.abs(angleDelta) >= this.config.angularThreshold;
-  }
-
-  reset(): void {
-    this.lastValidValue = 0;
-  }
-}
-
-// ============================================================================
-// MAIN PROTECTION SYSTEM
-// ============================================================================
-
-export class TrackingProtectionSystem {
-  private humanValidator: HumanPresenceValidator;
-  private stateMachine: TrackingStateMachine;
-  private trackingPointManager: TrackingPointManager;
-  private noiseFilter: NoiseFilter;
-  private config: ProtectionConfig;
-
-  constructor(config: Partial<ProtectionConfig> = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
-    this.humanValidator = new HumanPresenceValidator(this.config);
-    this.stateMachine = new TrackingStateMachine(this.config);
-    this.trackingPointManager = new TrackingPointManager(this.config);
-    this.noiseFilter = new NoiseFilter(this.config);
-  }
-
-  /**
-   * Set the exercise type (updates required keypoints)
-   */
-  setExercise(exercise: string): void {
-    this.config.exerciseKeypoints = EXERCISE_KEYPOINTS[exercise] || [];
-    this.humanValidator.setExercise(exercise);
-  }
-
-  /**
-   * Set the tracking point (LAYER 3)
-   */
-  setTrackingPoint(x: number, y: number, keypointName: string): void {
-    this.trackingPointManager.setTrackingPoint(x, y, keypointName);
-  }
-
-  /**
-   * Get recommended tracking point for exercise
-   */
-  getRecommendedTrackingPoint(exercise: string): string {
-    return RECOMMENDED_TRACKING_POINTS[exercise] || 'left_hip';
-  }
-
-  /**
-   * Process a frame through all 3 protection layers
-   * INSTRUMENTED: Complete diagnostic logging for every frame
-   * 
-   * LAYER 1: Human Presence Validation
-   * LAYER 2: State Machine Control  
-   * LAYER 3: Coach-Defined Tracking Point
-   */
-  processFrame(pose: PoseData | null): ProtectionResult {
-    // START DIAGNOSTIC FRAME
-    vbtDiagnostics.startFrame();
-    
-    // LAYER 3: FIRST - Check if tracking point is set (MANDATORY)
-    if (!this.trackingPointManager.isSet()) {
-      // DIAGNOSTIC LOG - Recording Gate
-      vbtDiagnostics.logRecordingGate(
-        false, // buttonPressed (unknown at this layer)
-        false, // recordingStarted
-        false, // canCalculate
-        false, // trackingPointSet
-        'noHuman', // state
-        true, // blocked
-        'trackingPointManager.isSet() === false'
-      );
-      
-      // DIAGNOSTIC LOG - Rep Counting
-      vbtDiagnostics.logRepCounting(
-        false, // eligible
-        'noHuman', // state
-        'idle', // repPhase
-        false, // canCountRep
-        true, // blocked
-        'Tracking point not set'
-      );
-      
-      // DIAGNOSTIC LOG - Final Decision
-      vbtDiagnostics.logFinalDecision(
-        false, // frameValid
-        false, // velocityCalculated
-        false, // repCounted
-        false, // recordingAllowed
-        false, // canCalculate
-        'noHuman' // state
-      );
-      
-      // END DIAGNOSTIC FRAME
-      vbtDiagnostics.endFrame();
-      
-      return {
-        state: 'noHuman',
-        isValid: false,
-        canCalculate: false,
-        canCountRep: false,
-        trackingPoint: null,
-        smoothedPosition: null,
-        velocity: 0,
-        message: 'BLOQUEADO: Coach deve definir ponto de tracking antes de gravar',
-      };
-    }
-
-    // LAYER 1: Validate human presence (keypoints with score >= 0.6)
-    const humanValidation = this.humanValidator.validateKeypoints(pose);
-    const humanStable = this.humanValidator.isStable();
-    
-    // If no valid human keypoints, block everything
-    if (!humanValidation.isValid) {
-      this.stateMachine.transition(false, false, 0, null);
-      
-      // DIAGNOSTIC LOG - Recording Gate
-      vbtDiagnostics.logRecordingGate(
-        false, false, false, true, 'noHuman', true,
-        'humanValidation.isValid === false'
-      );
-      
-      // DIAGNOSTIC LOG - Rep Counting
-      vbtDiagnostics.logRepCounting(
-        false, 'noHuman', 'idle', false, true,
-        'Human presence validation failed'
-      );
-      
-      // DIAGNOSTIC LOG - Final Decision
-      vbtDiagnostics.logFinalDecision(
-        false, false, false, false, false, 'noHuman'
-      );
-      
-      // END DIAGNOSTIC FRAME
-      vbtDiagnostics.endFrame();
-      
-      return {
-        state: 'noHuman',
-        isValid: false,
-        canCalculate: false,
-        canCountRep: false,
-        trackingPoint: this.trackingPointManager.getTrackingPoint(),
-        smoothedPosition: null,
-        velocity: 0,
-        message: `BLOQUEADO: ${humanValidation.message}`,
-      };
-    }
-    
-    // If not stable (5 consecutive valid frames), block calculations
-    if (!humanStable) {
-      const progress = Math.round(this.humanValidator.getStabilityProgress() * 100);
-      
-      // DIAGNOSTIC LOG - Recording Gate
-      vbtDiagnostics.logRecordingGate(
-        false, false, false, true, 'noHuman', true,
-        `humanStable === false (${progress}%)`
-      );
-      
-      // DIAGNOSTIC LOG - Rep Counting
-      vbtDiagnostics.logRepCounting(
-        false, 'noHuman', 'idle', false, true,
-        `Stability check failed: ${progress}%`
-      );
-      
-      // DIAGNOSTIC LOG - Final Decision
-      vbtDiagnostics.logFinalDecision(
-        true, // frameValid (pose detected)
-        false, false, false, false, 'noHuman'
-      );
-      
-      // END DIAGNOSTIC FRAME
-      vbtDiagnostics.endFrame();
-      
-      return {
-        state: 'noHuman',
-        isValid: true,
-        canCalculate: false,
-        canCountRep: false,
-        trackingPoint: this.trackingPointManager.getTrackingPoint(),
-        smoothedPosition: null,
-        velocity: 0,
-        message: `Estabilizando detecção... ${progress}% (${this.config.requiredStableFrames} frames necessários)`,
-      };
-    }
-
-    // LAYER 3: Get tracking point position from pose
-    const trackingResult = this.trackingPointManager.getTrackedPosition(pose);
-    
-    // If tracking point not detected or low confidence, block
-    if (!trackingResult.isValid) {
-      // DIAGNOSTIC LOG - Recording Gate
-      vbtDiagnostics.logRecordingGate(
-        false, false, false, true, 'noHuman', true,
-        `trackingResult.isValid === false (confidence: ${trackingResult.confidence.toFixed(2)})`
-      );
-      
-      // DIAGNOSTIC LOG - Rep Counting
-      vbtDiagnostics.logRepCounting(
-        false, 'noHuman', 'idle', false, true,
-        'Tracking point not valid or low confidence'
-      );
-      
-      // DIAGNOSTIC LOG - Final Decision
-      vbtDiagnostics.logFinalDecision(
-        false, false, false, false, false, 'noHuman'
-      );
-      
-      // END DIAGNOSTIC FRAME
-      vbtDiagnostics.endFrame();
-      
-      return {
-        state: 'noHuman',
-        isValid: false,
-        canCalculate: false,
-        canCountRep: false,
-        trackingPoint: this.trackingPointManager.getTrackingPoint(),
-        smoothedPosition: null,
-        velocity: 0,
-        message: `BLOQUEADO: ${trackingResult.message}`,
-      };
-    }
-
-    // Get smoothed position (moving average)
-    const smoothedPosition = this.trackingPointManager.getSmoothedPosition(trackingResult.position);
-    
-    // Get filtered movement delta (ignore micro-variations)
-    const rawDelta = this.trackingPointManager.getMovementDelta();
-    const filteredDelta = this.noiseFilter.filterMovement(rawDelta);
-    
-    // Get filtered velocity
-    const rawVelocity = this.trackingPointManager.getVelocity();
-    const filteredVelocity = this.noiseFilter.filterVelocity(rawVelocity);
-
-    // LAYER 2: State machine transition
-    const stateResult = this.stateMachine.transition(
-      humanValidation.isValid,
-      humanStable,
-      filteredDelta,
-      smoothedPosition
-    );
-
-    // Determine what's allowed based on state
-    const canCalculate = stateResult.newState !== 'noHuman' && trackingResult.isValid;
-    const canCountRep = stateResult.newState === 'executing' && stateResult.repCompleted;
-
-    // DIAGNOSTIC LOG - Recording Gate (SUCCESS or partial)
-    const recordingBlocked = !canCalculate || stateResult.newState === 'noHuman';
-    let recordingBlockReason: string | null = null;
-    if (recordingBlocked) {
-      if (stateResult.newState === 'noHuman') {
-        recordingBlockReason = 'state === noHuman';
-      } else if (!canCalculate) {
-        recordingBlockReason = 'canCalculate === false';
-      }
-    }
-    vbtDiagnostics.logRecordingGate(
-      false, // buttonPressed (unknown)
-      true, // recordingStarted (if we get here, recording is possible)
-      canCalculate,
-      true, // trackingPointSet
-      stateResult.newState,
-      recordingBlocked,
-      recordingBlockReason
-    );
-    
-    // DIAGNOSTIC LOG - Rep Counting
-    vbtDiagnostics.logRepCounting(
-      canCountRep, // eligible
-      stateResult.newState, // state
-      this.stateMachine.getRepPhase(), // repPhase
-      canCountRep, // canCountRep
-      !canCountRep, // blocked
-      canCountRep ? null : `State: ${stateResult.newState}, repCompleted: ${stateResult.repCompleted}`
-    );
-    
-    // DIAGNOSTIC LOG - Final Decision
-    vbtDiagnostics.logFinalDecision(
-      humanValidation.isValid && trackingResult.isValid, // frameValid
-      canCalculate && filteredVelocity !== 0, // velocityCalculated
-      canCountRep, // repCounted
-      canCalculate, // recordingAllowed
-      canCalculate, // canCalculate
-      stateResult.newState // state
-    );
-    
-    // END DIAGNOSTIC FRAME
-    vbtDiagnostics.endFrame();
-
     return {
-      state: stateResult.newState,
-      isValid: humanValidation.isValid && trackingResult.isValid,
-      canCalculate,
-      canCountRep,
-      trackingPoint: this.trackingPointManager.getTrackingPoint(),
-      smoothedPosition,
-      velocity: canCalculate ? filteredVelocity : 0,
-      message: stateResult.message,
+      frameValid: passed,
+      filteredMovement: passed ? movementDelta : 0,
     };
   }
 
   /**
-   * Get current state
+   * STAGE 5: Check if frame is COUNTABLE (velocity threshold)
    */
-  getState(): TrackingState {
-    return this.stateMachine.getState();
+  checkFrameCountable(velocity: number): {
+    frameCountable: boolean;
+    filteredVelocity: number;
+  } {
+    const passed = Math.abs(velocity) >= this.config.velocityThreshold;
+    
+    vbtDiagnostics.logVelocityFilter(
+      velocity, passed ? velocity : 0, this.config.velocityThreshold, passed
+    );
+    
+    if (passed) {
+      this.lastValidVelocity = velocity;
+    }
+    
+    return {
+      frameCountable: passed,
+      filteredVelocity: passed ? velocity : 0,
+    };
+  }
+
+  filterMovement(delta: number): number {
+    return this.checkFrameValid(delta).filteredMovement;
+  }
+
+  filterVelocity(velocity: number): number {
+    return this.checkFrameCountable(velocity).filteredVelocity;
+  }
+
+  reset(): void {
+    this.lastValidMovement = 0;
+    this.lastValidVelocity = 0;
+  }
+}
+
+// ============================================================================
+// MAIN: TRACKING PROTECTION SYSTEM (Progressive Architecture)
+// ============================================================================
+
+export class TrackingProtectionSystem {
+  private config: ProtectionConfig;
+  
+  // Stage validators
+  private frameStabilityValidator: FrameStabilityValidator;
+  private humanValidator: HumanPresenceValidator;
+  private trackingPointManager: TrackingPointManager;
+  private noiseFilter: NoiseFilter;
+  
+  // State machines
+  private progressiveStateMachine: ProgressiveStateMachine;
+  private legacyStateMachine: TrackingStateMachine; // For backward compatibility
+
+  constructor(config: Partial<ProtectionConfig> = {}) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
+    
+    this.frameStabilityValidator = new FrameStabilityValidator(this.config);
+    this.humanValidator = new HumanPresenceValidator(this.config);
+    this.trackingPointManager = new TrackingPointManager(this.config);
+    this.noiseFilter = new NoiseFilter(this.config);
+    
+    this.progressiveStateMachine = new ProgressiveStateMachine(this.config);
+    this.legacyStateMachine = new TrackingStateMachine(this.config);
   }
 
   /**
-   * Get stability progress
+   * Set tracking point (coach selection)
    */
-  getStabilityProgress(): number {
-    return this.humanValidator.getStabilityProgress();
-  }
-
-  /**
-   * Get tracking point
-   */
-  getTrackingPoint(): TrackingPoint {
-    return this.trackingPointManager.getTrackingPoint();
-  }
-
-  /**
-   * Check if tracking point is set
-   */
-  isTrackingPointSet(): boolean {
-    return this.trackingPointManager.isSet();
-  }
-
-  /**
-   * Get rep phase
-   */
-  getRepPhase(): string {
-    return this.stateMachine.getRepPhase();
+  setTrackingPoint(x: number, y: number, keypointName: string): void {
+    this.trackingPointManager.setTrackingPoint(x, y, keypointName);
   }
 
   /**
@@ -1212,20 +1174,258 @@ export class TrackingProtectionSystem {
   }
 
   /**
-   * Full reset
+   * Check if tracking point is set
+   */
+  isTrackingPointSet(): boolean {
+    return this.trackingPointManager.isSet();
+  }
+
+  /**
+   * Get tracking point
+   */
+  getTrackingPoint(): TrackingPoint {
+    return this.trackingPointManager.getTrackingPoint();
+  }
+
+  /**
+   * Set recording active state
+   */
+  setRecordingActive(active: boolean): void {
+    this.progressiveStateMachine.setRecordingActive(active);
+  }
+
+  /**
+   * MAIN: Process frame through 5-STAGE PROGRESSIVE VALIDATION PIPELINE
+   * 
+   * Stage 1: FRAME_USABLE - Pose exists with keypoints
+   * Stage 2: FRAME_STABLE - Enough stable frames accumulated
+   * Stage 3: FRAME_TRACKABLE - Tracking point valid
+   * Stage 4: FRAME_VALID - Movement detected
+   * Stage 5: FRAME_COUNTABLE - Ready for rep counting
+   */
+  processFrame(pose: PoseData | null): ProtectionResult {
+    // START DIAGNOSTIC FRAME
+    vbtDiagnostics.startFrame();
+
+    // ========================================
+    // STAGE 1: FRAME_USABLE
+    // ========================================
+    const usableResult = this.frameStabilityValidator.checkFrameUsable(pose);
+
+    // ========================================
+    // STAGE 2: FRAME_STABLE (INDEPENDENT of tracking point!)
+    // ========================================
+    const stabilityResult = this.frameStabilityValidator.updateStability(usableResult.frameUsable);
+
+    // ========================================
+    // STAGE 3: FRAME_TRACKABLE (only after stable)
+    // ========================================
+    let trackableResult = {
+      frameTrackable: false,
+      position: null as { x: number; y: number } | null,
+      confidence: 0,
+      message: 'Not checked (not stable)',
+    };
+    
+    // Only check tracking AFTER stabilization is achieved
+    if (stabilityResult.frameStable) {
+      trackableResult = this.trackingPointManager.checkFrameTrackable(pose);
+    }
+
+    // ========================================
+    // STAGE 4 & 5: FRAME_VALID & FRAME_COUNTABLE
+    // ========================================
+    let smoothedPosition: { x: number; y: number } | null = null;
+    let movementDelta = 0;
+    let velocity = 0;
+    let frameValid = false;
+    let frameCountable = false;
+
+    if (trackableResult.frameTrackable && trackableResult.position) {
+      smoothedPosition = this.trackingPointManager.getSmoothedPosition(trackableResult.position);
+      movementDelta = this.trackingPointManager.getMovementDelta();
+      velocity = this.trackingPointManager.getVelocity();
+      
+      const validResult = this.noiseFilter.checkFrameValid(movementDelta);
+      frameValid = validResult.frameValid;
+      
+      const countableResult = this.noiseFilter.checkFrameCountable(velocity);
+      frameCountable = countableResult.frameCountable;
+    }
+
+    // ========================================
+    // Build validation flags
+    // ========================================
+    const validationFlags: ValidationFlags = {
+      frameUsable: usableResult.frameUsable,
+      frameStable: stabilityResult.frameStable,
+      frameTrackable: trackableResult.frameTrackable,
+      frameValid: frameValid,
+      frameCountable: frameCountable,
+    };
+
+    // ========================================
+    // Update state machine with flags
+    // ========================================
+    const stateResult = this.progressiveStateMachine.updateState(
+      validationFlags,
+      smoothedPosition,
+      movementDelta
+    );
+
+    // ========================================
+    // Determine capabilities based on stage
+    // ========================================
+    const stage = stateResult.stage;
+    
+    // canCalculate: Recording is allowed when state >= READY
+    const canCalculate = stage === 'READY' || stage === 'TRACKING' || stage === 'RECORDING';
+    
+    // canCountRep: Only when fully valid and rep completed
+    const canCountRep = stage === 'RECORDING' && stateResult.repCompleted;
+
+    // ========================================
+    // Log recording gate status
+    // ========================================
+    const recordingBlocked = !canCalculate;
+    let recordingBlockReason: string | null = null;
+    
+    if (recordingBlocked) {
+      if (!validationFlags.frameUsable) {
+        recordingBlockReason = 'frameUsable === false (no pose)';
+      } else if (!validationFlags.frameStable) {
+        recordingBlockReason = `frameStable === false (${stabilityResult.stableFrameCount}/${stabilityResult.requiredFrames})`;
+      }
+    }
+    
+    vbtDiagnostics.logRecordingGate(
+      false, // buttonPressed (unknown at this layer)
+      stage === 'RECORDING',
+      canCalculate,
+      this.trackingPointManager.isSet(),
+      stage,
+      recordingBlocked,
+      recordingBlockReason
+    );
+
+    // ========================================
+    // Log rep counting status
+    // ========================================
+    vbtDiagnostics.logRepCounting(
+      frameCountable,
+      stage,
+      this.progressiveStateMachine.getRepPhase(),
+      canCountRep,
+      !canCountRep,
+      canCountRep ? null : `Stage: ${stage}, frameCountable: ${frameCountable}`
+    );
+
+    // ========================================
+    // Log final decision
+    // ========================================
+    vbtDiagnostics.logFinalDecision(
+      validationFlags.frameUsable && validationFlags.frameStable,
+      validationFlags.frameTrackable && velocity > 0,
+      canCountRep,
+      canCalculate,
+      canCalculate,
+      stage
+    );
+
+    // END DIAGNOSTIC FRAME
+    vbtDiagnostics.endFrame();
+
+    // ========================================
+    // Build and return result
+    // ========================================
+    return {
+      // Legacy fields
+      state: stateResult.legacyState,
+      isValid: validationFlags.frameUsable && validationFlags.frameStable,
+      canCalculate,
+      canCountRep,
+      trackingPoint: this.trackingPointManager.getTrackingPoint(),
+      smoothedPosition,
+      velocity: canCalculate && validationFlags.frameTrackable ? velocity : 0,
+      message: stateResult.message,
+      
+      // NEW: Progressive validation fields
+      validationStage: stage,
+      validationFlags,
+      stableFrameCount: stabilityResult.stableFrameCount,
+      stabilityProgress: stabilityResult.stabilityProgress,
+    };
+  }
+
+  /**
+   * Get current validation stage
+   */
+  getValidationStage(): ValidationStage {
+    return this.progressiveStateMachine.getStage();
+  }
+
+  /**
+   * Get stability progress
+   */
+  getStabilityProgress(): number {
+    return this.frameStabilityValidator.getStabilityProgress();
+  }
+
+  /**
+   * Get rep phase
+   */
+  getRepPhase(): string {
+    return this.progressiveStateMachine.getRepPhase();
+  }
+
+  /**
+   * Check if movement delta is significant
+   */
+  isSignificantMovement(delta: number): boolean {
+    return Math.abs(delta) >= this.config.minMovementDelta;
+  }
+
+  /**
+   * Check if angle change is significant
+   */
+  isSignificantAngleChange(angleDelta: number): boolean {
+    return Math.abs(angleDelta) >= this.config.angularThreshold;
+  }
+
+  /**
+   * Set exercise (updates required keypoints)
+   */
+  setExercise(exercise: string): void {
+    this.config.exerciseKeypoints = EXERCISE_KEYPOINTS[exercise] || [];
+    this.humanValidator.setExercise(exercise);
+  }
+
+  /**
+   * Reset all state
    */
   reset(): void {
+    this.frameStabilityValidator.reset();
     this.humanValidator.reset();
-    this.stateMachine.reset();
     this.trackingPointManager.reset();
     this.noiseFilter.reset();
+    this.progressiveStateMachine.reset();
+    this.legacyStateMachine.reset();
+  }
+
+  /**
+   * Update configuration
+   */
+  updateConfig(config: Partial<ProtectionConfig>): void {
+    this.config = { ...this.config, ...config };
+    this.frameStabilityValidator.updateConfig(this.config);
+    this.trackingPointManager.updateConfig(this.config);
   }
 }
 
 // ============================================================================
-// EXPORTS
+// FACTORY FUNCTION
 // ============================================================================
 
-export const createProtectionSystem = (config?: Partial<ProtectionConfig>): TrackingProtectionSystem => {
+export const createTrackingProtection = (config: Partial<ProtectionConfig> = {}): TrackingProtectionSystem => {
   return new TrackingProtectionSystem(config);
 };
