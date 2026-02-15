@@ -154,6 +154,7 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   style,
   showDebugInfo = false,
   minConfidence = 0.6,
+  onCameraToggle,
 }, ref) => {
   // State
   const [isCameraReady, setIsCameraReady] = useState(false);
@@ -173,10 +174,35 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   // Determine if we should use native MediaPipe or simulation
   const shouldUseNativeMediapipe = Platform.OS !== 'web' && MediapipePoseView && !useSimulation;
   
+  // Log camera facing on mount and changes
+  useEffect(() => {
+    console.log("[Camera] Using camera:", facing);
+  }, [facing]);
+  
   // Keep callback ref updated
   useEffect(() => {
     onPoseDetectedRef.current = onPoseDetected;
   }, [onPoseDetected]);
+  
+  // Toggle camera handler
+  const handleToggleCamera = useCallback(() => {
+    console.log("[Camera] Toggle camera requested, current facing:", facing);
+    
+    // Use native switchCamera if available (for RNMediapipe)
+    if (Platform.OS !== 'web' && switchCamera) {
+      try {
+        switchCamera();
+        console.log("[Camera] Native switchCamera called");
+      } catch (e) {
+        console.warn("[Camera] switchCamera failed:", e);
+      }
+    }
+    
+    // Notify parent component
+    if (onCameraToggle) {
+      onCameraToggle();
+    }
+  }, [facing, onCameraToggle]);
   
   // Expose methods via ref
   useImperativeHandle(ref, () => ({
@@ -198,6 +224,7 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
         simulatorRef.current.reset();
       }
     },
+    toggleCamera: handleToggleCamera,
     getCurrentPose: () => currentPose,
     isDetecting: () => isDetecting,
   }), [currentPose, isDetecting]);
