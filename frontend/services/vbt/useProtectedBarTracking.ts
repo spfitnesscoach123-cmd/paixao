@@ -187,6 +187,9 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   // BUG 5 FIX: Tracking landmark stored as INDEX, not screen coordinates
   const trackingLandmarkIndexRef = useRef<number | null>(null);
   
+  // Frame counter for debug logging
+  const frameCountRef = useRef(0);
+  
   // Recommended tracking point based on exercise
   const recommendedTrackingPoint = RECOMMENDED_TRACKING_POINTS[config.exercise] || 'left_hip';
   
