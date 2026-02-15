@@ -149,4 +149,4 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
 - Project ID: f4714b6a-260d-41fa-9c24-a4e0e6f28b6d
 
 ## Last Updated
-December 2025
+December 2025 (BUG 5 Fix - Visibility/Confidence Extraction)
