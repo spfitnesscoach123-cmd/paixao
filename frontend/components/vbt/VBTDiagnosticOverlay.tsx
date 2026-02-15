@@ -395,6 +395,27 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     marginTop: 2,
   },
+  warningBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.3)',
+    padding: 8,
+    borderRadius: 4,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  warningTitle: {
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: 'bold',
+    fontFamily: 'monospace',
+    marginBottom: 4,
+  },
+  warningText: {
+    color: '#fca5a5',
+    fontSize: 9,
+    fontFamily: 'monospace',
+    marginLeft: 4,
+  },
   diagnosisSection: {
     backgroundColor: 'rgba(245, 158, 11, 0.2)',
     padding: 8,
@@ -443,6 +464,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
+    marginVertical: 2,
   },
   compactLabel: {
     fontSize: 10,
