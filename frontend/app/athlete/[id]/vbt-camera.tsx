@@ -1137,7 +1137,7 @@ export default function VBTCameraPage() {
                 <CameraView
                   ref={cameraRef}
                   style={styles.camera}
-                  facing="back"
+                  facing={cameraFacing}
                   onCameraReady={handleCameraReady}
                 >
                   {/* Overlay for point selection */}
@@ -1515,7 +1515,7 @@ export default function VBTCameraPage() {
                 <CameraView
                   ref={cameraRef}
                   style={styles.camera}
-                  facing="back"
+                  facing={cameraFacing}
                   onCameraReady={handleCameraReady}
                 >
                   {cameraReady ? (
