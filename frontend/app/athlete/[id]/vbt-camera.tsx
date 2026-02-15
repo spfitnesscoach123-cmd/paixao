@@ -885,7 +885,7 @@ export default function VBTCameraPage() {
   
   // Recording state for video capture
   const [isVideoRecording, setIsVideoRecording] = useState(false);
-  const recordingPromiseRef = useRef<Promise<{ uri: string }> | null>(null);
+  const recordingPromiseRef = useRef<Promise<{ uri: string } | undefined> | null>(null);
 
   // Start recording - BUG 2 FIX: Call actual native recording
   const handleStartRecording = useCallback(async () => {
