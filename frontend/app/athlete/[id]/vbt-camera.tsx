@@ -247,6 +247,36 @@ export default function VBTCameraPage() {
   // Diagnostic overlay state - Enable for debugging pipeline blockers
   const [showDiagnosticOverlay, setShowDiagnosticOverlay] = useState<boolean>(true);
   
+  // Camera facing control - EXPLICIT CONTROL
+  const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
+  
+  // Log camera state on mount and changes
+  useEffect(() => {
+    console.log("[Camera] Using camera:", cameraFacing);
+  }, [cameraFacing]);
+  
+  // Toggle camera function
+  const toggleCamera = useCallback(() => {
+    console.log("[Camera] Toggling camera from:", cameraFacing);
+    
+    // Use native switchCamera if available (for RNMediapipe)
+    if (Platform.OS !== 'web' && switchCamera) {
+      try {
+        switchCamera();
+        console.log("[Camera] Native switchCamera called");
+      } catch (e) {
+        console.warn("[Camera] switchCamera failed:", e);
+      }
+    }
+    
+    // Update state for UI and expo-camera fallback
+    setCameraFacing(prev => {
+      const newFacing = prev === 'back' ? 'front' : 'back';
+      console.log("[Camera] New camera facing:", newFacing);
+      return newFacing;
+    });
+  }, [cameraFacing]);
+  
   // Tutorial animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
