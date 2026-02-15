@@ -399,34 +399,45 @@ export default function VBTCameraPage() {
   }, [feedbackFadeAnim]);
 
   // Convert MediaPipe landmarks to VBT pose format
-  // @thinksys/react-native-mediapipe returns landmarks as an object with body parts
+  // @thinksys/react-native-mediapipe returns landmarks with visibility property
+  // BUG 5 FIX: Properly extract visibility/score from all possible data formats
   const convertMediapipeLandmarks = useCallback((landmarkData: any): VBTPoseData | null => {
     // Log raw data for debugging (every 30 frames to avoid spam)
     frameCountRef.current++;
     const shouldLog = frameCountRef.current % 30 === 0;
     
-    if (shouldLog) {
-      console.log('[VBTCamera] Raw landmark data:', JSON.stringify(landmarkData).substring(0, 500));
+    // CRITICAL DEBUG: Log the exact structure of incoming data on first few frames
+    if (frameCountRef.current <= 3 || shouldLog) {
+      console.log('[VBTCamera] Frame #' + frameCountRef.current + ' Raw data type:', typeof landmarkData);
+      console.log('[VBTCamera] Raw data keys:', landmarkData ? Object.keys(landmarkData) : 'null');
+      console.log('[VBTCamera] Raw data sample:', JSON.stringify(landmarkData).substring(0, 800));
     }
 
     // Handle different data formats from MediaPipe
     let landmarks: any[] = [];
+    let dataFormat = 'unknown';
     
-    // Format 1: Direct array of landmarks
+    // Format 1: Direct array of landmarks (standard MediaPipe format)
     if (Array.isArray(landmarkData)) {
       landmarks = landmarkData;
+      dataFormat = 'direct_array';
     }
-    // Format 2: Object with landmarks property
+    // Format 2: Object with landmarks property (common wrapper format)
     else if (landmarkData?.landmarks && Array.isArray(landmarkData.landmarks)) {
       landmarks = landmarkData.landmarks;
+      dataFormat = 'landmarks_property';
     }
-    // Format 3: Object with poseLandmarks property
+    // Format 3: Object with poseLandmarks property (alternative wrapper)
     else if (landmarkData?.poseLandmarks && Array.isArray(landmarkData.poseLandmarks)) {
       landmarks = landmarkData.poseLandmarks;
+      dataFormat = 'poseLandmarks_property';
     }
-    // Format 4: @thinksys format with body part objects
+    // Format 4: @thinksys body parts format - CONVERT to landmark array
     else if (landmarkData && typeof landmarkData === 'object') {
-      // Convert body part format to landmark array
+      dataFormat = 'body_parts';
+      
+      // @thinksys/react-native-mediapipe returns body parts as arrays of points
+      // Each point has {x, y, z, visibility} or [x, y, z, visibility]
       const bodyPartMapping: Record<string, number[]> = {
         face: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         leftArm: [11, 13, 15, 17, 19, 21],
@@ -436,21 +447,43 @@ export default function VBTCameraPage() {
         rightLeg: [24, 26, 28, 30, 32],
       };
       
-      // Try to extract coordinates from body parts
+      // Extract coordinates from body parts
       for (const [part, indices] of Object.entries(bodyPartMapping)) {
         const partData = landmarkData[part];
         if (partData && Array.isArray(partData)) {
           partData.forEach((point: any, i: number) => {
             if (point && indices[i] !== undefined) {
+              // BUG 5 FIX: Extract visibility properly from all possible formats
+              // Try multiple property names and array positions
+              let visibility = 0.85; // Default high value if pose is detected
+              
+              if (typeof point === 'object' && point !== null) {
+                // Object format: {x, y, z, visibility} or {x, y, visibility}
+                visibility = point.visibility ?? point.score ?? point.confidence ?? 0.85;
+              } else if (Array.isArray(point)) {
+                // Array format: [x, y, z, visibility] or [x, y, visibility]
+                visibility = point[3] ?? point[2] ?? 0.85;
+              }
+              
+              // Ensure visibility is a valid number between 0 and 1
+              if (typeof visibility !== 'number' || isNaN(visibility)) {
+                visibility = 0.85;
+              }
+              visibility = Math.max(0, Math.min(1, visibility));
+              
               landmarks[indices[i]] = {
                 x: point.x ?? point[0] ?? 0,
                 y: point.y ?? point[1] ?? 0,
-                visibility: point.visibility ?? point.confidence ?? point[2] ?? 0.7,
+                visibility: visibility,
               };
             }
           });
         }
       }
+    }
+    
+    if (shouldLog) {
+      console.log('[VBTCamera] Data format detected:', dataFormat, '| Landmarks count:', landmarks.length);
     }
     
     if (!landmarks || landmarks.length === 0) {
@@ -472,7 +505,22 @@ export default function VBTCameraPage() {
       if (landmark) {
         const x = landmark.x ?? landmark[0] ?? 0;
         const y = landmark.y ?? landmark[1] ?? 0;
-        const score = landmark.visibility ?? landmark.confidence ?? landmark[2] ?? 0.5;
+        
+        // BUG 5 FIX: Properly extract visibility/score with correct priority
+        // MediaPipe uses 'visibility' property, some wrappers use 'score' or 'confidence'
+        let score = 0.85; // Default high value if landmark exists
+        
+        if (typeof landmark === 'object' && landmark !== null) {
+          score = landmark.visibility ?? landmark.score ?? landmark.confidence ?? 0.85;
+        } else if (Array.isArray(landmark)) {
+          score = landmark[3] ?? landmark[2] ?? 0.85;
+        }
+        
+        // Ensure score is a valid number
+        if (typeof score !== 'number' || isNaN(score)) {
+          score = 0.85;
+        }
+        score = Math.max(0, Math.min(1, score));
         
         keypoints.push({
           name: name as string,
@@ -484,8 +532,9 @@ export default function VBTCameraPage() {
         // Store for visual overlay
         detectedKps.set(name as string, { x, y, score });
         
-        if (shouldLog && name === 'left_hip') {
-          console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(2)}`);
+        // Debug logging for key tracking points
+        if (shouldLog && (name === 'left_hip' || name === 'right_hip')) {
+          console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(3)}`);
         }
       }
     }
@@ -495,8 +544,11 @@ export default function VBTCameraPage() {
     
     if (shouldLog) {
       const validCount = keypoints.filter(kp => kp.score >= 0.5).length;
-      setDebugLandmarks(`${validCount}/${keypoints.length} keypoints`);
-      console.log(`[VBTCamera] Converted ${keypoints.length} keypoints, ${validCount} valid`);
+      const avgScore = keypoints.length > 0 
+        ? (keypoints.reduce((sum, kp) => sum + kp.score, 0) / keypoints.length).toFixed(2)
+        : '0';
+      setDebugLandmarks(`${validCount}/${keypoints.length} kps, avg: ${avgScore}`);
+      console.log(`[VBTCamera] Converted ${keypoints.length} keypoints, ${validCount} valid, avgScore: ${avgScore}`);
     }
     
     return {
