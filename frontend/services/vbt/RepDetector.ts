@@ -83,6 +83,10 @@ export class RepDetector {
   // Direction tracking for hysteresis
   private lastDirection: 'up' | 'down' | 'stationary' = 'stationary';
   private directionChangeCount: number = 0;
+  
+  // CRITICAL: Store completed rep data BEFORE resetting arrays
+  // This fixes the bug where meanVelocity was 0 in the result
+  private lastCompletedRepData: RepData | null = null;
 
   constructor(config: Partial<RepDetectorConfig> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
