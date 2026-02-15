@@ -29,6 +29,7 @@ import {
   RECOMMENDED_TRACKING_POINTS,
   ProtectionConfig,
 } from './trackingProtection';
+import { recordingController } from './recordingController';
 import {
   BarTrackerState,
   BarPositionSimulator,
@@ -326,6 +327,8 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
    * - Recording does NOT require tracking point to be perfectly valid
    * - Recording will begin capturing frames and transition to active tracking
    *   once tracking becomes valid
+   * 
+   * USES recordingController.start() as SINGLE SOURCE OF TRUTH
    */
   const startTracking = useCallback(() => {
     // CAMADA 3: Check if tracking point is set - STILL MANDATORY for actual tracking
@@ -356,9 +359,11 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       if (tp.isSet) {
         protectionSystemRef.current.setTrackingPoint(tp.x, tp.y, tp.keypointName);
       }
-      // Set recording active - NEW: triggers state transition to RECORDING when valid
-      protectionSystemRef.current.setRecordingActive(true);
     }
+    
+    // SINGLE SOURCE OF TRUTH: Call recordingController.start()
+    // The state machine will automatically transition to RECORDING when appropriate
+    recordingController.start();
     
     // Start simulation if enabled (development/testing mode)
     // In production, real poses come from PoseCamera via processPose()
@@ -417,10 +422,8 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       intervalRef.current = null;
     }
     
-    // Notify protection system that recording stopped
-    if (protectionSystemRef.current) {
-      protectionSystemRef.current.setRecordingActive(false);
-    }
+    // SINGLE SOURCE OF TRUTH: Call recordingController.stop()
+    recordingController.stop();
     
     setStatusMessage('Tracking parado');
   }, []);
@@ -466,6 +469,9 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     if (poseSimulatorRef.current) {
       poseSimulatorRef.current.reset();
     }
+    
+    // Also reset recording controller
+    recordingController.reset();
     
     // Also clear tracking point on full reset
     setIsTrackingPointSet(false);
