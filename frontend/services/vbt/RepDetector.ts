@@ -55,6 +55,7 @@ const DEFAULT_CONFIG: RepDetectorConfig = {
   directionChangeThreshold: 0.05, // 5cm/s - INCREASED to be less sensitive to micro-changes
   repLockoutDuration: 300,        // 300ms lockout after rep
   maxRepDuration: 10000,          // 10s maximum rep duration
+  startDirection: 'down',         // Default: eccentric-first exercises (squat, bench)
 };
 
 /**
