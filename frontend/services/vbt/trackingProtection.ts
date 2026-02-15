@@ -498,6 +498,9 @@ export class ProgressiveStateMachine {
     // Read recording state from global controller - SINGLE SOURCE OF TRUTH
     const isRecordingActive = recordingController.isActive();
 
+    // [RecordingController] Frame loop log
+    console.log("[RecordingController] state:", recordingController.isActive());
+
     // [VBT_STATE_CHECK] DIAGNOSTIC LOG - MANDATORY
     console.log("[VBT_STATE_CHECK]", {
       stage: this.currentStage,

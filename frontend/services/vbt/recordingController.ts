@@ -14,22 +14,22 @@
  */
 
 class RecordingController {
-  private isRecording: boolean = false;
+  private active: boolean = false;
   private startTimestamp: number = 0;
 
   start(): void {
-    this.isRecording = true;
+    this.active = true;
+    console.log("[RecordingController] STARTED");
     this.startTimestamp = Date.now();
-    console.log("[VBT_RECORDING] STARTED", this.startTimestamp);
   }
 
   stop(): void {
-    this.isRecording = false;
-    console.log("[VBT_RECORDING] STOPPED");
+    this.active = false;
+    console.log("[RecordingController] STOPPED");
   }
 
   isActive(): boolean {
-    return this.isRecording;
+    return this.active;
   }
 
   getStartTime(): number {
@@ -40,9 +40,9 @@ class RecordingController {
    * Reset recording state (for full system reset)
    */
   reset(): void {
-    this.isRecording = false;
+    this.active = false;
     this.startTimestamp = 0;
-    console.log("[VBT_RECORDING] RESET");
+    console.log("[RecordingController] RESET");
   }
 }
 
