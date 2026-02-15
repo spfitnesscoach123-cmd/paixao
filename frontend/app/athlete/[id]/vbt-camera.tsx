@@ -633,6 +633,13 @@ export default function VBTCameraPage() {
         console.log('[VBT_CAMERA] Raw event type:', typeof event);
         console.log('[VBT_CAMERA] Has nativeEvent:', !!event?.nativeEvent);
         setDisplayFrameCount(1); // Force immediate update on first frame
+        
+        // BUG 2 FIX: Mark camera as ready when first frame is received from RNMediapipe
+        // This is critical because RNMediapipe doesn't have onCameraReady callback
+        if (!cameraReady) {
+          setCameraReady(true);
+          console.log('[VBT_CAMERA] Camera marked as READY (first frame received)');
+        }
       }
       
       const vbtPose = convertMediapipeLandmarks(landmarkData);
