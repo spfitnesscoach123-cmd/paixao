@@ -28,6 +28,7 @@ import {
   EXERCISE_KEYPOINTS,
   RECOMMENDED_TRACKING_POINTS,
 } from '../trackingProtection';
+import { recordingController } from '../recordingController';
 
 // Helper para criar pose de teste
 function createTestPose(keypoints: Partial<Keypoint>[]): PoseData {
@@ -315,12 +316,20 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
       expect(result.canCountRep).toBe(false);
     });
     
-    test('Sem ponto definido -> bloqueio total', () => {
-      // Não define ponto
-      const result = protectionSystem.processFrame(createSquatPose());
+    test('Sem ponto definido -> stage READY com mensagem apropriada', () => {
+      // Não define ponto - sistema estabiliza mas não pode track
       
-      expect(result.canCalculate).toBe(false);
-      expect(result.message).toContain('BLOQUEADO');
+      // Simula frames para estabilizar primeiro
+      const validPose = createSquatPose(0.5, 0.85);
+      for (let i = 0; i < 6; i++) {
+        protectionSystem.processFrame(validPose);
+      }
+      
+      const result = protectionSystem.processFrame(validPose);
+      
+      // Sem ponto definido, deve estar em READY (estável mas sem tracking)
+      expect(result.validationStage).toBe('READY');
+      expect(result.message).toContain('tracking');
     });
     
     test('CENÁRIO 2: Movimento fora do ponto -> nenhum cálculo', () => {
@@ -412,6 +421,106 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
     test('Velocidades significativas passam', () => {
       const velocity = 0.5; // m/s
       expect(noiseFilter.filterVelocity(velocity)).toBe(velocity);
+    });
+  });
+  
+  describe('RecordingController - Single Source of Truth', () => {
+    beforeEach(() => {
+      // Reset recording controller before each test
+      recordingController.reset();
+    });
+    
+    test('RecordingController starts inactive', () => {
+      expect(recordingController.isActive()).toBe(false);
+    });
+    
+    test('RecordingController.start() sets active to true', () => {
+      recordingController.start();
+      expect(recordingController.isActive()).toBe(true);
+    });
+    
+    test('RecordingController.stop() sets active to false', () => {
+      recordingController.start();
+      expect(recordingController.isActive()).toBe(true);
+      
+      recordingController.stop();
+      expect(recordingController.isActive()).toBe(false);
+    });
+    
+    test('RecordingController.getStartTime() returns timestamp', () => {
+      recordingController.start();
+      const startTime = recordingController.getStartTime();
+      expect(startTime).toBeGreaterThan(0);
+      expect(startTime).toBeLessThanOrEqual(Date.now());
+    });
+    
+    test('RecordingController.reset() clears all state', () => {
+      recordingController.start();
+      expect(recordingController.isActive()).toBe(true);
+      
+      recordingController.reset();
+      expect(recordingController.isActive()).toBe(false);
+      expect(recordingController.getStartTime()).toBe(0);
+    });
+    
+    test('State machine transitions to RECORDING when recordingController is active', () => {
+      const protectionSystem = createTrackingProtection({
+        minKeypointScore: 0.6,
+        requiredStableFrames: 5,
+        minMovementDelta: 0.02,
+      });
+      protectionSystem.setExercise('Back Squat');
+      protectionSystem.setTrackingPoint(0.5, 0.5, 'left_hip');
+      
+      // Stabilize first
+      const validPose = createSquatPose(0.5, 0.85);
+      for (let i = 0; i < 6; i++) {
+        protectionSystem.processFrame(validPose);
+      }
+      
+      // Not recording yet - should be TRACKING
+      let result = protectionSystem.processFrame(validPose);
+      expect(result.validationStage).toBe('TRACKING');
+      
+      // Start recording via controller
+      recordingController.start();
+      
+      // Now should transition to RECORDING within 1 frame
+      result = protectionSystem.processFrame(validPose);
+      expect(result.validationStage).toBe('RECORDING');
+      
+      // Cleanup
+      recordingController.reset();
+    });
+    
+    test('State machine exits RECORDING when recordingController.stop() is called', () => {
+      const protectionSystem = createTrackingProtection({
+        minKeypointScore: 0.6,
+        requiredStableFrames: 5,
+        minMovementDelta: 0.02,
+      });
+      protectionSystem.setExercise('Back Squat');
+      protectionSystem.setTrackingPoint(0.5, 0.5, 'left_hip');
+      
+      // Stabilize and start recording
+      const validPose = createSquatPose(0.5, 0.85);
+      for (let i = 0; i < 6; i++) {
+        protectionSystem.processFrame(validPose);
+      }
+      
+      recordingController.start();
+      let result = protectionSystem.processFrame(validPose);
+      expect(result.validationStage).toBe('RECORDING');
+      
+      // Stop recording
+      recordingController.stop();
+      
+      // Should transition back to TRACKING
+      result = protectionSystem.processFrame(validPose);
+      expect(result.validationStage).toBe('TRACKING');
+      
+      // Cleanup
+      recordingController.reset();
     });
   });
 });
