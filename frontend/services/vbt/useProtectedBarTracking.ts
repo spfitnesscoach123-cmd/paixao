@@ -320,9 +320,16 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   
   /**
    * Start tracking
+   * 
+   * RECORDING BEHAVIOR CHANGE:
+   * - Recording is NOW ALLOWED when state >= READY (stable)
+   * - Recording does NOT require tracking point to be perfectly valid
+   * - Recording will begin capturing frames and transition to active tracking
+   *   once tracking becomes valid
    */
   const startTracking = useCallback(() => {
-    // CAMADA 3: Check if tracking point is set - MANDATORY
+    // CAMADA 3: Check if tracking point is set - STILL MANDATORY for actual tracking
+    // But we ALLOW starting recording to begin stabilization
     if (!isTrackingPointSet) {
       setStatusMessage('ERRO: Defina ponto de tracking antes de iniciar');
       return;
@@ -349,6 +356,8 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       if (tp.isSet) {
         protectionSystemRef.current.setTrackingPoint(tp.x, tp.y, tp.keypointName);
       }
+      // Set recording active - NEW: triggers state transition to RECORDING when valid
+      protectionSystemRef.current.setRecordingActive(true);
     }
     
     // Start simulation if enabled (development/testing mode)
