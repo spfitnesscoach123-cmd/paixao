@@ -201,25 +201,34 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   }, [config.exercise, config.cameraHeight, config.cameraDistance, config.loadKg, simulationEnabled]);
   
   /**
-   * Process pose data through protection system
+   * Process pose data through 5-STAGE PROGRESSIVE VALIDATION pipeline
+   * 
+   * Stage 1: FRAME_USABLE - Pose exists with keypoints
+   * Stage 2: FRAME_STABLE - Enough stable frames accumulated (INDEPENDENT)
+   * Stage 3: FRAME_TRACKABLE - Tracking point valid
+   * Stage 4: FRAME_VALID - Movement detected
+   * Stage 5: FRAME_COUNTABLE - Ready for rep counting
    */
   const processPose = useCallback((pose: PoseData | null) => {
     if (!protectionSystemRef.current || !isTracking) return;
     
     const result = protectionSystemRef.current.processFrame(pose);
     
-    // Update protection state
+    // Update protection state with NEW progressive fields
     setProtectionState(result.state);
-    setIsHumanDetected(result.isValid);
-    setIsStable(protectionSystemRef.current.getStabilityProgress() >= 1);
-    setStabilityProgress(protectionSystemRef.current.getStabilityProgress());
+    setValidationStage(result.validationStage);
+    setValidationFlags(result.validationFlags);
+    setIsHumanDetected(result.validationFlags.frameUsable);
+    setIsStable(result.validationFlags.frameStable);
+    setStabilityProgress(result.stabilityProgress);
+    setStableFrameCount(result.stableFrameCount);
     setCanCalculate(result.canCalculate);
     setStatusMessage(result.message);
     setTrackingPointState(result.trackingPoint);
     setRepPhase(protectionSystemRef.current.getRepPhase());
     
-    // Only process velocity if allowed
-    if (result.canCalculate && result.smoothedPosition && trackerRef.current) {
+    // Only process velocity if allowed (Stage 3+ is trackable)
+    if (result.canCalculate && result.validationFlags.frameTrackable && result.smoothedPosition && trackerRef.current) {
       const barPosition: BarPosition = {
         x: result.smoothedPosition.x,
         y: result.smoothedPosition.y,
