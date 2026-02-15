@@ -9,6 +9,7 @@
  * - useBarTracking: Basic React hook (simulation/dev)
  * - trackingProtection: 3-layer protection system
  * - useProtectedBarTracking: Protected React hook for production
+ * - diagnostics: Real-time diagnostic logging for debugging
  * 
  * PROTECTION LAYERS:
  * 1. Human Presence Validation - Requires keypoints with score >= 0.6
@@ -20,6 +21,7 @@ export * from './barTracker';
 export * from './useBarTracking';
 export * from './trackingProtection';
 export * from './useProtectedBarTracking';
+export * from './diagnostics';
 
 // Re-export types
 export type {
@@ -49,3 +51,9 @@ export type {
   ProtectedRepData,
   ProtectedTrackingResult,
 } from './useProtectedBarTracking';
+
+export type {
+  VBTDiagnosticFrame,
+  BlockingDiagnosis,
+  LayerStatus,
+} from './diagnostics';
