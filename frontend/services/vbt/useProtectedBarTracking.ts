@@ -209,9 +209,20 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
    * Stage 3: FRAME_TRACKABLE - Tracking point valid
    * Stage 4: FRAME_VALID - Movement detected
    * Stage 5: FRAME_COUNTABLE - Ready for rep counting
+   * 
+   * CRITICAL: This function MUST process poses in ALL phases, not just during isTracking.
+   * The protection system needs continuous pose data to:
+   * - Detect human presence
+   * - Build stability frames
+   * - Validate tracking point selection
+   * 
+   * If we only process when isTracking === true, the system will remain stuck
+   * showing "N/A" for trackingPoint, humanPresence, and stability = 0
    */
   const processPose = useCallback((pose: PoseData | null) => {
-    if (!protectionSystemRef.current || !isTracking) return;
+    // Only check for protection system, NOT isTracking
+    // We need to process frames in all phases for stability and human detection
+    if (!protectionSystemRef.current) return;
     
     const result = protectionSystemRef.current.processFrame(pose);
     
@@ -228,22 +239,26 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     setTrackingPointState(result.trackingPoint);
     setRepPhase(protectionSystemRef.current.getRepPhase());
     
-    // Only process velocity if allowed (Stage 3+ is trackable)
-    if (result.canCalculate && result.validationFlags.frameTrackable && result.smoothedPosition && trackerRef.current) {
-      const barPosition: BarPosition = {
-        x: result.smoothedPosition.x,
-        y: result.smoothedPosition.y,
-        confidence: 1,
-        timestamp: Date.now(),
-      };
+    // Only process velocity and rep counting when ACTIVELY TRACKING (recording phase)
+    // Stability and human detection should work in all phases
+    if (isTracking) {
+      // Only process velocity if allowed (Stage 3+ is trackable)
+      if (result.canCalculate && result.validationFlags.frameTrackable && result.smoothedPosition && trackerRef.current) {
+        const barPosition: BarPosition = {
+          x: result.smoothedPosition.x,
+          y: result.smoothedPosition.y,
+          confidence: 1,
+          timestamp: Date.now(),
+        };
+        
+        const velocityData = trackerRef.current.processPosition(barPosition);
+        processVelocityData(velocityData, result.trackingPoint?.keypointName || '');
+      }
       
-      const velocityData = trackerRef.current.processPosition(barPosition);
-      processVelocityData(velocityData, result.trackingPoint?.keypointName || '');
-    }
-    
-    // Handle rep completion from protection system
-    if (result.canCountRep) {
-      handleRepCompletion(result.trackingPoint?.keypointName || '');
+      // Handle rep completion from protection system
+      if (result.canCountRep) {
+        handleRepCompletion(result.trackingPoint?.keypointName || '');
+      }
     }
   }, [isTracking]);
   
