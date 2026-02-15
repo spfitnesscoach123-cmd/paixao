@@ -7,14 +7,16 @@
  * COMPONENTS:
  * - barTracker: Core tracking logic, physics calculations, position processing
  * - useBarTracking: Basic React hook (simulation/dev)
- * - trackingProtection: 3-layer protection system
+ * - trackingProtection: 5-STAGE PROGRESSIVE VALIDATION pipeline
  * - useProtectedBarTracking: Protected React hook for production
  * - diagnostics: Real-time diagnostic logging for debugging
  * 
- * PROTECTION LAYERS:
- * 1. Human Presence Validation - Requires keypoints with score >= 0.6
- * 2. State Machine Control - noHuman | ready | executing
- * 3. Coach-Defined Tracking Point - Manual point selection required
+ * PROGRESSIVE VALIDATION STAGES:
+ * 1. FRAME_USABLE - Pose exists with keypoints
+ * 2. FRAME_STABLE - Enough stable frames (INDEPENDENT of tracking)
+ * 3. FRAME_TRACKABLE - Tracking point valid
+ * 4. FRAME_VALID - Movement detected
+ * 5. FRAME_COUNTABLE - Ready for rep counting
  */
 
 export * from './barTracker';
@@ -42,6 +44,8 @@ export type {
   PoseData,
   TrackingPoint,
   TrackingState,
+  ValidationStage,
+  ValidationFlags,
   ProtectionConfig,
   ProtectionResult,
 } from './trackingProtection';
