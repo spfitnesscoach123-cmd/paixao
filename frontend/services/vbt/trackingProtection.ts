@@ -129,6 +129,24 @@ export const RECOMMENDED_TRACKING_POINTS: Record<string, string> = {
   'Row': 'left_elbow',
 };
 
+// Exercise movement direction type
+// 'down' = eccentric-first (starts with descent): Squat, Bench Press, Hip Thrust
+// 'up' = concentric-first (starts with lift): Deadlift, Power Clean, Hang Clean
+export const EXERCISE_START_DIRECTION: Record<string, 'down' | 'up'> = {
+  'Back Squat': 'down',
+  'Front Squat': 'down',
+  'Bench Press': 'down',
+  'Deadlift': 'up',       // Starts from floor, lift UP first
+  'Power Clean': 'up',     // Starts from floor, lift UP first
+  'Hang Clean': 'up',      // Starts with pull UP
+  'Push Press': 'down',    // Dip down first, then press
+  'Hip Thrust': 'down',    // Lower first, then thrust up
+  'Leg Press': 'down',
+  'Shoulder Press': 'down',
+  'Pull Up': 'up',         // Pull UP first
+  'Row': 'up',             // Pull UP first
+};
+
 const DEFAULT_CONFIG: ProtectionConfig = {
   minKeypointScore: 0.6,
   minUsableScore: 0.3,              // NEW: Lower threshold for frame_usable
