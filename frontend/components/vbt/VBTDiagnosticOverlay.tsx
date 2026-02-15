@@ -3,16 +3,25 @@
  * 
  * Displays real-time diagnostic information on screen during VBT recording.
  * Shows all protection layer statuses, thresholds, and blocking reasons.
+ * 
+ * IMPORTANT: Also shows MediaPipe frame reception status to help diagnose
+ * the "Waiting for first frame" issue.
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { vbtDiagnostics, VBTDiagnosticFrame, BlockingDiagnosis } from '../../services/vbt/diagnostics';
 
 interface DiagnosticOverlayProps {
   visible?: boolean;
   compact?: boolean;
   onClose?: () => void;
+  /** Number of frames received from MediaPipe */
+  frameCount?: number;
+  /** Is MediaPipe available */
+  mediapipeAvailable?: boolean;
+  /** Current platform */
+  currentPlatform?: string;
 }
 
 export const VBTDiagnosticOverlay: React.FC<DiagnosticOverlayProps> = ({
