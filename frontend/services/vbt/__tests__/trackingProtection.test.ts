@@ -371,7 +371,7 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
       // Reset
       protectionSystem.reset();
       
-      expect(protectionSystem.getState()).toBe('noHuman');
+      expect(protectionSystem.getValidationStage()).toBe('INITIALIZING');
       expect(protectionSystem.getStabilityProgress()).toBe(0);
     });
   });
