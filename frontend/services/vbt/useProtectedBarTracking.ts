@@ -121,11 +121,20 @@ const TRACKING_INTERVAL = 33; // ~30 fps
 // ============================================================================
 
 export function useProtectedBarTracking(config: ProtectedTrackingConfig): ProtectedTrackingResult {
-  // Protection system state
+  // Protection system state (Progressive Stages)
   const [protectionState, setProtectionState] = useState<TrackingState>('noHuman');
+  const [validationStage, setValidationStage] = useState<ValidationStage>('INITIALIZING');
+  const [validationFlags, setValidationFlags] = useState<ValidationFlags>({
+    frameUsable: false,
+    frameStable: false,
+    frameTrackable: false,
+    frameValid: false,
+    frameCountable: false,
+  });
   const [isHumanDetected, setIsHumanDetected] = useState(false);
   const [isStable, setIsStable] = useState(false);
   const [stabilityProgress, setStabilityProgress] = useState(0);
+  const [stableFrameCount, setStableFrameCount] = useState(0);
   const [canCalculate, setCanCalculate] = useState(false);
   const [statusMessage, setStatusMessage] = useState('Aguardando seleção de ponto de tracking...');
   
@@ -162,10 +171,10 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   // Recommended tracking point based on exercise
   const recommendedTrackingPoint = RECOMMENDED_TRACKING_POINTS[config.exercise] || 'left_hip';
   
-  // Initialize systems
+  // Initialize systems with NEW progressive architecture
   useEffect(() => {
-    // Create protection system
-    protectionSystemRef.current = createProtectionSystem({
+    // Create protection system with progressive validation
+    protectionSystemRef.current = createTrackingProtection({
       ...config.protectionConfig,
       exerciseKeypoints: EXERCISE_KEYPOINTS[config.exercise] || [],
     });
