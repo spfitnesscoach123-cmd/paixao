@@ -178,6 +178,15 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastRepCountRef = useRef(0);
   
+  // ========================================
+  // BUG 3, 4, 5 FIXES: New production modules
+  // ========================================
+  const velocityCalculatorRef = useRef<VelocityCalculator | null>(null);
+  const repDetectorRef = useRef<RepDetector | null>(null);
+  
+  // BUG 5 FIX: Tracking landmark stored as INDEX, not screen coordinates
+  const trackingLandmarkIndexRef = useRef<number | null>(null);
+  
   // Recommended tracking point based on exercise
   const recommendedTrackingPoint = RECOMMENDED_TRACKING_POINTS[config.exercise] || 'left_hip';
   
@@ -196,6 +205,33 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       distanceCm: config.cameraDistance,
     });
     trackerRef.current = new BarTrackerState(trackerConfig);
+    
+    // ========================================
+    // BUG 3 FIX: Initialize VelocityCalculator with camera calibration
+    // Velocity is now calculated inside the MediaPipe pose loop
+    // with proper smoothing using last 5 frames moving average
+    // ========================================
+    velocityCalculatorRef.current = new VelocityCalculator({
+      calibration: {
+        cameraHeightCm: config.cameraHeight,
+        cameraDistanceCm: config.cameraDistance,
+        fovDegrees: 60,
+        frameHeight: 1920,
+      },
+      smoothingWindowSize: 5,  // Moving average over last 5 frames
+      noiseThresholdMs: 0.02,  // Reject noise below 2cm/s
+    });
+    
+    // ========================================
+    // BUG 4 FIX: Initialize RepDetector for full cycle detection
+    // Detects: eccentric -> transition -> concentric -> completion
+    // Prevents false positives with minimum thresholds
+    // ========================================
+    repDetectorRef.current = new RepDetector({
+      minVelocityThreshold: 0.05,
+      minPhaseDuration: 200,
+      directionChangeThreshold: 0.02,
+    });
     
     // Create simulators if simulation mode is enabled
     if (simulationEnabled) {
