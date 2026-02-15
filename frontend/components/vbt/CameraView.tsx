@@ -200,7 +200,7 @@ const CameraView = forwardRef<CameraViewRef, CameraViewProps>((props, ref) => {
     console.log('[CameraView] Starting recording...');
     
     // CRITICAL: Call the actual native recording method
-    const success = await recordingPipelineRef.current?.startRecording(cameraRef) ?? false;
+    const success = await recordingPipelineRef.current?.startRecording(cameraRef as React.RefObject<ExpoCameraView>) ?? false;
     
     return success;
   }, [isCameraReady]);
@@ -216,7 +216,7 @@ const CameraView = forwardRef<CameraViewRef, CameraViewProps>((props, ref) => {
     
     console.log('[CameraView] Stopping recording...');
     
-    const result = await recordingPipelineRef.current.stopRecording(cameraRef);
+    const result = await recordingPipelineRef.current.stopRecording(cameraRef as React.RefObject<ExpoCameraView>);
     return result;
   }, []);
 
