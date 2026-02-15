@@ -369,7 +369,15 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
               };
               setRepsData(prev => [...prev, newRepData]);
               
-              console.log(`[VBT] Rep ${newRepCount} completed! Mean: ${repResult.currentRep.meanVelocity.toFixed(3)} m/s`);
+              console.log(`[VBT] ============= REP ${newRepCount} COMPLETED =============`);
+              console.log(`[VBT] Mean Velocity: ${repResult.currentRep.meanVelocity.toFixed(3)} m/s`);
+              console.log(`[VBT] Peak Velocity: ${repResult.currentRep.peakVelocity.toFixed(3)} m/s`);
+              console.log(`[VBT] Velocity Drop: ${repResult.currentRep.velocityDrop.toFixed(1)}%`);
+              console.log(`[VBT] newRepData:`, JSON.stringify(newRepData));
+            } else if (repResult.repCompleted) {
+              // DEBUG: Log if repCompleted is true but currentRep is null
+              console.warn('[VBT] WARNING: repCompleted=true but currentRep is null!');
+              console.warn('[VBT] repResult:', JSON.stringify(repResult));
             }
             
             // Update feedback color based on velocity drop
