@@ -1620,6 +1620,26 @@ export default function VBTCameraPage() {
               </TouchableOpacity>
             )}
           </View>
+          
+          {/* Diagnostic Toggle Button */}
+          <TouchableOpacity
+            style={styles.diagnosticToggleButton}
+            onPress={() => setShowDiagnosticOverlay(!showDiagnosticOverlay)}
+            data-testid="diagnostic-toggle-btn"
+          >
+            <Ionicons 
+              name={showDiagnosticOverlay ? 'bug' : 'bug-outline'} 
+              size={20} 
+              color={showDiagnosticOverlay ? '#10b981' : '#6b7280'} 
+            />
+          </TouchableOpacity>
+          
+          {/* VBT Diagnostic Overlay - Real-time debugging */}
+          <VBTDiagnosticOverlay 
+            visible={showDiagnosticOverlay}
+            compact={isTracking} /* Use compact mode during active recording */
+            onClose={() => setShowDiagnosticOverlay(false)}
+          />
         </View>
       )}
       
