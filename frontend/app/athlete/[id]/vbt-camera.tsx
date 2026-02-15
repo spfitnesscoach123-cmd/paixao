@@ -684,7 +684,7 @@ export default function VBTCameraPage() {
     } catch (e) {
       console.error('[VBT_CAMERA] Error processing MediaPipe landmark:', e);
     }
-  }, [phase, isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate]);
+  }, [phase, isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate, cameraReady]);
 
   // Legacy handler name for compatibility
   const handleMediapipePoseDetected = handleMediapipeLandmark;
