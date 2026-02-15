@@ -24,10 +24,25 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
   - State Machine: INITIALIZING → STABILIZING → READY → TRACKING → RECORDING
   - Stabilization now INDEPENDENT of tracking point validation
 - [x] **Diagnostic Instrumentation** - Real-time debugging overlay
+- [x] **RecordingController Refactor** (December 2025) ✨ NEW
+  - Created global `RecordingController` singleton as SINGLE SOURCE OF TRUTH
+  - Removed `setRecordingActive()` method from `ProgressiveStateMachine`
+  - State machine now reads directly from `recordingController.isActive()`
+  - Automatic transition TRACKING → RECORDING when recording is active
+  - Added `[VBT_STATE_CHECK]` diagnostic logging
+  - All 34 unit tests passing
 
 ## Architecture Documentation
 - `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
 - `/app/frontend/docs/VBT_DIAGNOSTIC_INSTRUMENTATION.md` - Debugging guide
+- `/app/frontend/services/vbt/recordingController.ts` - Recording state singleton
+
+## Key Files Modified (RecordingController Refactor)
+- `services/vbt/recordingController.ts` - NEW: Single source of truth for recording state
+- `services/vbt/trackingProtection.ts` - Refactored to use recordingController
+- `services/vbt/useProtectedBarTracking.ts` - Updated to call recordingController.start()/stop()
+- `services/vbt/index.ts` - Export recordingController
+- `services/vbt/__tests__/trackingProtection.test.ts` - Added RecordingController tests
 
 ## Current Blocker 🔴
 **iOS Build requires interactive credential setup**
@@ -43,10 +58,11 @@ eas build --platform ios --profile production --clear-cache
 ```
 
 ## Pending Issues (P1-P3)
-1. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
-2. **P1**: Internationalization of "Avaliações" page
-3. **P2**: Test `gps_import` pipeline with `identity_resolver`
-4. **P3**: Back button icon not rendering on web
+1. **P1**: Verify diagnostic overlay works with new RecordingController
+2. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
+3. **P1**: Internationalization of "Avaliações" page
+4. **P2**: Test `gps_import` pipeline with `identity_resolver`
+5. **P3**: Back button icon not rendering on web
 
 ## Future Tasks
 - Integrate identity resolution into `force_import` and `wellness_import`
