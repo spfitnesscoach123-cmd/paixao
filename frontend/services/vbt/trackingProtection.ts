@@ -819,10 +819,21 @@ export class NoiseFilter {
 
   /**
    * Filter out micro-movements (noise)
+   * INSTRUMENTED: Logs filtering decisions
    */
   filterMovement(delta: number): number {
     // Ignore movements smaller than threshold
-    if (Math.abs(delta) < this.config.minMovementDelta) {
+    const passed = Math.abs(delta) >= this.config.minMovementDelta;
+    
+    // DIAGNOSTIC LOG
+    vbtDiagnostics.logNoiseFilter(
+      delta,
+      passed ? delta : 0,
+      this.config.minMovementDelta,
+      passed
+    );
+    
+    if (!passed) {
       return 0;
     }
     
@@ -832,10 +843,22 @@ export class NoiseFilter {
 
   /**
    * Filter velocity value
+   * INSTRUMENTED: Logs filtering decisions
    */
   filterVelocity(velocity: number): number {
+    const threshold = 0.05; // 5cm/s threshold
+    const passed = Math.abs(velocity) >= threshold;
+    
+    // DIAGNOSTIC LOG
+    vbtDiagnostics.logVelocityFilter(
+      velocity,
+      passed ? velocity : 0,
+      threshold,
+      passed
+    );
+    
     // Ignore micro-velocities
-    if (Math.abs(velocity) < 0.05) { // 5cm/s threshold
+    if (!passed) {
       return 0;
     }
     return velocity;
