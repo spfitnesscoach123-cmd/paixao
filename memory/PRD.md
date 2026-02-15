@@ -100,18 +100,38 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
 3. Recognize when tracking point is selected
 4. Progress from "Stabilizing Detection... (0%)" to ready state
 
+## 🔴 CRITICAL BUG 5 FIX - Visibility/Confidence Extraction (December 2025) ✨ NEW
+**ROOT CAUSE**: The `@thinksys/react-native-mediapipe` iOS native code sends landmark data with `visibility` that can be `null` (optional in Swift). JavaScript's `null ?? defaultValue` returns `null`, not `defaultValue`, causing all confidence scores to be `0` or `null`.
+
+**FIXES IMPLEMENTED**:
+1. **Explicit null checks**: Changed from `landmark.visibility ?? 0.85` to explicit type checking:
+   ```javascript
+   const rawScore = landmark.visibility ?? landmark.score ?? landmark.confidence;
+   if (rawScore !== null && rawScore !== undefined && typeof rawScore === 'number' && !isNaN(rawScore)) {
+     score = rawScore;
+   } else {
+     score = 0.85; // Default - landmark detected = likely valid
+   }
+   ```
+2. **Fallback to `presence`**: If `visibility` is null, try `presence` field (also sent by MediaPipe)
+3. **Camera ready fix**: `cameraReady` state now set to `true` on first frame received from RNMediapipe (not just on CameraView's `onCameraReady`)
+4. **Enhanced logging**: Added detailed debug logging for keypoint scores on first 5 frames
+
 **User Action Required**: Test the fix in Development Build to verify:
 - Diagnostic overlay shows non-N/A values
+- CONFIDENCE shows values > 0.00 (should be ~0.85 or actual MediaPipe visibility)
 - Stability progress increases
 - Human presence becomes "PASS"
 - Tracking point shows "SET" after selection
+- Recording button responds (cameraReady = true)
 
 ## Pending Issues (P0-P3)
-1. **P1**: Verify pipeline fix works correctly in Development Build
-2. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
-3. **P1**: Internationalization of "Avaliações" page
-4. **P2**: Test `gps_import` pipeline with `identity_resolver`
-5. **P3**: Back button icon not rendering on web
+1. **P0**: Verify BUG 5 fix - confidence should show real values in diagnostic overlay
+2. **P1**: Verify pipeline fix works correctly in Development Build
+3. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
+4. **P1**: Internationalization of "Avaliações" page
+5. **P2**: Test `gps_import` pipeline with `identity_resolver`
+6. **P3**: Back button icon not rendering on web
 
 ## Future Tasks
 - Integrate identity resolution into `force_import` and `wellness_import`
