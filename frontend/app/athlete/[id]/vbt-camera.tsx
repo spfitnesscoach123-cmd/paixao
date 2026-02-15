@@ -494,12 +494,53 @@ export default function VBTCameraPage() {
     };
   }, []);
 
+  // Frame counter for detecting if onLandmark is being called
+  const landmarkCallCountRef = useRef(0);
+  const lastLandmarkLogTimeRef = useRef(Date.now());
+  
+  // Log frame reception rate every 5 seconds
+  useEffect(() => {
+    const logInterval = setInterval(() => {
+      const now = Date.now();
+      const elapsedSec = (now - lastLandmarkLogTimeRef.current) / 1000;
+      const fps = landmarkCallCountRef.current / elapsedSec;
+      
+      if (shouldMountCamera) {
+        console.log(`[VBT_CAMERA] 📊 Frame Reception Rate: ${fps.toFixed(1)} FPS (${landmarkCallCountRef.current} frames in ${elapsedSec.toFixed(1)}s)`);
+        
+        if (landmarkCallCountRef.current === 0) {
+          console.warn('[VBT_CAMERA] ⚠️ NO FRAMES RECEIVED! Possible causes:');
+          console.warn('[VBT_CAMERA]   1. Using Expo Go instead of Development Build');
+          console.warn('[VBT_CAMERA]   2. MediaPipe native module not linked');
+          console.warn('[VBT_CAMERA]   3. Camera permissions not granted');
+          console.warn('[VBT_CAMERA]   4. Camera isActive is false');
+        }
+      }
+      
+      landmarkCallCountRef.current = 0;
+      lastLandmarkLogTimeRef.current = now;
+    }, 5000);
+    
+    return () => clearInterval(logInterval);
+  }, [shouldMountCamera]);
+
   // Handle REAL pose detection from native MediaPipe (@thinksys/react-native-mediapipe)
   // This is called via onLandmark prop - processes BOTH during tracking AND point selection
+  // IMPORTANT: This callback WILL NOT be called in Expo Go - only in Development/EAS builds
   const handleMediapipeLandmark = useCallback((event: any) => {
+    // Increment frame counter
+    landmarkCallCountRef.current++;
+    
     try {
       // @thinksys/react-native-mediapipe passes data directly or via nativeEvent
       const landmarkData = event?.nativeEvent || event;
+      
+      // Log first frame received
+      if (landmarkCallCountRef.current === 1) {
+        console.log('[VBT_CAMERA] ✅ FIRST FRAME RECEIVED! MediaPipe is working.');
+        console.log('[VBT_CAMERA] Raw event type:', typeof event);
+        console.log('[VBT_CAMERA] Has nativeEvent:', !!event?.nativeEvent);
+      }
       
       const vbtPose = convertMediapipeLandmarks(landmarkData);
       
@@ -511,14 +552,18 @@ export default function VBTCameraPage() {
         if (vbtPose && vbtPose.keypoints.length > 0) {
           // Pass REAL pose data to the VBT pipeline
           processPose(vbtPose);
-          console.log('[VBTCamera] Frame processed: state=' + protectionState + ', stable=' + isStable + ', canCalc=' + canCalculate);
+          
+          // Log every 30 frames to avoid spam
+          if (landmarkCallCountRef.current % 30 === 0) {
+            console.log('[VBT_CAMERA] Frame processed: state=' + protectionState + ', stable=' + isStable + ', canCalc=' + canCalculate);
+          }
         } else {
           // No pose detected - pass empty pose to trigger no-human state
           processPose({ keypoints: [], timestamp: Date.now() });
         }
       }
     } catch (e) {
-      console.error('[VBTCamera] Error processing MediaPipe landmark:', e);
+      console.error('[VBT_CAMERA] Error processing MediaPipe landmark:', e);
     }
   }, [isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate]);
 
