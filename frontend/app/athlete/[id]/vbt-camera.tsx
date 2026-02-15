@@ -1741,6 +1741,9 @@ export default function VBTCameraPage() {
             visible={showDiagnosticOverlay}
             compact={isTracking} /* Use compact mode during active recording */
             onClose={() => setShowDiagnosticOverlay(false)}
+            frameCount={landmarkCallCountRef.current}
+            mediapipeAvailable={MEDIAPIPE_AVAILABLE}
+            currentPlatform={Platform.OS}
           />
         </View>
       )}
