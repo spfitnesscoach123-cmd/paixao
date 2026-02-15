@@ -504,6 +504,16 @@ export default function VBTPage() {
                 </Text>
                 <Text style={styles.summaryLabel}>1RM Est.</Text>
               </View>
+              {analysis.load_velocity_profile.optimal_load && (
+                <View style={styles.summaryCard}>
+                  <Text style={[styles.summaryValue, { color: '#f59e0b' }]}>
+                    {analysis.load_velocity_profile.optimal_load}
+                  </Text>
+                  <Text style={styles.summaryLabel}>
+                    kg {locale === 'pt' ? 'Ótimo' : 'Optimal'}
+                  </Text>
+                </View>
+              )}
               <View style={styles.summaryCard}>
                 <Text style={styles.summaryValue}>{analysis.latest_session.max_power}</Text>
                 <Text style={styles.summaryLabel}>W Max</Text>
