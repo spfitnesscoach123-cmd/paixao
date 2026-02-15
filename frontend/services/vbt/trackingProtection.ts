@@ -586,12 +586,14 @@ export class TrackingPointManager {
       isSet: true,
     };
     this.positionHistory = [];
+    console.log(`[VBT_DIAG][LAYER3] Tracking point SET: ${keypointName} at (${x.toFixed(3)}, ${y.toFixed(3)})`);
   }
 
   /**
    * Clear the tracking point
    */
   clearTrackingPoint(): void {
+    console.log(`[VBT_DIAG][LAYER3] Tracking point CLEARED (was: ${this.trackingPoint.keypointName})`);
     this.trackingPoint = {
       x: 0,
       y: 0,
@@ -618,6 +620,7 @@ export class TrackingPointManager {
   /**
    * Get the position of the tracking point from pose data
    * CAMADA 3: Ponto de tracking definido pelo coach
+   * INSTRUMENTED: Logs all tracking point checks
    * Returns null if point not found or confidence too low
    */
   getTrackedPosition(pose: PoseData | null): {
@@ -627,6 +630,16 @@ export class TrackingPointManager {
     message: string;
   } {
     if (!this.trackingPoint.isSet) {
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logTrackingPointCheck(
+        false, // isSet
+        null, // keypointName
+        false, // keypointFound
+        0, // confidence
+        this.config.minKeypointScore, // minConfidence
+        false // passed
+      );
+      
       return {
         position: null,
         confidence: 0,
@@ -636,6 +649,16 @@ export class TrackingPointManager {
     }
 
     if (!pose || !pose.keypoints) {
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logTrackingPointCheck(
+        true, // isSet
+        this.trackingPoint.keypointName, // keypointName
+        false, // keypointFound
+        0, // confidence
+        this.config.minKeypointScore, // minConfidence
+        false // passed
+      );
+      
       return {
         position: null,
         confidence: 0,
@@ -648,6 +671,16 @@ export class TrackingPointManager {
     const keypoint = pose.keypoints.find(kp => kp.name === this.trackingPoint.keypointName);
 
     if (!keypoint) {
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logTrackingPointCheck(
+        true, // isSet
+        this.trackingPoint.keypointName, // keypointName
+        false, // keypointFound
+        0, // confidence
+        this.config.minKeypointScore, // minConfidence
+        false // passed
+      );
+      
       return {
         position: null,
         confidence: 0,
@@ -657,6 +690,16 @@ export class TrackingPointManager {
     }
 
     if (keypoint.score < this.config.minKeypointScore) {
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logTrackingPointCheck(
+        true, // isSet
+        this.trackingPoint.keypointName, // keypointName
+        true, // keypointFound
+        keypoint.score, // confidence
+        this.config.minKeypointScore, // minConfidence
+        false // passed
+      );
+      
       return {
         position: null,
         confidence: keypoint.score,
@@ -664,6 +707,16 @@ export class TrackingPointManager {
         message: `Confiança do ponto muito baixa: ${(keypoint.score * 100).toFixed(0)}% (mín: 60%)`,
       };
     }
+
+    // DIAGNOSTIC LOG - SUCCESS
+    vbtDiagnostics.logTrackingPointCheck(
+      true, // isSet
+      this.trackingPoint.keypointName, // keypointName
+      true, // keypointFound
+      keypoint.score, // confidence
+      this.config.minKeypointScore, // minConfidence
+      true // passed
+    );
 
     return {
       position: { x: keypoint.x, y: keypoint.y },
