@@ -1,25 +1,27 @@
 /**
  * useProtectedBarTracking Hook
  * 
- * Enhanced React hook with 3-layer protection system:
- * - Layer 1: Human presence validation
- * - Layer 2: State machine control
- * - Layer 3: Coach-defined tracking point
+ * Enhanced React hook with 5-STAGE PROGRESSIVE VALIDATION pipeline:
+ * - Stage 1: FRAME_USABLE - Pose exists with keypoints
+ * - Stage 2: FRAME_STABLE - Enough stable frames accumulated (INDEPENDENT of tracking)
+ * - Stage 3: FRAME_TRACKABLE - Tracking point valid
+ * - Stage 4: FRAME_VALID - Movement detected
+ * - Stage 5: FRAME_COUNTABLE - Ready for rep counting
  * 
- * This hook wraps the protection system with React state management.
- * Supports both real MediaPipe pose detection and simulation for development.
+ * CRITICAL: Stabilization is INDEPENDENT of tracking point validation.
+ * This breaks the circular dependency that caused infinite stabilization loops.
  * 
- * INTEGRATION:
- * - Real detection: Uses PoseDetector from services/pose
- * - Simulation: Uses built-in BarPositionSimulator
+ * Recording can begin when state >= READY (stable), even before tracking is perfect.
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   TrackingProtectionSystem,
-  createProtectionSystem,
+  createTrackingProtection,
   ProtectionResult,
   TrackingState,
+  ValidationStage,
+  ValidationFlags,
   TrackingPoint,
   PoseData,
   Keypoint,
