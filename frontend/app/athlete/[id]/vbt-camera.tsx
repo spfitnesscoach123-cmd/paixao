@@ -259,32 +259,40 @@ export default function VBTCameraPage() {
   // Frame count state for diagnostic overlay (refs don't trigger re-render)
   const [displayFrameCount, setDisplayFrameCount] = useState(0);
   
-  // Camera facing control - EXPLICIT CONTROL
+  // ========================================
+  // BUG 1 FIX: Camera facing uses useRef as source of truth
+  // State is only for UI synchronization, ref persists across re-renders
+  // Camera must NEVER reset during tracking, recording, or MediaPipe initialization
+  // ========================================
+  const cameraFacingRef = useRef<'front' | 'back'>('back');
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
   
   // Log camera state on mount and changes
   useEffect(() => {
-    console.log("[VBT_CAMERA] Current camera facing:", cameraFacing);
+    console.log("[VBT_CAMERA] Camera facing ref:", cameraFacingRef.current, "state:", cameraFacing);
   }, [cameraFacing]);
   
-  // Toggle camera function - SYNCHRONIZED STATE + NATIVE CALL
+  // Toggle camera function - useRef as source of truth
+  // BUG 1 FIX: Camera toggle explicitly updates ref first, then state
   const toggleCamera = useCallback(() => {
-    setCameraFacing(prev => {
-      const next = prev === 'back' ? 'front' : 'back';
-      
-      // Call native switchCamera in sync with state update
-      if (Platform.OS !== 'web' && switchCamera) {
-        try {
-          switchCamera();
-        } catch (e) {
-          console.warn("[VBT_CAMERA] switchCamera failed:", e);
-        }
+    // Update ref (source of truth) FIRST
+    const newFacing = cameraFacingRef.current === 'back' ? 'front' : 'back';
+    cameraFacingRef.current = newFacing;
+    
+    // Update state for UI synchronization
+    setCameraFacing(newFacing);
+    
+    // Call native switchCamera in sync with ref update
+    if (Platform.OS !== 'web' && switchCamera) {
+      try {
+        switchCamera();
+        console.log("[VBT_CAMERA] Native switchCamera called successfully");
+      } catch (e) {
+        console.warn("[VBT_CAMERA] switchCamera failed:", e);
       }
-      
-      console.log("[VBT_CAMERA] Camera switched to:", next);
-      
-      return next;
-    });
+    }
+    
+    console.log("[VBT_CAMERA] Camera switched to:", newFacing, "(ref:", cameraFacingRef.current, ")");
   }, []);
   
   // Tutorial animations
