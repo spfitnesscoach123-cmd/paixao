@@ -167,6 +167,7 @@ export class RepDetector {
 
   /**
    * Process ECCENTRIC phase - descending movement
+   * FIXED: Transition based on DIRECTION CHANGE, not velocity threshold
    */
   private processEccentric(
     velocity: number,
@@ -185,10 +186,22 @@ export class RepDetector {
       return false;
     }
     
-    // Detect transition to bottom (velocity drops to stationary)
-    if (absVelocity < this.config.directionChangeThreshold) {
+    // FIXED: Detect transition based on DIRECTION CHANGE or velocity drop
+    // When direction changes from 'down' to 'up' or 'stationary', we hit the bottom
+    if (direction === 'up') {
+      // Direct transition to concentric when direction changes
+      this.transitionToPhase('concentric', now);
+      this.concentricStartTime = now;
+      this.concentricVelocities = [absVelocity];
+      this.peakConcentricVelocity = absVelocity;
+      console.log('[RepDetector] ECCENTRIC -> CONCENTRIC (direction change)');
+      return false;
+    }
+    
+    // Also transition if velocity drops significantly (stationary at bottom)
+    if (direction === 'stationary' || absVelocity < this.config.directionChangeThreshold) {
       this.transitionToPhase('transition', now);
-      console.log('[RepDetector] Entered TRANSITION phase');
+      console.log('[RepDetector] ECCENTRIC -> TRANSITION (velocity drop)');
     }
     
     return false;
