@@ -1,19 +1,27 @@
 /**
- * Test Suite para o Sistema de 3 Camadas de Proteção VBT
+ * Test Suite para o Sistema de 5 Estágios de Validação Progressiva VBT
  * 
  * CENÁRIOS DE VALIDAÇÃO OBRIGATÓRIOS:
  * 1. Cena vazia -> nenhum cálculo
  * 2. Movimento fora do ponto definido -> nenhum cálculo
  * 3. Baixa confiança -> nenhum cálculo
  * 4. Movimento válido -> contagem correta
+ * 
+ * ARQUITETURA PROGRESSIVA:
+ * Stage 1: FRAME_USABLE
+ * Stage 2: FRAME_STABLE
+ * Stage 3: FRAME_TRACKABLE
+ * Stage 4: FRAME_VALID
+ * Stage 5: FRAME_COUNTABLE
  */
 
 import {
   TrackingProtectionSystem,
-  createProtectionSystem,
+  createTrackingProtection,
   HumanPresenceValidator,
   TrackingStateMachine,
   TrackingPointManager,
+  FrameStabilityValidator,
   NoiseFilter,
   PoseData,
   Keypoint,
