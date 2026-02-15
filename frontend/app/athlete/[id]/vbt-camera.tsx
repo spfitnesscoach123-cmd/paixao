@@ -256,6 +256,9 @@ export default function VBTCameraPage() {
   // Diagnostic overlay state - Enable for debugging pipeline blockers
   const [showDiagnosticOverlay, setShowDiagnosticOverlay] = useState<boolean>(true);
   
+  // Frame count state for diagnostic overlay (refs don't trigger re-render)
+  const [displayFrameCount, setDisplayFrameCount] = useState(0);
+  
   // Camera facing control - EXPLICIT CONTROL
   const [cameraFacing, setCameraFacing] = useState<'front' | 'back'>('back');
   
