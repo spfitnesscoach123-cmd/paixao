@@ -18,6 +18,16 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
 - [x] EAS project created and linked: `f4714b6a-260d-41fa-9c24-a4e0e6f28b6d`
 - [x] eas.json configured with appVersionSource: "local"
 - [x] app.json updated with projectId
+- [x] **5-STAGE PROGRESSIVE VALIDATION PIPELINE** (December 2025)
+  - Eliminated circular dependency causing infinite stabilization
+  - Stages: FRAME_USABLE → FRAME_STABLE → FRAME_TRACKABLE → FRAME_VALID → FRAME_COUNTABLE
+  - State Machine: INITIALIZING → STABILIZING → READY → TRACKING → RECORDING
+  - Stabilization now INDEPENDENT of tracking point validation
+- [x] **Diagnostic Instrumentation** - Real-time debugging overlay
+
+## Architecture Documentation
+- `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
+- `/app/frontend/docs/VBT_DIAGNOSTIC_INSTRUMENTATION.md` - Debugging guide
 
 ## Current Blocker 🔴
 **iOS Build requires interactive credential setup**
@@ -54,4 +64,4 @@ eas build --platform ios --profile production --clear-cache
 - Project ID: f4714b6a-260d-41fa-9c24-a4e0e6f28b6d
 
 ## Last Updated
-February 2025
+December 2025
