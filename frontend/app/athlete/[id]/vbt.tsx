@@ -67,6 +67,9 @@ interface VBTAnalysis {
     estimated_1rm: number | null;
     mvt_velocity: number;
     data_points: number;
+    optimal_load?: number | null;
+    optimal_velocity?: number | null;
+    optimal_power?: number | null;
   };
   velocity_loss_analysis: Array<{ set: number; velocity: number; loss_percent: number }>;
   trend: string;
