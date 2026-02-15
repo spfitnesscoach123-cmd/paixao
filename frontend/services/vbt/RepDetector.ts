@@ -39,6 +39,7 @@ export interface RepDetectorConfig {
   directionChangeThreshold: number;  // Velocity threshold for direction change
   repLockoutDuration: number;        // Cooldown period after rep completion (ms)
   maxRepDuration: number;            // Maximum single rep duration (ms)
+  startDirection: 'down' | 'up';     // Which direction starts the rep (eccentric-first vs concentric-first)
 }
 
 export interface RepDetectorResult {
