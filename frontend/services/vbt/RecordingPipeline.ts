@@ -121,10 +121,14 @@ export class RecordingPipeline {
       
       // CRITICAL: Actually start the camera recording
       // This is the key fix for BUG 2 - recording must call native method
-      this.recordingPromise = cameraRef.current.recordAsync({
+      const recordPromise = cameraRef.current?.recordAsync({
         maxDuration: this.config.maxDurationMs / 1000, // Convert to seconds
         // Note: expo-camera may not support all options
       });
+      
+      if (recordPromise) {
+        this.recordingPromise = recordPromise;
+      }
       
       // Transition to recording state
       this.setState('recording');
