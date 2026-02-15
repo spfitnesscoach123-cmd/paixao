@@ -382,10 +382,14 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
     beforeEach(() => {
       noiseFilter = new NoiseFilter({
         minKeypointScore: 0.6,
+        minUsableScore: 0.3,
+        trackingConfidenceThreshold: 0.5,
         requiredStableFrames: 5,
+        stabilityDecayRate: 1,
         minMovementDelta: 0.02,
         movingAverageWindow: 5,
         angularThreshold: 5,
+        velocityThreshold: 0.05,
         exerciseKeypoints: [],
       });
     });
