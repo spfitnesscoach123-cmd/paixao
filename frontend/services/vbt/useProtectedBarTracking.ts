@@ -64,14 +64,17 @@ export interface ProtectedRepData {
 }
 
 export interface ProtectedTrackingResult {
-  // Protection State (Layer 1 & 2)
+  // Protection State (Progressive Stages)
   protectionState: TrackingState;
+  validationStage: ValidationStage;
+  validationFlags: ValidationFlags;
   isHumanDetected: boolean;
   isStable: boolean;
   stabilityProgress: number;
+  stableFrameCount: number;
   canCalculate: boolean;
   
-  // Tracking Point (Layer 3)
+  // Tracking Point (Stage 3)
   trackingPoint: TrackingPoint | null;
   isTrackingPointSet: boolean;
   recommendedTrackingPoint: string;
