@@ -493,11 +493,14 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   }, []);
   
   return {
-    // Protection state
+    // Protection state (Progressive Stages)
     protectionState,
+    validationStage,
+    validationFlags,
     isHumanDetected,
     isStable,
     stabilityProgress,
+    stableFrameCount,
     canCalculate,
     
     // Tracking point
