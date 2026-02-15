@@ -29,6 +29,7 @@ import { colors } from '../../constants/theme';
 
 let MediapipePoseView: any = null;
 let MediapipeModule: any = null;
+let switchCamera: (() => void) | null = null;
 
 // Only import native MediaPipe on iOS/Android
 if (Platform.OS !== 'web') {
@@ -36,6 +37,7 @@ if (Platform.OS !== 'web') {
     const mediapipe = require('@thinksys/react-native-mediapipe');
     MediapipePoseView = mediapipe.MediapipePoseView;
     MediapipeModule = mediapipe.default || mediapipe;
+    switchCamera = mediapipe.switchCamera;
   } catch (e) {
     console.warn('[PoseCamera] MediaPipe not available, will use simulation fallback');
   }
