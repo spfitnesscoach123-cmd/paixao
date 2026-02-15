@@ -17,6 +17,7 @@
  */
 
 import { vbtDiagnostics } from './diagnostics';
+import { recordingController } from './recordingController';
 
 // ============================================================================
 // TYPES & INTERFACES
@@ -432,7 +433,7 @@ export class ProgressiveStateMachine {
   private peakPosition: { x: number; y: number } | null = null;
   private movementDirection: 'up' | 'down' | 'stationary' = 'stationary';
   private repPhase: 'idle' | 'descending' | 'ascending' | 'completed' = 'idle';
-  private isRecordingActive: boolean = false;
+  // REMOVED: isRecordingActive - now uses recordingController.isActive()
 
   constructor(private config: ProtectionConfig) {}
 
@@ -468,15 +469,8 @@ export class ProgressiveStateMachine {
     return this.repPhase;
   }
 
-  /**
-   * Set recording active state
-   */
-  setRecordingActive(active: boolean): void {
-    this.isRecordingActive = active;
-    if (active && this.currentStage === 'TRACKING') {
-      this.transitionTo('RECORDING', 'Recording started');
-    }
-  }
+  // REMOVED: setRecordingActive() - now uses recordingController.isActive() directly
+  // The recording state is controlled by RecordingController singleton
 
   /**
    * Update state based on validation flags
@@ -500,6 +494,18 @@ export class ProgressiveStateMachine {
     const previousStage = this.currentStage;
     let repCompleted = false;
     let message = '';
+
+    // Read recording state from global controller - SINGLE SOURCE OF TRUTH
+    const isRecordingActive = recordingController.isActive();
+
+    // [VBT_STATE_CHECK] DIAGNOSTIC LOG - MANDATORY
+    console.log("[VBT_STATE_CHECK]", {
+      stage: this.currentStage,
+      recording: isRecordingActive,
+      frameUsable: flags.frameUsable,
+      frameStable: flags.frameStable,
+      frameTrackable: flags.frameTrackable
+    });
 
     // STAGE TRANSITIONS (strictly hierarchical)
     
@@ -559,8 +565,16 @@ export class ProgressiveStateMachine {
       return { stage: 'READY', legacyState: 'ready', repCompleted: false, message };
     }
 
-    // Frame trackable → TRACKING (or RECORDING if active)
-    if (!this.isRecordingActive) {
+    // TRACKING → RECORDING: Automatic transition when recordingController.isActive() === true
+    // Frame trackable → Check if recording is active
+    if (isRecordingActive) {
+      // AUTOMATIC TRANSITION: TRACKING → RECORDING when recording is active
+      if (this.currentStage !== 'RECORDING') {
+        this.transitionTo('RECORDING', 'Recording active with valid tracking');
+        this.repPhase = 'idle';
+      }
+    } else {
+      // Not recording - stay in or transition to TRACKING
       if (this.currentStage !== 'TRACKING') {
         this.transitionTo('TRACKING', 'Tracking point valid');
       }
@@ -574,11 +588,7 @@ export class ProgressiveStateMachine {
       return { stage: 'TRACKING', legacyState: 'ready', repCompleted: false, message };
     }
 
-    // Recording active with valid tracking → RECORDING
-    if (this.currentStage !== 'RECORDING') {
-      this.transitionTo('RECORDING', 'Recording with valid tracking');
-      this.repPhase = 'idle';
-    }
+    // At this point: Recording is active with valid tracking → RECORDING state
 
     // Process movement during recording
     if (currentPosition && this.baselinePosition) {
@@ -682,7 +692,8 @@ export class ProgressiveStateMachine {
     this.lastStageChange = Date.now();
     this.stageHistory = [];
     this.resetMovementTracking();
-    this.isRecordingActive = false;
+    // NOTE: Recording state is NOT reset here - it's controlled by RecordingController
+    // Call recordingController.reset() separately if needed
   }
 }
 
@@ -1187,12 +1198,8 @@ export class TrackingProtectionSystem {
     return this.trackingPointManager.getTrackingPoint();
   }
 
-  /**
-   * Set recording active state
-   */
-  setRecordingActive(active: boolean): void {
-    this.progressiveStateMachine.setRecordingActive(active);
-  }
+  // REMOVED: setRecordingActive() - Use recordingController.start()/stop() instead
+  // Recording state is controlled by RecordingController singleton
 
   /**
    * MAIN: Process frame through 5-STAGE PROGRESSIVE VALIDATION PIPELINE
