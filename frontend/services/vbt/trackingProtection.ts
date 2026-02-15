@@ -919,14 +919,52 @@ export class TrackingProtectionSystem {
 
   /**
    * Process a frame through all 3 protection layers
+   * INSTRUMENTED: Complete diagnostic logging for every frame
    * 
    * LAYER 1: Human Presence Validation
    * LAYER 2: State Machine Control  
    * LAYER 3: Coach-Defined Tracking Point
    */
   processFrame(pose: PoseData | null): ProtectionResult {
+    // START DIAGNOSTIC FRAME
+    vbtDiagnostics.startFrame();
+    
     // LAYER 3: FIRST - Check if tracking point is set (MANDATORY)
     if (!this.trackingPointManager.isSet()) {
+      // DIAGNOSTIC LOG - Recording Gate
+      vbtDiagnostics.logRecordingGate(
+        false, // buttonPressed (unknown at this layer)
+        false, // recordingStarted
+        false, // canCalculate
+        false, // trackingPointSet
+        'noHuman', // state
+        true, // blocked
+        'trackingPointManager.isSet() === false'
+      );
+      
+      // DIAGNOSTIC LOG - Rep Counting
+      vbtDiagnostics.logRepCounting(
+        false, // eligible
+        'noHuman', // state
+        'idle', // repPhase
+        false, // canCountRep
+        true, // blocked
+        'Tracking point not set'
+      );
+      
+      // DIAGNOSTIC LOG - Final Decision
+      vbtDiagnostics.logFinalDecision(
+        false, // frameValid
+        false, // velocityCalculated
+        false, // repCounted
+        false, // recordingAllowed
+        false, // canCalculate
+        'noHuman' // state
+      );
+      
+      // END DIAGNOSTIC FRAME
+      vbtDiagnostics.endFrame();
+      
       return {
         state: 'noHuman',
         isValid: false,
@@ -946,6 +984,27 @@ export class TrackingProtectionSystem {
     // If no valid human keypoints, block everything
     if (!humanValidation.isValid) {
       this.stateMachine.transition(false, false, 0, null);
+      
+      // DIAGNOSTIC LOG - Recording Gate
+      vbtDiagnostics.logRecordingGate(
+        false, false, false, true, 'noHuman', true,
+        'humanValidation.isValid === false'
+      );
+      
+      // DIAGNOSTIC LOG - Rep Counting
+      vbtDiagnostics.logRepCounting(
+        false, 'noHuman', 'idle', false, true,
+        'Human presence validation failed'
+      );
+      
+      // DIAGNOSTIC LOG - Final Decision
+      vbtDiagnostics.logFinalDecision(
+        false, false, false, false, false, 'noHuman'
+      );
+      
+      // END DIAGNOSTIC FRAME
+      vbtDiagnostics.endFrame();
+      
       return {
         state: 'noHuman',
         isValid: false,
@@ -961,6 +1020,28 @@ export class TrackingProtectionSystem {
     // If not stable (5 consecutive valid frames), block calculations
     if (!humanStable) {
       const progress = Math.round(this.humanValidator.getStabilityProgress() * 100);
+      
+      // DIAGNOSTIC LOG - Recording Gate
+      vbtDiagnostics.logRecordingGate(
+        false, false, false, true, 'noHuman', true,
+        `humanStable === false (${progress}%)`
+      );
+      
+      // DIAGNOSTIC LOG - Rep Counting
+      vbtDiagnostics.logRepCounting(
+        false, 'noHuman', 'idle', false, true,
+        `Stability check failed: ${progress}%`
+      );
+      
+      // DIAGNOSTIC LOG - Final Decision
+      vbtDiagnostics.logFinalDecision(
+        true, // frameValid (pose detected)
+        false, false, false, false, 'noHuman'
+      );
+      
+      // END DIAGNOSTIC FRAME
+      vbtDiagnostics.endFrame();
+      
       return {
         state: 'noHuman',
         isValid: true,
@@ -978,6 +1059,26 @@ export class TrackingProtectionSystem {
     
     // If tracking point not detected or low confidence, block
     if (!trackingResult.isValid) {
+      // DIAGNOSTIC LOG - Recording Gate
+      vbtDiagnostics.logRecordingGate(
+        false, false, false, true, 'noHuman', true,
+        `trackingResult.isValid === false (confidence: ${trackingResult.confidence.toFixed(2)})`
+      );
+      
+      // DIAGNOSTIC LOG - Rep Counting
+      vbtDiagnostics.logRepCounting(
+        false, 'noHuman', 'idle', false, true,
+        'Tracking point not valid or low confidence'
+      );
+      
+      // DIAGNOSTIC LOG - Final Decision
+      vbtDiagnostics.logFinalDecision(
+        false, false, false, false, false, 'noHuman'
+      );
+      
+      // END DIAGNOSTIC FRAME
+      vbtDiagnostics.endFrame();
+      
       return {
         state: 'noHuman',
         isValid: false,
@@ -1012,6 +1113,49 @@ export class TrackingProtectionSystem {
     // Determine what's allowed based on state
     const canCalculate = stateResult.newState !== 'noHuman' && trackingResult.isValid;
     const canCountRep = stateResult.newState === 'executing' && stateResult.repCompleted;
+
+    // DIAGNOSTIC LOG - Recording Gate (SUCCESS or partial)
+    const recordingBlocked = !canCalculate || stateResult.newState === 'noHuman';
+    let recordingBlockReason: string | null = null;
+    if (recordingBlocked) {
+      if (stateResult.newState === 'noHuman') {
+        recordingBlockReason = 'state === noHuman';
+      } else if (!canCalculate) {
+        recordingBlockReason = 'canCalculate === false';
+      }
+    }
+    vbtDiagnostics.logRecordingGate(
+      false, // buttonPressed (unknown)
+      true, // recordingStarted (if we get here, recording is possible)
+      canCalculate,
+      true, // trackingPointSet
+      stateResult.newState,
+      recordingBlocked,
+      recordingBlockReason
+    );
+    
+    // DIAGNOSTIC LOG - Rep Counting
+    vbtDiagnostics.logRepCounting(
+      canCountRep, // eligible
+      stateResult.newState, // state
+      this.stateMachine.getRepPhase(), // repPhase
+      canCountRep, // canCountRep
+      !canCountRep, // blocked
+      canCountRep ? null : `State: ${stateResult.newState}, repCompleted: ${stateResult.repCompleted}`
+    );
+    
+    // DIAGNOSTIC LOG - Final Decision
+    vbtDiagnostics.logFinalDecision(
+      humanValidation.isValid && trackingResult.isValid, // frameValid
+      canCalculate && filteredVelocity !== 0, // velocityCalculated
+      canCountRep, // repCounted
+      canCalculate, // recordingAllowed
+      canCalculate, // canCalculate
+      stateResult.newState // state
+    );
+    
+    // END DIAGNOSTIC FRAME
+    vbtDiagnostics.endFrame();
 
     return {
       state: stateResult.newState,
