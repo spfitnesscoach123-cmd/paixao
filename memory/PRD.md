@@ -45,7 +45,41 @@ Português (Brazilian Portuguese)
 3. **useProtectedBarTracking.ts**:
    - Added frame counter and detailed debug logs
 
+**Status**: VERIFIED - Reps now count correctly (tested on iPhone via TestFlight)
+
+---
+
+### December 2025 - VBT Bug Fixes (Session 3)
+
+#### Bug: Velocity Data Shows 0 m/s in Reports (Critical)
+**Symptoms**:
+- Reps count correctly on screen during recording ✅
+- Velocity meter shows real values (0.63 m/s) during recording ✅
+- But saved data shows 0 m/s and -100% velocity drop ❌
+- Charts show "Insufficient data" ❌
+
+**Root Cause**: Race condition in `RepDetector.ts`:
+```
+1. processConcentric() calls completeRep(now) → returns true
+2. completeRep() resets this.concentricVelocities = [] BEFORE createResult
+3. createResult() calculates meanVelocity from EMPTY array → returns 0!
+```
+
+**Fix Applied**:
+1. **RepDetector.ts**:
+   - Added `lastCompletedRepData: RepData | null` property
+   - `completeRep()` now stores calculated values in `lastCompletedRepData` BEFORE resetting arrays
+   - `createResult()` uses stored data instead of recalculating from empty arrays
+   - `reset()` clears `lastCompletedRepData`
+   - Added comprehensive debug logging
+
+2. **useProtectedBarTracking.ts**:
+   - Enhanced logging when rep completes
+   - Warning log if `repCompleted=true` but `currentRep=null`
+
 **Status**: Ready for EAS Build and TestFlight testing
+
+**Note**: Historical data in database will still show 0 m/s. Only new recordings will have correct values.
 
 ### Previous Session - Confidence Fix
 - Fixed null handling for `visibility` property in MediaPipe landmarks
