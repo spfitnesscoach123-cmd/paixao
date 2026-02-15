@@ -255,6 +255,7 @@ export class RepDetector {
 
   /**
    * Process TRANSITION phase - at bottom, waiting for direction change
+   * IMPROVED: Supports both eccentric-first and concentric-first exercises
    */
   private processTransition(
     velocity: number,
@@ -270,13 +271,25 @@ export class RepDetector {
       return false;
     }
     
-    // Start concentric phase when upward movement detected
-    if (direction === 'up' && absVelocity >= this.config.minVelocityThreshold) {
-      this.transitionToPhase('concentric', now);
-      this.concentricStartTime = now;
-      this.concentricVelocities = [absVelocity];
-      this.peakConcentricVelocity = absVelocity;
-      console.log('[RepDetector] Started CONCENTRIC phase');
+    if (this.config.startDirection === 'up') {
+      // CONCENTRIC-FIRST EXERCISE (Deadlift, Power Clean)
+      // In transition waiting for eccentric to start
+      if (direction === 'down' && absVelocity >= this.config.minVelocityThreshold) {
+        this.transitionToPhase('eccentric', now);
+        this.eccentricStartTime = now;
+        this.eccentricVelocities = [absVelocity];
+        console.log('[RepDetector] TRANSITION -> ECCENTRIC (concentric-first)');
+      }
+    } else {
+      // ECCENTRIC-FIRST EXERCISE (Squat, Bench)
+      // Start concentric phase when upward movement detected
+      if (direction === 'up' && absVelocity >= this.config.minVelocityThreshold) {
+        this.transitionToPhase('concentric', now);
+        this.concentricStartTime = now;
+        this.concentricVelocities = [absVelocity];
+        this.peakConcentricVelocity = absVelocity;
+        console.log('[RepDetector] Started CONCENTRIC phase');
+      }
     }
     
     return false;
