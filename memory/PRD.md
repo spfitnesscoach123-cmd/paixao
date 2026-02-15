@@ -24,52 +24,56 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
   - State Machine: INITIALIZING → STABILIZING → READY → TRACKING → RECORDING
   - Stabilization now INDEPENDENT of tracking point validation
 - [x] **Diagnostic Instrumentation** - Real-time debugging overlay
-- [x] **RecordingController Refactor** (December 2025) ✨ NEW
+- [x] **RecordingController Refactor** (December 2025)
   - Created global `RecordingController` singleton as SINGLE SOURCE OF TRUTH
   - Removed `setRecordingActive()` method from `ProgressiveStateMachine`
   - State machine now reads directly from `recordingController.isActive()`
   - Automatic transition TRACKING → RECORDING when recording is active
   - Added `[VBT_STATE_CHECK]` diagnostic logging
   - All 34 unit tests passing
-- [x] **Camera Selection Control** (December 2025) ✨ NEW
+- [x] **Camera Selection Control** (December 2025)
   - Added explicit `cameraFacing` state control (`'front' | 'back'`)
   - Default camera is always `'back'` on mount
   - Toggle button in header during camera phases
   - Uses native `switchCamera()` from `@thinksys/react-native-mediapipe`
-  - Added `[Camera] Using camera:` diagnostic logging
-  - `CameraView` (expo-camera) uses `facing={cameraFacing}` prop
+  - Synchronized state + native call in single atomic operation
+- [x] **Frame Processor Debugging** (December 2025) ✨ NEW
+  - Created `babel.config.js` with reanimated plugin configured LAST
+  - Added frame reception rate logging (every 5 seconds)
+  - Added first frame detection with `[VBT_CAMERA] ✅ FIRST FRAME RECEIVED!`
+  - Enhanced `VBTDiagnosticOverlay` with MediaPipe status section
+  - Created `/app/memory/VBT_FRAME_PROCESSOR_FIX.md` guide
 
 ## Architecture Documentation
 - `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
 - `/app/frontend/docs/VBT_DIAGNOSTIC_INSTRUMENTATION.md` - Debugging guide
 - `/app/frontend/services/vbt/recordingController.ts` - Recording state singleton
+- `/app/memory/VBT_FRAME_PROCESSOR_FIX.md` - Frame processor debugging guide ✨ NEW
 
-## Key Files Modified (RecordingController Refactor)
-- `services/vbt/recordingController.ts` - NEW: Single source of truth for recording state
-- `services/vbt/trackingProtection.ts` - Refactored to use recordingController
-- `services/vbt/useProtectedBarTracking.ts` - Updated to call recordingController.start()/stop()
-- `services/vbt/index.ts` - Export recordingController
-- `services/vbt/__tests__/trackingProtection.test.ts` - Added RecordingController tests
+## Key Files Modified (Frame Processor Fix)
+- `babel.config.js` - NEW: Created with reanimated plugin
+- `app/athlete/[id]/vbt-camera.tsx` - Added frame logging, fixed toggleCamera sync
+- `components/vbt/VBTDiagnosticOverlay.tsx` - Added MediaPipe status display
 
 ## Current Blocker 🔴
-**iOS Build requires interactive credential setup**
-- EAS Build needs Apple Distribution Certificate + Provisioning Profile
-- Credential configuration requires interactive terminal (not available in CI)
-- User must run `eas build --platform ios --profile production` on macOS with interactive terminal
+**"Waiting for first frame" issue - Requires Development Build**
+- The `@thinksys/react-native-mediapipe` library uses native code
+- **Does NOT work in Expo Go** - requires Development Build or EAS Build
+- User must rebuild the app after native code changes
 
-## Command Ready to Execute (on user's Mac)
-```bash
-cd frontend
-export EXPO_TOKEN="bzr31V2lay3v8wey672xCPqx-skJ5YbtshEMoJDe"
-eas build --platform ios --profile production --clear-cache
-```
+### Steps to Fix
+1. Run `npx expo prebuild --clean`
+2. Run `npx expo run:ios` or `eas build --profile development --platform ios`
+3. Disable Remote JS Debugger on device
+4. Verify camera permissions
 
-## Pending Issues (P1-P3)
-1. **P1**: Verify diagnostic overlay works with new RecordingController
-2. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
-3. **P1**: Internationalization of "Avaliações" page
-4. **P2**: Test `gps_import` pipeline with `identity_resolver`
-5. **P3**: Back button icon not rendering on web
+## Pending Issues (P0-P3)
+1. **P0**: Rebuild app with EAS/Dev Build to enable MediaPipe frames ⚠️ CRITICAL
+2. **P1**: Verify diagnostic overlay works with new frame props
+3. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
+4. **P1**: Internationalization of "Avaliações" page
+5. **P2**: Test `gps_import` pipeline with `identity_resolver`
+6. **P3**: Back button icon not rendering on web
 
 ## Future Tasks
 - Integrate identity resolution into `force_import` and `wellness_import`
