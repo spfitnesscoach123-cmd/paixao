@@ -527,6 +527,13 @@ export default function VBTCameraPage() {
   // Handle REAL pose detection from native MediaPipe (@thinksys/react-native-mediapipe)
   // This is called via onLandmark prop - processes BOTH during tracking AND point selection
   // IMPORTANT: This callback WILL NOT be called in Expo Go - only in Development/EAS builds
+  // 
+  // CRITICAL FIX: processPose MUST be called in ALL phases, not just when isTracking === true
+  // Otherwise the protection pipeline never receives data, causing:
+  // - trackingPoint to remain N/A
+  // - humanPresence to never become true  
+  // - stability to remain 0
+  // - The entire VBT system to stay stuck in "Stabilizing Detection... (0%)"
   const handleMediapipeLandmark = useCallback((event: any) => {
     // Increment frame counter
     landmarkCallCountRef.current++;
@@ -547,25 +554,28 @@ export default function VBTCameraPage() {
       // Store preview pose data for stabilization visualization
       setPreviewPoseData(vbtPose);
       
-      // If tracking is active, send to VBT pipeline
-      if (isTracking) {
-        if (vbtPose && vbtPose.keypoints.length > 0) {
-          // Pass REAL pose data to the VBT pipeline
-          processPose(vbtPose);
-          
-          // Log every 30 frames to avoid spam
-          if (landmarkCallCountRef.current % 30 === 0) {
-            console.log('[VBT_CAMERA] Frame processed: state=' + protectionState + ', stable=' + isStable + ', canCalc=' + canCalculate);
-          }
-        } else {
-          // No pose detected - pass empty pose to trigger no-human state
-          processPose({ keypoints: [], timestamp: Date.now() });
+      // CRITICAL: ALWAYS send pose data to VBT pipeline
+      // This enables the protection system to:
+      // 1. Detect human presence (Stage 1: FRAME_USABLE)
+      // 2. Build stability (Stage 2: FRAME_STABLE)
+      // 3. Validate tracking point (Stage 3: FRAME_TRACKABLE)
+      // Without this, the system remains stuck at "Waiting for first frame"
+      if (vbtPose && vbtPose.keypoints.length > 0) {
+        // Pass REAL pose data to the VBT pipeline
+        processPose(vbtPose);
+        
+        // Log every 30 frames to avoid spam
+        if (landmarkCallCountRef.current % 30 === 0) {
+          console.log('[VBT_CAMERA] Frame processed: phase=' + phase + ', isTracking=' + isTracking + ', state=' + protectionState + ', stable=' + isStable + ', canCalc=' + canCalculate);
         }
+      } else {
+        // No pose detected - pass empty pose to trigger no-human state
+        processPose({ keypoints: [], timestamp: Date.now() });
       }
     } catch (e) {
       console.error('[VBT_CAMERA] Error processing MediaPipe landmark:', e);
     }
-  }, [isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate]);
+  }, [phase, isTracking, convertMediapipeLandmarks, processPose, protectionState, isStable, canCalculate]);
 
   // Legacy handler name for compatibility
   const handleMediapipePoseDetected = handleMediapipeLandmark;
