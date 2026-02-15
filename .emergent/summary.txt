@@ -1,78 +1,75 @@
 <analysis>**original_problem_statement:**
-The user's primary goal is to create a fully functional VBT (Velocity-Based Training) Camera feature within a React Native application and prepare it for a TestFlight release. This involves several critical requirements:
-1.  **VBT Camera Feature**: Fix camera state transitions, implement a Coach Marker for manual keypoint selection, and add a one-time interactive tutorial for this feature.
-2.  **Real Pose Detection**: Use MediaPipe for real-time pose detection on native platforms (iOS/Android), ensuring data flows correctly into the VBT calculation pipeline.
-3.  **Build Integrity and Audit**: Ensure the application is completely free of location-related APIs to avoid Apple's  warning upon submission. This includes removing , ensuring  is absent, and setting  for .
-4.  **Fix Build/Deployment Errors**: Resolve issues preventing a successful build and deployment via EAS (Expo Application Services).
-5.  **Strict Build Environment**: The application must be built with the New Architecture enabled () and the JSC JavaScript engine ().
+The user wants to debug and refactor a VBT (Velocity-Based Training) camera feature in a React Native application. The initial goal of preparing an app for TestFlight is currently superseded by critical bug fixes in the detection pipeline.
+
+The user's recent requests have been highly specific and architectural:
+1.  **Audit**: Perform a non-destructive audit of the VBT detection pipeline to identify all validation criteria and blocking conditions.
+2.  **Instrument**: Add real-time diagnostic logging and a visual UI overlay to expose the internal state and blocking reasons of the detection pipeline.
+3.  **Refactor (Circular Dependency)**: Re-architect the validation logic to eliminate a circular dependency that caused the system to get stuck in a stabilizing state. This required implementing a new 5-stage progressive validation pipeline.
+4.  **Refactor (Recording State)**: The current task is to refactor the recording activation logic to use a global , ensuring the  state is reliably triggered.
 
 **PRODUCT REQUIREMENTS:**
-1.  A fully functional and tested VBT camera with Coach Marker and Tutorial features.
-2.  A clean build that passes Apple's review without location-related warnings.
-3.  A successful iOS build ( file) generated via EAS, ready for TestFlight.
-4.  Maintain existing build configurations (, ).
-5.  Zero regressions to other application features.
+1.  A VBT detection pipeline that reliably exits the stabilizing state.
+2.  A VBT camera that reliably enters the recording state when the record button is pressed.
+3.  The final system must not have any circular dependencies between stabilization, tracking, and validation.
+4.  All existing safety protections and validation thresholds must be preserved, just re-ordered.
+5.  A diagnostic overlay to visualize the state of the detection pipeline in real-time.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent has performed all possible pre-build steps for an EAS (Expo Application Services) iOS build. The codebase is clean, dependencies are installed, and all code-level fixes from the previous session are intact. The agent successfully used the user-provided  to initialize a new EAS project (, ID: ) and fixed a configuration error in . The project is fully prepared for the final build step, but this step is blocked.
+The agent has just completed a major architectural refactor of the VBT detection pipeline. The previous logic, which had a circular dependency causing it to get stuck in stabilizing, has been replaced with a new 5-stage progressive validation system ( ->  ->  ->  -> ). This new architecture is implemented primarily in  and integrated into the  hook. A diagnostic UI overlay was also created but may need adjustments to work with the new architecture. The system is now ready for the next refactoring task focused on the recording state.
 
 **Last working item**:
--   **Last item agent was working**: The agent was repeatedly attempting to execute the An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username command as per the user's explicit instructions, diagnosing and resolving intermediate issues along the way.
--   **Status**: BLOCKED
--   **Agent Testing Done**: N/A
--   **Which testing method agent to use?**: NA. The task is a build, not a feature test.
+-   **Last item agent was working**: Refactor the  state activation to use a global  as a single source of truth, as mandated by the user's latest instructions. This is to fix a bug where the system fails to enter the  state even when the timer starts.
+-   **Status**: NOT STARTED
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: frontend testing agent
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Complete the internationalization of the  component. (P1)
--   **Issue 2**: Internationalize the Avaliações (Assessments) page. (P1)
--   **Issue 3**: Test the  pipeline's integration with the . (P2)
--   **Issue 4**: Back button icon not rendering on web. (P3)
+-   **Issue 1**: Refactor  state activation to use a global . (P0 - HIGHEST PRIORITY)
+-   **Issue 2**: The diagnostic overlay and logging may be broken or outdated after the major architectural refactor and need to be verified/updated. (P1)
+-   **Issue 3**: Complete the internationalization of the  component. (P2)
+-   **Issue 4**: Internationalize the Avaliações (Assessments) page. (P2)
+-   **Issue 5**: EAS Project Slug Conflict ( vs. ) may cause issues with automated deployments. (P3)
+-   **Issue 6**: Back button icon not rendering on web. (P3)
 
 **Issues Detail**:
--   All listed issues are pending from previous sessions and have not been started.
+-   **Issue 1**:
+    -   **Attempted fixes**: None. This is a new task.
+    -   **Next debug checklist**: Implement the  class as a singleton, remove the  method from , and update the state machine's  method to read directly from the  method. The  function in  should call .
+    -   **Why fix this issue and what will be achieved with the fix?**: This will fix a critical bug where the recording UI starts, but the underlying state machine never transitions to , preventing velocity calculation and rep counting.
+    -   **Status**: NOT STARTED
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None
 
 **In progress Task List**:
--   **Task 1**: Generate the final iOS build for TestFlight. (P0 - HIGHEST PRIORITY)
-
-**Task Detail**:
--   **Task 1**:
-    -   **Where to resume**: The agent cannot resume this task. The user must execute the build command in their local macOS environment to complete the one-time interactive setup of Apple Developer credentials.
-    -   **What will be achieved with this?**: Generation of a  file for TestFlight, fulfilling the user's primary objective.
+-   **Task 1**: Generate the final iOS build for TestFlight.
+    -   **Where to resume**: This task cannot be resumed by the agent.
+    -   **What will be achieved with this?**: Generation of a  file for TestFlight.
     -   **Status**: BLOCKED
-    -   **Should Test frontend/backend/both after fix?**: Frontend (requires user testing on TestFlight).
-    -   **Blocked on something**: The An Expo user account is required to proceed.
+    -   **Blocked on something**: Requires the user to run the An Expo user account is required to proceed.
 
 Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username process for a new project requires interactive input (Apple ID login) to generate and configure iOS distribution credentials (certificates and provisioning profiles). The agent's non-interactive environment cannot provide this input.
+Input is required, but stdin is not readable. Failed to display prompt: Email or username command in an interactive terminal on a local macOS machine to set up Apple Developer credentials for the new EAS project. This task is on hold indefinitely.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   Complete internationalization of  and the Avaliações page. (P1)
     -   Test the  pipeline's integration with the . (P2)
-    -   Fix back button icon rendering on web. (P3)
 -   **Future Tasks**:
     -   Integrate identity resolution into  and .
     -   Build a UI for manual resolution of ambiguous athlete names.
     -   Implement a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
--   **EAS Project Initialization (DONE)**: Successfully linked the local project to the user's Expo account by running An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username and configuring the .
--   **Build Configuration Fix (DONE)**: Resolved an EAS build error by adding  to .
--   **Build Failure Diagnosis (DONE)**: Systematically diagnosed multiple build failures, including the need for an , project initialization, and the final critical blocker related to missing iOS credentials.
+-   **VBT Pipeline Audit (DONE)**: Analyzed the entire VBT detection pipeline and produced a detailed report on its validation criteria, state machine, and blocking conditions.
+-   **Diagnostic Instrumentation (DONE)**: Implemented extensive real-time logging and created a  component to display the internal state of the detection pipeline on-screen.
+-   **Architectural Refactor for Circular Dependency (DONE)**: Replaced the entire validation logic with a new 5-stage progressive validation pipeline ( ->  ->  ->  -> ), completely eliminating the circular dependency that caused the system to get stuck in the stabilizing state.
 
 **Earlier issues found/mentioned but not fixed**
 -   **Issue 1: EAS Project Slug Conflict**
-    -   **Debug checklist**: The previous session identified a slug conflict with . In this session, the agent created a new project, , as a workaround. However, the original conflict may still affect automated deployments from the Emergent platform if they are hardcoded to use the old slug.
-    -   **Why to solve this issue and what will be achieved with this?**: Resolving this would align the platform's automated deployment system with the user's existing EAS project structure, preventing future deployment failures.
+    -   **Debug checklist**: A new EAS project () was created as a workaround for a slug conflict. The original conflict with  might still affect automated deployments from the platform if they are hardcoded to the old slug.
+    -   **Why to solve this issue and what will be achieved with this?**: Aligning the deployment system with the correct EAS project would prevent future build/deployment failures.
     -   **Should Test frontend/backend/both after fix?**: N/A (Infrastructure issue).
     -   **Is recurring issue?**: Y
 
@@ -85,122 +82,42 @@ Input is required, but stdin is not readable. Failed to display prompt: Email or
 
 
 **Key Technical Concepts**
--   **EAS (Expo Application Services)**: The build pipeline for the React Native app. The agent has dealt with authentication (), project initialization (An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username), and diagnosing credential management failures.
--   **iOS Code Signing**: The core reason for the build blockage. EAS requires Apple-issued certificates and provisioning profiles to sign an  file. The initial creation of these credentials is an interactive process.
-
-**key DB schema**
--   No database schema changes were made.
-
-**changes in tech stack**
--   None.
+-   **Progressive Validation Pipeline**: The core logic was refactored into a 5-stage pipeline where each stage builds upon the previous one, breaking dependencies. (Stage 1: , Stage 2: , Stage 3: , Stage 4: , Stage 5: ).
+-   **State Machine**: The  in  now manages transitions based on the new progressive validation flags ( ->  ->  ->  -> ).
+-   **React Hooks for Complex Logic**: The  hook encapsulates the complex interaction between the UI, the camera feed, and the VBT processing system.
+-   **Singleton Controller**: The next task involves creating a  singleton to manage the recording state globally, acting as a single source of truth.
 
 **All files of reference**
--    (Main feature file)
--    (Configuration file for Expo/EAS)
--    (EAS build profile configuration, modified in this session)
--   
--   
-
-**Areas that need refactoring**:
--   The  component remains very large and could be broken down into smaller, more manageable child components.
-
-**key api endpoints**
--   No API endpoints were changed.
+-   : Contains the core 5-stage validation pipeline and state machine. **(Heavily refactored)**.
+-   : The main React hook that integrates the VBT logic into the UI. **(Heavily refactored)**.
+-   : The main camera screen component. Modified to integrate the diagnostic overlay.
+-   : The new UI component created for real-time debugging.
+-   : The module created to house the diagnostic data structures and logic.
 
 **Critical Info for New Agent**
--   **The primary task is CRITICALLY BLOCKED by an environmental limitation.** You **MUST NOT** attempt to run An Expo user account is required to proceed.
+-   You **MUST** immediately begin the next refactoring task outlined in the user's last message (Message 165). This involves creating a global  to fix the  state activation.
+-   The core VBT logic has been completely re-architected. You must work within the new 5-stage progressive validation framework in . Do not revert to the old logic.
+-   The primary goal is to make the recording functionality robust. The state transition to  should be automatic as soon as  is true and the state is .
+-   Do **NOT** attempt to run the iOS build (An Expo user account is required to proceed.
 
 Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username again. It will fail.
--   The root cause is that the user's Expo account lacks the necessary Apple Developer credentials (Distribution Certificate, Provisioning Profile) for this project.
--   This setup **MUST** be performed by the user in an **interactive terminal on a macOS machine**. This is a one-time requirement for a new project.
--   Your first action should be to clearly and firmly inform the user that they must execute the following command on their own Mac to proceed:
-    Resolved "production" environment for the build. Learn more: https://docs.expo.dev/eas/environment-variables/#setting-the-environment-for-your-builds
-No environment variables with visibility "Plain text" and "Sensitive" found for the "production" environment on EAS.
-
-Specified value for "ios.bundleIdentifier" in app.json is ignored because an ios directory was detected in the project.
-EAS Build will use the value found in the native code.
-
-
-✔ Using remote iOS credentials (Expo server)
-
-If you provide your Apple account credentials we will be able to generate all necessary build credentials and fully validate them.
-This is optional, but without Apple account access you will need to provide all the missing values manually and we can only run minimal validation on them.
-Input is required, but stdin is not readable. Failed to display prompt: Do you want to log in to your Apple account?
--   Explain that during this process, EAS will prompt them to log into their Apple Developer account to automatically generate and store the required credentials. Once this is done, future builds may be able to run non-interactively. Do not proceed until the user acknowledges this.
+Input is required, but stdin is not readable. Failed to display prompt: Email or username). This task is blocked on the user and is not the current priority.
+-   After implementing the , you must verify that the diagnostic overlay still functions correctly and reflects the new state management.
 
 **documents and test reports created in this job**
--    (from previous session)
--    (from previous session)
--    (from previous session)
--    (from previous session)
+-   
+-   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Instructed the agent to run the iOS build with exact steps.
-2.  **Agent**: Identified the build requires authentication ().
-3.  **User**: Provided an invalid token, then a valid one.
-4.  **Agent**: Used the token, but the build failed because the EAS project was not initialized.
-5.  **Agent**: Initialized the EAS project (An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username).
-6.  **Agent**: Retried the build, which failed due to missing iOS credentials requiring an interactive setup.
-7.  **User**: Re-instructed the agent to run the build with new usage: git [-v | --version] [-h | --help] [-C <path>] [-c <name>=<value>]
-           [--exec-path[=<path>]] [--html-path] [--man-path] [--info-path]
-           [-p | --paginate | -P | --no-pager] [--no-replace-objects] [--bare]
-           [--git-dir=<path>] [--work-tree=<path>] [--namespace=<name>]
-           [--super-prefix=<path>] [--config-env=<name>=<envvar>]
-           <command> [<args>]
-
-These are common Git commands used in various situations:
-
-start a working area (see also: git help tutorial)
-   clone     Clone a repository into a new directory
-   init      Create an empty Git repository or reinitialize an existing one
-
-work on the current change (see also: git help everyday)
-   add       Add file contents to the index
-   mv        Move or rename a file, a directory, or a symlink
-   restore   Restore working tree files
-   rm        Remove files from the working tree and from the index
-
-examine the history and state (see also: git help revisions)
-   bisect    Use binary search to find the commit that introduced a bug
-   diff      Show changes between commits, commit and working tree, etc
-   grep      Print lines matching a pattern
-   log       Show commit logs
-   show      Show various types of objects
-   status    Show the working tree status
-
-grow, mark and tweak your common history
-   branch    List, create, or delete branches
-   commit    Record changes to the repository
-   merge     Join two or more development histories together
-   rebase    Reapply commits on top of another base tip
-   reset     Reset current HEAD to the specified state
-   switch    Switch branches
-   tag       Create, list, delete or verify a tag object signed with GPG
-
-collaborate (see also: git help workflows)
-   fetch     Download objects and refs from another repository
-   pull      Fetch from and integrate with another repository or a local branch
-   push      Update remote refs along with associated objects
-
-'git help -a' and 'git help -g' list available subcommands and some
-concept guides. See 'git help <command>' or 'git help <concept>'
-to read about a specific subcommand or concept.
-See 'git help git' for an overview of the system. steps.
-8.  **Agent**: Attempted the new steps, fixed an  error, but again hit the same critical blocker (missing iOS credentials).
-9.  **Agent**: Re-explained the blocker and provided the user with the exact command to run locally on their Mac.
-10. **User**: Sent .
+1.  **User**: (Msg 100) Mandated a major architectural refactor to a 5-stage progressive validation pipeline to fix an infinite stabilizing loop. Provided extremely detailed requirements for the new architecture.
+2.  **Agent**: (Msg 101) Acknowledged the refactoring task.
+3.  **Agent**: (Msg 105-164) Implemented the full 5-stage refactor across , , updated tests, and created documentation.
+4.  **User**: (Msg 165) Provided the next critical task: Refactor the  state activation. The current implementation is unreliable. Mandated the creation of a global  to act as a single source of truth and provided a detailed 8-step implementation plan. This is the **current P0 task**.
 
 **Project Health Check:**
--   **Broken**: Nothing is broken at the code level.
--   **Mocked**: Pose detection for the web platform remains mocked, as intended.
--   **Blocked**: The final iOS build step is critically blocked, pending user action in a macOS environment.
+-   **Broken**: The  state activation is unreliable and considered broken, which is the immediate task to fix.
+-   **Mocked**: Pose detection for the web platform remains mocked.
+-   **Blocked**: The iOS build for TestFlight remains blocked pending user action.
 
 **3rd Party Integrations**
 -   
@@ -210,14 +127,13 @@ See 'git help git' for an overview of the system. steps.
 -   
 
 **Testing status**
--   **Testing agent used after significant changes**: YES (in the previous session)
+-   **Testing agent used after significant changes**: NO (Not since the major refactor).
 -   **Troubleshoot agent used after agent stuck in loop**: NO
--   **Test files created**: []
--   **Known regressions**: None.
+-   **Test files created**: None new. Existing test file  was updated.
+-   **Known regressions**: The diagnostic overlay's accuracy is unknown after the major refactor.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
--   **EXPO_TOKEN**:  (provided by user)
 
 **What agent forgot to execute**
--   Nothing. The agent correctly identified that it could not execute the final build command due to environmental limitations and performed all possible prerequisite steps.</analysis>
+-   Nothing. The agent has been following a sequence of highly detailed and specific instructions from the user. The next task is clearly defined and ready to be started.</analysis>
