@@ -296,12 +296,13 @@ export class RepDetector {
 
   /**
    * Complete the current rep and record data
+   * CRITICAL FIX: Store rep data BEFORE resetting velocity arrays
    */
   private completeRep(now: number): boolean {
     this.repCount++;
     this.lastRepCompletionTime = now;
     
-    // Calculate rep metrics
+    // Calculate rep metrics BEFORE resetting arrays
     const meanConcentricVelocity = this.calculateMean(this.concentricVelocities);
     const meanEccentricVelocity = this.calculateMean(this.eccentricVelocities);
     
@@ -315,15 +316,30 @@ export class RepDetector {
       ? Math.max(0, ((this.firstRepMeanVelocity - meanConcentricVelocity) / this.firstRepMeanVelocity) * 100)
       : 0;
     
+    // CRITICAL: Store the completed rep data BEFORE resetting arrays
+    // This fixes the bug where createResult() returned 0 values
+    this.lastCompletedRepData = {
+      repNumber: this.repCount,
+      meanVelocity: Math.round(meanConcentricVelocity * 1000) / 1000,
+      peakVelocity: Math.round(this.peakConcentricVelocity * 1000) / 1000,
+      eccentricVelocity: Math.round(meanEccentricVelocity * 1000) / 1000,
+      duration: now - this.repStartTime,
+      concentricDuration: now - this.concentricStartTime,
+      eccentricDuration: this.concentricStartTime - this.eccentricStartTime,
+      timestamp: now,
+      velocityDrop: Math.round(velocityDrop * 10) / 10,
+    };
+    
     console.log(`[RepDetector] REP ${this.repCount} COMPLETE!`);
     console.log(`  Mean Velocity: ${meanConcentricVelocity.toFixed(3)} m/s`);
     console.log(`  Peak Velocity: ${this.peakConcentricVelocity.toFixed(3)} m/s`);
     console.log(`  Velocity Drop: ${velocityDrop.toFixed(1)}%`);
+    console.log(`  Stored in lastCompletedRepData:`, this.lastCompletedRepData);
     
     // Transition to lockout
     this.transitionToPhase('lockout', now);
     
-    // Reset phase tracking for next rep
+    // Reset phase tracking for next rep AFTER storing data
     this.concentricVelocities = [];
     this.eccentricVelocities = [];
     this.peakConcentricVelocity = 0;
