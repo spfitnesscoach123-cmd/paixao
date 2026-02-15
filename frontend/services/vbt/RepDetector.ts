@@ -161,6 +161,7 @@ export class RepDetector {
 
   /**
    * Process IDLE phase - waiting for movement to start
+   * IMPROVED: Supports both eccentric-first and concentric-first exercises
    */
   private processIdle(
     velocity: number,
@@ -168,13 +169,27 @@ export class RepDetector {
     absVelocity: number,
     now: number
   ): boolean {
-    // Start eccentric phase when downward movement detected
-    if (direction === 'down' && absVelocity >= this.config.minVelocityThreshold) {
-      this.transitionToPhase('eccentric', now);
+    const startDir = this.config.startDirection;
+    
+    // For eccentric-first exercises (Squat, Bench): Start with 'down'
+    // For concentric-first exercises (Deadlift, Power Clean): Start with 'up'
+    if (direction === startDir && absVelocity >= this.config.minVelocityThreshold) {
       this.repStartTime = now;
-      this.eccentricStartTime = now;
-      this.eccentricVelocities = [absVelocity];
-      console.log('[RepDetector] Started ECCENTRIC phase');
+      
+      if (startDir === 'down') {
+        // Eccentric-first: Start eccentric phase
+        this.transitionToPhase('eccentric', now);
+        this.eccentricStartTime = now;
+        this.eccentricVelocities = [absVelocity];
+        console.log('[RepDetector] Started ECCENTRIC phase (eccentric-first exercise)');
+      } else {
+        // Concentric-first: Start concentric phase directly
+        this.transitionToPhase('concentric', now);
+        this.concentricStartTime = now;
+        this.concentricVelocities = [absVelocity];
+        this.peakConcentricVelocity = absVelocity;
+        console.log('[RepDetector] Started CONCENTRIC phase (concentric-first exercise: Deadlift/Clean)');
+      }
     }
     
     return false;
