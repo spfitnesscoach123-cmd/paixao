@@ -197,7 +197,7 @@ export class RepDetector {
 
   /**
    * Process ECCENTRIC phase - descending movement
-   * FIXED: Transition based on DIRECTION CHANGE, not velocity threshold
+   * IMPROVED: Supports both eccentric-first and concentric-first exercises
    */
   private processEccentric(
     velocity: number,
@@ -216,22 +216,38 @@ export class RepDetector {
       return false;
     }
     
-    // FIXED: Detect transition based on DIRECTION CHANGE or velocity drop
-    // When direction changes from 'down' to 'up' or 'stationary', we hit the bottom
-    if (direction === 'up') {
-      // Direct transition to concentric when direction changes
-      this.transitionToPhase('concentric', now);
-      this.concentricStartTime = now;
-      this.concentricVelocities = [absVelocity];
-      this.peakConcentricVelocity = absVelocity;
-      console.log('[RepDetector] ECCENTRIC -> CONCENTRIC (direction change)');
-      return false;
-    }
-    
-    // Also transition if velocity drops significantly (stationary at bottom)
-    if (direction === 'stationary' || absVelocity < this.config.directionChangeThreshold) {
-      this.transitionToPhase('transition', now);
-      console.log('[RepDetector] ECCENTRIC -> TRANSITION (velocity drop)');
+    // Different behavior based on exercise type
+    if (this.config.startDirection === 'up') {
+      // CONCENTRIC-FIRST EXERCISE (Deadlift, Power Clean)
+      // Rep completes when eccentric phase ends (direction changes or velocity drops)
+      const isVelocityDropped = absVelocity < this.config.directionChangeThreshold;
+      const isDirectionReversed = direction === 'up' && absVelocity >= this.config.minVelocityThreshold;
+      const isStationary = direction === 'stationary' && this.eccentricVelocities.length >= 2;
+      
+      if (isVelocityDropped || isDirectionReversed || isStationary) {
+        console.log('[RepDetector] ECCENTRIC COMPLETE! (concentric-first exercise) reason:', 
+          isVelocityDropped ? 'velocity_drop' : 
+          isDirectionReversed ? 'direction_reversed' : 'stationary');
+        return this.completeRep(now);
+      }
+    } else {
+      // ECCENTRIC-FIRST EXERCISE (Squat, Bench)
+      // After eccentric, transition to concentric
+      if (direction === 'up') {
+        // Direct transition to concentric when direction changes
+        this.transitionToPhase('concentric', now);
+        this.concentricStartTime = now;
+        this.concentricVelocities = [absVelocity];
+        this.peakConcentricVelocity = absVelocity;
+        console.log('[RepDetector] ECCENTRIC -> CONCENTRIC (direction change)');
+        return false;
+      }
+      
+      // Also transition if velocity drops significantly (stationary at bottom)
+      if (direction === 'stationary' || absVelocity < this.config.directionChangeThreshold) {
+        this.transitionToPhase('transition', now);
+        console.log('[RepDetector] ECCENTRIC -> TRANSITION (velocity drop)');
+      }
     }
     
     return false;
