@@ -378,30 +378,17 @@ export class RepDetector {
 
   /**
    * Create result object
+   * CRITICAL FIX: Use lastCompletedRepData instead of recalculating from empty arrays
    */
   private createResult(repCompleted: boolean): RepDetectorResult {
     let currentRep: RepData | null = null;
     
-    if (repCompleted) {
-      const now = Date.now();
-      const meanVelocity = this.calculateMean(this.concentricVelocities);
-      const meanEccentricVelocity = this.calculateMean(this.eccentricVelocities);
+    if (repCompleted && this.lastCompletedRepData) {
+      // Use the stored data from completeRep() instead of recalculating
+      // This fixes the bug where arrays were already cleared
+      currentRep = this.lastCompletedRepData;
       
-      const velocityDrop = this.firstRepMeanVelocity && this.firstRepMeanVelocity > 0
-        ? Math.max(0, ((this.firstRepMeanVelocity - meanVelocity) / this.firstRepMeanVelocity) * 100)
-        : 0;
-      
-      currentRep = {
-        repNumber: this.repCount,
-        meanVelocity: Math.round(meanVelocity * 1000) / 1000,
-        peakVelocity: Math.round(this.peakConcentricVelocity * 1000) / 1000,
-        eccentricVelocity: Math.round(meanEccentricVelocity * 1000) / 1000,
-        duration: now - this.repStartTime,
-        concentricDuration: now - this.concentricStartTime,
-        eccentricDuration: this.concentricStartTime - this.eccentricStartTime,
-        timestamp: now,
-        velocityDrop: Math.round(velocityDrop * 10) / 10,
-      };
+      console.log('[RepDetector] createResult using stored data:', currentRep);
     }
     
     return {
