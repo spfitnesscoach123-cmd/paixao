@@ -2,44 +2,49 @@
 The user wants to debug and refactor a VBT (Velocity-Based Training) camera feature in a React Native application. The initial goal of preparing an app for TestFlight is currently superseded by critical bug fixes in the detection pipeline.
 
 The user's recent requests have been highly specific and architectural:
-1.  **Audit**: Perform a non-destructive audit of the VBT detection pipeline to identify all validation criteria and blocking conditions.
-2.  **Instrument**: Add real-time diagnostic logging and a visual UI overlay to expose the internal state and blocking reasons of the detection pipeline.
-3.  **Refactor (Circular Dependency)**: Re-architect the validation logic to eliminate a circular dependency that caused the system to get stuck in a stabilizing state. This required implementing a new 5-stage progressive validation pipeline.
-4.  **Refactor (Recording State)**: The current task is to refactor the recording activation logic to use a global , ensuring the  state is reliably triggered.
+1.  **Audit**: Perform a non-destructive audit of the VBT detection pipeline to identify all validation criteria and blocking conditions. (Completed)
+2.  **Instrument**: Add real-time diagnostic logging and a visual UI overlay to expose the internal state and blocking reasons of the detection pipeline. (Completed, but needs verification)
+3.  **Refactor (Circular Dependency)**: Re-architect the validation logic to eliminate a circular dependency that caused the system to get stuck in a stabilizing state. This required implementing a new 5-stage progressive validation pipeline. (Completed)
+4.  **Refactor (Recording State)**: Refactor the recording activation logic to use a global , ensuring the  state is reliably triggered. (Completed)
+5.  **Feature (Camera Control)**: Implement explicit control for switching between the front and back cameras. (Completed, pending verification)
 
 **PRODUCT REQUIREMENTS:**
 1.  A VBT detection pipeline that reliably exits the stabilizing state.
 2.  A VBT camera that reliably enters the recording state when the record button is pressed.
-3.  The final system must not have any circular dependencies between stabilization, tracking, and validation.
-4.  All existing safety protections and validation thresholds must be preserved, just re-ordered.
+3.  A functional UI control to switch between the front and back cameras.
+4.  The final system must not have any circular dependencies between stabilization, tracking, and validation.
 5.  A diagnostic overlay to visualize the state of the detection pipeline in real-time.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent has just completed a major architectural refactor of the VBT detection pipeline. The previous logic, which had a circular dependency causing it to get stuck in stabilizing, has been replaced with a new 5-stage progressive validation system ( ->  ->  ->  -> ). This new architecture is implemented primarily in  and integrated into the  hook. A diagnostic UI overlay was also created but may need adjustments to work with the new architecture. The system is now ready for the next refactoring task focused on the recording state.
+The agent has successfully completed two major refactoring tasks. First, the  state bug was fixed by implementing a global  singleton, which now acts as the single source of truth for the recording status. Second, the agent implemented explicit camera control. A state variable  was added to , along with a toggle button in the UI. The implementation handles camera switching for both the native ( via the  method) and web ( via the  prop) environments. The application is now in a state where the new camera switching feature needs to be verified.
 
 **Last working item**:
--   **Last item agent was working**: Refactor the  state activation to use a global  as a single source of truth, as mandated by the user's latest instructions. This is to fix a bug where the system fails to enter the  state even when the timer starts.
--   **Status**: NOT STARTED
+-   **Last item agent was working**: Implementing an explicit camera selection control, allowing the user to toggle between the front and back cameras. This involved adding state management, a UI button, and the corresponding logic in  and .
+-   **Status**: USER VERIFICATION PENDING
 -   **Agent Testing Done**: N
 -   **Which testing method agent to use?**: frontend testing agent
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Refactor  state activation to use a global . (P0 - HIGHEST PRIORITY)
--   **Issue 2**: The diagnostic overlay and logging may be broken or outdated after the major architectural refactor and need to be verified/updated. (P1)
+-   **Issue 1**: Verify the newly implemented camera switching functionality. (P0 - HIGHEST PRIORITY)
+-   **Issue 2**: The diagnostic overlay and logging may be broken or outdated after the major architectural refactors and need to be verified/updated. (P1)
 -   **Issue 3**: Complete the internationalization of the  component. (P2)
 -   **Issue 4**: Internationalize the Avaliações (Assessments) page. (P2)
 -   **Issue 5**: EAS Project Slug Conflict ( vs. ) may cause issues with automated deployments. (P3)
 -   **Issue 6**: Back button icon not rendering on web. (P3)
 
 **Issues Detail**:
--   **Issue 1**:
-    -   **Attempted fixes**: None. This is a new task.
-    -   **Next debug checklist**: Implement the  class as a singleton, remove the  method from , and update the state machine's  method to read directly from the  method. The  function in  should call .
-    -   **Why fix this issue and what will be achieved with the fix?**: This will fix a critical bug where the recording UI starts, but the underlying state machine never transitions to , preventing velocity calculation and rep counting.
-    -   **Status**: NOT STARTED
+-   **Issue 1**: Verify the newly implemented camera switching functionality.
+    -   **Attempted fixes**: The feature was just implemented.
+    -   **Next debug checklist**:
+        1.  Take a screenshot of the  screen to confirm the new camera toggle button is visible in the header.
+        2.  Use the frontend testing agent to interact with the button and verify that the  state changes.
+        3.  Check the console logs for  and  upon toggling.
+        4.  Visually confirm the camera view switches.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is not a bug fix but a necessary verification step to confirm the successful implementation of a new user-requested feature.
+    -   **Status**: USER VERIFICATION PENDING
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
@@ -62,13 +67,12 @@ Input is required, but stdin is not readable. Failed to display prompt: Email or
     -   Implement a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
--   **VBT Pipeline Audit (DONE)**: Analyzed the entire VBT detection pipeline and produced a detailed report on its validation criteria, state machine, and blocking conditions.
--   **Diagnostic Instrumentation (DONE)**: Implemented extensive real-time logging and created a  component to display the internal state of the detection pipeline on-screen.
--   **Architectural Refactor for Circular Dependency (DONE)**: Replaced the entire validation logic with a new 5-stage progressive validation pipeline ( ->  ->  ->  -> ), completely eliminating the circular dependency that caused the system to get stuck in the stabilizing state.
+-   **Refactor  state activation (DONE)**: Implemented a global  as a singleton to reliably manage the recording state, fixing a critical bug where the system would fail to enter the  state. Associated tests in  were updated and passed.
+-   **Implement explicit camera selection control (DONE)**: Added a UI button and the underlying logic to allow users to switch between front and back cameras on both native and web platforms.
 
 **Earlier issues found/mentioned but not fixed**
 -   **Issue 1: EAS Project Slug Conflict**
-    -   **Debug checklist**: A new EAS project () was created as a workaround for a slug conflict. The original conflict with  might still affect automated deployments from the platform if they are hardcoded to the old slug.
+    -   **Debug checklist**: A new EAS project () was created as a workaround for a slug conflict. The original conflict with  might still affect automated deployments if they are hardcoded to the old slug.
     -   **Why to solve this issue and what will be achieved with this?**: Aligning the deployment system with the correct EAS project would prevent future build/deployment failures.
     -   **Should Test frontend/backend/both after fix?**: N/A (Infrastructure issue).
     -   **Is recurring issue?**: Y
@@ -82,40 +86,41 @@ Input is required, but stdin is not readable. Failed to display prompt: Email or
 
 
 **Key Technical Concepts**
--   **Progressive Validation Pipeline**: The core logic was refactored into a 5-stage pipeline where each stage builds upon the previous one, breaking dependencies. (Stage 1: , Stage 2: , Stage 3: , Stage 4: , Stage 5: ).
--   **State Machine**: The  in  now manages transitions based on the new progressive validation flags ( ->  ->  ->  -> ).
--   **React Hooks for Complex Logic**: The  hook encapsulates the complex interaction between the UI, the camera feed, and the VBT processing system.
--   **Singleton Controller**: The next task involves creating a  singleton to manage the recording state globally, acting as a single source of truth.
+-   **Progressive Validation Pipeline**: A 5-stage pipeline ( ->  ->  ->  -> ) that forms the core of the VBT logic.
+-   **Singleton Controller**: The  was implemented as a global singleton to provide a single, reliable source of truth for the application's recording state.
+-   **Imperative and Declarative Camera Control**: The system uses a hybrid approach for camera control. A declarative  prop is used for the web-based , while an imperative  call is used for the native component. This is managed by a single  state variable.
+-   **Conditional Imports**: The application uses  checks to conditionally import and use different camera libraries ( for native,  for web).
 
 **All files of reference**
--   : Contains the core 5-stage validation pipeline and state machine. **(Heavily refactored)**.
--   : The main React hook that integrates the VBT logic into the UI. **(Heavily refactored)**.
--   : The main camera screen component. Modified to integrate the diagnostic overlay.
--   : The new UI component created for real-time debugging.
--   : The module created to house the diagnostic data structures and logic.
+-   : Main camera screen. Modified to include camera switching state, logic, and UI button.
+-   : New file containing the global singleton for managing recording state.
+-   : Core state machine. Modified to use the new .
+-   : Main hook. Modified to use the new .
+-   : Reusable camera component. Modified to support camera switching.
+-   : Test file. Modified to align with the  refactor.
 
 **Critical Info for New Agent**
--   You **MUST** immediately begin the next refactoring task outlined in the user's last message (Message 165). This involves creating a global  to fix the  state activation.
--   The core VBT logic has been completely re-architected. You must work within the new 5-stage progressive validation framework in . Do not revert to the old logic.
--   The primary goal is to make the recording functionality robust. The state transition to  should be automatic as soon as  is true and the state is .
+-   Your first task is to **verify the camera switching functionality**. Use a screenshot to check the UI and the frontend testing agent to confirm functionality. Check console logs for confirmation.
+-   Be aware of the dual-library camera setup:  for native and  for web. The switching logic is different for each.
+-   After verifying the camera control, the next priority is to check if the  is still displaying accurate information after all the recent refactors.
 -   Do **NOT** attempt to run the iOS build (An Expo user account is required to proceed.
 
 Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username). This task is blocked on the user and is not the current priority.
--   After implementing the , you must verify that the diagnostic overlay still functions correctly and reflects the new state management.
+Input is required, but stdin is not readable. Failed to display prompt: Email or username). This task is blocked on the user.
 
 **documents and test reports created in this job**
--   
--   
+-   /app/memory/PRD.md (Updated)
+-   /app/memory/VBT_INSTRUMENTATION_REPORT.md
+-   /app/memory/VBT_RESTRUCTURE_DESIGN_DOC.md
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: (Msg 100) Mandated a major architectural refactor to a 5-stage progressive validation pipeline to fix an infinite stabilizing loop. Provided extremely detailed requirements for the new architecture.
-2.  **Agent**: (Msg 101) Acknowledged the refactoring task.
-3.  **Agent**: (Msg 105-164) Implemented the full 5-stage refactor across , , updated tests, and created documentation.
-4.  **User**: (Msg 165) Provided the next critical task: Refactor the  state activation. The current implementation is unreliable. Mandated the creation of a global  to act as a single source of truth and provided a detailed 8-step implementation plan. This is the **current P0 task**.
+1.  **User**: Mandated a refactor to fix the  state using a global . (Completed)
+2.  **User**: Requested additional console logs in the new . (Completed)
+3.  **User**: Requested a full analysis of the camera libraries used in the project. (Completed)
+4.  **User**: Based on the analysis, requested the implementation of an explicit camera selection control (front/back toggle). (Completed, pending verification)
 
 **Project Health Check:**
--   **Broken**: The  state activation is unreliable and considered broken, which is the immediate task to fix.
+-   **Broken**: None. The critical  state bug has been fixed.
 -   **Mocked**: Pose detection for the web platform remains mocked.
 -   **Blocked**: The iOS build for TestFlight remains blocked pending user action.
 
@@ -127,13 +132,13 @@ Input is required, but stdin is not readable. Failed to display prompt: Email or
 -   
 
 **Testing status**
--   **Testing agent used after significant changes**: NO (Not since the major refactor).
+-   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None new. Existing test file  was updated.
--   **Known regressions**: The diagnostic overlay's accuracy is unknown after the major refactor.
+-   **Known regressions**: The diagnostic overlay's accuracy is unknown after the recent refactors.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
 
 **What agent forgot to execute**
--   Nothing. The agent has been following a sequence of highly detailed and specific instructions from the user. The next task is clearly defined and ready to be started.</analysis>
+-   The agent did not test or verify the camera switching feature after implementation. The feature was coded, but no screenshot was taken, nor was the testing agent called to confirm that the new button appears in the UI and functions as expected. This should be the immediate first step for the next agent.</analysis>
