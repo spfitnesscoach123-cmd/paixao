@@ -417,6 +417,11 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       intervalRef.current = null;
     }
     
+    // Notify protection system that recording stopped
+    if (protectionSystemRef.current) {
+      protectionSystemRef.current.setRecordingActive(false);
+    }
+    
     setStatusMessage('Tracking parado');
   }, []);
   
@@ -433,9 +438,18 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     setRepsData([]);
     setFeedbackColor('neutral');
     setProtectionState('noHuman');
+    setValidationStage('INITIALIZING');
+    setValidationFlags({
+      frameUsable: false,
+      frameStable: false,
+      frameTrackable: false,
+      frameValid: false,
+      frameCountable: false,
+    });
     setIsHumanDetected(false);
     setIsStable(false);
     setStabilityProgress(0);
+    setStableFrameCount(0);
     setCanCalculate(false);
     setRepPhase('idle');
     lastRepCountRef.current = 0;
