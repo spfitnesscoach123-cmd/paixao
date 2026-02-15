@@ -31,6 +31,13 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
   - Automatic transition TRACKING → RECORDING when recording is active
   - Added `[VBT_STATE_CHECK]` diagnostic logging
   - All 34 unit tests passing
+- [x] **Camera Selection Control** (December 2025) ✨ NEW
+  - Added explicit `cameraFacing` state control (`'front' | 'back'`)
+  - Default camera is always `'back'` on mount
+  - Toggle button in header during camera phases
+  - Uses native `switchCamera()` from `@thinksys/react-native-mediapipe`
+  - Added `[Camera] Using camera:` diagnostic logging
+  - `CameraView` (expo-camera) uses `facing={cameraFacing}` prop
 
 ## Architecture Documentation
 - `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
