@@ -269,7 +269,7 @@ export class RepDetector {
   /**
    * Process CONCENTRIC phase - ascending movement
    * Rep completes when velocity drops indicating lockout OR direction changes
-   * IMPROVED: More robust detection with direction change
+   * IMPROVED: Supports both eccentric-first and concentric-first exercises
    */
   private processConcentric(
     velocity: number,
@@ -293,19 +293,41 @@ export class RepDetector {
       return false;
     }
     
-    // IMPROVED: Detect rep completion with multiple conditions
-    // 1. Direction reverses to down (next rep starting)
-    // 2. Velocity drops to near-zero (lockout at top)
-    // 3. Movement becomes stationary
-    const isVelocityDropped = absVelocity < this.config.directionChangeThreshold;
-    const isDirectionReversed = direction === 'down' && absVelocity >= this.config.minVelocityThreshold;
-    const isStationary = direction === 'stationary' && this.concentricVelocities.length >= 2;
-    
-    if (isVelocityDropped || isDirectionReversed || isStationary) {
-      console.log('[RepDetector] CONCENTRIC COMPLETE! reason:', 
-        isVelocityDropped ? 'velocity_drop' : 
-        isDirectionReversed ? 'direction_reversed' : 'stationary');
-      return this.completeRep(now);
+    // Different behavior based on exercise type
+    if (this.config.startDirection === 'up') {
+      // CONCENTRIC-FIRST EXERCISE (Deadlift, Power Clean)
+      // After concentric, need to go through eccentric before completing
+      const isVelocityDropped = absVelocity < this.config.directionChangeThreshold;
+      const isDirectionReversed = direction === 'down' && absVelocity >= this.config.minVelocityThreshold;
+      const isStationary = direction === 'stationary' && this.concentricVelocities.length >= 2;
+      
+      if (isDirectionReversed) {
+        // Direction changed to down - start eccentric phase
+        this.transitionToPhase('eccentric', now);
+        this.eccentricStartTime = now;
+        this.eccentricVelocities = [absVelocity];
+        console.log('[RepDetector] CONCENTRIC -> ECCENTRIC (concentric-first exercise)');
+        return false;
+      } else if (isVelocityDropped || isStationary) {
+        // If velocity drops without direction change, wait for eccentric
+        // This handles the pause at top of deadlift
+        this.transitionToPhase('transition', now);
+        console.log('[RepDetector] CONCENTRIC -> TRANSITION (waiting for eccentric)');
+        return false;
+      }
+    } else {
+      // ECCENTRIC-FIRST EXERCISE (Squat, Bench)
+      // Rep completes after concentric phase
+      const isVelocityDropped = absVelocity < this.config.directionChangeThreshold;
+      const isDirectionReversed = direction === 'down' && absVelocity >= this.config.minVelocityThreshold;
+      const isStationary = direction === 'stationary' && this.concentricVelocities.length >= 2;
+      
+      if (isVelocityDropped || isDirectionReversed || isStationary) {
+        console.log('[RepDetector] CONCENTRIC COMPLETE! reason:', 
+          isVelocityDropped ? 'velocity_drop' : 
+          isDirectionReversed ? 'direction_reversed' : 'stationary');
+        return this.completeRep(now);
+      }
     }
     
     return false;
