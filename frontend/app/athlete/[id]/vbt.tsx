@@ -218,6 +218,39 @@ const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
         strokeWidth="3"
       />
       
+      {/* Optimal Load Point (Maximum Power) */}
+      {analysis.load_velocity_profile.optimal_load && (
+        <G>
+          <Circle
+            cx={getX(analysis.load_velocity_profile.optimal_load)}
+            cy={getY(analysis.load_velocity_profile.optimal_load)}
+            r="10"
+            fill="#f59e0b"
+            stroke="#ffffff"
+            strokeWidth="2"
+          />
+          <SvgText
+            x={getX(analysis.load_velocity_profile.optimal_load)}
+            y={getY(analysis.load_velocity_profile.optimal_load) - 18}
+            textAnchor="middle"
+            fill="#f59e0b"
+            fontSize="10"
+            fontWeight="bold"
+          >
+            {locale === 'pt' ? 'Ótimo' : 'Optimal'}
+          </SvgText>
+          <SvgText
+            x={getX(analysis.load_velocity_profile.optimal_load)}
+            y={getY(analysis.load_velocity_profile.optimal_load) - 7}
+            textAnchor="middle"
+            fill="#f59e0b"
+            fontSize="9"
+          >
+            {analysis.load_velocity_profile.optimal_load}kg
+          </SvgText>
+        </G>
+      )}
+      
       {/* Estimated 1RM Point */}
       {estimated_1rm && (
         <G>
