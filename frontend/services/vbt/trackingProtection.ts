@@ -287,6 +287,7 @@ export class TrackingStateMachine {
 
   /**
    * Attempt state transition based on conditions
+   * INSTRUMENTED: Logs all transition attempts and blocking conditions
    * 
    * States (seguindo nomenclatura do usuário):
    * - 'noHuman' = 'semPessoa'
@@ -302,6 +303,8 @@ export class TrackingStateMachine {
     const previousState = this.currentState;
     let repCompleted = false;
     let message = '';
+    let blocked = false;
+    let blockReason: string | null = null;
 
     // STATE: noHuman (semPessoa)
     if (!humanValid) {
@@ -309,6 +312,21 @@ export class TrackingStateMachine {
         this.transitionTo('noHuman', 'Detecção de pessoa perdida');
       }
       this.resetMovementTracking();
+      blocked = true;
+      blockReason = 'humanValid === false';
+      
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logStateMachineTransition(
+        previousState,
+        'noHuman',
+        humanValid,
+        humanStable,
+        movementDelta,
+        this.config.minMovementDelta,
+        blocked,
+        blockReason
+      );
+      
       return { newState: 'noHuman', repCompleted: false, message: 'SEM PESSOA - Nenhuma pessoa válida detectada' };
     }
 
@@ -317,6 +335,21 @@ export class TrackingStateMachine {
       if (this.currentState !== 'noHuman') {
         this.transitionTo('noHuman', 'Detecção instável');
       }
+      blocked = true;
+      blockReason = 'humanStable === false';
+      
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logStateMachineTransition(
+        previousState,
+        'noHuman',
+        humanValid,
+        humanStable,
+        movementDelta,
+        this.config.minMovementDelta,
+        blocked,
+        blockReason
+      );
+      
       return { newState: 'noHuman', repCompleted: false, message: 'Aguardando detecção estável...' };
     }
 
@@ -328,6 +361,19 @@ export class TrackingStateMachine {
       if (currentPosition) {
         this.baselinePosition = { ...currentPosition };
       }
+      
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logStateMachineTransition(
+        previousState,
+        'ready',
+        humanValid,
+        humanStable,
+        movementDelta,
+        this.config.minMovementDelta,
+        false,
+        null
+      );
+      
       return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando início do movimento' };
     }
 
@@ -336,8 +382,34 @@ export class TrackingStateMachine {
       if (movementDelta >= this.config.minMovementDelta) {
         this.transitionTo('executing', 'Movimento significativo detectado');
         this.repPhase = 'descending';
+        
+        // DIAGNOSTIC LOG
+        vbtDiagnostics.logStateMachineTransition(
+          previousState,
+          'executing',
+          humanValid,
+          humanStable,
+          movementDelta,
+          this.config.minMovementDelta,
+          false,
+          null
+        );
+        
         return { newState: 'executing', repCompleted: false, message: 'EXECUTANDO - Movimento detectado, rastreando...' };
       }
+      
+      // DIAGNOSTIC LOG - waiting for movement
+      vbtDiagnostics.logStateMachineTransition(
+        previousState,
+        'ready',
+        humanValid,
+        humanStable,
+        movementDelta,
+        this.config.minMovementDelta,
+        true,
+        `movementDelta (${movementDelta.toFixed(4)}) < minMovementDelta (${this.config.minMovementDelta})`
+      );
+      
       return { newState: 'ready', repCompleted: false, message: 'PRONTO - Aguardando movimento' };
     }
 
@@ -375,6 +447,19 @@ export class TrackingStateMachine {
       // Check if movement stopped (return to ready)
       if (movementDelta < this.config.minMovementDelta / 2 && this.repPhase === 'idle') {
         this.transitionTo('ready', 'Movimento parou');
+        
+        // DIAGNOSTIC LOG
+        vbtDiagnostics.logStateMachineTransition(
+          previousState,
+          'ready',
+          humanValid,
+          humanStable,
+          movementDelta,
+          this.config.minMovementDelta,
+          false,
+          null
+        );
+        
         return { newState: 'ready', repCompleted, message: message || 'Movimento parou - aguardando' };
       }
 
@@ -385,8 +470,32 @@ export class TrackingStateMachine {
         'completed': 'Completa'
       }[this.repPhase] || this.repPhase;
 
+      // DIAGNOSTIC LOG
+      vbtDiagnostics.logStateMachineTransition(
+        previousState,
+        'executing',
+        humanValid,
+        humanStable,
+        movementDelta,
+        this.config.minMovementDelta,
+        false,
+        null
+      );
+
       return { newState: 'executing', repCompleted, message: message || `EXECUTANDO: ${phaseLabel}` };
     }
+
+    // DIAGNOSTIC LOG - unknown state
+    vbtDiagnostics.logStateMachineTransition(
+      previousState,
+      this.currentState,
+      humanValid,
+      humanStable,
+      movementDelta,
+      this.config.minMovementDelta,
+      true,
+      'Unknown state condition'
+    );
 
     return { newState: this.currentState, repCompleted, message: 'Estado desconhecido' };
   }
