@@ -232,8 +232,8 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // IMPROVED: Uses direction change detection, not just velocity thresholds
     // CONCENTRIC-FIRST: Deadlift, Power Clean start with UP movement
     // ========================================
-    const exerciseStartDir = EXERCISE_START_DIRECTION[exercise] || 'down';
-    console.log(`[VBT] Initializing RepDetector for ${exercise} with startDirection: ${exerciseStartDir}`);
+    const exerciseStartDir = EXERCISE_START_DIRECTION[config.exercise] || 'down';
+    console.log(`[VBT] Initializing RepDetector for ${config.exercise} with startDirection: ${exerciseStartDir}`);
     
     repDetectorRef.current = new RepDetector({
       minVelocityThreshold: 0.03,   // 3cm/s - lowered to detect slower movements
