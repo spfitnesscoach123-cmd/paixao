@@ -37,43 +37,54 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
   - Toggle button in header during camera phases
   - Uses native `switchCamera()` from `@thinksys/react-native-mediapipe`
   - Synchronized state + native call in single atomic operation
-- [x] **Frame Processor Debugging** (December 2025) ✨ NEW
+- [x] **Frame Processor Debugging** (December 2025)
   - Created `babel.config.js` with reanimated plugin configured LAST
   - Added frame reception rate logging (every 5 seconds)
   - Added first frame detection with `[VBT_CAMERA] ✅ FIRST FRAME RECEIVED!`
   - Enhanced `VBTDiagnosticOverlay` with MediaPipe status section
-  - Created `/app/memory/VBT_FRAME_PROCESSOR_FIX.md` guide
+- [x] **🔴 CRITICAL FIX: Pipeline Data Flow** (December 2025) ✨ NEW
+  - **ROOT CAUSE FOUND**: `processPose()` was only called when `isTracking === true`
+  - This meant during `pointSelection` phase, landmarks were detected but NEVER sent to the protection pipeline
+  - Result: `trackingPoint`, `humanPresence`, `stability` all stayed at N/A/0
+  - **FIX**: `processPose()` now called in ALL phases, not just during recording
+  - The protection pipeline now continuously receives pose data for:
+    1. Human presence detection (Stage 1: FRAME_USABLE)
+    2. Stability building (Stage 2: FRAME_STABLE)
+    3. Tracking point validation (Stage 3: FRAME_TRACKABLE)
+  - Velocity/rep counting still only processed when `isTracking === true`
 
 ## Architecture Documentation
 - `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
 - `/app/frontend/docs/VBT_DIAGNOSTIC_INSTRUMENTATION.md` - Debugging guide
 - `/app/frontend/services/vbt/recordingController.ts` - Recording state singleton
-- `/app/memory/VBT_FRAME_PROCESSOR_FIX.md` - Frame processor debugging guide ✨ NEW
 
-## Key Files Modified (Frame Processor Fix)
-- `babel.config.js` - NEW: Created with reanimated plugin
-- `app/athlete/[id]/vbt-camera.tsx` - Added frame logging, fixed toggleCamera sync
-- `components/vbt/VBTDiagnosticOverlay.tsx` - Added MediaPipe status display
+## Key Files Modified (Pipeline Data Flow Fix) ✨ NEW
+- `app/athlete/[id]/vbt-camera.tsx`:
+  - `handleMediapipeLandmark()` - Now ALWAYS calls `processPose()`, not just when `isTracking`
+  - Added `displayFrameCount` state for diagnostic overlay re-rendering
+- `services/vbt/useProtectedBarTracking.ts`:
+  - `processPose()` - Removed early return when `!isTracking`
+  - Velocity/rep counting still guarded by `isTracking` check
 
-## Current Blocker 🔴
-**"Waiting for first frame" issue - Requires Development Build**
-- The `@thinksys/react-native-mediapipe` library uses native code
-- **Does NOT work in Expo Go** - requires Development Build or EAS Build
-- User must rebuild the app after native code changes
+## Current Status 🟢
+**Pipeline issue FIXED** - The VBT system should now:
+1. Detect human presence as soon as MediaPipe provides landmarks
+2. Build stability frames progressively
+3. Recognize when tracking point is selected
+4. Progress from "Stabilizing Detection... (0%)" to ready state
 
-### Steps to Fix
-1. Run `npx expo prebuild --clean`
-2. Run `npx expo run:ios` or `eas build --profile development --platform ios`
-3. Disable Remote JS Debugger on device
-4. Verify camera permissions
+**User Action Required**: Test the fix in Development Build to verify:
+- Diagnostic overlay shows non-N/A values
+- Stability progress increases
+- Human presence becomes "PASS"
+- Tracking point shows "SET" after selection
 
 ## Pending Issues (P0-P3)
-1. **P0**: Rebuild app with EAS/Dev Build to enable MediaPipe frames ⚠️ CRITICAL
-2. **P1**: Verify diagnostic overlay works with new frame props
-3. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
-4. **P1**: Internationalization of "Avaliações" page
-5. **P2**: Test `gps_import` pipeline with `identity_resolver`
-6. **P3**: Back button icon not rendering on web
+1. **P1**: Verify pipeline fix works correctly in Development Build
+2. **P1**: Internationalization of `ScientificAnalysisTab.tsx`
+3. **P1**: Internationalization of "Avaliações" page
+4. **P2**: Test `gps_import` pipeline with `identity_resolver`
+5. **P3**: Back button icon not rendering on web
 
 ## Future Tasks
 - Integrate identity resolution into `force_import` and `wellness_import`
