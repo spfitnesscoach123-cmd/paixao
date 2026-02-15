@@ -28,6 +28,9 @@ export const VBTDiagnosticOverlay: React.FC<DiagnosticOverlayProps> = ({
   visible = true,
   compact = false,
   onClose,
+  frameCount = 0,
+  mediapipeAvailable = false,
+  currentPlatform = Platform.OS,
 }) => {
   const [diagnosticData, setDiagnosticData] = useState<VBTDiagnosticFrame | null>(null);
   const [blockingDiagnosis, setBlockingDiagnosis] = useState<BlockingDiagnosis | null>(null);
@@ -45,6 +48,11 @@ export const VBTDiagnosticOverlay: React.FC<DiagnosticOverlayProps> = ({
   if (!visible) return null;
   
   const overlayData = vbtDiagnostics.getOverlayData();
+  
+  // Check if frames are being received
+  const isReceivingFrames = frameCount > 0;
+  const frameStatusColor = isReceivingFrames ? '#10b981' : '#ef4444';
+  const mediapipeStatusColor = mediapipeAvailable ? '#10b981' : '#ef4444';
   
   const getStatusColor = (status: string): string => {
     if (status === 'PASS' || status === 'ALLOWED' || status === 'SET') return '#10b981';
