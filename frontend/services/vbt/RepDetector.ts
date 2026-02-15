@@ -100,6 +100,15 @@ export class RepDetector {
     const now = Date.now();
     const absVelocity = Math.abs(velocity);
     
+    // DEBUG: Log state machine updates (every 15th call to avoid spam)
+    if (this.directionChangeCount++ % 15 === 0) {
+      console.log('[RepDetector] STATE:', this.currentPhase, 
+        '| vel:', absVelocity.toFixed(3), 
+        '| dir:', direction, 
+        '| eccCount:', this.eccentricVelocities.length,
+        '| concCount:', this.concentricVelocities.length);
+    }
+    
     // Check if in lockout period
     if (this.currentPhase === 'lockout') {
       if (now - this.lastRepCompletionTime >= this.config.repLockoutDuration) {
