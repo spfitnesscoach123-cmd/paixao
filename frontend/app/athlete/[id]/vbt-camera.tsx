@@ -541,6 +541,11 @@ export default function VBTCameraPage() {
     // Increment frame counter
     landmarkCallCountRef.current++;
     
+    // Update display frame count every 10 frames (for diagnostic overlay without excessive re-renders)
+    if (landmarkCallCountRef.current % 10 === 0) {
+      setDisplayFrameCount(landmarkCallCountRef.current);
+    }
+    
     try {
       // @thinksys/react-native-mediapipe passes data directly or via nativeEvent
       const landmarkData = event?.nativeEvent || event;
@@ -550,6 +555,7 @@ export default function VBTCameraPage() {
         console.log('[VBT_CAMERA] ✅ FIRST FRAME RECEIVED! MediaPipe is working.');
         console.log('[VBT_CAMERA] Raw event type:', typeof event);
         console.log('[VBT_CAMERA] Has nativeEvent:', !!event?.nativeEvent);
+        setDisplayFrameCount(1); // Force immediate update on first frame
       }
       
       const vbtPose = convertMediapipeLandmarks(landmarkData);
