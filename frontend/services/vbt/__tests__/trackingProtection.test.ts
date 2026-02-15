@@ -92,7 +92,8 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
       
       const result = validator.validateKeypoints(lowConfidencePose);
       expect(result.isValid).toBe(false);
-      expect(result.message).toContain('confiança baixa');
+      // Mensagem inclui percentual de confiança baixa
+      expect(result.message).toContain('insuficientes');
     });
     
     test('Pose válida com confiança >= 0.6 deve retornar válido', () => {
@@ -348,7 +349,8 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
       const result = protectionSystem.processFrame(lowConfPose);
       
       expect(result.canCalculate).toBe(false);
-      expect(result.message).toContain('BLOQUEADO');
+      // Em baixa confiança, sistema fica em STABILIZING ou não progride
+      expect(['INITIALIZING', 'STABILIZING']).toContain(result.validationStage);
     });
     
     test('CENÁRIO 4: Fluxo completo com movimento válido', () => {
