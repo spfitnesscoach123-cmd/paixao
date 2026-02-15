@@ -24,6 +24,7 @@ export * from './useBarTracking';
 export * from './trackingProtection';
 export * from './useProtectedBarTracking';
 export * from './diagnostics';
+export * from './recordingController';
 
 // Re-export types
 export type {
