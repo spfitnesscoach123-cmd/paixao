@@ -252,7 +252,7 @@ export default function VBTCameraPage() {
   
   // Log camera state on mount and changes
   useEffect(() => {
-    console.log("[Camera] Using camera:", cameraFacing);
+    console.log("[VBT_CAMERA] Current camera facing:", cameraFacing);
   }, [cameraFacing]);
   
   // Toggle camera function - SYNCHRONIZED STATE + NATIVE CALL
