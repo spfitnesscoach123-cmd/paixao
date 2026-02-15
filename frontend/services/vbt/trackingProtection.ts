@@ -14,7 +14,11 @@
  * LAYER 3: Coach-Defined Tracking Point
  * - Manual point selection on screen
  * - All calculations use ONLY this point
+ * 
+ * DIAGNOSTIC INSTRUMENTATION: Added for debugging pipeline blockers
  */
+
+import { vbtDiagnostics } from './diagnostics';
 
 // ============================================================================
 // TYPES & INTERFACES
