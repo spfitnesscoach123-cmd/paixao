@@ -826,9 +826,13 @@ export default function VBTCameraPage() {
         
         // Start native camera recording
         // Note: recordAsync returns a promise that resolves when recording stops
-        recordingPromiseRef.current = cameraRef.current.recordAsync({
+        const recordPromise = cameraRef.current.recordAsync({
           maxDuration: 300, // 5 minutes max
         });
+        
+        if (recordPromise) {
+          recordingPromiseRef.current = recordPromise;
+        }
         
         console.log('[VBT_CAMERA] Native camera recording STARTED');
       } catch (e) {
