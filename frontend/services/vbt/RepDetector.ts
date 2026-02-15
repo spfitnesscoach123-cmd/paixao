@@ -247,7 +247,8 @@ export class RepDetector {
 
   /**
    * Process CONCENTRIC phase - ascending movement
-   * Rep completes when velocity drops indicating lockout
+   * Rep completes when velocity drops indicating lockout OR direction changes
+   * IMPROVED: More robust detection with direction change
    */
   private processConcentric(
     velocity: number,
@@ -271,11 +272,20 @@ export class RepDetector {
       return false;
     }
     
-    // Detect rep completion (velocity drops to stationary at top)
-    // OR direction reverses to down
-    if (absVelocity < this.config.directionChangeThreshold || direction === 'down') {
-      // Rep complete!
+    // IMPROVED: Detect rep completion with multiple conditions
+    // 1. Direction reverses to down (next rep starting)
+    // 2. Velocity drops to near-zero (lockout at top)
+    // 3. Movement becomes stationary
+    const isVelocityDropped = absVelocity < this.config.directionChangeThreshold;
+    const isDirectionReversed = direction === 'down' && absVelocity >= this.config.minVelocityThreshold;
+    const isStationary = direction === 'stationary' && this.concentricVelocities.length >= 2;
+    
+    if (isVelocityDropped || isDirectionReversed || isStationary) {
+      console.log('[RepDetector] CONCENTRIC COMPLETE! reason:', 
+        isVelocityDropped ? 'velocity_drop' : 
+        isDirectionReversed ? 'direction_reversed' : 'stationary');
       return this.completeRep(now);
+    }
     }
     
     return false;
