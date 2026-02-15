@@ -401,6 +401,7 @@ export default function VBTCameraPage() {
   // Convert MediaPipe landmarks to VBT pose format
   // @thinksys/react-native-mediapipe returns landmarks with visibility property
   // BUG 5 FIX: Properly extract visibility/score from all possible data formats
+  // CRITICAL: visibility can be null from iOS, so we need explicit null checks
   const convertMediapipeLandmarks = useCallback((landmarkData: any): VBTPoseData | null => {
     // Log raw data for debugging (every 30 frames to avoid spam)
     frameCountRef.current++;
@@ -422,7 +423,7 @@ export default function VBTCameraPage() {
       landmarks = landmarkData;
       dataFormat = 'direct_array';
     }
-    // Format 2: Object with landmarks property (common wrapper format)
+    // Format 2: Object with landmarks property - THIS IS THE @thinksys FORMAT
     else if (landmarkData?.landmarks && Array.isArray(landmarkData.landmarks)) {
       landmarks = landmarkData.landmarks;
       dataFormat = 'landmarks_property';
@@ -459,16 +460,16 @@ export default function VBTCameraPage() {
               
               if (typeof point === 'object' && point !== null) {
                 // Object format: {x, y, z, visibility} or {x, y, visibility}
-                visibility = point.visibility ?? point.score ?? point.confidence ?? 0.85;
+                // CRITICAL: Check for null explicitly, not just falsy
+                const rawVis = point.visibility ?? point.score ?? point.confidence;
+                visibility = (rawVis !== null && rawVis !== undefined && !isNaN(rawVis)) ? rawVis : 0.85;
               } else if (Array.isArray(point)) {
                 // Array format: [x, y, z, visibility] or [x, y, visibility]
-                visibility = point[3] ?? point[2] ?? 0.85;
+                const rawVis = point[3] ?? point[2];
+                visibility = (rawVis !== null && rawVis !== undefined && !isNaN(rawVis)) ? rawVis : 0.85;
               }
               
               // Ensure visibility is a valid number between 0 and 1
-              if (typeof visibility !== 'number' || isNaN(visibility)) {
-                visibility = 0.85;
-              }
               visibility = Math.max(0, Math.min(1, visibility));
               
               landmarks[indices[i]] = {
@@ -506,20 +507,36 @@ export default function VBTCameraPage() {
         const x = landmark.x ?? landmark[0] ?? 0;
         const y = landmark.y ?? landmark[1] ?? 0;
         
-        // BUG 5 FIX: Properly extract visibility/score with correct priority
-        // MediaPipe uses 'visibility' property, some wrappers use 'score' or 'confidence'
+        // BUG 5 FIX: Properly extract visibility/score with explicit null check
+        // @thinksys returns {x, y, z, visibility, presence} where visibility can be null
+        // CRITICAL: Use explicit null check, not ?? operator which treats null as valid
         let score = 0.85; // Default high value if landmark exists
         
         if (typeof landmark === 'object' && landmark !== null) {
-          score = landmark.visibility ?? landmark.score ?? landmark.confidence ?? 0.85;
+          // Check visibility first (MediaPipe standard), then score/confidence (wrappers)
+          const rawScore = landmark.visibility ?? landmark.score ?? landmark.confidence;
+          
+          // CRITICAL FIX: Check if value is actually a valid number
+          // visibility can be null from iOS native code
+          if (rawScore !== null && rawScore !== undefined && typeof rawScore === 'number' && !isNaN(rawScore)) {
+            score = rawScore;
+          } else {
+            // If visibility is null/undefined, use presence as fallback, or default to 0.85
+            const presenceScore = landmark.presence;
+            if (presenceScore !== null && presenceScore !== undefined && typeof presenceScore === 'number' && !isNaN(presenceScore)) {
+              score = presenceScore;
+            } else {
+              score = 0.85; // Default - we detected the landmark, so it's likely valid
+            }
+          }
         } else if (Array.isArray(landmark)) {
-          score = landmark[3] ?? landmark[2] ?? 0.85;
+          const rawScore = landmark[3] ?? landmark[2];
+          if (rawScore !== null && rawScore !== undefined && typeof rawScore === 'number' && !isNaN(rawScore)) {
+            score = rawScore;
+          }
         }
         
-        // Ensure score is a valid number
-        if (typeof score !== 'number' || isNaN(score)) {
-          score = 0.85;
-        }
+        // Clamp score between 0 and 1
         score = Math.max(0, Math.min(1, score));
         
         keypoints.push({
@@ -534,7 +551,7 @@ export default function VBTCameraPage() {
         
         // Debug logging for key tracking points
         if (shouldLog && (name === 'left_hip' || name === 'right_hip')) {
-          console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(3)}`);
+          console.log(`[VBTCamera] ${name}: x=${x.toFixed(3)}, y=${y.toFixed(3)}, score=${score.toFixed(3)}, rawVis=${landmark.visibility}`);
         }
       }
     }
