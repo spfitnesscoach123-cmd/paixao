@@ -84,6 +84,8 @@ export interface PoseCameraProps {
   showDebugInfo?: boolean;
   /** Minimum confidence threshold */
   minConfidence?: number;
+  /** Callback when camera is toggled (for native switchCamera) */
+  onCameraToggle?: () => void;
 }
 
 export interface PoseCameraRef {
@@ -97,6 +99,8 @@ export interface PoseCameraRef {
   getCurrentPose: () => VBTPoseData | null;
   /** Is detection active */
   isDetecting: () => boolean;
+  /** Toggle camera (front/back) */
+  toggleCamera: () => void;
 }
 
 // ============================================================================
