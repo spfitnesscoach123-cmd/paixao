@@ -297,7 +297,7 @@ describe('Sistema de 3 Camadas de Proteção VBT', () => {
     let protectionSystem: TrackingProtectionSystem;
     
     beforeEach(() => {
-      protectionSystem = createProtectionSystem({
+      protectionSystem = createTrackingProtection({
         minKeypointScore: 0.6,
         requiredStableFrames: 5,
         minMovementDelta: 0.02,
