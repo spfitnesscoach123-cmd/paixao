@@ -623,6 +623,22 @@ export default function VBTCameraPage() {
       // Store preview pose data for stabilization visualization
       setPreviewPoseData(vbtPose);
       
+      // CRITICAL DEBUG: Log keypoint scores on first 5 frames and every 60 frames
+      if (vbtPose && (landmarkCallCountRef.current <= 5 || landmarkCallCountRef.current % 60 === 0)) {
+        const trackingKps = vbtPose.keypoints.filter(kp => 
+          kp.name === 'left_hip' || kp.name === 'right_hip' || kp.name === 'left_knee'
+        );
+        console.log('[VBT_CAMERA] BUG5_DEBUG - Keypoint scores:', trackingKps.map(kp => 
+          `${kp.name}: score=${kp.score.toFixed(3)}, x=${kp.x.toFixed(3)}, y=${kp.y.toFixed(3)}`
+        ));
+        
+        const avgScore = vbtPose.keypoints.reduce((sum, kp) => sum + kp.score, 0) / vbtPose.keypoints.length;
+        const validKps = vbtPose.keypoints.filter(kp => kp.score >= 0.3).length;
+        console.log('[VBT_CAMERA] BUG5_DEBUG - Total keypoints:', vbtPose.keypoints.length, 
+          '| Valid (>=0.3):', validKps, 
+          '| Avg score:', avgScore.toFixed(3));
+      }
+      
       // CRITICAL: ALWAYS send pose data to VBT pipeline
       // This enables the protection system to:
       // 1. Detect human presence (Stage 1: FRAME_USABLE)
