@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
-      "buildNumber": "25",
+      "buildNumber": "29",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
@@ -21,7 +21,7 @@
     },
     "android": {
       "package": "com.loadmanager.app",
-      "versionCode": 25,
+      "versionCode": 29,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000F1F"
