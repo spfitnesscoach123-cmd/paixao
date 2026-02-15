@@ -12,6 +12,11 @@
  * This breaks the circular dependency that caused infinite stabilization loops.
  * 
  * Recording can begin when state >= READY (stable), even before tracking is perfect.
+ * 
+ * BUG FIXES IMPLEMENTED:
+ * - BUG 3: Velocity calculated in MediaPipe pose loop with smoothing
+ * - BUG 4: RepDetector detects full rep cycle (eccentric -> transition -> concentric)
+ * - BUG 5: Tracking point stored as landmark index, confidence checked each frame
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -41,6 +46,10 @@ import {
   PoseSimulator,
   VBTPoseData,
 } from '../pose';
+
+// Import new production modules for bug fixes
+import { VelocityCalculator, VelocityResult } from './VelocityCalculator';
+import { RepDetector, RepDetectorResult, RepPhase } from './RepDetector';
 
 // ============================================================================
 // TYPES
