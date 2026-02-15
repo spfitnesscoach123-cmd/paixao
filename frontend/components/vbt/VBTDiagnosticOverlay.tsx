@@ -133,6 +133,41 @@ export const VBTDiagnosticOverlay: React.FC<DiagnosticOverlayProps> = ({
       </View>
       
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* MediaPipe Status - CRITICAL SECTION */}
+        <View style={[styles.section, { backgroundColor: !isReceivingFrames ? 'rgba(239, 68, 68, 0.2)' : 'transparent' }]}>
+          <Text style={styles.sectionTitle}>MEDIAPIPE STATUS</Text>
+          
+          <View style={styles.row}>
+            <Text style={styles.label}>MODULE:</Text>
+            <Text style={[styles.value, { color: mediapipeStatusColor }]}>
+              {mediapipeAvailable ? '✓ LOADED' : '✗ NOT AVAILABLE'}
+            </Text>
+          </View>
+          
+          <View style={styles.row}>
+            <Text style={styles.label}>FRAMES:</Text>
+            <Text style={[styles.value, { color: frameStatusColor }]}>
+              {isReceivingFrames ? `✓ ${frameCount} received` : '✗ NO FRAMES'}
+            </Text>
+          </View>
+          
+          <View style={styles.row}>
+            <Text style={styles.label}>PLATFORM:</Text>
+            <Text style={styles.value}>{currentPlatform.toUpperCase()}</Text>
+          </View>
+          
+          {!isReceivingFrames && (
+            <View style={styles.warningBox}>
+              <Text style={styles.warningTitle}>⚠️ NO FRAMES RECEIVED</Text>
+              <Text style={styles.warningText}>Possible causes:</Text>
+              <Text style={styles.warningText}>• Using Expo Go (use Dev Build)</Text>
+              <Text style={styles.warningText}>• MediaPipe not linked (run pod install)</Text>
+              <Text style={styles.warningText}>• Camera permission denied</Text>
+              <Text style={styles.warningText}>• Remote JS Debugger enabled</Text>
+            </View>
+          )}
+        </View>
+        
         {/* Current State */}
         <View style={styles.section}>
           <View style={styles.row}>
