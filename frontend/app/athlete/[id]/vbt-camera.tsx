@@ -255,27 +255,25 @@ export default function VBTCameraPage() {
     console.log("[Camera] Using camera:", cameraFacing);
   }, [cameraFacing]);
   
-  // Toggle camera function
+  // Toggle camera function - SYNCHRONIZED STATE + NATIVE CALL
   const toggleCamera = useCallback(() => {
-    console.log("[Camera] Toggling camera from:", cameraFacing);
-    
-    // Use native switchCamera if available (for RNMediapipe)
-    if (Platform.OS !== 'web' && switchCamera) {
-      try {
-        switchCamera();
-        console.log("[Camera] Native switchCamera called");
-      } catch (e) {
-        console.warn("[Camera] switchCamera failed:", e);
-      }
-    }
-    
-    // Update state for UI and expo-camera fallback
     setCameraFacing(prev => {
-      const newFacing = prev === 'back' ? 'front' : 'back';
-      console.log("[Camera] New camera facing:", newFacing);
-      return newFacing;
+      const next = prev === 'back' ? 'front' : 'back';
+      
+      // Call native switchCamera in sync with state update
+      if (Platform.OS !== 'web' && switchCamera) {
+        try {
+          switchCamera();
+        } catch (e) {
+          console.warn("[VBT_CAMERA] switchCamera failed:", e);
+        }
+      }
+      
+      console.log("[VBT_CAMERA] Camera switched to:", next);
+      
+      return next;
     });
-  }, [cameraFacing]);
+  }, []);
   
   // Tutorial animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
