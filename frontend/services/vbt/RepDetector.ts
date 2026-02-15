@@ -286,7 +286,6 @@ export class RepDetector {
         isDirectionReversed ? 'direction_reversed' : 'stationary');
       return this.completeRep(now);
     }
-    }
     
     return false;
   }
