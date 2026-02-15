@@ -42,17 +42,26 @@ import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
 // Conditional import for native MediaPipe
 // @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
 // Also exports switchCamera function to toggle between front/back cameras
+// IMPORTANT: This ONLY works in Development Build or EAS Build, NOT in Expo Go
 let RNMediapipe: any = null;
 let switchCamera: (() => void) | null = null;
+let MEDIAPIPE_AVAILABLE = false;
+
 if (Platform.OS !== 'web') {
   try {
     const mediapipe = require('@thinksys/react-native-mediapipe');
     RNMediapipe = mediapipe.RNMediapipe;
     switchCamera = mediapipe.switchCamera;
-    console.log('[VBTCamera] MediaPipe loaded successfully');
+    MEDIAPIPE_AVAILABLE = !!RNMediapipe;
+    console.log('[VBT_CAMERA] ✅ MediaPipe loaded successfully');
+    console.log('[VBT_CAMERA] RNMediapipe component:', RNMediapipe ? 'AVAILABLE' : 'NOT FOUND');
+    console.log('[VBT_CAMERA] switchCamera function:', switchCamera ? 'AVAILABLE' : 'NOT FOUND');
   } catch (e) {
-    console.warn('[VBTCamera] MediaPipe not available:', e);
+    console.warn('[VBT_CAMERA] ⚠️ MediaPipe not available:', e);
+    console.warn('[VBT_CAMERA] Make sure you are using Development Build or EAS Build, NOT Expo Go');
   }
+} else {
+  console.log('[VBT_CAMERA] Web platform detected - using expo-camera fallback');
 }
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
