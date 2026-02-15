@@ -210,9 +210,11 @@ export class VelocityCalculator {
     // Determine direction based on Y delta
     // Negative deltaY = moving up (concentric)
     // Positive deltaY = moving down (eccentric)
+    // IMPROVED: Increased threshold to reduce direction flickering
     let direction: 'up' | 'down' | 'stationary' = 'stationary';
     
-    if (Math.abs(deltaY) >= 0.005) { // 0.5% of screen minimum
+    // Use 1% of screen as minimum to avoid micro-movement noise
+    if (Math.abs(deltaY) >= 0.01) {
       direction = deltaY < 0 ? 'up' : 'down';
     }
     
