@@ -41,11 +41,14 @@ import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
 
 // Conditional import for native MediaPipe
 // @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
+// Also exports switchCamera function to toggle between front/back cameras
 let RNMediapipe: any = null;
+let switchCamera: (() => void) | null = null;
 if (Platform.OS !== 'web') {
   try {
     const mediapipe = require('@thinksys/react-native-mediapipe');
     RNMediapipe = mediapipe.RNMediapipe;
+    switchCamera = mediapipe.switchCamera;
     console.log('[VBTCamera] MediaPipe loaded successfully');
   } catch (e) {
     console.warn('[VBTCamera] MediaPipe not available:', e);
