@@ -785,8 +785,18 @@ export default function VBTCameraPage() {
     }, 50);
   }, [isTracking, stopTracking]);
 
-  // Start recording
-  const handleStartRecording = useCallback(() => {
+  // ========================================
+  // BUG 2 FIX: Recording calls actual native camera method
+  // The play button must call cameraRef.current.recordAsync()
+  // NOT only set state
+  // ========================================
+  
+  // Recording state for video capture
+  const [isVideoRecording, setIsVideoRecording] = useState(false);
+  const recordingPromiseRef = useRef<Promise<{ uri: string }> | null>(null);
+
+  // Start recording - BUG 2 FIX: Call actual native recording
+  const handleStartRecording = useCallback(async () => {
     if (!cameraReady) {
       Alert.alert(labels.title, labels.waitCamera);
       return;
@@ -800,18 +810,67 @@ export default function VBTCameraPage() {
       return;
     }
     
+    console.log('[VBT_CAMERA] Starting recording...');
+    
+    // Reset recording time
     setRecordingTime(0);
+    
+    // Start VBT tracking (velocity/rep counting)
     startTracking();
     
+    // BUG 2 FIX: Start ACTUAL video recording on native camera
+    // This is the critical fix - we must call the native recording method
+    if (cameraRef.current && Platform.OS !== 'web') {
+      try {
+        setIsVideoRecording(true);
+        
+        // Start native camera recording
+        // Note: recordAsync returns a promise that resolves when recording stops
+        recordingPromiseRef.current = cameraRef.current.recordAsync({
+          maxDuration: 300, // 5 minutes max
+        });
+        
+        console.log('[VBT_CAMERA] Native camera recording STARTED');
+      } catch (e) {
+        console.error('[VBT_CAMERA] Failed to start native recording:', e);
+        setIsVideoRecording(false);
+      }
+    }
+    
+    // Start recording timer
     recordingTimerRef.current = setInterval(() => {
       setRecordingTime(prev => prev + 1);
     }, 1000);
   }, [cameraReady, isTrackingPointSet, startTracking, labels, locale]);
 
-  // Stop recording
-  const handleStopRecording = useCallback(() => {
+  // Stop recording - BUG 2 FIX: Stop actual native recording
+  const handleStopRecording = useCallback(async () => {
+    console.log('[VBT_CAMERA] Stopping recording...');
+    
+    // Stop VBT tracking
     stopTracking();
     
+    // BUG 2 FIX: Stop ACTUAL video recording on native camera
+    if (cameraRef.current && isVideoRecording) {
+      try {
+        cameraRef.current.stopRecording();
+        setIsVideoRecording(false);
+        
+        // Wait for recording promise to resolve
+        if (recordingPromiseRef.current) {
+          const result = await recordingPromiseRef.current;
+          console.log('[VBT_CAMERA] Video recording saved to:', result.uri);
+          recordingPromiseRef.current = null;
+        }
+        
+        console.log('[VBT_CAMERA] Native camera recording STOPPED');
+      } catch (e) {
+        console.error('[VBT_CAMERA] Failed to stop native recording:', e);
+        setIsVideoRecording(false);
+      }
+    }
+    
+    // Clear recording timer
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
       recordingTimerRef.current = null;
@@ -820,7 +879,7 @@ export default function VBTCameraPage() {
     if (repsData.length > 0 || repCount > 0) {
       goToReview();
     }
-  }, [stopTracking, repsData.length, repCount, goToReview]);
+  }, [stopTracking, repsData.length, repCount, goToReview, isVideoRecording]);
 
   // VBT submission mutation
   const vbtMutation = useMutation({
