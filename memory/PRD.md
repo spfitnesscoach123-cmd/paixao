@@ -49,7 +49,33 @@ Português (Brazilian Portuguese)
 
 ---
 
-### December 2025 - VBT Bug Fixes (Session 3)
+### December 2025 - VBT Concentric-First Exercises (Session 4)
+
+#### Bug: Deadlift/Power Clean Not Counting Reps
+**Root Cause**: RepDetector was hardcoded for eccentric-first exercises (Squat, Bench). It expected movement to start with `direction === 'down'`, but Deadlift/Clean start with `direction === 'up'`.
+
+**Fix Applied**:
+1. **RepDetector.ts**:
+   - Added `startDirection: 'down' | 'up'` config option
+   - Modified `processIdle()` to support both directions
+   - Modified `processEccentric()`, `processTransition()`, `processConcentric()` for both flows
+
+2. **trackingProtection.ts**:
+   - Added `EXERCISE_START_DIRECTION` mapping
+   - Deadlift, Power Clean, Hang Clean, Pull Up, Row = 'up' (concentric-first)
+   - Squat, Bench, Hip Thrust, Leg Press = 'down' (eccentric-first)
+
+3. **useProtectedBarTracking.ts**:
+   - Uses `EXERCISE_START_DIRECTION` to configure RepDetector per exercise
+
+#### Bug: Load-Velocity Chart Inconsistency
+**Fix Applied**:
+1. **vbt.tsx**:
+   - Added optimal load point (orange) to chart
+   - Added optimal load card in summary section
+   - Updated TypeScript types with `optimal_load`, `optimal_velocity`, `optimal_power`
+
+**Status**: Ready for EAS Build and TestFlight testing
 
 #### Bug: Velocity Data Shows 0 m/s in Reports (Critical)
 **Symptoms**:
