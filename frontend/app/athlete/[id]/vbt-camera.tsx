@@ -2760,4 +2760,20 @@ const styles = StyleSheet.create({
   feedbackTextError: {
     color: '#ffffff',
   },
+  
+  // Diagnostic Overlay Toggle Button
+  diagnosticToggleButton: {
+    position: 'absolute',
+    top: 60,
+    right: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
 });
