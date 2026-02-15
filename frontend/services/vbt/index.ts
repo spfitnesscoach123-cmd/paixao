@@ -10,6 +10,11 @@
  * - trackingProtection: 5-STAGE PROGRESSIVE VALIDATION pipeline
  * - useProtectedBarTracking: Protected React hook for production
  * - diagnostics: Real-time diagnostic logging for debugging
+ * - VelocityCalculator: Production-grade velocity calculation with smoothing
+ * - RepDetector: Full rep cycle detection with phase tracking
+ * - TrackingSystem: Landmark-based tracking system
+ * - RecordingPipeline: Video recording management
+ * - useMediaPipePose: MediaPipe integration hook
  * 
  * PROGRESSIVE VALIDATION STAGES:
  * 1. FRAME_USABLE - Pose exists with keypoints
@@ -25,6 +30,13 @@ export * from './trackingProtection';
 export * from './useProtectedBarTracking';
 export * from './diagnostics';
 export * from './recordingController';
+
+// New production modules
+export * from './VelocityCalculator';
+export * from './RepDetector';
+export * from './TrackingSystem';
+export * from './RecordingPipeline';
+export * from './useMediaPipePose';
 
 // Re-export types
 export type {
@@ -62,3 +74,38 @@ export type {
   BlockingDiagnosis,
   LayerStatus,
 } from './diagnostics';
+
+// New production types
+export type {
+  VelocityPosition,
+  VelocityResult,
+  VelocityCalibration,
+  VelocityCalculatorConfig,
+} from './VelocityCalculator';
+
+export type {
+  RepPhase,
+  RepData as RepDetectorRepData,
+  RepDetectorConfig,
+  RepDetectorResult,
+} from './RepDetector';
+
+export type {
+  TrackingConfig,
+  TrackedLandmark,
+  TrackingResult,
+  TrackingSystemState,
+} from './TrackingSystem';
+
+export type {
+  RecordingState,
+  RecordingConfig,
+  RecordingResult,
+  RecordingPipelineState,
+  RecordingCallbacks,
+} from './RecordingPipeline';
+
+export type {
+  MediaPipePoseConfig,
+  MediaPipePoseResult,
+} from './useMediaPipePose';
