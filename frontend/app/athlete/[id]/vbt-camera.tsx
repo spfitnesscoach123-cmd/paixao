@@ -241,6 +241,9 @@ export default function VBTCameraPage() {
   const [tutorialChecked, setTutorialChecked] = useState(false);
   const [selectionFeedback, setSelectionFeedback] = useState<{type: 'success' | 'error', message: string, position?: {x: number, y: number}} | null>(null);
   
+  // Diagnostic overlay state
+  const [showDiagnosticOverlay, setShowDiagnosticOverlay] = useState(__DEV__ || true); // Enable in dev and for debugging
+  
   // Tutorial animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
