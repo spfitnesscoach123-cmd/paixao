@@ -29,12 +29,15 @@ import {
   useProtectedBarTracking, 
   RECOMMENDED_TRACKING_POINTS,
   EXERCISE_KEYPOINTS,
+  vbtDiagnostics,
+  getBlockingDiagnosis,
 } from '../../../services/vbt';
 import { 
   LANDMARK_INDEX_TO_VBT_NAME,
   ProcessedKeypoint,
   VBTPoseData,
 } from '../../../services/pose';
+import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
 
 // Conditional import for native MediaPipe
 // @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
