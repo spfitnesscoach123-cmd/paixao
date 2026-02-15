@@ -334,6 +334,15 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
               velocityResult.direction
             );
             
+            // DEBUG: Log RepDetector state every 30 frames
+            if (frameCountRef.current % 30 === 0) {
+              console.log('[VBT_REP_DEBUG] velocity:', velocityResult.smoothedVelocity.toFixed(3), 
+                'm/s | direction:', velocityResult.direction, 
+                '| phase:', repResult.phase, 
+                '| deltaY:', velocityResult.deltaY?.toFixed(4) || 'N/A',
+                '| repCount:', repResult.repCount);
+            }
+            
             // Update rep phase
             setRepPhase(repResult.phase);
             
