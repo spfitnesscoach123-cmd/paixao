@@ -447,6 +447,7 @@ export class RepDetector {
     this.peakConcentricVelocity = 0;
     this.lastDirection = 'stationary';
     this.directionChangeCount = 0;
+    this.lastCompletedRepData = null;  // Reset stored rep data
   }
 
   /**
