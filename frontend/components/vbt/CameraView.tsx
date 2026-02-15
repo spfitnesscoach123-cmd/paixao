@@ -79,7 +79,7 @@ export interface CameraViewRef {
   getCameraFacing: () => 'front' | 'back';
   
   // Reference access
-  getCameraRef: () => React.RefObject<ExpoCameraView>;
+  getCameraRef: () => React.RefObject<ExpoCameraView | null>;
 }
 
 /**
