@@ -228,12 +228,12 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // ========================================
     // BUG 4 FIX: Initialize RepDetector for full cycle detection
     // Detects: eccentric -> transition -> concentric -> completion
-    // Prevents false positives with minimum thresholds
+    // IMPROVED: Uses direction change detection, not just velocity thresholds
     // ========================================
     repDetectorRef.current = new RepDetector({
-      minVelocityThreshold: 0.05,
-      minPhaseDuration: 200,
-      directionChangeThreshold: 0.02,
+      minVelocityThreshold: 0.03,   // 3cm/s - lowered to detect slower movements
+      minPhaseDuration: 150,         // 150ms - faster response to phase changes
+      directionChangeThreshold: 0.05, // 5cm/s - less sensitive to micro-changes
     });
     
     // Create simulators if simulation mode is enabled
