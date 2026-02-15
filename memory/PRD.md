@@ -42,7 +42,7 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
   - Added frame reception rate logging (every 5 seconds)
   - Added first frame detection with `[VBT_CAMERA] ✅ FIRST FRAME RECEIVED!`
   - Enhanced `VBTDiagnosticOverlay` with MediaPipe status section
-- [x] **🔴 CRITICAL FIX: Pipeline Data Flow** (December 2025) ✨ NEW
+- [x] **🔴 CRITICAL FIX: Pipeline Data Flow** (December 2025)
   - **ROOT CAUSE FOUND**: `processPose()` was only called when `isTracking === true`
   - This meant during `pointSelection` phase, landmarks were detected but NEVER sent to the protection pipeline
   - Result: `trackingPoint`, `humanPresence`, `stability` all stayed at N/A/0
@@ -52,6 +52,33 @@ Build a fully functional VBT (Velocity-Based Training) Camera feature within a R
     2. Stability building (Stage 2: FRAME_STABLE)
     3. Tracking point validation (Stage 3: FRAME_TRACKABLE)
   - Velocity/rep counting still only processed when `isTracking === true`
+- [x] **🚀 PRODUCTION-GRADE VBT MODULES** (February 2026) ✨ NEW
+  - **BUG 1 FIX**: Camera facing now uses `useRef` as source of truth (not state)
+    - `cameraFacingRef.current` persists across re-renders
+    - Camera NEVER resets during tracking, recording, or MediaPipe initialization
+  - **BUG 2 FIX**: Recording calls actual native `cameraRef.current.recordAsync()`
+    - Added `RecordingPipeline.ts` with proper lifecycle management
+    - `startRecording()` and `stopRecording()` use native camera methods
+  - **BUG 3 FIX**: Velocity calculated with `VelocityCalculator.ts`
+    - Formula: velocity = deltaPosition / deltaTime
+    - Smoothing: Moving average over last 5 frames
+    - Noise rejection below 2cm/s threshold
+  - **BUG 4 FIX**: Rep detection with `RepDetector.ts`
+    - Full cycle: eccentric → transition → concentric → completion
+    - Minimum phase duration requirements
+    - False positive prevention with thresholds
+  - **BUG 5 FIX**: Tracking point stored as landmark INDEX
+    - `TrackingSystem.ts` manages landmark tracking by NAME/INDEX
+    - Confidence validation (blocks if < 0.5)
+    - Position smoothing with moving average
+
+## New Production Modules (February 2026)
+- `/app/frontend/services/vbt/VelocityCalculator.ts` - Production-grade velocity calculation
+- `/app/frontend/services/vbt/RepDetector.ts` - Full rep cycle detection
+- `/app/frontend/services/vbt/TrackingSystem.ts` - Landmark-based tracking system
+- `/app/frontend/services/vbt/RecordingPipeline.ts` - Video recording management
+- `/app/frontend/services/vbt/useMediaPipePose.ts` - MediaPipe integration hook
+- `/app/frontend/components/vbt/CameraView.tsx` - Reusable camera component
 
 ## Architecture Documentation
 - `/app/frontend/docs/VBT_PROGRESSIVE_VALIDATION_ARCHITECTURE.md` - New 5-stage pipeline
