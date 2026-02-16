@@ -1293,20 +1293,6 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     lineHeight: 20,
   },
-  exportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#dc2626',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  exportButtonText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 15,
-  },
   // Modal styles
   modalOverlay: {
     flex: 1,
