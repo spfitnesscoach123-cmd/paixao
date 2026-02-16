@@ -842,24 +842,6 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
         </View>
       )}
 
-      {/* Export PDF Button */}
-      <TouchableOpacity 
-        style={styles.exportButton}
-        onPress={loadReportPreview}
-        disabled={generating || loadingReport}
-      >
-        {(generating || loadingReport) ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <>
-            <Ionicons name="print" size={22} color="#ffffff" />
-            <Text style={styles.exportButtonText}>
-              {locale === 'pt' ? 'Gerar Relatório PDF' : 'Generate PDF Report'}
-            </Text>
-          </>
-        )}
-      </TouchableOpacity>
-
       {/* PDF Preview Modal - Shows full report with charts */}
       <Modal
         visible={showPdfPreview}
