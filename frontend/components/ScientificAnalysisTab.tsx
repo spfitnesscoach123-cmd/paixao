@@ -11,7 +11,7 @@ import {
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
