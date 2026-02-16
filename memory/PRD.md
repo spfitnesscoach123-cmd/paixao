@@ -25,6 +25,35 @@ Português (Brazilian Portuguese)
 
 ## What's Been Implemented
 
+### December 2025 - PDF Report System Fix (Session 5)
+
+#### Issue: Redundant Buttons and Non-functional PDF Export
+**Symptoms**:
+- Two PDF export buttons (large button at bottom + small icon in header)
+- Refresh button in header that wasn't needed
+- PDF button wasn't loading HTML preview before showing modal
+
+**Fixes Applied**:
+1. **ScientificAnalysisTab.tsx**:
+   - Removed large "Gerar Relatório PDF" button from bottom of page
+   - Removed refresh button from header
+   - Kept only small document icon button in header (top-right)
+   - Fixed handler: button now calls `loadReportPreview()` to load HTML before showing modal
+   - Removed unused imports (`useRef`, `useQueryClient`, `Path` from SVG)
+   - Cleaned up unused state variables (`generating`)
+   - Cleaned up unused styles (`refreshButton`, `exportButton`, `exportButtonText`)
+
+**Flow After Fix**:
+```
+Press document button → Load HTML report → Show preview modal → User can print/share
+```
+
+**Status**: IMPLEMENTED - Ready for TestFlight testing
+
+**Note**: Backend endpoint `/api/report/scientific/{athlete_id}` already generates complete HTML with inline SVG charts. No backend changes were needed.
+
+---
+
 ### December 2025 - VBT Bug Fixes (Session 2)
 
 #### Bug: Rep Counter Stuck at Zero
