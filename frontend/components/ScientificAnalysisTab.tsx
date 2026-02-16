@@ -467,10 +467,8 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 // ===== MAIN COMPONENT =====
 
 export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ athleteId }) => {
-  const queryClient = useQueryClient();
   const { locale } = useLanguage();
   const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const [generating, setGenerating] = useState(false);
   const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
 
