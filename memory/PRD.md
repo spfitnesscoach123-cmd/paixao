@@ -147,6 +147,7 @@ Português (Brazilian Portuguese)
 - [PENDING] Validate fix with TestFlight build
 
 ### P1 - High Priority
+- [DONE] Fix PDF report system in Scientific Analysis tab (December 2025)
 - Complete internationalization of `ScientificAnalysisTab.tsx`
 - Internationalize "Avaliações" (Assessments) page
 - Test `gps_import` pipeline with `identity_resolver`
