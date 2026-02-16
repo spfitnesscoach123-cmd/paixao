@@ -1105,15 +1105,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  refreshButton: {
-    padding: 8,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    borderRadius: 8,
-  },
   pdfButton: {
     padding: 8,
     backgroundColor: 'rgba(220, 38, 38, 0.1)',
     borderRadius: 8,
+    minWidth: 36,
+    minHeight: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   riskCard: {
     backgroundColor: colors.dark.card,
