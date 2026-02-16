@@ -9,7 +9,7 @@ import requests
 import os
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://strength-graph-sync.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://deadlift-rep-counter.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"
