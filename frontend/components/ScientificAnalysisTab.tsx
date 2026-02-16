@@ -505,7 +505,6 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
   };
 
   const handleExportPdf = async () => {
-    setGenerating(true);
     try {
       const baseUrl = api.defaults.baseURL?.replace('/api', '') || '';
       const fullUrl = `${baseUrl}/api/report/scientific/${athleteId}?lang=${locale}`;
@@ -517,8 +516,6 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       }
     } catch (error) {
       console.error('PDF export error:', error);
-    } finally {
-      setGenerating(false);
     }
   };
 
