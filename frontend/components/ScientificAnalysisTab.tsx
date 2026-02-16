@@ -472,7 +472,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
   const [reportHtml, setReportHtml] = useState<string | null>(null);
   const [loadingReport, setLoadingReport] = useState(false);
 
-  const { data: analysis, isLoading, error, refetch } = useQuery({
+  const { data: analysis, isLoading, error } = useQuery({
     queryKey: ['scientific-analysis', athleteId, locale],
     queryFn: async () => {
       const response = await api.get<ScientificInsights>(`/analysis/scientific/${athleteId}?lang=${locale}`);
