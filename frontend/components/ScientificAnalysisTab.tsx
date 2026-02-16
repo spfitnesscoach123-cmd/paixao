@@ -579,14 +579,16 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
           <Text style={styles.headerSubtitle}>{analysis.analysis_date}</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.refreshButton} onPress={() => refetch()}>
-            <Ionicons name="refresh" size={20} color={colors.accent.primary} />
-          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.pdfButton} 
-            onPress={() => setShowPdfPreview(true)}
+            onPress={loadReportPreview}
+            disabled={loadingReport}
           >
-            <Ionicons name="document-text" size={20} color="#dc2626" />
+            {loadingReport ? (
+              <ActivityIndicator size="small" color="#dc2626" />
+            ) : (
+              <Ionicons name="document-text" size={20} color="#dc2626" />
+            )}
           </TouchableOpacity>
         </View>
       </View>
