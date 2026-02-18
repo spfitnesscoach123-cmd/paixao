@@ -506,18 +506,41 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
     return level.charAt(0).toUpperCase() + level.slice(1);
   };
 
-  const handleExportPdf = async () => {
+  // CORREÇÃO: Usar o mesmo sistema de impressão da Periodização
+  // Utiliza expo-print e expo-sharing ao invés de abrir URL externa
+  const handlePrintPdf = async () => {
+    if (!reportHtml) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Relatório não carregado' : 'Report not loaded'
+      );
+      return;
+    }
+    
+    setLoadingReport(true);
     try {
-      const baseUrl = api.defaults.baseURL?.replace('/api', '') || '';
-      const fullUrl = `${baseUrl}/api/report/scientific/${athleteId}?lang=${locale}`;
-      
       if (Platform.OS === 'web') {
-        window.open(fullUrl, '_blank');
+        // Web: abrir nova janela para impressão
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(reportHtml);
+          printWindow.document.close();
+          printWindow.print();
+        }
       } else {
-        await Linking.openURL(fullUrl);
+        // Mobile: usar expo-print e sharing
+        const { uri } = await Print.printToFileAsync({ html: reportHtml });
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
       }
+      setShowPdfPreview(false);
     } catch (error) {
-      console.error('PDF export error:', error);
+      console.error('PDF print error:', error);
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Erro ao gerar PDF' : 'Failed to generate PDF'
+      );
+    } finally {
+      setLoadingReport(false);
     }
   };
 
