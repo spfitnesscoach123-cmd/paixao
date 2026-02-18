@@ -8,6 +8,7 @@ import {
   Alert,
   Dimensions,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,6 +19,8 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../services/api';
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 
 const { width: screenWidth } = Dimensions.get('window');
 
