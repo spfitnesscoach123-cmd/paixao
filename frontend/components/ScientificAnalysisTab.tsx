@@ -1388,24 +1388,13 @@ const styles = StyleSheet.create({
   modalFooter: {
     flexDirection: 'row',
     padding: 16,
-    gap: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border.default,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border.default,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    color: colors.text.secondary,
-    fontWeight: '600',
+    justifyContent: 'center',
   },
   modalPrintButton: {
     flex: 1,
+    maxWidth: 300,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
