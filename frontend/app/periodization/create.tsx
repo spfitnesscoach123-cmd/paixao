@@ -524,17 +524,25 @@ export default function CreatePeriodizationScreen() {
       colors={[colors.dark.background, colors.dark.secondary]}
       style={styles.container}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/periodization')} style={styles.headerBack}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-          <Text style={styles.headerBackText}>Voltar ao Menu Principal</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>
-          {locale === 'pt' ? 'Nova Semana' : 'New Week'}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      {/* CORREÇÃO 3: Header com SafeAreaView e padding adequado para visibilidade do botão */}
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            onPress={() => router.push('/(tabs)/periodization')} 
+            style={styles.headerBack}
+            data-testid="back-to-periodization"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Text style={styles.headerBackText}>
+              {locale === 'pt' ? 'Voltar' : 'Back'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>
+            {locale === 'pt' ? 'Nova Semana' : 'New Week'}
+          </Text>
+          <View style={{ width: 80 }} />
+        </View>
+      </SafeAreaView>
 
       {renderStepIndicator()}
 
