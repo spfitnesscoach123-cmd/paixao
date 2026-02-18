@@ -57,6 +57,7 @@ export default function PeriodizationDetailScreen() {
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   // Fetch week details
   const { data: week, isLoading: weekLoading } = useQuery({
@@ -77,6 +78,146 @@ export default function PeriodizationDetailScreen() {
     },
     enabled: !!id,
   });
+
+  // MELHORIA 2 & 3: Dados dinâmicos unificados com useMemo
+  const displayedData = useMemo(() => {
+    if (!calculations?.athletes) return [];
+    
+    return calculations.athletes.map((athlete: any) => {
+      // Se um dia está selecionado, usar dados diários; senão, usar semanais
+      if (selectedDay) {
+        const dayTarget = athlete.daily_targets?.find((d: any) => d.date === selectedDay);
+        return {
+          athlete_id: athlete.athlete_id,
+          athlete_name: athlete.athlete_name,
+          values: dayTarget || {},
+        };
+      } else {
+        return {
+          athlete_id: athlete.athlete_id,
+          athlete_name: athlete.athlete_name,
+          values: athlete.weekly_targets || {},
+        };
+      }
+    });
+  }, [calculations, selectedDay]);
+
+  // Título dinâmico da tabela
+  const tableTitle = useMemo(() => {
+    if (selectedDay) {
+      const dayConfig = calculations?.days_config?.find((d: any) => d.date === selectedDay);
+      const classification = DAY_CLASSIFICATIONS.find(c => c.id === dayConfig?.day_classification);
+      const formattedDate = format(parseISO(selectedDay), 'dd/MM', { locale: dateLocale });
+      return locale === 'pt' 
+        ? `Metas do Dia ${formattedDate} (${classification?.label || ''})` 
+        : `Day Targets ${formattedDate} (${classification?.label || ''})`;
+    }
+    return locale === 'pt' ? 'Metas Semanais' : 'Weekly Targets';
+  }, [selectedDay, calculations, locale, dateLocale]);
+
+  // MELHORIA 1: Função para gerar PDF
+  const handlePrintPdf = async () => {
+    if (!week || !displayedData.length) return;
+    
+    setGeneratingPdf(true);
+    try {
+      const selectedDayInfo = selectedDay 
+        ? (() => {
+            const dayConfig = calculations?.days_config?.find((d: any) => d.date === selectedDay);
+            const classification = DAY_CLASSIFICATIONS.find(c => c.id === dayConfig?.day_classification);
+            return `${format(parseISO(selectedDay), 'dd/MM/yyyy', { locale: dateLocale })} (${classification?.label || ''})`;
+          })()
+        : null;
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1f2937; font-size: 24px; margin-bottom: 5px; }
+            h2 { color: #6b7280; font-size: 16px; font-weight: normal; margin-top: 0; }
+            .info { color: #374151; margin-bottom: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background: #8b5cf6; color: white; padding: 12px 8px; text-align: center; font-size: 11px; }
+            th:first-child { text-align: left; }
+            td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
+            td:first-child { text-align: left; font-weight: 500; }
+            tr:nth-child(even) { background: #f9fafb; }
+            .header-row { display: flex; justify-content: space-between; align-items: center; }
+            .badge { display: inline-block; background: #8b5cf6; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="header-row">
+            <div>
+              <h1>${week.name}</h1>
+              <h2>${format(parseISO(week.start_date), 'dd MMM yyyy', { locale: dateLocale })} - ${format(parseISO(week.end_date), 'dd MMM yyyy', { locale: dateLocale })}</h2>
+            </div>
+          </div>
+          
+          <p class="info">
+            <strong>${selectedDayInfo ? (locale === 'pt' ? 'Metas do Dia:' : 'Day Targets:') : (locale === 'pt' ? 'Metas Semanais' : 'Weekly Targets')}</strong>
+            ${selectedDayInfo ? `<span class="badge">${selectedDayInfo}</span>` : ''}
+          </p>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>${locale === 'pt' ? 'Atleta' : 'Athlete'}</th>
+                ${METRICS.map(m => `<th>${m.label}</th>`).join('')}
+              </tr>
+            </thead>
+            <tbody>
+              ${displayedData.map((athlete: any) => `
+                <tr>
+                  <td>${athlete.athlete_name}</td>
+                  ${METRICS.map(m => `<td>${Math.round(athlete.values[m.id] || 0).toLocaleString()}</td>`).join('')}
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+          
+          <p style="margin-top: 30px; color: #9ca3af; font-size: 10px; text-align: center;">
+            ${locale === 'pt' ? 'Gerado por LoadManager Pro' : 'Generated by LoadManager Pro'} - ${format(new Date(), 'dd/MM/yyyy HH:mm')}
+          </p>
+        </body>
+        </html>
+      `;
+
+      if (Platform.OS === 'web') {
+        // Web: abrir em nova janela para impressão
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          printWindow.print();
+        }
+      } else {
+        // Mobile: usar expo-print e sharing
+        const { uri } = await Print.printToFileAsync({ html });
+        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+      }
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Erro ao gerar PDF' : 'Failed to generate PDF'
+      );
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  // Toggle day selection (click again to deselect)
+  const handleDaySelect = (date: string) => {
+    if (selectedDay === date) {
+      setSelectedDay(null); // Deselect if clicking same day
+    } else {
+      setSelectedDay(date);
+    }
+  };
 
   // Check if week is editable
   const isEditable = () => {
