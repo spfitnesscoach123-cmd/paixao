@@ -134,6 +134,22 @@ export default function Login() {
         colors={[colors.dark.secondary, colors.dark.primary]}
         style={styles.background}
       >
+        {/* CORREÇÃO 4: Botão Voltar para tela de seleção de role */}
+        <SafeAreaView style={styles.backButtonContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => {
+              // Limpar role selecionado para voltar à tela de seleção
+              AsyncStorage.removeItem('role_selected');
+              router.replace('/role-select');
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Text style={styles.backButtonText}>{t('common.back') || 'Voltar'}</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
