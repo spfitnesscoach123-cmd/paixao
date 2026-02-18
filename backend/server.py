@@ -974,21 +974,54 @@ async def create_gps_data(
     gps_data: GPSDataCreate,
     current_user: dict = Depends(get_current_user)
 ):
+    """Create GPS data entry.
+    
+    IMPORTANT: If activity_type is 'game', this will also update the athlete's
+    peak values for periodization calculations.
+    """
+    coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)
+    
     # Verify athlete belongs to current user
     athlete = await db.athletes.find_one({
         "_id": ObjectId(gps_data.athlete_id),
-        "coach_id": current_user["_id"]
+        "coach_id": coach_id
     })
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
     
+    # Generate session_id for manual entries if not provided
+    session_id = f"manual_{gps_data.date}_{gps_data.athlete_id}"
+    
     gps = GPSData(
-        coach_id=current_user["_id"],
+        coach_id=coach_id,
+        session_id=session_id,
         **gps_data.model_dump()
     )
     
     result = await db.gps_data.insert_one(gps.model_dump(by_alias=True, exclude=["id"]))
     gps.id = str(result.inserted_id)
+    
+    # CRITICAL: Update peak values if this is a GAME session
+    # This ensures manual entries are considered in periodization calculations
+    if gps_data.activity_type == "game":
+        session_metrics = {
+            "total_distance": gps_data.total_distance or 0,
+            "hid_z3": gps_data.high_intensity_distance or 0,
+            "hsr_z4": gps_data.high_speed_running or 0,
+            "sprint_z5": gps_data.sprint_distance or 0,
+            "sprints_count": gps_data.number_of_sprints or 0,
+            "acc_dec_total": (gps_data.number_of_accelerations or 0) + (gps_data.number_of_decelerations or 0)
+        }
+        
+        await update_athlete_peak_values(
+            athlete_id=gps_data.athlete_id,
+            coach_id=coach_id_str,
+            session_metrics=session_metrics,
+            session_date=gps_data.date,
+            athlete_name=athlete.get("name", "")
+        )
+    
     return gps
 
 @api_router.get("/gps-data/athlete/{athlete_id}", response_model=List[GPSData])
