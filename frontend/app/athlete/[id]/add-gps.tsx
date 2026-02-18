@@ -52,29 +52,45 @@ export default function AddGPS() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gps', id] });
-      Alert.alert('Sucesso', 'Dados GPS registrados com sucesso!');
+      queryClient.invalidateQueries({ queryKey: ['athlete-analysis', id] });
+      queryClient.invalidateQueries({ queryKey: ['acwr', id] });
+      Alert.alert(
+        locale === 'pt' ? 'Sucesso' : 'Success', 
+        locale === 'pt' ? 'Dados GPS registrados com sucesso!' : 'GPS data saved successfully!'
+      );
       router.back();
     },
     onError: (error: any) => {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao registrar dados GPS');
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error', 
+        error.response?.data?.detail || (locale === 'pt' ? 'Erro ao registrar dados GPS' : 'Failed to save GPS data')
+      );
     },
   });
 
   const handleSubmit = () => {
-    if (!totalDistance || !highIntensityDistance || !sprintDistance) {
-      Alert.alert('Erro', 'Por favor, preencha os campos obrigatórios');
+    // Validação: campos obrigatórios
+    if (!totalDistance || !hidZone3 || !sprintZone5) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error', 
+        locale === 'pt' ? 'Por favor, preencha os campos obrigatórios' : 'Please fill in required fields'
+      );
       return;
     }
+
+    // Calcular ACC+DEC total
+    const totalAccDec = (parseInt(accCount) || 0) + (parseInt(decCount) || 0);
 
     createMutation.mutate({
       athlete_id: id,
       date,
       total_distance: parseFloat(totalDistance),
-      high_intensity_distance: parseFloat(highIntensityDistance),
-      sprint_distance: parseFloat(sprintDistance),
-      number_of_sprints: parseInt(numberOfSprints) || 0,
-      number_of_accelerations: parseInt(numberOfAccelerations) || 0,
-      number_of_decelerations: parseInt(numberOfDecelerations) || 0,
+      high_intensity_distance: parseFloat(hidZone3),      // HID Z3 (14.4-19.8 km/h)
+      high_speed_running: parseFloat(hsrZone4) || 0,      // HSR Z4 (19.8-25.2 km/h)
+      sprint_distance: parseFloat(sprintZone5),           // Sprint Z5 (>25 km/h)
+      number_of_sprints: parseInt(sprintCount) || 0,
+      number_of_accelerations: parseInt(accCount) || 0,
+      number_of_decelerations: parseInt(decCount) || 0,
       max_speed: maxSpeed ? parseFloat(maxSpeed) : undefined,
       notes: notes || undefined,
     });
