@@ -10,6 +10,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Platform,
+  SafeAreaView,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
