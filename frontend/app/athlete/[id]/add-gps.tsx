@@ -86,6 +86,7 @@ export default function AddGPS() {
     createMutation.mutate({
       athlete_id: id,
       date,
+      activity_type: activityType,  // CRÍTICO: define se é jogo ou treino para periodização
       total_distance: parseFloat(totalDistance),
       high_intensity_distance: parseFloat(hidZone3),      // HID Z3 (14.4-19.8 km/h)
       high_speed_running: parseFloat(hsrZone4) || 0,      // HSR Z4 (19.8-25.2 km/h)
