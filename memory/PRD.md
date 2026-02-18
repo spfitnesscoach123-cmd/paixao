@@ -25,6 +25,31 @@ Português (Brazilian Portuguese)
 
 ## What's Been Implemented
 
+### December 2025 - Melhorias na Página de Semana (Session 7)
+
+#### MELHORIA 1: Botão "Imprimir PDF" 
+- Adicionado botão de PDF no header da página de semana
+- Gera PDF com a tabela exibida (semanal OU diária dependendo da seleção)
+- Funciona tanto no Web (window.print) quanto Mobile (expo-print + sharing)
+
+#### MELHORIA 2: Tabela Unificada (Diária + Semanal)
+- **ANTES**: Duas tabelas separadas (semanal e diária)
+- **DEPOIS**: Uma única tabela dinâmica que alterna automaticamente
+- `selectedDay == null` → mostra dados semanais
+- `selectedDay != null` → mostra dados do dia selecionado
+- Botão "Ver Semanal" para limpar seleção e voltar à visão semanal
+
+#### MELHORIA 3: Performance com useMemo
+- `displayedData` calculado com useMemo para evitar re-renders desnecessários
+- `tableTitle` também memoizado
+
+**Arquivos Modificados**:
+- `/app/frontend/app/periodization/[id].tsx`
+
+**Status**: IMPLEMENTADO - Aguardando teste no dispositivo
+
+---
+
 ### December 2025 - LoadManager Corrections (Session 6)
 
 #### CORREÇÃO 1-2: Padronização dos Campos GPS
