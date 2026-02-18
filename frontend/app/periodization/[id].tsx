@@ -691,10 +691,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 12,
     color: colors.text.tertiary,
   },
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
   tableContainer: {
     marginBottom: 24,
   },
