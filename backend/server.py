@@ -990,13 +990,16 @@ async def create_gps_data(
     if not athlete:
         raise HTTPException(status_code=404, detail="Athlete not found")
     
+    # Prepare GPS data dict
+    gps_dict = gps_data.model_dump()
+    
     # Generate session_id for manual entries if not provided
-    session_id = f"manual_{gps_data.date}_{gps_data.athlete_id}"
+    if not gps_dict.get("session_id"):
+        gps_dict["session_id"] = f"manual_{gps_data.date}_{gps_data.athlete_id}"
     
     gps = GPSData(
         coach_id=coach_id,
-        session_id=session_id,
-        **gps_data.model_dump()
+        **gps_dict
     )
     
     result = await db.gps_data.insert_one(gps.model_dump(by_alias=True, exclude=["id"]))
