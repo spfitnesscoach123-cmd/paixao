@@ -387,6 +387,39 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 12,
   },
+  activityHint: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  activityTypeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  activityTypeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 12,
+    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  activityTypeButtonActive: {
+    borderColor: 'transparent',
+  },
+  activityTypeText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#6b7280',
+  },
+  activityTypeTextActive: {
+    color: '#ffffff',
+  },
   inputGroup: {
     marginBottom: 16,
   },
