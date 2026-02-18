@@ -25,6 +25,34 @@ Português (Brazilian Portuguese)
 
 ## What's Been Implemented
 
+### December 2025 - Correção do Botão de Impressão na Análise Científica (Session 8)
+
+#### Problema: Botões de PDF não funcionavam no modal de preview
+**ANTES**:
+- ❌ Botão roxo "Fechar" (não gerava PDF)
+- ❌ Botão vermelho "Abrir para Imprimir" (não gerava PDF - abria URL externa)
+
+**DEPOIS**:
+- ✅ Um único botão "Imprimir PDF" que usa expo-print + expo-sharing
+- ✅ Comportamento idêntico ao da Periodização
+
+**Correções Aplicadas**:
+1. Removido import `expo-linking` (não necessário)
+2. Adicionado imports `expo-print` e `expo-sharing`
+3. Criada nova função `handlePrintPdf()` que:
+   - Web: abre janela de impressão do navegador
+   - Mobile: usa expo-print para gerar PDF e expo-sharing para compartilhar
+4. Removido botão "Fechar" do footer
+5. Botão único centralizado com texto "Imprimir PDF"
+6. Removidos estilos não utilizados (modalCancelButton, modalCancelText)
+
+**Arquivo Modificado**:
+- `/app/frontend/components/ScientificAnalysisTab.tsx`
+
+**Status**: IMPLEMENTADO - Aguardando teste no dispositivo
+
+---
+
 ### December 2025 - Melhorias na Página de Semana (Session 7)
 
 #### MELHORIA 1: Botão "Imprimir PDF" 
