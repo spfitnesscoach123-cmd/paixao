@@ -450,7 +450,9 @@ export default function PeriodizationDetailScreen() {
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.push('/(tabs)/periodization')} style={styles.headerBack}>
           <Ionicons name="arrow-back" size={20} color={colors.accent.light} />
-          <Text style={styles.headerBackText}>Voltar ao Menu Principal</Text>
+          <Text style={styles.headerBackText}>
+            {locale === 'pt' ? 'Voltar' : 'Back'}
+          </Text>
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>{week.name}</Text>
@@ -459,11 +461,27 @@ export default function PeriodizationDetailScreen() {
             {format(parseISO(week.end_date), 'dd MMM', { locale: dateLocale })}
           </Text>
         </View>
-        {isEditable() && (
-          <TouchableOpacity onPress={handleDelete} style={styles.headerDelete}>
-            <Ionicons name="trash-outline" size={22} color="#ef4444" />
+        <View style={styles.headerActions}>
+          {/* MELHORIA 1: Botão Imprimir PDF */}
+          <TouchableOpacity 
+            onPress={handlePrintPdf} 
+            style={styles.headerPdfButton}
+            disabled={generatingPdf}
+          >
+            {generatingPdf ? (
+              <ActivityIndicator size="small" color="#ffffff" />
+            ) : (
+              <>
+                <Ionicons name="print" size={18} color="#ffffff" />
+              </>
+            )}
           </TouchableOpacity>
-        )}
+          {isEditable() && (
+            <TouchableOpacity onPress={handleDelete} style={styles.headerDelete}>
+              <Ionicons name="trash-outline" size={22} color="#ef4444" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* View mode toggle */}
