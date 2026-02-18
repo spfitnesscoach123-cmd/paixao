@@ -279,6 +279,30 @@ const createLoginStyles = (colors: any) => StyleSheet.create({
   background: {
     flex: 1,
   },
+  backButtonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+    paddingTop: Platform.OS === 'ios' ? 50 : 16,
+    paddingLeft: 16,
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    borderRadius: 20,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    fontSize: 14,
+    color: colors.text.primary,
+    fontWeight: '500',
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
