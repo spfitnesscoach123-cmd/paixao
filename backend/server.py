@@ -3491,6 +3491,279 @@ def calculate_metric_acwr(acute_values: List[float], chronic_values: List[float]
     
     return round(acute_load, 2), round(chronic_load, 2), acwr_ratio, risk_level
 
+
+
+# ============= CORREÇÃO 5-9: ACWR COM ROLLING WINDOW REAL =============
+# Inclui dias sem treino como valor ZERO para simular recuperação real
+
+def calculate_rolling_average(
+    gps_data_by_date: dict,
+    metric_key: str,
+    window_size: int,
+    end_date: datetime
+) -> float:
+    """
+    Calcula média móvel REAL incluindo dias sem treino como ZERO.
+    """
+    total = 0.0
+    for i in range(window_size):
+        date = (end_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        day_data = gps_data_by_date.get(date, {})
+        value = day_data.get(metric_key, 0) or 0
+        total += value
+    
+    return total / window_size if window_size > 0 else 0
+
+
+def calculate_rolling_acwr(
+    gps_data_by_date: dict,
+    metric_key: str,
+    current_date: datetime = None
+) -> tuple:
+    """
+    Calcula ACWR com rolling window real - inclui dias sem treino como ZERO.
+    Returns: (acute_load, chronic_load, acwr_ratio, risk_level)
+    """
+    if current_date is None:
+        current_date = datetime.utcnow()
+    
+    acute_load = calculate_rolling_average(gps_data_by_date, metric_key, 7, current_date)
+    chronic_load = calculate_rolling_average(gps_data_by_date, metric_key, 28, current_date)
+    
+    if chronic_load > 0:
+        acwr_ratio = round(acute_load / chronic_load, 2)
+    else:
+        acwr_ratio = 0
+    
+    if acwr_ratio < 0.8:
+        risk_level = "low"
+    elif 0.8 <= acwr_ratio <= 1.3:
+        risk_level = "optimal"
+    elif 1.3 < acwr_ratio <= 1.5:
+        risk_level = "moderate"
+    else:
+        risk_level = "high"
+    
+    return round(acute_load, 2), round(chronic_load, 2), acwr_ratio, risk_level
+
+
+class ACWRMetricDetail(BaseModel):
+    metric_id: str
+    metric_name: str
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str
+    unit: str
+
+
+class ACWRRollingResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    metrics: List[ACWRMetricDetail]
+    overall_risk: str
+    recommendation: str
+
+
+@api_router.get("/analysis/acwr-rolling/{athlete_id}", response_model=ACWRRollingResponse)
+async def get_acwr_rolling_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """CORREÇÃO 5-9: ACWR com Rolling Window Real - inclui dias sem treino como ZERO"""
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    today = datetime.utcnow()
+    date_28_days_ago = (today - timedelta(days=28)).strftime("%Y-%m-%d")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_28_days_ago}
+    }).to_list(1000)
+    
+    # Agrupar dados por data
+    gps_data_by_date = {}
+    for record in gps_records:
+        date_key = record.get("date", "")
+        if not date_key:
+            continue
+        if date_key not in gps_data_by_date:
+            gps_data_by_date[date_key] = {
+                "total_distance": 0, "high_intensity_distance": 0,
+                "high_speed_running": 0, "sprint_distance": 0,
+                "number_of_sprints": 0, "acc_dec": 0,
+            }
+        gps_data_by_date[date_key]["total_distance"] += record.get("total_distance", 0) or 0
+        gps_data_by_date[date_key]["high_intensity_distance"] += record.get("high_intensity_distance", 0) or 0
+        gps_data_by_date[date_key]["high_speed_running"] += record.get("high_speed_running", 0) or 0
+        gps_data_by_date[date_key]["sprint_distance"] += record.get("sprint_distance", 0) or 0
+        gps_data_by_date[date_key]["number_of_sprints"] += record.get("number_of_sprints", 0) or 0
+        gps_data_by_date[date_key]["acc_dec"] += (record.get("number_of_accelerations", 0) or 0) + (record.get("number_of_decelerations", 0) or 0)
+    
+    metrics = []
+    risk_levels = []
+    
+    # Total Distance
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "total_distance", today)
+    metrics.append(ACWRMetricDetail(metric_id="total_distance", metric_name=t("metric_total_distance"),
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit="m"))
+    risk_levels.append(risk)
+    
+    # HID Z3
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "high_intensity_distance", today)
+    metrics.append(ACWRMetricDetail(metric_id="hid_z3", metric_name=t("metric_hid"),
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit="m"))
+    risk_levels.append(risk)
+    
+    # HSR Z4
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "high_speed_running", today)
+    metrics.append(ACWRMetricDetail(metric_id="hsr_z4", metric_name=t("metric_hsr"),
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit="m"))
+    risk_levels.append(risk)
+    
+    # Sprint Z5
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "sprint_distance", today)
+    metrics.append(ACWRMetricDetail(metric_id="sprint_z5", metric_name=t("metric_sprint"),
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit="m"))
+    risk_levels.append(risk)
+    
+    # Sprints count
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "number_of_sprints", today)
+    metrics.append(ACWRMetricDetail(metric_id="sprints_count", metric_name="Sprints",
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit=""))
+    risk_levels.append(risk)
+    
+    # ACC+DEC
+    acute, chronic, ratio, risk = calculate_rolling_acwr(gps_data_by_date, "acc_dec", today)
+    metrics.append(ACWRMetricDetail(metric_id="acc_dec_total", metric_name=t("metric_acc_dec"),
+        acute_load=acute, chronic_load=chronic, acwr_ratio=ratio, risk_level=risk, unit=""))
+    risk_levels.append(risk)
+    
+    if "high" in risk_levels:
+        overall_risk = "high"
+        recommendation = t("acwr_detail_high")
+    elif "moderate" in risk_levels:
+        overall_risk = "moderate"
+        recommendation = t("acwr_detail_moderate")
+    elif all(r == "low" for r in risk_levels):
+        overall_risk = "low"
+        recommendation = t("acwr_detail_low")
+    else:
+        overall_risk = "optimal"
+        recommendation = t("acwr_detail_optimal")
+    
+    return ACWRRollingResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete.get("name", "Unknown"),
+        analysis_date=today.strftime("%Y-%m-%d"),
+        metrics=metrics,
+        overall_risk=overall_risk,
+        recommendation=recommendation
+    )
+
+
+# CORREÇÃO 7: ACWR médio da equipe
+class TeamACWRMetric(BaseModel):
+    metric_id: str
+    metric_name: str
+    avg_acwr: float
+    risk_level: str
+
+
+class TeamACWRResponse(BaseModel):
+    team_size: int
+    analysis_date: str
+    metrics: List[TeamACWRMetric]
+    overall_risk: str
+
+
+@api_router.get("/analysis/team-acwr", response_model=TeamACWRResponse)
+async def get_team_acwr_analysis(
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """CORREÇÃO 7: ACWR médio da equipe por métrica"""
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(1000)
+    if not athletes:
+        raise HTTPException(status_code=404, detail="No athletes found")
+    
+    today = datetime.utcnow()
+    date_28_days_ago = (today - timedelta(days=28)).strftime("%Y-%m-%d")
+    
+    metric_acwrs = {"total_distance": [], "hid_z3": [], "hsr_z4": [], "sprint_z5": [], "sprints_count": [], "acc_dec_total": []}
+    
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        gps_records = await db.gps_data.find({
+            "athlete_id": athlete_id, "coach_id": current_user["_id"], "date": {"$gte": date_28_days_ago}
+        }).to_list(1000)
+        
+        if not gps_records:
+            continue
+        
+        gps_data_by_date = {}
+        for record in gps_records:
+            date_key = record.get("date", "")
+            if not date_key:
+                continue
+            if date_key not in gps_data_by_date:
+                gps_data_by_date[date_key] = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0, "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
+            gps_data_by_date[date_key]["total_distance"] += record.get("total_distance", 0) or 0
+            gps_data_by_date[date_key]["high_intensity_distance"] += record.get("high_intensity_distance", 0) or 0
+            gps_data_by_date[date_key]["high_speed_running"] += record.get("high_speed_running", 0) or 0
+            gps_data_by_date[date_key]["sprint_distance"] += record.get("sprint_distance", 0) or 0
+            gps_data_by_date[date_key]["number_of_sprints"] += record.get("number_of_sprints", 0) or 0
+            gps_data_by_date[date_key]["acc_dec"] += (record.get("number_of_accelerations", 0) or 0) + (record.get("number_of_decelerations", 0) or 0)
+        
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "total_distance", today)
+        metric_acwrs["total_distance"].append(ratio)
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "high_intensity_distance", today)
+        metric_acwrs["hid_z3"].append(ratio)
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "high_speed_running", today)
+        metric_acwrs["hsr_z4"].append(ratio)
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "sprint_distance", today)
+        metric_acwrs["sprint_z5"].append(ratio)
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "number_of_sprints", today)
+        metric_acwrs["sprints_count"].append(ratio)
+        _, _, ratio, _ = calculate_rolling_acwr(gps_data_by_date, "acc_dec", today)
+        metric_acwrs["acc_dec_total"].append(ratio)
+    
+    def get_risk(acwr: float) -> str:
+        if acwr < 0.8: return "low"
+        elif acwr <= 1.3: return "optimal"
+        elif acwr <= 1.5: return "moderate"
+        return "high"
+    
+    metrics = []
+    risk_levels = []
+    metric_names = {"total_distance": t("metric_total_distance"), "hid_z3": t("metric_hid"), "hsr_z4": t("metric_hsr"), "sprint_z5": t("metric_sprint"), "sprints_count": "Sprints", "acc_dec_total": t("metric_acc_dec")}
+    
+    for metric_id, values in metric_acwrs.items():
+        avg_acwr = round(sum(values) / len(values), 2) if values else 0
+        risk = get_risk(avg_acwr)
+        risk_levels.append(risk)
+        metrics.append(TeamACWRMetric(metric_id=metric_id, metric_name=metric_names.get(metric_id, metric_id), avg_acwr=avg_acwr, risk_level=risk))
+    
+    if "high" in risk_levels: overall_risk = "high"
+    elif "moderate" in risk_levels: overall_risk = "moderate"
+    elif all(r == "low" for r in risk_levels): overall_risk = "low"
+    else: overall_risk = "optimal"
+    
+    return TeamACWRResponse(team_size=len(athletes), analysis_date=today.strftime("%Y-%m-%d"), metrics=metrics, overall_risk=overall_risk)
+
+
 @api_router.get("/analysis/acwr-detailed/{athlete_id}", response_model=ACWRDetailedAnalysis)
 async def get_acwr_detailed_analysis(
     athlete_id: str,
