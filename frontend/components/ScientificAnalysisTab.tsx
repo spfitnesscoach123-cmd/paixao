@@ -927,7 +927,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
               </View>
             )}
             
-            {/* CORREÇÃO: Apenas UM botão funcional */}
+            {/* CORREÇÃO: Apenas UM botão vermelho funcional */}
             <View style={styles.modalFooter}>
               <TouchableOpacity 
                 style={styles.modalPrintButton}
@@ -938,9 +938,9 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <>
-                    <Ionicons name="print" size={20} color="#ffffff" />
+                    <Ionicons name="share-outline" size={20} color="#ffffff" />
                     <Text style={styles.modalPrintText}>
-                      {locale === 'pt' ? 'Imprimir PDF' : 'Print PDF'}
+                      {locale === 'pt' ? 'Abrir para Imprimir' : 'Open to Print'}
                     </Text>
                   </>
                 )}
