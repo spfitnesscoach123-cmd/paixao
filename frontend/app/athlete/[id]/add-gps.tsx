@@ -119,6 +119,61 @@ export default function AddGPS() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
+        {/* TIPO DE ATIVIDADE - CRÍTICO PARA PERIODIZAÇÃO */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Tipo de Atividade' : 'Activity Type'} 
+            <Text style={styles.required}> *</Text>
+          </Text>
+          <Text style={styles.activityHint}>
+            {locale === 'pt' 
+              ? 'Selecione "Jogo" para que os dados sejam usados no cálculo de metas da Periodização' 
+              : 'Select "Game" for data to be used in Periodization target calculations'}
+          </Text>
+          <View style={styles.activityTypeSelector}>
+            <TouchableOpacity
+              style={[
+                styles.activityTypeButton,
+                activityType === 'training' && styles.activityTypeButtonActive,
+                activityType === 'training' && { backgroundColor: '#3b82f6' }
+              ]}
+              onPress={() => setActivityType('training')}
+            >
+              <Ionicons 
+                name="fitness" 
+                size={20} 
+                color={activityType === 'training' ? '#ffffff' : '#9ca3af'} 
+              />
+              <Text style={[
+                styles.activityTypeText,
+                activityType === 'training' && styles.activityTypeTextActive
+              ]}>
+                {locale === 'pt' ? 'Treino' : 'Training'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.activityTypeButton,
+                activityType === 'game' && styles.activityTypeButtonActive,
+                activityType === 'game' && { backgroundColor: '#10b981' }
+              ]}
+              onPress={() => setActivityType('game')}
+            >
+              <Ionicons 
+                name="trophy" 
+                size={20} 
+                color={activityType === 'game' ? '#ffffff' : '#9ca3af'} 
+              />
+              <Text style={[
+                styles.activityTypeText,
+                activityType === 'game' && styles.activityTypeTextActive
+              ]}>
+                {locale === 'pt' ? 'Jogo' : 'Game'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
             {locale === 'pt' ? 'Data do Treino' : 'Training Date'}
