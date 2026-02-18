@@ -18,19 +18,30 @@ import api from '../../../services/api';
 import { GPSData } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
+// CORREÇÃO 1: Padronização dos campos GPS conforme CSV Catapult
+// Campos padronizados:
+// - totalDistance (Dist. Total)
+// - hidZone3 (HID Z3: 14.4-19.8 km/h)
+// - hsrZone4 (HSR Z4: 19.8-25.2 km/h)
+// - sprintZone5 (Sprint Z5: >25 km/h)
+// - sprintCount (Sprints)
+// - accDecCount (ACC+DEC)
+
 export default function AddGPS() {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [totalDistance, setTotalDistance] = useState('');
-  const [highIntensityDistance, setHighIntensityDistance] = useState('');
-  const [sprintDistance, setSprintDistance] = useState('');
-  const [numberOfSprints, setNumberOfSprints] = useState('');
-  const [numberOfAccelerations, setNumberOfAccelerations] = useState('');
-  const [numberOfDecelerations, setNumberOfDecelerations] = useState('');
+  // Campos padronizados para compatibilidade com CSV e Periodização
+  const [totalDistance, setTotalDistance] = useState('');        // total_distance
+  const [hidZone3, setHidZone3] = useState('');                  // high_intensity_distance (HID Z3)
+  const [hsrZone4, setHsrZone4] = useState('');                  // high_speed_running (HSR Z4)
+  const [sprintZone5, setSprintZone5] = useState('');            // sprint_distance (Sprint Z5)
+  const [sprintCount, setSprintCount] = useState('');            // number_of_sprints
+  const [accCount, setAccCount] = useState('');                  // number_of_accelerations
+  const [decCount, setDecCount] = useState('');                  // number_of_decelerations
   const [maxSpeed, setMaxSpeed] = useState('');
   const [notes, setNotes] = useState('');
 
