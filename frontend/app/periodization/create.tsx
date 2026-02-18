@@ -561,12 +561,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  safeArea: {
+    backgroundColor: 'transparent',
+    zIndex: 100,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 16 : 8,
     paddingBottom: 16,
   },
   headerBack: {
