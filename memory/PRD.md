@@ -25,6 +25,51 @@ Português (Brazilian Portuguese)
 
 ## What's Been Implemented
 
+### December 2025 - LoadManager Corrections (Session 6)
+
+#### CORREÇÃO 1-2: Padronização dos Campos GPS
+**Problema**: Dados manuais não eram reconhecidos pela Periodização.
+
+**Solução Implementada**:
+- Formulário `add-gps.tsx` atualizado com campos padronizados:
+  - `totalDistance` → "Dist. Total"
+  - `hidZone3` → "HID Z3 (14.4-19.8 km/h)"
+  - `hsrZone4` → "HSR Z4 (19.8-25.2 km/h)"
+  - `sprintZone5` → "Sprint Z5 (>25 km/h)"
+  - `sprintCount` → "Sprints"
+  - `accDecCount` → "ACC+DEC"
+- Campos idênticos aos usados no parser CSV Catapult
+
+#### CORREÇÃO 3: Botão Voltar em "+ Nova Semana"
+- Adicionado `SafeAreaView` com padding adequado
+- Botão 100% visível em todos os dispositivos
+
+#### CORREÇÃO 4: Botão Voltar na Tela Login do Coach
+- Adicionado botão "← Voltar" no canto superior esquerdo
+- Retorna para tela de seleção de role (Sou Coach / Sou Atleta)
+
+#### CORREÇÃO 5-9: ACWR com Rolling Window Real
+**Problema**: ACWR permanecia artificialmente alto sem treinos.
+
+**Solução Implementada**:
+- Novo endpoint: `GET /api/analysis/acwr-rolling/{athlete_id}`
+- Novo endpoint: `GET /api/analysis/team-acwr`
+- Cálculo CORRETO com rolling window:
+  - Acute Load: média dos últimos 7 dias (incluindo zeros)
+  - Chronic Load: média dos últimos 28 dias (incluindo zeros)
+  - ACWR = Acute / Chronic
+- ACWR diminui automaticamente quando não há treinos
+- ACWR individual por métrica (6 métricas)
+- ACWR médio da equipe
+
+**Arquivos Modificados**:
+- `/app/frontend/app/athlete/[id]/add-gps.tsx`
+- `/app/frontend/app/login.tsx`
+- `/app/frontend/app/periodization/create.tsx`
+- `/app/backend/server.py`
+
+---
+
 ### December 2025 - PDF Report System Fix (Session 5)
 
 #### Issue: Redundant Buttons and Non-functional PDF Export
