@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  SafeAreaView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
