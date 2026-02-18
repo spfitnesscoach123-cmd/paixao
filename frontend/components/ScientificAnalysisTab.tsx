@@ -506,8 +506,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
     return level.charAt(0).toUpperCase() + level.slice(1);
   };
 
-  // CORREÇÃO: Usar o mesmo sistema de impressão da Periodização
-  // Utiliza expo-print e expo-sharing ao invés de abrir URL externa
+  // CORREÇÃO: Usar expo-print diretamente (mesmo sistema da Periodização)
   const handlePrintPdf = async () => {
     if (!reportHtml) {
       Alert.alert(
@@ -527,17 +526,28 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
           printWindow.document.close();
           printWindow.print();
         }
+        setShowPdfPreview(false);
       } else {
-        // Mobile: usar expo-print e sharing
-        const { uri } = await Print.printToFileAsync({ html: reportHtml });
-        await Sharing.shareAsync(uri, { UTI: '.pdf', mimeType: 'application/pdf' });
+        // Mobile: usar expo-print para gerar PDF e expo-sharing para compartilhar
+        const { uri } = await Print.printToFileAsync({ 
+          html: reportHtml,
+          base64: false 
+        });
+        
+        if (uri) {
+          setShowPdfPreview(false);
+          await Sharing.shareAsync(uri, { 
+            UTI: '.pdf', 
+            mimeType: 'application/pdf',
+            dialogTitle: locale === 'pt' ? 'Compartilhar Relatório' : 'Share Report'
+          });
+        }
       }
-      setShowPdfPreview(false);
     } catch (error) {
       console.error('PDF print error:', error);
       Alert.alert(
         locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Erro ao gerar PDF' : 'Failed to generate PDF'
+        locale === 'pt' ? 'Erro ao gerar PDF. Tente novamente.' : 'Failed to generate PDF. Please try again.'
       );
     } finally {
       setLoadingReport(false);
