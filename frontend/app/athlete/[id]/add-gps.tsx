@@ -34,6 +34,8 @@ export default function AddGPS() {
   const queryClient = useQueryClient();
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  // Campo para tipo de atividade - CRÍTICO para Periodização
+  const [activityType, setActivityType] = useState<'game' | 'training'>('training');
   // Campos padronizados para compatibilidade com CSV e Periodização
   const [totalDistance, setTotalDistance] = useState('');        // total_distance
   const [hidZone3, setHidZone3] = useState('');                  // high_intensity_distance (HID Z3)
