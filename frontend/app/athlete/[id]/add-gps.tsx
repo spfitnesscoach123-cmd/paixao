@@ -105,7 +105,9 @@ export default function AddGPS() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Dados GPS - Entrada Manual</Text>
+        <Text style={styles.headerTitle}>
+          {locale === 'pt' ? 'Dados GPS - Entrada Manual' : 'GPS Data - Manual Entry'}
+        </Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -115,9 +117,13 @@ export default function AddGPS() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data do Treino</Text>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Data do Treino' : 'Training Date'}
+          </Text>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Data <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>
+              {locale === 'pt' ? 'Data' : 'Date'} <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="AAAA-MM-DD"
@@ -129,10 +135,15 @@ export default function AddGPS() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Distâncias (metros)</Text>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Distâncias (metros)' : 'Distances (meters)'}
+          </Text>
           
+          {/* Dist. Total */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Distância Total <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>
+              {locale === 'pt' ? 'Dist. Total' : 'Total Distance'} <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 10500"
@@ -142,67 +153,99 @@ export default function AddGPS() {
             />
           </View>
 
+          {/* HID Z3 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Alta Intensidade <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>
+              HID Z3 (14.4-19.8 km/h) <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 2300"
-              value={highIntensityDistance}
-              onChangeText={setHighIntensityDistance}
+              value={hidZone3}
+              onChangeText={setHidZone3}
               keyboardType="decimal-pad"
             />
           </View>
 
+          {/* HSR Z4 */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Distância em Sprints <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>
+              HSR Z4 (19.8-25.2 km/h)
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ex: 800"
+              value={hsrZone4}
+              onChangeText={setHsrZone4}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          {/* Sprint Z5 */}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>
+              Sprint Z5 (&gt;25 km/h) <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 450"
-              value={sprintDistance}
-              onChangeText={setSprintDistance}
+              value={sprintZone5}
+              onChangeText={setSprintZone5}
               keyboardType="decimal-pad"
             />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Eventos</Text>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Eventos' : 'Events'}
+          </Text>
           
+          {/* Sprints */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Número de Sprints</Text>
+            <Text style={styles.label}>Sprints</Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 15"
-              value={numberOfSprints}
-              onChangeText={setNumberOfSprints}
+              value={sprintCount}
+              onChangeText={setSprintCount}
               keyboardType="number-pad"
             />
           </View>
 
+          {/* ACC */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Acelerações</Text>
+            <Text style={styles.label}>
+              {locale === 'pt' ? 'Acelerações (ACC)' : 'Accelerations (ACC)'}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 35"
-              value={numberOfAccelerations}
-              onChangeText={setNumberOfAccelerations}
+              value={accCount}
+              onChangeText={setAccCount}
               keyboardType="number-pad"
             />
           </View>
 
+          {/* DEC */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Desacelerações</Text>
+            <Text style={styles.label}>
+              {locale === 'pt' ? 'Desacelerações (DEC)' : 'Decelerations (DEC)'}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 32"
-              value={numberOfDecelerations}
-              onChangeText={setNumberOfDecelerations}
+              value={decCount}
+              onChangeText={setDecCount}
               keyboardType="number-pad"
             />
           </View>
 
+          {/* Velocidade Máxima */}
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Velocidade Máxima (km/h)</Text>
+            <Text style={styles.label}>
+              {locale === 'pt' ? 'Velocidade Máxima (km/h)' : 'Max Speed (km/h)'}
+            </Text>
             <TextInput
               style={styles.input}
               placeholder="Ex: 34.5"
@@ -214,11 +257,13 @@ export default function AddGPS() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Observações</Text>
+          <Text style={styles.sectionTitle}>
+            {locale === 'pt' ? 'Observações' : 'Notes'}
+          </Text>
           <View style={styles.inputGroup}>
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Notas sobre o treino..."
+              placeholder={locale === 'pt' ? 'Notas sobre o treino...' : 'Training notes...'}
               value={notes}
               onChangeText={setNotes}
               multiline
@@ -235,7 +280,9 @@ export default function AddGPS() {
           {createMutation.isPending ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.buttonText}>Registrar Dados GPS</Text>
+            <Text style={styles.buttonText}>
+              {locale === 'pt' ? 'Registrar Dados GPS' : 'Save GPS Data'}
+            </Text>
           )}
         </TouchableOpacity>
       </ScrollView>
