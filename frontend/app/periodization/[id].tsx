@@ -261,20 +261,34 @@ export default function PeriodizationDetailScreen() {
     );
   };
 
-  // Render table view
+  // MELHORIA 2: Render table view UNIFICADA (diária e semanal em uma única tabela)
   const renderTableView = () => {
     if (!calculations) return null;
 
     return (
       <View style={styles.tableContainer}>
-        {/* Weekly targets header */}
+        {/* Unified Table Header with dynamic title */}
         <View style={styles.sectionHeader}>
-          <Ionicons name="calendar" size={20} color={colors.accent.primary} />
-          <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Metas Semanais' : 'Weekly Targets'}
-          </Text>
+          <Ionicons 
+            name={selectedDay ? "today" : "calendar"} 
+            size={20} 
+            color={colors.accent.primary} 
+          />
+          <Text style={styles.sectionTitle}>{tableTitle}</Text>
+          {selectedDay && (
+            <TouchableOpacity 
+              style={styles.clearSelectionButton}
+              onPress={() => setSelectedDay(null)}
+            >
+              <Ionicons name="close-circle" size={18} color={colors.text.tertiary} />
+              <Text style={styles.clearSelectionText}>
+                {locale === 'pt' ? 'Ver Semanal' : 'View Weekly'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
+        {/* UNIFIED Table - shows weekly OR daily based on selection */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={styles.table}>
             {/* Header */}
@@ -291,8 +305,8 @@ export default function PeriodizationDetailScreen() {
               ))}
             </View>
 
-            {/* Rows */}
-            {calculations.athletes.map((athlete: any) => (
+            {/* Rows - using displayedData (memoized) */}
+            {displayedData.map((athlete: any) => (
               <View key={athlete.athlete_id} style={styles.tableRow}>
                 <View style={styles.tableNameCell}>
                   <Text style={styles.tableNameText} numberOfLines={1}>
@@ -302,7 +316,7 @@ export default function PeriodizationDetailScreen() {
                 {METRICS.map(metric => (
                   <View key={metric.id} style={styles.tableValueCell}>
                     <Text style={styles.tableValueText}>
-                      {Math.round(athlete.weekly_targets[metric.id]).toLocaleString()}
+                      {Math.round(athlete.values[metric.id] || 0).toLocaleString()}
                     </Text>
                   </View>
                 ))}
@@ -311,15 +325,14 @@ export default function PeriodizationDetailScreen() {
           </View>
         </ScrollView>
 
-        {/* Daily targets section */}
+        {/* Day selector */}
         <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Ionicons name="today" size={20} color={colors.accent.primary} />
+          <Ionicons name="calendar-outline" size={20} color={colors.accent.primary} />
           <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Metas Diárias' : 'Daily Targets'}
+            {locale === 'pt' ? 'Selecionar Dia' : 'Select Day'}
           </Text>
         </View>
 
-        {/* Day selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
           {calculations.days_config.map((day: any) => {
             const classification = DAY_CLASSIFICATIONS.find(c => c.id === day.day_classification);
@@ -329,9 +342,9 @@ export default function PeriodizationDetailScreen() {
                 key={day.date}
                 style={[
                   styles.daySelectorItem,
-                  isSelected && { borderColor: classification?.color, borderWidth: 2 },
+                  isSelected && { borderColor: classification?.color, borderWidth: 2, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
                 ]}
-                onPress={() => setSelectedDay(day.date)}
+                onPress={() => handleDaySelect(day.date)}
               >
                 <Text style={styles.daySelectorDate}>
                   {format(parseISO(day.date), 'EEE', { locale: dateLocale })}
@@ -346,48 +359,6 @@ export default function PeriodizationDetailScreen() {
             );
           })}
         </ScrollView>
-
-        {/* Daily table for selected day */}
-        {selectedDay && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.table}>
-              {/* Header */}
-              <View style={styles.tableRow}>
-                <View style={styles.tableHeaderCell}>
-                  <Text style={styles.tableHeaderText}>
-                    {locale === 'pt' ? 'Atleta' : 'Athlete'}
-                  </Text>
-                </View>
-                {METRICS.map(metric => (
-                  <View key={metric.id} style={styles.tableMetricCell}>
-                    <Text style={styles.tableHeaderText}>{metric.label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Rows */}
-              {calculations.athletes.map((athlete: any) => {
-                const dayTarget = athlete.daily_targets.find((d: any) => d.date === selectedDay);
-                return (
-                  <View key={athlete.athlete_id} style={styles.tableRow}>
-                    <View style={styles.tableNameCell}>
-                      <Text style={styles.tableNameText} numberOfLines={1}>
-                        {athlete.athlete_name}
-                      </Text>
-                    </View>
-                    {METRICS.map(metric => (
-                      <View key={metric.id} style={styles.tableValueCell}>
-                        <Text style={styles.tableValueText}>
-                          {dayTarget ? Math.round(dayTarget[metric.id]).toLocaleString() : '-'}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })}
-            </View>
-          </ScrollView>
-        )}
       </View>
     );
   };
