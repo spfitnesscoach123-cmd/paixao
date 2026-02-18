@@ -38,7 +38,18 @@ Português (Brazilian Portuguese)
   - `sprintZone5` → "Sprint Z5 (>25 km/h)"
   - `sprintCount` → "Sprints"
   - `accDecCount` → "ACC+DEC"
-- Campos idênticos aos usados no parser CSV Catapult
+- **NOVO**: Adicionado seletor de "Tipo de Atividade" (Treino/Jogo) no formulário
+- **CRÍTICO**: Quando `activity_type = "game"`, os peak values são automaticamente atualizados
+- Backend `POST /gps-data` agora chama `update_athlete_peak_values()` para sessões de jogo
+- Dados manuais agora aparecem corretamente na Periodização
+
+**Fluxo Corrigido**:
+```
+Entrada Manual GPS (activity_type="game") → 
+update_athlete_peak_values() → 
+Peak Values Atualizados → 
+Periodização Calcula Metas Corretamente
+```
 
 #### CORREÇÃO 3: Botão Voltar em "+ Nova Semana"
 - Adicionado `SafeAreaView` com padding adequado
