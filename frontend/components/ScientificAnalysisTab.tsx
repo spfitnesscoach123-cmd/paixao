@@ -917,26 +917,23 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
               </View>
             )}
             
+            {/* CORREÇÃO: Apenas UM botão funcional */}
             <View style={styles.modalFooter}>
               <TouchableOpacity 
-                style={styles.modalCancelButton}
-                onPress={() => setShowPdfPreview(false)}
-              >
-                <Text style={styles.modalCancelText}>
-                  {locale === 'pt' ? 'Fechar' : 'Close'}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
                 style={styles.modalPrintButton}
-                onPress={() => {
-                  setShowPdfPreview(false);
-                  handleExportPdf();
-                }}
+                onPress={handlePrintPdf}
+                disabled={loadingReport}
               >
-                <Ionicons name="print" size={20} color="#ffffff" />
-                <Text style={styles.modalPrintText}>
-                  {locale === 'pt' ? 'Abrir para Imprimir' : 'Open to Print'}
-                </Text>
+                {loadingReport ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <>
+                    <Ionicons name="print" size={20} color="#ffffff" />
+                    <Text style={styles.modalPrintText}>
+                      {locale === 'pt' ? 'Imprimir PDF' : 'Print PDF'}
+                    </Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
