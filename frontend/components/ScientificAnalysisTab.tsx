@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Dimensions,
   Platform,
-  Alert
+  Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -16,6 +17,7 @@ import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline } from 'react-nat
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
