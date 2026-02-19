@@ -25,6 +25,53 @@ Português (Brazilian Portuguese)
 
 ## What's Been Implemented
 
+### December 2025 - Correção DEFINITIVA do Sistema de PDF na Análise Científica (Session 9)
+
+#### Problema Crítico Corrigido:
+- **Mobile**: Botão ficava em loading infinito, tela recarregava
+- **Desktop**: PDF gerado parcialmente, app travava completamente (UI freeze)
+- **Causa**: Modal + WebView causavam memory leaks e deadlock no thread principal
+
+#### Solução Implementada - REIMPLEMENTAÇÃO TOTAL:
+
+**REMOVIDO COMPLETAMENTE**:
+- Modal de preview
+- WebView
+- Estados intermediários (`showPdfPreview`, `loadReportPreview`, `reportHtml`)
+- Todos os estilos relacionados ao modal
+- Todos os listeners e observers problemáticos
+
+**NOVA IMPLEMENTAÇÃO** (idêntica à Periodização):
+- **Geração DIRETA de PDF** sem modal intermediário
+- `handlePrintPdf()` com `useCallback` para evitar re-renders
+- Um único estado `generatingPdf`
+- `isMountedRef` para verificação de componente montado
+- Cleanup garantido com `finally`
+- Thread safety com async/await correto
+
+**Fluxo Novo**:
+```
+Clicar botão de impressão → 
+Buscar HTML da API → 
+Gerar PDF (expo-print) → 
+Abrir compartilhamento (expo-sharing) → 
+Limpar estado ✅
+```
+
+**Garantias de Estabilidade**:
+- Promise sempre resolvida/rejeitada
+- Estado de loading sempre resetado no `finally`
+- Verificação de componente montado antes de setState
+- Nenhum memory leak
+- UI nunca travada
+
+**Arquivo Modificado**:
+- `/app/frontend/components/ScientificAnalysisTab.tsx` - Reimplementação total do sistema de PDF
+
+**Status**: IMPLEMENTADO - Pronto para build
+
+---
+
 ### December 2025 - Correção do Botão de Impressão na Análise Científica (Session 8)
 
 #### Problema: Botões de PDF não funcionavam no modal de preview
