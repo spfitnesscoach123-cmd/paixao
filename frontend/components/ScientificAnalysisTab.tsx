@@ -1299,69 +1299,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.dark.secondary,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.default,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  previewScroll: {
-    padding: 16,
-    maxHeight: 400,
-  },
-  previewSection: {
-    marginBottom: 16,
-  },
-  previewSectionTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  previewText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-  },
-  previewItem: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    marginLeft: 8,
-    marginTop: 4,
-  },
-  previewInsights: {
-    fontSize: 11,
-    color: colors.text.tertiary,
-    lineHeight: 16,
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border.default,
-    justifyContent: 'center',
-  },
-  modalPrintButton: {
-    flex: 1,
-    maxWidth: 300,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#dc2626',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-  },
-  modalPrintText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-  },
 });
 
 export default ScientificAnalysisTab;
