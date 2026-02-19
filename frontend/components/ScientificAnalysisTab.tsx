@@ -468,9 +468,12 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 
 export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ athleteId }) => {
   const { locale } = useLanguage();
-  const [showPdfPreview, setShowPdfPreview] = useState(false);
-  const [reportHtml, setReportHtml] = useState<string | null>(null);
-  const [loadingReport, setLoadingReport] = useState(false);
+  
+  // Estado único para controle de geração de PDF - SEM modal, SEM WebView
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+  
+  // Ref para controle de cleanup
+  const isMountedRef = useRef(true);
 
   const { data: analysis, isLoading, error, refetch } = useQuery({
     queryKey: ['scientific-analysis', athleteId, locale],
@@ -479,8 +482,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       return response.data;
     },
     enabled: !!athleteId,
-    staleTime: 0, // Always fetch fresh data to ensure dynamic updates
-    refetchOnMount: 'always', // Refetch when component mounts
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const getRiskColor = (level: string) => {
@@ -504,69 +507,90 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
     return level.charAt(0).toUpperCase() + level.slice(1);
   };
 
-  // CORREÇÃO: Usar expo-print diretamente (mesmo sistema da Periodização)
-  const handlePrintPdf = async () => {
-    if (!reportHtml) {
+  // ============================================================
+  // SISTEMA DE PDF - IMPLEMENTAÇÃO IDÊNTICA À PERIODIZAÇÃO
+  // - SEM modal WebView
+  // - SEM estados intermediários problemáticos
+  // - Geração direta de PDF com cleanup garantido
+  // ============================================================
+  const handlePrintPdf = useCallback(async () => {
+    // Verificar se há dados para gerar o PDF
+    if (!analysis) {
       Alert.alert(
         locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Relatório não carregado' : 'Report not loaded'
+        locale === 'pt' ? 'Dados de análise não disponíveis' : 'Analysis data not available'
       );
       return;
     }
-    
-    setLoadingReport(true);
+
+    // Evitar múltiplas execuções simultâneas
+    if (generatingPdf) return;
+
+    setGeneratingPdf(true);
+
     try {
+      // Buscar HTML do relatório diretamente da API
+      const response = await api.get(`/report/scientific/${athleteId}?lang=${locale}`, {
+        responseType: 'text',
+      });
+      
+      const reportHtml = response.data;
+
+      if (!reportHtml) {
+        throw new Error('Empty report HTML');
+      }
+
       if (Platform.OS === 'web') {
-        // Web: abrir nova janela para impressão
+        // WEB: Abrir em nova janela para impressão
+        // Usar setTimeout para garantir que o estado seja atualizado antes
         const printWindow = window.open('', '_blank');
         if (printWindow) {
           printWindow.document.write(reportHtml);
           printWindow.document.close();
+          // Aguardar um frame para garantir renderização
+          await new Promise(resolve => setTimeout(resolve, 100));
           printWindow.print();
         }
-        setShowPdfPreview(false);
       } else {
-        // Mobile: usar expo-print para gerar PDF e expo-sharing para compartilhar
+        // MOBILE (iOS/Android): Usar expo-print + expo-sharing
         const { uri } = await Print.printToFileAsync({ 
           html: reportHtml,
-          base64: false 
+          base64: false,
         });
         
         if (uri) {
-          setShowPdfPreview(false);
+          // Compartilhar PDF gerado
           await Sharing.shareAsync(uri, { 
             UTI: '.pdf', 
             mimeType: 'application/pdf',
-            dialogTitle: locale === 'pt' ? 'Compartilhar Relatório' : 'Share Report'
+            dialogTitle: locale === 'pt' ? 'Compartilhar Relatório Científico' : 'Share Scientific Report'
           });
         }
       }
     } catch (error) {
-      console.error('PDF print error:', error);
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Erro ao gerar PDF. Tente novamente.' : 'Failed to generate PDF. Please try again.'
-      );
+      console.error('PDF generation error:', error);
+      // Apenas mostrar alerta se o componente ainda estiver montado
+      if (isMountedRef.current) {
+        Alert.alert(
+          locale === 'pt' ? 'Erro' : 'Error',
+          locale === 'pt' ? 'Erro ao gerar PDF. Tente novamente.' : 'Failed to generate PDF. Please try again.'
+        );
+      }
     } finally {
-      setLoadingReport(false);
+      // GARANTIR que o estado de loading seja sempre resetado
+      if (isMountedRef.current) {
+        setGeneratingPdf(false);
+      }
     }
-  };
+  }, [analysis, athleteId, locale, generatingPdf]);
 
-  // Load report HTML for preview
-  const loadReportPreview = async () => {
-    setLoadingReport(true);
-    try {
-      const response = await api.get(`/report/scientific/${athleteId}?lang=${locale}`, {
-        responseType: 'text',
-      });
-      setReportHtml(response.data);
-      setShowPdfPreview(true);
-    } catch (error) {
-      console.error('Error loading report preview:', error);
-    } finally {
-      setLoadingReport(false);
-    }
-  };
+  // Cleanup ao desmontar componente
+  React.useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   if (isLoading) {
     return (
