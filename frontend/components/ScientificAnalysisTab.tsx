@@ -642,16 +642,16 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
           <Text style={styles.headerSubtitle}>{analysis.analysis_date}</Text>
         </View>
         <View style={styles.headerActions}>
-          {/* Botão para abrir preview/opções de PDF */}
+          {/* BOTÃO ÚNICO - Gera PDF e abre compartilhamento DIRETO */}
           <TouchableOpacity 
             style={styles.pdfButton} 
-            onPress={handleOpenPreview}
-            disabled={loadingReport}
+            onPress={handleGenerateAndSharePdf}
+            disabled={isGenerating}
           >
-            {loadingReport ? (
+            {isGenerating ? (
               <ActivityIndicator size="small" color="#dc2626" />
             ) : (
-              <Ionicons name="document-text" size={20} color="#dc2626" />
+              <Ionicons name="share-outline" size={20} color="#dc2626" />
             )}
           </TouchableOpacity>
         </View>
