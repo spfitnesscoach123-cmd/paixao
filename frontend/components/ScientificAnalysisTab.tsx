@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -6,7 +6,6 @@ import {
   ScrollView, 
   TouchableOpacity, 
   ActivityIndicator,
-  Modal,
   Dimensions,
   Platform,
   Alert
@@ -15,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
-import { WebView } from 'react-native-webview';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../services/api';
