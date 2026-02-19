@@ -471,8 +471,11 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ athleteId }) => {
   const { locale } = useLanguage();
   
-  // Estado único para controle de geração de PDF - SEM modal, SEM WebView
-  const [generatingPdf, setGeneratingPdf] = useState(false);
+  // Estados para controle do fluxo: Visualizar → Imprimir/Salvar
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [loadingReport, setLoadingReport] = useState(false);
+  const [pdfUri, setPdfUri] = useState<string | null>(null);
+  const [reportHtml, setReportHtml] = useState<string | null>(null);
   
   // Ref para controle de cleanup
   const isMountedRef = useRef(true);
@@ -510,13 +513,9 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
   };
 
   // ============================================================
-  // SISTEMA DE PDF - IMPLEMENTAÇÃO IDÊNTICA À PERIODIZAÇÃO
-  // - SEM modal WebView
-  // - SEM estados intermediários problemáticos
-  // - Geração direta de PDF com cleanup garantido
+  // PASSO 1: Carregar relatório e gerar PDF para preview
   // ============================================================
-  const handlePrintPdf = useCallback(async () => {
-    // Verificar se há dados para gerar o PDF
+  const handleOpenPreview = useCallback(async () => {
     if (!analysis) {
       Alert.alert(
         locale === 'pt' ? 'Erro' : 'Error',
@@ -525,66 +524,117 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       return;
     }
 
-    // Evitar múltiplas execuções simultâneas
-    if (generatingPdf) return;
-
-    setGeneratingPdf(true);
+    if (loadingReport) return;
+    setLoadingReport(true);
 
     try {
-      // Buscar HTML do relatório diretamente da API
+      // Buscar HTML do relatório
       const response = await api.get(`/report/scientific/${athleteId}?lang=${locale}`, {
         responseType: 'text',
       });
       
-      const reportHtml = response.data;
-
-      if (!reportHtml) {
-        throw new Error('Empty report HTML');
-      }
+      const html = response.data;
+      if (!html) throw new Error('Empty report HTML');
+      
+      setReportHtml(html);
 
       if (Platform.OS === 'web') {
-        // WEB: Abrir em nova janela para impressão
-        // Usar setTimeout para garantir que o estado seja atualizado antes
+        // Web: Mostrar modal com opções
+        setShowPreviewModal(true);
+      } else {
+        // Mobile: Gerar arquivo PDF primeiro para preview
+        const { uri } = await Print.printToFileAsync({ 
+          html,
+          base64: false,
+        });
+        
+        if (uri && isMountedRef.current) {
+          setPdfUri(uri);
+          setShowPreviewModal(true);
+        }
+      }
+    } catch (error) {
+      console.error('Preview error:', error);
+      if (isMountedRef.current) {
+        Alert.alert(
+          locale === 'pt' ? 'Erro' : 'Error',
+          locale === 'pt' ? 'Erro ao carregar relatório' : 'Failed to load report'
+        );
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoadingReport(false);
+      }
+    }
+  }, [analysis, athleteId, locale, loadingReport]);
+
+  // ============================================================
+  // PASSO 2A: Visualizar PDF (Preview nativo do sistema)
+  // ============================================================
+  const handleViewPdf = useCallback(async () => {
+    try {
+      if (Platform.OS === 'web' && reportHtml) {
+        // Web: Abrir em nova aba para visualização
+        const previewWindow = window.open('', '_blank');
+        if (previewWindow) {
+          previewWindow.document.write(reportHtml);
+          previewWindow.document.close();
+        }
+        setShowPreviewModal(false);
+      } else if (pdfUri) {
+        // Mobile: Usar Print.printAsync que mostra preview nativo
+        await Print.printAsync({ uri: pdfUri });
+      }
+    } catch (error) {
+      console.error('View PDF error:', error);
+    }
+  }, [pdfUri, reportHtml]);
+
+  // ============================================================
+  // PASSO 2B: Salvar/Compartilhar PDF
+  // ============================================================
+  const handleSavePdf = useCallback(async () => {
+    try {
+      if (Platform.OS === 'web' && reportHtml) {
+        // Web: Gerar e baixar PDF
         const printWindow = window.open('', '_blank');
         if (printWindow) {
           printWindow.document.write(reportHtml);
           printWindow.document.close();
-          // Aguardar um frame para garantir renderização
-          await new Promise(resolve => setTimeout(resolve, 100));
           printWindow.print();
         }
-      } else {
-        // MOBILE (iOS/Android): Usar expo-print + expo-sharing
-        const { uri } = await Print.printToFileAsync({ 
-          html: reportHtml,
-          base64: false,
+        setShowPreviewModal(false);
+      } else if (pdfUri) {
+        // Mobile: Compartilhar arquivo PDF
+        await Sharing.shareAsync(pdfUri, { 
+          UTI: '.pdf', 
+          mimeType: 'application/pdf',
+          dialogTitle: locale === 'pt' ? 'Salvar Relatório Científico' : 'Save Scientific Report'
         });
-        
-        if (uri) {
-          // Compartilhar PDF gerado
-          await Sharing.shareAsync(uri, { 
-            UTI: '.pdf', 
-            mimeType: 'application/pdf',
-            dialogTitle: locale === 'pt' ? 'Compartilhar Relatório Científico' : 'Share Scientific Report'
-          });
-        }
+        setShowPreviewModal(false);
       }
     } catch (error) {
-      console.error('PDF generation error:', error);
-      // Apenas mostrar alerta se o componente ainda estiver montado
-      if (isMountedRef.current) {
-        Alert.alert(
-          locale === 'pt' ? 'Erro' : 'Error',
-          locale === 'pt' ? 'Erro ao gerar PDF. Tente novamente.' : 'Failed to generate PDF. Please try again.'
-        );
-      }
-    } finally {
-      // GARANTIR que o estado de loading seja sempre resetado
-      if (isMountedRef.current) {
-        setGeneratingPdf(false);
-      }
+      console.error('Save PDF error:', error);
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Erro ao salvar PDF' : 'Failed to save PDF'
+      );
     }
-  }, [analysis, athleteId, locale, generatingPdf]);
+  }, [pdfUri, reportHtml, locale]);
+
+  // ============================================================
+  // Fechar modal e limpar recursos
+  // ============================================================
+  const handleClosePreview = useCallback(() => {
+    setShowPreviewModal(false);
+    // Limpar URI do PDF após um delay para evitar problemas
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setPdfUri(null);
+        setReportHtml(null);
+      }
+    }, 500);
+  }, []);
 
   // Cleanup ao desmontar componente
   React.useEffect(() => {
