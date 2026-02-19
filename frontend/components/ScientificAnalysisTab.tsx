@@ -631,15 +631,16 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
           <Text style={styles.headerSubtitle}>{analysis.analysis_date}</Text>
         </View>
         <View style={styles.headerActions}>
+          {/* ÚNICO BOTÃO DE PDF - Gera diretamente sem modal */}
           <TouchableOpacity 
             style={styles.pdfButton} 
-            onPress={loadReportPreview}
-            disabled={loadingReport}
+            onPress={handlePrintPdf}
+            disabled={generatingPdf}
           >
-            {loadingReport ? (
+            {generatingPdf ? (
               <ActivityIndicator size="small" color="#dc2626" />
             ) : (
-              <Ionicons name="document-text" size={20} color="#dc2626" />
+              <Ionicons name="print" size={20} color="#dc2626" />
             )}
           </TouchableOpacity>
         </View>
