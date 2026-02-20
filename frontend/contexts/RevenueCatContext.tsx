@@ -263,7 +263,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       
       // EXECUTAR IMEDIATAMENTE APÓS INICIAR TRIAL OU COMPRA
       // Verificar acesso usando APENAS expirationDate
-      const entitlement = updatedInfo.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+      const entitlement = updatedInfo.entitlements.all[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
       let success = false;
       
       if (entitlement && entitlement.expirationDate) {
@@ -271,12 +271,12 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         const now = new Date();
         success = expDate > now;
         
-        console.log('[PREMIUM] Purchase complete - Expiration:', entitlement.expirationDate);
-        console.log('[PREMIUM] Purchase complete - Premium access:', success);
+        console.log('[PRO] Purchase complete - Expiration:', entitlement.expirationDate);
+        console.log('[PRO] Purchase complete - Pro access:', success);
         
         setIsPremium(success);
       } else {
-        console.log('[PREMIUM] Purchase complete - No entitlement found');
+        console.log('[PRO] Purchase complete - No entitlement found');
         setIsPremium(false);
       }
       
