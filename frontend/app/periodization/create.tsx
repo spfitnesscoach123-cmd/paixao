@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { PremiumGate } from '../../components/PremiumGate';
 import api from '../../services/api';
 import { format, addDays, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
