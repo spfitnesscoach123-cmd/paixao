@@ -8,19 +8,19 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "test_sIEsQYnhfhPLkFmeRJQZkAiGYXB"
+        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "appl_eIJnPUEMyRzosbpoDejVevXnbti"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "test_sIEsQYnhfhPLkFmeRJQZkAiGYXB"
+        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "appl_eIJnPUEMyRzosbpoDejVevXnbti"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "test_sIEsQYnhfhPLkFmeRJQZkAiGYXB"
+        "EXPO_PUBLIC_REVENUECAT_APPLE_KEY": "appl_eIJnPUEMyRzosbpoDejVevXnbti"
       }
     }
   },
