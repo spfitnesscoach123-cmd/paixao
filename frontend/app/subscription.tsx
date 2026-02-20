@@ -233,7 +233,7 @@ export default function Subscription() {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       setRevenueCatCustomerInfo(customerInfo);
       
-      const hasPro = customerInfo?.entitlements?.active?.['pro']?.isActive;
+      const hasPro = customerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive;
       
       if (hasPro) {
         Alert.alert('🎉', t.purchaseSuccess);
