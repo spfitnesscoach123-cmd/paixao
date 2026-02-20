@@ -244,6 +244,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   }, [Purchases]);
 
   // Purchase a package
+  // IMPORTANTE: Verificar premium IMEDIATAMENTE após compra/trial
   const purchasePackage = useCallback(async (pkg: RevenueCatPackage): Promise<PurchaseResult> => {
     if (!isNativePlatform || !Purchases) {
       return { 
@@ -260,7 +261,24 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       
       setCustomerInfo(updatedInfo);
       
-      const success = hasProEntitlement(updatedInfo);
+      // EXECUTAR IMEDIATAMENTE APÓS INICIAR TRIAL OU COMPRA
+      // Verificar acesso usando APENAS expirationDate
+      const entitlement = updatedInfo.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+      let success = false;
+      
+      if (entitlement && entitlement.expirationDate) {
+        const expDate = new Date(entitlement.expirationDate);
+        const now = new Date();
+        success = expDate > now;
+        
+        console.log('[PREMIUM] Purchase complete - Expiration:', entitlement.expirationDate);
+        console.log('[PREMIUM] Purchase complete - Premium access:', success);
+        
+        setIsPremium(success);
+      } else {
+        console.log('[PREMIUM] Purchase complete - No entitlement found');
+        setIsPremium(false);
+      }
       
       return {
         success,
