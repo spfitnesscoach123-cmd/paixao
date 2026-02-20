@@ -105,10 +105,10 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       setCustomerInfo(info);
       
       // Verificar acesso usando APENAS expirationDate
-      const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+      const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
       
       if (!entitlement || !entitlement.expirationDate) {
-        console.log('[PREMIUM] No entitlement or expirationDate found');
+        console.log('[PRO] No entitlement or expirationDate found');
         setIsPremium(false);
         return false;
       }
@@ -117,10 +117,10 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       const now = new Date();
       const hasAccess = expDate > now;
       
-      console.log('[PREMIUM] Premium entitlement:', entitlement);
-      console.log('[PREMIUM] Expiration date:', entitlement.expirationDate);
-      console.log('[PREMIUM] Current date:', now.toISOString());
-      console.log('[PREMIUM] Premium access:', hasAccess);
+      console.log('[PRO] Pro entitlement:', entitlement);
+      console.log('[PRO] Expiration date:', entitlement.expirationDate);
+      console.log('[PRO] Current date:', now.toISOString());
+      console.log('[PRO] Pro access:', hasAccess);
       
       setIsPremium(hasAccess);
       return hasAccess;
