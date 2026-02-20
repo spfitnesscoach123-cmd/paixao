@@ -1878,6 +1878,13 @@ export default function VBTCameraPage() {
                 </CameraView>
               )
             )}
+            
+            {/* FatigueVisualOverlay - BORDA VISUAL COLORIDA baseada na perda de velocidade */}
+            {/* Este é um componente 100% VISUAL, NÃO interfere na câmera/pipeline */}
+            <FatigueVisualOverlay 
+              velocityDropPercent={velocityDrop} 
+              visible={isTracking && canCalculate}
+            />
           </View>
           
           {/* Controls */}
