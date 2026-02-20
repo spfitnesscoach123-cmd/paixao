@@ -73,12 +73,63 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   const [packages, setPackages] = useState<RevenueCatPackage[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [Purchases, setPurchases] = useState<any>(null);
+  
+  // FONTE ÚNICA DA VERDADE: isPremium baseado em expirationDate > now
+  const [isPremium, setIsPremium] = useState(false);
 
-  // Computed values
-  const isPro = hasProEntitlement(customerInfo);
+  // Valores informativos (NÃO usados para determinar acesso)
   const isTrialing = isInTrialPeriod(customerInfo);
   const expirationDate = getSubscriptionExpirationDate(customerInfo);
   const managementURL = getManagementURL(customerInfo);
+  
+  // @deprecated - mantido para compatibilidade
+  const isPro = isPremium;
+
+  /**
+   * FUNÇÃO GLOBAL: checkPremiumAccess
+   * 
+   * SEMPRE busca do RevenueCat usando Purchases.getCustomerInfo()
+   * NUNCA usa cache local como fonte de verdade
+   * 
+   * REGRA: premium = expirationDate > now
+   */
+  const checkPremiumAccess = useCallback(async (): Promise<boolean> => {
+    if (!isNativePlatform || !Purchases) {
+      console.log('[PREMIUM] Non-native platform or Purchases not initialized');
+      return false;
+    }
+
+    try {
+      // SEMPRE buscar do RevenueCat, NUNCA usar cache
+      const info = await Purchases.getCustomerInfo();
+      setCustomerInfo(info);
+      
+      // Verificar acesso usando APENAS expirationDate
+      const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+      
+      if (!entitlement || !entitlement.expirationDate) {
+        console.log('[PREMIUM] No entitlement or expirationDate found');
+        setIsPremium(false);
+        return false;
+      }
+      
+      const expDate = new Date(entitlement.expirationDate);
+      const now = new Date();
+      const hasAccess = expDate > now;
+      
+      console.log('[PREMIUM] Premium entitlement:', entitlement);
+      console.log('[PREMIUM] Expiration date:', entitlement.expirationDate);
+      console.log('[PREMIUM] Current date:', now.toISOString());
+      console.log('[PREMIUM] Premium access:', hasAccess);
+      
+      setIsPremium(hasAccess);
+      return hasAccess;
+    } catch (err) {
+      console.error('[PREMIUM] Error checking premium access:', err);
+      setIsPremium(false);
+      return false;
+    }
+  }, [Purchases]);
 
   // Initialize RevenueCat SDK (only on native platforms)
   useEffect(() => {
@@ -116,19 +167,47 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
 
         // Set up listener for customer info updates
         PurchasesSDK.addCustomerInfoUpdateListener((info: RevenueCatCustomerInfo) => {
-          console.log('RevenueCat: Customer info updated');
+          console.log('[PREMIUM] Customer info updated via listener');
           setCustomerInfo(info);
+          
+          // IMPORTANTE: Recalcular isPremium quando customerInfo atualiza
+          const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+          if (entitlement && entitlement.expirationDate) {
+            const expDate = new Date(entitlement.expirationDate);
+            const now = new Date();
+            const hasAccess = expDate > now;
+            console.log('[PREMIUM] Listener update - Premium access:', hasAccess);
+            setIsPremium(hasAccess);
+          } else {
+            setIsPremium(false);
+          }
         });
 
-        // Get initial customer info
+        // EXECUTAR OBRIGATORIAMENTE AO ABRIR O APP
+        // Verificar premium status imediatamente
         const info = await PurchasesSDK.getCustomerInfo();
         setCustomerInfo(info);
+        
+        // Verificar acesso usando APENAS expirationDate
+        const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+        if (entitlement && entitlement.expirationDate) {
+          const expDate = new Date(entitlement.expirationDate);
+          const now = new Date();
+          const hasAccess = expDate > now;
+          console.log('[PREMIUM] Initial check - Expiration:', entitlement.expirationDate);
+          console.log('[PREMIUM] Initial check - Premium access:', hasAccess);
+          setIsPremium(hasAccess);
+        } else {
+          console.log('[PREMIUM] Initial check - No entitlement found');
+          setIsPremium(false);
+        }
 
         setIsInitialized(true);
         console.log('RevenueCat: Initialized successfully');
       } catch (err) {
         console.error('RevenueCat: Failed to initialize', err);
         setError('Failed to initialize purchases');
+        setIsPremium(false);
         setIsInitialized(true);
       }
     };
