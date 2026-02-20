@@ -11,7 +11,7 @@
     "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.loadmanager.app",
+      "bundleIdentifier": "com.silaspaixao.loadmanagerpro",
       "buildNumber": "29",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
