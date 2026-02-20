@@ -79,10 +79,10 @@ export interface PurchaseResult {
 /**
  * FONTE ÚNICA DA VERDADE: expirationDate
  * 
- * O acesso premium é determinado EXCLUSIVAMENTE pela expirationDate do entitlement "premium".
+ * O acesso premium é determinado EXCLUSIVAMENTE pela expirationDate do entitlement "pro".
  * 
  * Regras:
- * - premium = expirationDate > now
+ * - isPro = expirationDate > now
  * - NÃO usar: entitlements.active, isActive, isTrial, isSubscribed, isCancelled, cache
  * 
  * Comportamento:
