@@ -108,11 +108,11 @@ export const getProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): 
 };
 
 /**
- * Obtém a data de expiração do entitlement premium
+ * Obtém a data de expiração do entitlement pro
  * Esta é a ÚNICA fonte de verdade para determinar acesso
  */
 export const getSubscriptionExpirationDate = (customerInfo: RevenueCatCustomerInfo | null): Date | null => {
-  const entitlement = getPremiumEntitlement(customerInfo);
+  const entitlement = getProEntitlement(customerInfo);
   
   if (!entitlement || !entitlement.expirationDate) {
     return null;
@@ -122,17 +122,17 @@ export const getSubscriptionExpirationDate = (customerInfo: RevenueCatCustomerIn
 };
 
 /**
- * FUNÇÃO PRINCIPAL: Verifica se o usuário tem acesso premium
+ * FUNÇÃO PRINCIPAL: Verifica se o usuário tem acesso pro
  * 
- * REGRA ÚNICA: premium = expirationDate > now
+ * REGRA ÚNICA: isPro = expirationDate > now
  * 
  * NÃO usa: isActive, isTrial, entitlements.active, etc.
  */
-export const checkPremiumAccessFromInfo = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
-  const entitlement = getPremiumEntitlement(customerInfo);
+export const checkProAccessFromInfo = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
+  const entitlement = getProEntitlement(customerInfo);
   
   if (!entitlement || !entitlement.expirationDate) {
-    console.log('[PREMIUM] No entitlement or expirationDate found');
+    console.log('[PRO] No entitlement or expirationDate found');
     return false;
   }
   
@@ -140,20 +140,20 @@ export const checkPremiumAccessFromInfo = (customerInfo: RevenueCatCustomerInfo 
   const now = new Date();
   const hasAccess = expirationDate > now;
   
-  console.log('[PREMIUM] Premium entitlement:', entitlement);
-  console.log('[PREMIUM] Expiration date:', entitlement.expirationDate);
-  console.log('[PREMIUM] Current date:', now.toISOString());
-  console.log('[PREMIUM] Premium access:', hasAccess);
+  console.log('[PRO] Pro entitlement:', entitlement);
+  console.log('[PRO] Expiration date:', entitlement.expirationDate);
+  console.log('[PRO] Current date:', now.toISOString());
+  console.log('[PRO] Pro access:', hasAccess);
   
   return hasAccess;
 };
 
 /**
- * @deprecated Use checkPremiumAccessFromInfo instead
+ * @deprecated Use checkProAccessFromInfo instead
  * Mantido para compatibilidade, mas internamente usa a nova lógica
  */
 export const hasProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
-  return checkPremiumAccessFromInfo(customerInfo);
+  return checkProAccessFromInfo(customerInfo);
 };
 
 /**
@@ -161,7 +161,7 @@ export const hasProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): 
  * O acesso é determinado EXCLUSIVAMENTE pela expirationDate
  */
 export const isInTrialPeriod = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
-  const entitlement = getPremiumEntitlement(customerInfo);
+  const entitlement = getProEntitlement(customerInfo);
   if (!entitlement) return false;
   
   return entitlement.periodType === 'trial';
