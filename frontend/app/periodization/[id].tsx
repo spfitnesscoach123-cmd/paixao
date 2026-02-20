@@ -46,7 +46,24 @@ const METRICS = [
   { id: 'acc_dec_total', label: 'ACC+DEC', unit: '' },
 ];
 
+/**
+ * PeriodizationDetailScreen - Detalhes da periodização semanal
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function PeriodizationDetailScreen() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Periodização' : 'Periodization';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <PeriodizationDetailContent />
+    </PremiumGate>
+  );
+}
+
+function PeriodizationDetailContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { locale } = useLanguage();
   const { colors } = useTheme();
