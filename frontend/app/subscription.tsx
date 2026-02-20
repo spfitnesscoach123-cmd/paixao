@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useRevenueCat } from '../contexts/RevenueCatContext';
 import * as Localization from 'expo-localization';
 
 const { width } = Dimensions.get('window');
