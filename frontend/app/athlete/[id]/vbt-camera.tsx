@@ -81,7 +81,35 @@ interface CameraConfig {
   loadKg: number;
 }
 
+/**
+ * VBTCameraPage - Página principal de VBT via câmera
+ * 
+ * Esta é uma FEATURE PREMIUM que requer:
+ * - Trial ativo (7 dias) OU
+ * - Assinatura ativa
+ * 
+ * O PremiumGate bloqueia o acesso se nenhuma das condições for atendida.
+ */
 export default function VBTCameraPage() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'VBT via Câmera' : 'VBT via Camera';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <VBTCameraContent />
+    </PremiumGate>
+  );
+}
+
+/**
+ * VBTCameraContent - Conteúdo interno da câmera VBT
+ * 
+ * NOTA: Nenhum cálculo ou lógica foi alterada.
+ * Este é apenas o conteúdo original movido para um componente interno
+ * para permitir o gate de acesso premium.
+ */
+function VBTCameraContent() {
   const { id: athleteId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
