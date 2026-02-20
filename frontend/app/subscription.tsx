@@ -348,10 +348,18 @@ export default function Subscription() {
         const customerInfo = await Purchases.restorePurchases();
         setRevenueCatCustomerInfo(customerInfo);
         
+        // IMPORTANTE: Atualizar o estado global do contexto
+        await checkPremiumAccess();
+        
         const hasPro = customerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive;
         
         if (hasPro) {
-          Alert.alert('✓', t.restoreSuccess);
+          Alert.alert('✓', t.restoreSuccess, [
+            {
+              text: 'OK',
+              onPress: () => router.back() // Volta para a tela anterior
+            }
+          ]);
           await fetchData();
         } else {
           Alert.alert(
