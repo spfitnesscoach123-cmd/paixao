@@ -38,6 +38,7 @@ import {
   VBTPoseData,
 } from '../../../services/pose';
 import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
+import FatigueVisualOverlay from '../../../components/vbt/FatigueVisualOverlay';
 
 // Conditional import for native MediaPipe
 // @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
