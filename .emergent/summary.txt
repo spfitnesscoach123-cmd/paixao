@@ -1,149 +1,174 @@
 <analysis>**original_problem_statement:**
-The user initially reported several issues with the Velocity Based Training (VBT) system:
-1.  **Tracking Points:** Upper body exercises (Push Press, Bench Press, Deadlift) were missing appropriate tracking point selections like Barra (Bar).
-2.  **Rep Counting Failure:** Deadlift failed to count repetitions, rendering reports empty.
-3.  **Graph Inconsistency:** The optimal load point was missing from the load-velocity graph on one page but present on another.
-4.  **Regression Concern:** The user insisted that existing functional exercises (e.g., Back Squat) must not be broken.
-
-During this session, two new critical issues emerged:
-1.  **Build Version Conflict:** The EAS build system was generating a build with an old version number () instead of the expected , indicating a potential environment desynchronization after the fork.
-2.  **App Crash on Camera:** After a power outage corrupted an EAS build (), the new version installed via TestFlight crashes immediately upon opening the camera, making the app unusable.
+The user has provided a series of feature requests and bug fixes focused on several areas of the Load Manager application:
+1.  **PDF Reporting ():** The primary and most persistent issue. The user reported that the PDF export feature was completely broken, causing the app to freeze, crash, or enter infinite loading states on both mobile and desktop. The request evolved through multiple iterations: remove redundant buttons, ensure charts appear correctly, and finally, replicate the working PDF generation logic from another part of the app () to create a robust and definitive fix. The user also requested a preview step, which was later removed in favor of a direct-to-share implementation due to instability.
+2.  **ACWR Calculation and Data Integration:** The user requested a complete overhaul of the Acute:Chronic Workload Ratio (ACWR) calculation to use a proper rolling window that accounts for days with zero load. They also reported that manually entered GPS data was not being reflected in the Periodization module. This required standardizing data fields, adding an activity type selector, and ensuring the backend processed this manual data to update athlete performance metrics.
+3.  **UI/UX Improvements:**
+    *   Add a missing Back button on the Coach Login screen.
+    *   Fix a layout issue where a Back button was not fully visible on the New Week screen.
+    *   On the Periodization Week View, unify the separate daily and weekly data tables into a single dynamic table and add a PDF print button.
+    *   Add a dropdown selector on the main dashboard to switch between different ACWR metrics (e.g., Total Distance, Sprints).
+4.  **Legal Content Extraction:** Generate a report containing the full text of the app's Privacy Policy and Terms of Use.
+5.  **VBT Overlay:**
+    *   First, a diagnostic request to confirm if a  component was rendering on the VBT camera screen.
+    *   After discovering it didn't exist, a feature request to implement a new  that displays a colored border (green/orange/red) around the camera view to indicate the level of velocity loss during an exercise.
+6.  **Deployment Issues:** The user shared deployment logs showing a  error and asked for a fix.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent first addressed the build version conflict by updating  to version  and instructed the user on how to start a new build. Following the user's request, the agent then performed a code integrity check to ensure the VBT fixes from the previous session were still present. During this check, the agent discovered and **fixed a critical bug** in  where an incorrect variable ( instead of ) was being used, which would have prevented the Deadlift rep-counting fix from working.
-
-After the user reported the app was crashing, the agent investigated the camera-related code (, ,  permissions) and found no obvious errors. The agent concluded the crash is likely due to the corrupted build process and advised the user to run a clean build using An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username.
+The agent has addressed a wide range of issues across the application.
+- **ACWR & GPS Data:** The backend ACWR calculation was completely rewritten to use a proper rolling window (). The frontend form for manual GPS data entry was updated to match CSV fields, and the backend logic was fixed to ensure this manual data correctly updates athlete peak values and integrates with the Periodization module (, ).
+- **UI/UX Fixes:** The Back button was added to the Coach Login page (), and the layout was fixed on the New Week screen ().
+- **Periodization Week View:** The daily and weekly tables were successfully unified into a single dynamic table, and a functional PDF print button was added ().
+- **PDF Reporting ():** This has been a major struggle. The agent went through multiple attempts to fix it, including removing a faulty WebView modal and rewriting the logic to directly use  and . The latest version attempts a direct generate and share flow, but its stability is unconfirmed and highly questionable given the history of failures.
+- **VBT Overlay:** The agent first diagnosed that the requested  did not exist. It then created a new component () and integrated it into the VBT camera screen ().
 
 **Last working item**:
--   **Last item agent was working**: Diagnosing a critical app crash that occurs when the camera is opened. The agent determined the cause was likely a corrupted build (due to a power outage) and not a code-level bug. The user was instructed to generate a clean build.
--   **Status**: USER VERIFICATION PENDING
--   **Agent Testing Done**: N (Code analysis was done, but no runtime testing.)
--   **Which testing method agent to use?**: Manual testing by the user is needed first to confirm the camera crash is resolved after a clean build. Afterward,  is required to validate all VBT features.
+-   **Last item agent was working**: Implementing the new  component. The agent created the component file, wrote the logic for the colored border based on , and inserted it into the JSX of the  screen.
+-   **Status**: IN PROGRESS
+-   **Agent Testing Done**: N
+-   **Which testing method agent to use?**: Screenshot tool. The agent should take a screenshot of the  screen to visually confirm that the overlay's border appears. Testing the color-changing logic requires a real device and build, which should be left to the user.
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: App crashes when opening the camera. (P0 - BLOCKER)
--   **Issue 2**: Verify the VBT fixes for concentric-first exercises (Deadlift), graph consistency, and ensure no regressions occurred in eccentric-first exercises (Back Squat). (P1)
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash (P0)
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing (P1)
 
 **Issues Detail**:
--   **Issue 1**: App crashes on camera open.
-    -   **Attempted fixes**: The agent investigated camera-related files and permissions, finding no code errors. It concluded the issue is a corrupted build. The user was instructed to run An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username.
-    -   **Next debug checklist**:
-        1.  Confirm with the user if running An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username and installing the new version from TestFlight has resolved the camera crash.
-        2.  If the crash persists, a more in-depth debugging of native modules and device logs will be required.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical blocker. The app is unusable until the camera can be opened.
-    -   **Status**: USER VERIFICATION PENDING
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend (manual user test)
-    -   **Blocked on other issue**: None. This is the primary blocker.
--   **Issue 2**: Verify VBT functionality for all exercise types.
-    -   **Attempted fixes**: A critical bug in  that broke the logic for concentric-first exercises was found and fixed in this session. The underlying feature code from the previous session is in place.
-    -   **Next debug checklist**:
-        1.  This issue is blocked by the camera crash (Issue 1).
-        2.  Once unblocked, use  to run a full test suite:
-            -   Test Deadlift to ensure reps are counted.
-            -   Test Back Squat to ensure no regressions.
-            -   Verify the optimal load point appears on all relevant graphs.
-            -   Verify upper-body tracking points are available.
-    -   **Why fix this issue and what will be achieved with the fix?**: This will validate the core user-requested fixes, making the VBT feature functional and reliable.
-    -   **Status**: BLOCKED
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash
+    -   **Attempted fixes**: The agent made numerous attempts:
+        1.  Removed redundant buttons and fixed handlers.
+        2.  Replaced a problematic WebView-based preview modal with a direct  call. This also failed.
+        3.  Re-introduced a modal with View and Save options, which also failed.
+        4.  The final attempt was to remove the modal entirely and create a direct-to-share-sheet flow using  and . The user reported this was also non-functional.
+    -   **Next debug checklist**: The current implementation in  is not working. The problem is critical and recurring. The next agent must:
+        1.  Re-examine the working implementation in  to understand why it succeeds.
+        2.  Apply the exact same pattern (state management,  blocks, and  usage) to .
+        3.  The issue is likely related to how the HTML content/view is captured () or a race condition/unresolved promise that blocks the main UI thread. A thorough, step-by-step debug is required.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical, user-facing feature that is completely broken and causing major user frustration. Fixing it will restore core reporting functionality.
+    -   **Status**: BLOCKED (by its own complexity and recurring failures)
     -   **Is recurring issue?**: Y
     -   **Should Test frontend/backend/both after fix?**: Frontend
-    -   **Blocked on other issue**: Issue 1: App crashes on camera open.
+    -   **Blocked on other issue**: None
+
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing
+    -   **Attempted fixes**: None. The agent implemented the backend part of this task but never started the frontend UI.
+    -   **Next debug checklist**:
+        1.  Locate the main dashboard component.
+        2.  Add a dropdown/selector component (e.g., using a  or a custom component).
+        3.  The options should be Dist. Total, HID Z3, HSR Z4, etc.
+        4.  Use  to manage the selected metric.
+        5.  Update the data display (cards, charts) on the dashboard to show the ACWR values for the selected metric.
+    -   **Why fix this issue and what will be achieved with the fix?**: This will complete a core feature request, allowing coaches to analyze team and athlete load across different physical output metrics.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: N
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None
 
 **In progress Task List**:
--   None.
+-   **Task 1**: Complete and Verify  Implementation (P0)
+    -   **Where to resume**: The component has been created and placed in . The next step is to test its visibility.
+    -   **What will be achieved with this?**: Provides real-time visual feedback on velocity loss to the athlete during VBT exercises.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on something**: None
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   Complete the internationalization of the  component. (P1)
-    -   Internationalize the Avaliações (Assessments) page. (P1)
-    -   Test the  pipeline's integration with the . (P2)
+    -   (P1) Implement the frontend ACWR metric selector on the main dashboard.
+    -   (P2) Complete the internationalization of the  component and the Avaliações (Assessments) page.
 -   **Future Tasks**:
+    -   Test the  pipeline's integration with the .
     -   Integrate identity resolution into  and .
     -   Build a UI for manual resolution of ambiguous athlete names.
-    -   Implement a feature for merging duplicate athlete profiles.
-    -   Address the EAS Project Slug Conflict ( vs. ). (P3)
+    -   Build a feature for merging duplicate athlete profiles.
+    -   Address the EAS Project Slug Conflict ( vs. ).
 
 **Completed work in this session**
--   **Critical Bug Fix**: Found and fixed a variable reference error ( vs ) in , which was preventing the concentric-first exercise logic from working.
--   **Build Version Fix**: Investigated a build version conflict between the local environment and the EAS build system and resolved it by updating  to version .
--   **Camera Crash Diagnosis**: Analyzed camera-related code (, permissions) and concluded the app crash was due to a corrupted build, not a code error. Provided the user with the correct command (An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username) to generate a clean build.
+-   **ACWR Logic Overhaul**: Implemented a new, correct rolling-window ACWR calculation on the backend.
+-   **Manual GPS Data Fix**: Fixed the entire pipeline for manually entered GPS data to ensure it appears correctly in the Periodization module.
+-   **Periodization Week View UI**: Unifed the daily/weekly tables into one dynamic table and added a working PDF export button.
+-   **UI Navigation**: Added a missing Back button to the Coach Login screen and fixed a layout issue on the New Week screen.
+-   ** Scaffolding**: Created the new component file and integrated it into the camera screen.
+-   **Legal Text Extraction**: Extracted and provided the full text for the Privacy Policy and Terms of Use.
+-   **Deployment Diagnosis**: Correctly identified a deployment error as a platform infrastructure issue, not a code bug.
 
 **Earlier issues found/mentioned but not fixed**
--   All tasks listed under Upcoming and Future Tasks remain pending.
+-   **VBT Rep Counting & Regressions:** The original issues from the first handoff (rep counting for Deadlift, graph consistency, ensuring no regressions for Back Squat) were never tested or verified as fixed due to being preempted by other critical bugs like the app crash. Their status is unknown.
+-   **ACWR Metric Selector on Dashboard:** As detailed in the Pending Issues section, the frontend for this feature was requested but never implemented.
 
 **Known issue recurrence from previous fork**
--   **Issue recurrence in previous fork**: The VBT pipeline bugs, especially rep counting.
--   **Recurrence count**: 3
--   **Status**: IN PROGRESS (A new critical fix was applied, but the entire feature set remains untested and is currently blocked by a camera crash).
+-   **Issue recurrence in previous fork**: The VBT pipeline bugs (rep counting).
+-   **Recurrence count**: 3+
+-   **Status**: IN PROGRESS (The core issue of VBT functionality remains unverified).
+-   **New Recurrence This Session**: The PDF generation in  is a major new recurring issue, failing at least 4 times after attempted fixes.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **EAS Build Management**: Managing build numbers and versions in  and using  to resolve corrupted builds.
--   **React Native Debugging**: Differentiating between code-level bugs and build/environment issues (e.g., corrupted builds).
--   **State Machine Logic**: A critical bug was found in the implementation of the state machine configuration for concentric-first exercises.
--   **Code Integrity Verification**: Manually reviewing files to ensure changes from a previous session persist after a fork.
+-   React Native (Expo) development
+-   FastAPI backend development
+-   MongoDB data modeling
+-   ACWR (Acute:Chronic Workload Ratio) rolling window algorithm
+-   PDF generation in Expo using  and 
+-   React Hooks for state management and performance (, , , )
+-   Debugging UI freezes and thread-blocking issues in React Native
 
 **key DB schema**
--   No changes made.
+-   **athletes**: Contains  (object with metrics like , , etc.) which is updated by manual GPS entries marked as game.
+-   **gps_data**: Stores individual training sessions. Now includes  (game or training).
+-   **teams**: The agent added a  field to the team model to store the average ACWR for each metric.
 
 **changes in tech stack**
--   None.
+-    was added to .
 
 **All files of reference**
--   : **Critically important file.** A bug was fixed here.
--   : Modified to update the application version and build number.
--   : Inspected while debugging the camera crash.
--   : Inspected while debugging the camera crash.
+-   : **Critical file.** The source of the recurring PDF crash/freeze bug. Needs a definitive fix.
+-   : Modified to include the new .
+-   : Newly created component for VBT feedback.
+-   : Contains the new, correct ACWR calculation logic and the updated endpoint for handling manual GPS data.
+-   : **Working reference.** Contains a functional PDF printing implementation that should be replicated.
+-   : Contains the corrected manual data entry form.
 
 **Areas that need refactoring**:
--   The  file remains complex. Once the feature is stable, it should be considered for refactoring to improve maintainability.
+-   The PDF generation logic in  is extremely brittle and needs to be completely rewritten to match the stable pattern found in .
 
 **key api endpoints**
--   None modified in this session.
+-   : Updated to accept  and trigger  recalculation.
+-   : New endpoint for individual ACWR.
+-   : New endpoint for team average ACWR.
+-   : Generates the HTML used for the PDF report.
+-   : Fetches calculated weekly/daily data.
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   Your first action MUST be to confirm with the user if the camera crash is resolved after they run the clean build (An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username). The app is unusable until this is fixed.
--   **DO NOT** attempt to test or modify the VBT features until the user confirms the camera works.
--   Once the camera crash is fixed, the P0 priority becomes testing the VBT fixes as originally planned. A critical bug was fixed in this session, but the entire feature set remains **completely unverified**. Use  for this, covering concentric-first (Deadlift), eccentric-first (Back Squat), and graph UI.
+-   The absolute highest priority is to **definitively fix the PDF generation feature in **. It is a major source of user frustration and has failed multiple times. Replicate the working logic from the  page () and do not attempt a novel solution. This is a critical blocker.
+-   The  component has been created and integrated but is untested. Your first technical task should be to verify it renders correctly before moving on to the PDF bug.
+-   A key feature, the **ACWR metric selector on the dashboard**, is still pending. The backend is ready, but the frontend UI needs to be built. This is the next feature to tackle after the critical bugs are resolved.
 
 **documents and test reports created in this job**
--   None.
+-    was updated throughout the session.
 
 **Last 10 User Messages and any pending HUMAN messages**
--   **User (~87)**: Asked for build instructions ().
--   **User (~56)**: Reported a new critical issue: the app, built from a corrupted process, now crashes when opening the camera.
--   **User (~54)**: Asked if it's possible to revert to version .
--   **User (~52)**: Asked for build instructions after the agent fixed the bug ().
--   **User (~27)**: Stressed the importance of ensuring no previous functionality was lost and that new implementations were correct.
--   **User (~17)**: Confirmed the incorrect build version  was seen in EAS.
--   **User (~5)**: Initiated the session by reporting a critical build version mismatch ( instead of ).
+1.  **User (latest):** Diagnostic request to check if  is rendering.
+2.  **User:** Frustrated message about the agent wasting credits and the PDF button still not working.
+3.  **User:** Asks for a preview step before printing/saving the PDF.
+4.  **User:** Acknowledges the agent's work and asks to continue with efficiency.
+5.  **User:** Critical bug report: The Save/Print PDF button does nothing.
+6.  **User:** Another critical bug report, providing details on the PDF system causing freezes/crashes on mobile and desktop and demanding a definitive, production-ready fix.
+7.  **User:** Reports deployment is failing and provides logs.
+8.  **User:** Finalizes the scope for fixing the broken print buttons in .
+9.  **User:** Confirms the Expo tunnel is connected.
+10. **User:** Defines the scope for fixing the print button on the  page, noting it has two broken buttons.
 
 **Project Health Check:**
--   **Broken**: The application is currently unusable as it crashes upon opening the camera. This is a critical blocker.
+-   **Broken**: The PDF generation feature on the Análise Científica page is critically broken, causing app freezes and crashes. This makes a core reporting feature unusable.
 
 **3rd Party Integrations**
+-   
+-   
+-   
 -   
 -   
 -   
@@ -152,10 +177,10 @@ Input is required, but stdin is not readable. Failed to display prompt: Email or
 -   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None
--   **Known regressions**: High risk of regression in all VBT functionality. The feature is unverified, and a critical bug was just patched.
+-   **Known regressions**: The  PDF export feature is in a constant state of regression. Each fix has introduced new failures or not resolved the underlying freeze/crash.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
 
 **What agent forgot to execute**
--   The primary task from the previous handoff—testing the VBT fixes—was not executed. This was due to being correctly preempted by higher-priority, blocking issues reported by the user (build version conflict and app crash). The task was not forgotten, but deferred.</analysis>
+-   The agent did not implement the **frontend UI for the ACWR metric selector** on the main dashboard, which was part of a larger user request (Correction 8 in Message 90). The backend logic was completed, but the user-facing part of the feature is missing.</analysis>
