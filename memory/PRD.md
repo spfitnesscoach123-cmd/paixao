@@ -2,29 +2,74 @@
 
 ## Informações Gerais
 - **Nome do Produto**: LoadManager Pro
-- **Versão**: 2.0
-- **Data de Atualização**: Dezembro 2025
+- **Versão**: 2.1
+- **Data de Atualização**: Fevereiro 2026
 
 ---
 
 ## Funcionalidades Implementadas
 
-### Sistema de Assinaturas e Gates Premium ✅ (Dezembro 2025)
+### Sistema de Assinaturas Premium - CORRIGIDO ✅ (Fevereiro 2026)
+
+**Status: IMPLEMENTADO E CORRIGIDO**
+
+#### FONTE ÚNICA DA VERDADE: `expirationDate`
+
+A verificação de acesso premium agora usa **EXCLUSIVAMENTE** a `expirationDate` do entitlement "premium".
+
+**Regra implementada:**
+```javascript
+isPremium = expirationDate > now
+```
+
+**O que NÃO é mais usado:**
+- ❌ `entitlements.active`
+- ❌ `isActive`
+- ❌ `isTrial`
+- ❌ `isSubscribed`
+- ❌ `isCancelled`
+- ❌ Cache local/AsyncStorage como fonte de verdade
+
+#### Arquivos Modificados:
+1. **`/app/frontend/services/revenuecat.ts`**
+   - `PREMIUM_ENTITLEMENT_ID: 'premium'` (era 'pro')
+   - `getPremiumEntitlement()` - Busca de `entitlements.all` (não `.active`)
+   - `checkPremiumAccessFromInfo()` - Verifica apenas `expirationDate > now`
+   - `getSubscriptionExpirationDate()` - Obtém data de expiração
+
+2. **`/app/frontend/contexts/RevenueCatContext.tsx`**
+   - Novo state `isPremium` como fonte única de verdade
+   - `checkPremiumAccess()` - Função global que sempre busca do RevenueCat
+   - Verificação ao abrir o app (`useEffect` inicial)
+   - Verificação imediata após compra/trial (`purchasePackage`)
+   - Verificação imediata após restore (`restorePurchases`)
+   - Listener atualiza `isPremium` automaticamente
+
+3. **`/app/frontend/components/PremiumGate.tsx`**
+   - Usa apenas `isPremium` do contexto
+   - `usePremiumAccess()` hook simplificado
+
+#### Comportamento Obrigatório:
+| Situação | Acesso |
+|----------|--------|
+| Trial ativo | ✅ Liberado |
+| Trial cancelado mas dentro do período | ✅ Liberado |
+| Assinatura ativa | ✅ Liberado |
+| Assinatura cancelada mas dentro do período | ✅ Liberado |
+| expirationDate < now | ❌ Bloqueado |
+
+#### Quando é verificado:
+1. ✅ Ao abrir o app (useEffect inicial)
+2. ✅ Imediatamente após iniciar trial
+3. ✅ Imediatamente após compra
+4. ✅ Imediatamente após restore
+5. ✅ Via listener de customerInfo updates
+
+---
+
+### Sistema de Gates Premium ✅ (Dezembro 2025)
 
 **Status: IMPLEMENTADO**
-
-#### Componentes Criados:
-1. **`/app/frontend/components/PremiumGate.tsx`** - Componente de gate para features premium
-   - Verifica `isPro` (assinatura ativa)
-   - Verifica `isTrialing` (trial ativo de 7 dias)
-   - Verifica `expirationDate` (acesso até expiração mesmo após cancelamento)
-   - Exibe tela de upgrade elegante quando bloqueado
-   - Hook `usePremiumAccess()` para verificação programática
-   - Função `checkPremiumAccess()` para verificação standalone
-
-2. **`RevenueCatProvider` integrado em `_layout.tsx`**
-   - Contexto global de assinatura
-   - Listener para atualizações em tempo real
 
 #### Features Protegidas por Premium Gate:
 | Feature | Arquivo | Status |
@@ -36,12 +81,6 @@
 | Upload GPS | `/app/frontend/app/athlete/[id]/upload-gps.tsx` | ✅ Protegido |
 | Periodization Create | `/app/frontend/app/periodization/create.tsx` | ✅ Protegido |
 | Periodization Detail | `/app/frontend/app/periodization/[id].tsx` | ✅ Protegido |
-
-#### Regras de Acesso:
-- **Trial 7 dias**: Acesso completo a todas as features
-- **Assinatura ativa**: Acesso completo
-- **Cancelado mas não expirado**: Acesso até `expirationDate`
-- **Expirado/Nunca assinou**: Bloqueado com tela de upgrade
 
 ---
 
