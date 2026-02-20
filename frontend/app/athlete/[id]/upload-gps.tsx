@@ -15,8 +15,27 @@ import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
 import api from '../../../services/api';
 import { parseCatapultCSV, validateCatapultCSV } from '../../../utils/csvParser';
+import { useLanguage } from '../../../contexts/LanguageContext';
+import { PremiumGate } from '../../../components/PremiumGate';
 
+/**
+ * UploadGPS - Upload de dados GPS via CSV
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function UploadGPS() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Upload GPS' : 'GPS Upload';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <UploadGPSContent />
+    </PremiumGate>
+  );
+}
+
+function UploadGPSContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
