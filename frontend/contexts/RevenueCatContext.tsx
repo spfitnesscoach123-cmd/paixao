@@ -395,19 +395,27 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     packages,
     error,
     
-    // Computed
-    isPro,
+    // FONTE ÚNICA DA VERDADE: isPremium baseado em expirationDate > now
+    isPremium,
+    
+    // Informativo apenas (NÃO usa para determinar acesso)
     isTrialing,
     expirationDate,
     managementURL,
+    
+    // @deprecated - mantido para compatibilidade
+    isPro,
     
     // Actions
     fetchOfferings,
     purchasePackage,
     restorePurchases,
-    checkSubscriptionStatus,
+    checkPremiumAccess,
     loginUser,
     logoutUser,
+    
+    // @deprecated
+    checkSubscriptionStatus,
   };
 
   return (
