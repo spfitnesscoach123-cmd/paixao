@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { GPSData } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { PremiumGate } from '../../../components/PremiumGate';
 
 // CORREÇÃO 1: Padronização dos campos GPS conforme CSV Catapult
 // Campos padronizados:
@@ -27,7 +28,24 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 // - sprintCount (Sprints)
 // - accDecCount (ACC+DEC)
 
+/**
+ * AddGPS - Adicionar dados GPS manualmente
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function AddGPS() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Adicionar GPS' : 'Add GPS';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <AddGPSContent />
+    </PremiumGate>
+  );
+}
+
+function AddGPSContent() {
   const { t, locale } = useLanguage();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
