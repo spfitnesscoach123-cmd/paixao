@@ -167,16 +167,16 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
 
         // Set up listener for customer info updates
         PurchasesSDK.addCustomerInfoUpdateListener((info: RevenueCatCustomerInfo) => {
-          console.log('[PREMIUM] Customer info updated via listener');
+          console.log('[PRO] Customer info updated via listener');
           setCustomerInfo(info);
           
           // IMPORTANTE: Recalcular isPremium quando customerInfo atualiza
-          const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+          const entitlement = info.entitlements.all[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
           if (entitlement && entitlement.expirationDate) {
             const expDate = new Date(entitlement.expirationDate);
             const now = new Date();
             const hasAccess = expDate > now;
-            console.log('[PREMIUM] Listener update - Premium access:', hasAccess);
+            console.log('[PRO] Listener update - Pro access:', hasAccess);
             setIsPremium(hasAccess);
           } else {
             setIsPremium(false);
