@@ -85,6 +85,10 @@ interface RevenueCatCustomerInfo {
 export default function Subscription() {
   const router = useRouter();
   const { locale } = useLanguage();
+  
+  // USAR O CONTEXTO GLOBAL para atualizar isPremium após compra
+  const { checkPremiumAccess } = useRevenueCat();
+  
   const [plan, setPlan] = useState<Plan | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
