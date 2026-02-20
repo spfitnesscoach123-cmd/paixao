@@ -125,7 +125,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       setIsPremium(hasAccess);
       return hasAccess;
     } catch (err) {
-      console.error('[PREMIUM] Error checking premium access:', err);
+      console.error('[PRO] Error checking pro access:', err);
       setIsPremium(false);
       return false;
     }
