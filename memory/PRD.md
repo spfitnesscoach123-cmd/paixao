@@ -1,357 +1,181 @@
-# LoadManager Pro VBT - Product Requirements Document
+# LoadManager Pro - PRD (Product Requirements Document)
 
-## Original Problem Statement
-Build a complete, production-grade Velocity Based Training (VBT) system using React Native, Expo CameraView, and MediaPipe Pose. The system must be robust, stable, and equivalent in reliability to professional VBT systems like LoadManager.
-
-## User Language
-Português (Brazilian Portuguese)
-
-## Core Requirements
-
-### VBT Camera System
-- Real-time pose detection using `@thinksys/react-native-mediapipe`
-- Velocity calculation with smoothing (5-frame moving average)
-- Automatic rep counting with phase detection (eccentric → transition → concentric)
-- Visual skeleton overlay with keypoint confidence display
-- Recording sessions with timer
-- Support for multiple exercises (Back Squat, Bench Press, Deadlift, etc.)
-
-### Data Management
-- Store VBT sessions per athlete
-- Calculate power (watts), velocity drop, fatigue detection
-- Generate scientific analysis charts
+## Informações Gerais
+- **Nome do Produto**: LoadManager Pro
+- **Versão**: 2.0
+- **Data de Atualização**: Dezembro 2025
 
 ---
 
-## What's Been Implemented
+## Funcionalidades Implementadas
 
-### December 2025 - Correção DEFINITIVA do Sistema de PDF na Análise Científica (Session 9)
+### Sistema de Assinaturas e Gates Premium ✅ (Dezembro 2025)
 
-#### Problema Crítico Corrigido:
-- **Mobile**: Botão ficava em loading infinito, tela recarregava
-- **Desktop**: PDF gerado parcialmente, app travava completamente (UI freeze)
-- **Causa**: Modal + WebView causavam memory leaks e deadlock no thread principal
+**Status: IMPLEMENTADO**
 
-#### Solução Implementada - REIMPLEMENTAÇÃO TOTAL:
+#### Componentes Criados:
+1. **`/app/frontend/components/PremiumGate.tsx`** - Componente de gate para features premium
+   - Verifica `isPro` (assinatura ativa)
+   - Verifica `isTrialing` (trial ativo de 7 dias)
+   - Verifica `expirationDate` (acesso até expiração mesmo após cancelamento)
+   - Exibe tela de upgrade elegante quando bloqueado
+   - Hook `usePremiumAccess()` para verificação programática
+   - Função `checkPremiumAccess()` para verificação standalone
 
-**REMOVIDO COMPLETAMENTE**:
-- Modal de preview
-- WebView
-- Estados intermediários (`showPdfPreview`, `loadReportPreview`, `reportHtml`)
-- Todos os estilos relacionados ao modal
-- Todos os listeners e observers problemáticos
+2. **`RevenueCatProvider` integrado em `_layout.tsx`**
+   - Contexto global de assinatura
+   - Listener para atualizações em tempo real
 
-**NOVA IMPLEMENTAÇÃO** (idêntica à Periodização):
-- **Geração DIRETA de PDF** sem modal intermediário
-- `handlePrintPdf()` com `useCallback` para evitar re-renders
-- Um único estado `generatingPdf`
-- `isMountedRef` para verificação de componente montado
-- Cleanup garantido com `finally`
-- Thread safety com async/await correto
+#### Features Protegidas por Premium Gate:
+| Feature | Arquivo | Status |
+|---------|---------|--------|
+| VBT Camera | `/app/frontend/app/athlete/[id]/vbt-camera.tsx` | ✅ Protegido |
+| VBT Data | `/app/frontend/app/athlete/[id]/vbt.tsx` | ✅ Protegido |
+| Jump Assessment | `/app/frontend/app/athlete/[id]/jump-assessment.tsx` | ✅ Protegido |
+| Add GPS | `/app/frontend/app/athlete/[id]/add-gps.tsx` | ✅ Protegido |
+| Upload GPS | `/app/frontend/app/athlete/[id]/upload-gps.tsx` | ✅ Protegido |
+| Periodization Create | `/app/frontend/app/periodization/create.tsx` | ✅ Protegido |
+| Periodization Detail | `/app/frontend/app/periodization/[id].tsx` | ✅ Protegido |
 
-**Fluxo Novo**:
-```
-Clicar botão de impressão → 
-Buscar HTML da API → 
-Gerar PDF (expo-print) → 
-Abrir compartilhamento (expo-sharing) → 
-Limpar estado ✅
-```
-
-**Garantias de Estabilidade**:
-- Promise sempre resolvida/rejeitada
-- Estado de loading sempre resetado no `finally`
-- Verificação de componente montado antes de setState
-- Nenhum memory leak
-- UI nunca travada
-
-**Arquivo Modificado**:
-- `/app/frontend/components/ScientificAnalysisTab.tsx` - Reimplementação total do sistema de PDF
-
-**Status**: IMPLEMENTADO - Pronto para build
+#### Regras de Acesso:
+- **Trial 7 dias**: Acesso completo a todas as features
+- **Assinatura ativa**: Acesso completo
+- **Cancelado mas não expirado**: Acesso até `expirationDate`
+- **Expirado/Nunca assinou**: Bloqueado com tela de upgrade
 
 ---
 
-### December 2025 - Correção do Botão de Impressão na Análise Científica (Session 8)
+### FatigueVisualOverlay - VBT ✅ (Dezembro 2025)
 
-#### Problema: Botões de PDF não funcionavam no modal de preview
-**ANTES**:
-- ❌ Botão roxo "Fechar" (não gerava PDF)
-- ❌ Botão vermelho "Abrir para Imprimir" (não gerava PDF - abria URL externa)
+**Status: IMPLEMENTADO**
 
-**DEPOIS**:
-- ✅ Um único botão "Imprimir PDF" que usa expo-print + expo-sharing
-- ✅ Comportamento idêntico ao da Periodização
+**Arquivo**: `/app/frontend/components/vbt/FatigueVisualOverlay.tsx`
 
-**Correções Aplicadas**:
-1. Removido import `expo-linking` (não necessário)
-2. Adicionado imports `expo-print` e `expo-sharing`
-3. Criada nova função `handlePrintPdf()` que:
-   - Web: abre janela de impressão do navegador
-   - Mobile: usa expo-print para gerar PDF e expo-sharing para compartilhar
-4. Removido botão "Fechar" do footer
-5. Botão único centralizado com texto "Imprimir PDF"
-6. Removidos estilos não utilizados (modalCancelButton, modalCancelText)
+**Funcionalidades**:
+1. **Transição Gradual de Cor** - Interpolação linear entre:
+   - 0% → Verde `#00C853`
+   - 15% → Laranja `#FF6D00`
+   - 30%+ → Vermelho `#D50000`
 
-**Arquivo Modificado**:
-- `/app/frontend/components/ScientificAnalysisTab.tsx`
+2. **Animação Fade Suave** - 300ms ease-out
 
-**Status**: IMPLEMENTADO - Aguardando teste no dispositivo
+3. **Indicador de Tendência** - `↓ ↑ →` baseado em mudança de valor
+
+4. **Indicador Percentual** - Exibe `-X%` em tempo real
+
+5. **Modo Elite** - Pulso sutil quando `velocityDropPercent > 25%`
 
 ---
 
-### December 2025 - Melhorias na Página de Semana (Session 7)
+### ACWR (Acute:Chronic Workload Ratio) ✅
 
-#### MELHORIA 1: Botão "Imprimir PDF" 
-- Adicionado botão de PDF no header da página de semana
-- Gera PDF com a tabela exibida (semanal OU diária dependendo da seleção)
-- Funciona tanto no Web (window.print) quanto Mobile (expo-print + sharing)
+**Status: IMPLEMENTADO (Backend)**
 
-#### MELHORIA 2: Tabela Unificada (Diária + Semanal)
-- **ANTES**: Duas tabelas separadas (semanal e diária)
-- **DEPOIS**: Uma única tabela dinâmica que alterna automaticamente
-- `selectedDay == null` → mostra dados semanais
-- `selectedDay != null` → mostra dados do dia selecionado
-- Botão "Ver Semanal" para limpar seleção e voltar à visão semanal
+- Cálculo correto com rolling window
+- Suporte a múltiplas métricas (Total Distance, HID Z3, HSR Z4, etc.)
 
-#### MELHORIA 3: Performance com useMemo
-- `displayedData` calculado com useMemo para evitar re-renders desnecessários
-- `tableTitle` também memoizado
-
-**Arquivos Modificados**:
-- `/app/frontend/app/periodization/[id].tsx`
-
-**Status**: IMPLEMENTADO - Aguardando teste no dispositivo
+**Pendente**: Frontend UI para seletor de métricas no dashboard
 
 ---
 
-### December 2025 - LoadManager Corrections (Session 6)
+### Periodização ✅
 
-#### CORREÇÃO 1-2: Padronização dos Campos GPS
-**Problema**: Dados manuais não eram reconhecidos pela Periodização.
+**Status: IMPLEMENTADO**
 
-**Solução Implementada**:
-- Formulário `add-gps.tsx` atualizado com campos padronizados:
-  - `totalDistance` → "Dist. Total"
-  - `hidZone3` → "HID Z3 (14.4-19.8 km/h)"
-  - `hsrZone4` → "HSR Z4 (19.8-25.2 km/h)"
-  - `sprintZone5` → "Sprint Z5 (>25 km/h)"
-  - `sprintCount` → "Sprints"
-  - `accDecCount` → "ACC+DEC"
-- **NOVO**: Adicionado seletor de "Tipo de Atividade" (Treino/Jogo) no formulário
-- **CRÍTICO**: Quando `activity_type = "game"`, os peak values são automaticamente atualizados
-- Backend `POST /gps-data` agora chama `update_athlete_peak_values()` para sessões de jogo
-- Dados manuais agora aparecem corretamente na Periodização
-
-**Fluxo Corrigido**:
-```
-Entrada Manual GPS (activity_type="game") → 
-update_athlete_peak_values() → 
-Peak Values Atualizados → 
-Periodização Calcula Metas Corretamente
-```
-
-#### CORREÇÃO 3: Botão Voltar em "+ Nova Semana"
-- Adicionado `SafeAreaView` com padding adequado
-- Botão 100% visível em todos os dispositivos
-
-#### CORREÇÃO 4: Botão Voltar na Tela Login do Coach
-- Adicionado botão "← Voltar" no canto superior esquerdo
-- Retorna para tela de seleção de role (Sou Coach / Sou Atleta)
-
-#### CORREÇÃO 5-9: ACWR com Rolling Window Real
-**Problema**: ACWR permanecia artificialmente alto sem treinos.
-
-**Solução Implementada**:
-- Novo endpoint: `GET /api/analysis/acwr-rolling/{athlete_id}`
-- Novo endpoint: `GET /api/analysis/team-acwr`
-- Cálculo CORRETO com rolling window:
-  - Acute Load: média dos últimos 7 dias (incluindo zeros)
-  - Chronic Load: média dos últimos 28 dias (incluindo zeros)
-  - ACWR = Acute / Chronic
-- ACWR diminui automaticamente quando não há treinos
-- ACWR individual por métrica (6 métricas)
-- ACWR médio da equipe
-
-**Arquivos Modificados**:
-- `/app/frontend/app/athlete/[id]/add-gps.tsx`
-- `/app/frontend/app/login.tsx`
-- `/app/frontend/app/periodization/create.tsx`
-- `/app/backend/server.py`
+- Criação de semanas com prescrições diárias
+- Tabela unificada dinâmica
+- Exportação PDF funcional
+- Cálculo de multiplicadores semanais
 
 ---
 
-### December 2025 - PDF Report System Fix (Session 5)
+### GPS Data ✅
 
-#### Issue: Redundant Buttons and Non-functional PDF Export
-**Symptoms**:
-- Two PDF export buttons (large button at bottom + small icon in header)
-- Refresh button in header that wasn't needed
-- PDF button wasn't loading HTML preview before showing modal
+**Status: IMPLEMENTADO**
 
-**Fixes Applied**:
-1. **ScientificAnalysisTab.tsx**:
-   - Removed large "Gerar Relatório PDF" button from bottom of page
-   - Removed refresh button from header
-   - Kept only small document icon button in header (top-right)
-   - Fixed handler: button now calls `loadReportPreview()` to load HTML before showing modal
-   - Removed unused imports (`useRef`, `useQueryClient`, `Path` from SVG)
-   - Cleaned up unused state variables (`generating`)
-   - Cleaned up unused styles (`refreshButton`, `exportButton`, `exportButtonText`)
-
-**Flow After Fix**:
-```
-Press document button → Load HTML report → Show preview modal → User can print/share
-```
-
-**Status**: IMPLEMENTED - Ready for TestFlight testing
-
-**Note**: Backend endpoint `/api/report/scientific/{athlete_id}` already generates complete HTML with inline SVG charts. No backend changes were needed.
+- Upload CSV Catapult
+- Entrada manual de dados
+- Integração com periodização
+- Atualização de peak values do atleta
 
 ---
 
-### December 2025 - VBT Bug Fixes (Session 2)
+## Backlog (Próximas Tarefas)
 
-#### Bug: Rep Counter Stuck at Zero
-**Root Cause**: RepDetector was stuck in `eccentric` phase because:
-- Transition depended on velocity falling below 0.02 m/s
-- Real movements have velocity 0.10-0.22 m/s (never reaches threshold)
+### P0 - Crítico
+- [ ] Corrigir PDF em "Análise Científica" (bug recorrente)
 
-**Fix Applied**:
-1. **RepDetector.ts**:
-   - New direction-based transition logic (eccentric→concentric when direction changes to 'up')
-   - Adjusted thresholds: `minVelocityThreshold: 0.03`, `directionChangeThreshold: 0.05`
-   - Multiple conditions for rep completion (velocity_drop, direction_reversed, stationary)
-   - Added debug logging
+### P1 - Alta Prioridade
+- [ ] Seletor de métricas ACWR no Dashboard (frontend)
+- [ ] Internacionalização completa das páginas
 
-2. **VelocityCalculator.ts**:
-   - Increased direction detection threshold from 0.5% to 1% of screen
+### P2 - Média Prioridade
+- [ ] Testar pipeline `gps_import` com `identity_resolver`
+- [ ] Integrar identity resolution em `force_import` e `wellness_import`
+- [ ] UI para resolução manual de nomes ambíguos
+- [ ] Feature para merge de perfis duplicados
 
-3. **useProtectedBarTracking.ts**:
-   - Added frame counter and detailed debug logs
-
-**Status**: VERIFIED - Reps now count correctly (tested on iPhone via TestFlight)
+### P3 - Baixa Prioridade
+- [ ] Resolver EAS Project Slug Conflict (`real-time-vbt` vs. `loadmanager-pro-vbt`)
 
 ---
 
-### December 2025 - VBT Concentric-First Exercises (Session 4)
+## Arquitetura
 
-#### Bug: Deadlift/Power Clean Not Counting Reps
-**Root Cause**: RepDetector was hardcoded for eccentric-first exercises (Squat, Bench). It expected movement to start with `direction === 'down'`, but Deadlift/Clean start with `direction === 'up'`.
-
-**Fix Applied**:
-1. **RepDetector.ts**:
-   - Added `startDirection: 'down' | 'up'` config option
-   - Modified `processIdle()` to support both directions
-   - Modified `processEccentric()`, `processTransition()`, `processConcentric()` for both flows
-
-2. **trackingProtection.ts**:
-   - Added `EXERCISE_START_DIRECTION` mapping
-   - Deadlift, Power Clean, Hang Clean, Pull Up, Row = 'up' (concentric-first)
-   - Squat, Bench, Hip Thrust, Leg Press = 'down' (eccentric-first)
-
-3. **useProtectedBarTracking.ts**:
-   - Uses `EXERCISE_START_DIRECTION` to configure RepDetector per exercise
-
-#### Bug: Load-Velocity Chart Inconsistency
-**Fix Applied**:
-1. **vbt.tsx**:
-   - Added optimal load point (orange) to chart
-   - Added optimal load card in summary section
-   - Updated TypeScript types with `optimal_load`, `optimal_velocity`, `optimal_power`
-
-**Status**: Ready for EAS Build and TestFlight testing
-
-#### Bug: Velocity Data Shows 0 m/s in Reports (Critical)
-**Symptoms**:
-- Reps count correctly on screen during recording ✅
-- Velocity meter shows real values (0.63 m/s) during recording ✅
-- But saved data shows 0 m/s and -100% velocity drop ❌
-- Charts show "Insufficient data" ❌
-
-**Root Cause**: Race condition in `RepDetector.ts`:
-```
-1. processConcentric() calls completeRep(now) → returns true
-2. completeRep() resets this.concentricVelocities = [] BEFORE createResult
-3. createResult() calculates meanVelocity from EMPTY array → returns 0!
-```
-
-**Fix Applied**:
-1. **RepDetector.ts**:
-   - Added `lastCompletedRepData: RepData | null` property
-   - `completeRep()` now stores calculated values in `lastCompletedRepData` BEFORE resetting arrays
-   - `createResult()` uses stored data instead of recalculating from empty arrays
-   - `reset()` clears `lastCompletedRepData`
-   - Added comprehensive debug logging
-
-2. **useProtectedBarTracking.ts**:
-   - Enhanced logging when rep completes
-   - Warning log if `repCompleted=true` but `currentRep=null`
-
-**Status**: Ready for EAS Build and TestFlight testing
-
-**Note**: Historical data in database will still show 0 m/s. Only new recordings will have correct values.
-
-### Previous Session - Confidence Fix
-- Fixed null handling for `visibility` property in MediaPipe landmarks
-- Fixed camera ready state to enable record button
-
----
-
-## Technical Architecture
-
-### Frontend (React Native + Expo)
+### Frontend (React Native / Expo)
 ```
 /app/frontend/
-├── app/athlete/[id]/vbt-camera.tsx    # Main VBT camera screen
-├── services/vbt/
-│   ├── RepDetector.ts                  # Rep counting state machine
-│   ├── VelocityCalculator.ts           # Velocity calculation with smoothing
-│   ├── useProtectedBarTracking.ts      # Main VBT hook
-│   ├── trackingProtection.ts           # 5-stage validation pipeline
-│   └── recordingController.ts          # Recording state singleton
-└── services/pose/
-    └── index.ts                        # Pose data types and utilities
+├── app/                          # Expo Router pages
+│   ├── _layout.tsx              # Root layout com providers
+│   ├── (tabs)/                  # Tab navigation
+│   ├── athlete/[id]/            # Athlete pages
+│   │   ├── vbt-camera.tsx       # VBT via câmera (Premium)
+│   │   ├── vbt.tsx              # VBT data (Premium)
+│   │   ├── jump-assessment.tsx  # Avaliação saltos (Premium)
+│   │   ├── add-gps.tsx          # GPS manual (Premium)
+│   │   └── upload-gps.tsx       # Upload CSV (Premium)
+│   ├── periodization/           # Periodização (Premium)
+│   └── subscription.tsx         # Página de assinatura
+├── components/
+│   ├── PremiumGate.tsx          # Gate de acesso premium
+│   └── vbt/
+│       └── FatigueVisualOverlay.tsx # Overlay de fadiga
+├── contexts/
+│   ├── RevenueCatContext.tsx    # Contexto de assinatura
+│   └── ...
+└── services/
+    └── revenuecat.ts            # Helpers RevenueCat
 ```
 
 ### Backend (FastAPI)
-- `POST /api/v1/athlete/{athlete_id}/vbt_session` - Save VBT session data
-- MongoDB for data persistence
-
-### Third-Party Integrations
-- `@thinksys/react-native-mediapipe` - Native MediaPipe pose detection
-- `expo-camera` - Camera access (fallback)
-- `react-native-vision-camera` - Camera support
-
----
-
-## Prioritized Backlog
-
-### P0 - Critical
-- [DONE] Fix rep counter (stuck at zero)
-- [PENDING] Validate fix with TestFlight build
-
-### P1 - High Priority
-- [DONE] Fix PDF report system in Scientific Analysis tab (December 2025)
-- Complete internationalization of `ScientificAnalysisTab.tsx`
-- Internationalize "Avaliações" (Assessments) page
-- Test `gps_import` pipeline with `identity_resolver`
-
-### P2 - Medium Priority
-- Integrate identity resolution into `force_import` and `wellness_import`
-- Build UI for manual resolution of ambiguous athlete names
-
-### P3 - Low Priority
-- Feature for merging duplicate athlete profiles
-- EAS Project Slug Conflict (`real-time-vbt` vs `loadmanager-pro-vbt`)
+```
+/app/backend/
+├── server.py                    # Main server
+│   ├── /api/subscription/*      # Endpoints de assinatura
+│   ├── /api/webhooks/revenuecat # Webhook RevenueCat
+│   ├── /api/vbt/*               # VBT endpoints
+│   ├── /api/gps-data/*          # GPS endpoints
+│   └── /api/periodization/*     # Periodização endpoints
+└── models.py                    # Data models
+```
 
 ---
 
-## Test Credentials
+## Credenciais de Teste
+
 - **Coach**: `coach_test@test.com` / `password`
 
 ---
 
-## Known Issues
-- EAS Project slug conflict needs resolution
-- Some package version warnings (non-blocking)
+## Integrações
+
+- **RevenueCat**: Gerenciamento de assinaturas iOS/Android
+- **expo-print**: Geração de PDFs
+- **expo-sharing**: Compartilhamento de arquivos
+- **expo-camera**: Câmera VBT
+- **react-native-vision-camera**: Processamento de vídeo
+- **@thinksys/react-native-mediapipe**: Pose detection
+
+---
+
+*Última atualização: Dezembro 2025*
