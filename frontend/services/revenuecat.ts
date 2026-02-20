@@ -94,15 +94,15 @@ export interface PurchaseResult {
  */
 
 /**
- * Obtém o entitlement "premium" de entitlements.all (NÃO de entitlements.active)
+ * Obtém o entitlement "pro" de entitlements.all (NÃO de entitlements.active)
  * Isso garante que temos acesso à expirationDate mesmo após cancelamento
  */
-export const getPremiumEntitlement = (customerInfo: RevenueCatCustomerInfo | null): any | null => {
+export const getProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): any | null => {
   if (!customerInfo) return null;
   
   // IMPORTANTE: Buscar de entitlements.all, NÃO de entitlements.active
   // entitlements.all contém todos os entitlements, incluindo cancelados
-  const entitlement = customerInfo.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+  const entitlement = customerInfo.entitlements.all[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
   
   return entitlement || null;
 };
