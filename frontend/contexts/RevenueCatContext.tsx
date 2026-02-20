@@ -303,6 +303,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   }, [Purchases]);
 
   // Restore purchases
+  // IMPORTANTE: Verificar premium IMEDIATAMENTE após restore
   const restorePurchases = useCallback(async (): Promise<PurchaseResult> => {
     if (!isNativePlatform || !Purchases) {
       return { 
@@ -318,7 +319,23 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       const restoredInfo = await Purchases.restorePurchases();
       setCustomerInfo(restoredInfo);
       
-      const success = hasProEntitlement(restoredInfo);
+      // Verificar acesso usando APENAS expirationDate
+      const entitlement = restoredInfo.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
+      let success = false;
+      
+      if (entitlement && entitlement.expirationDate) {
+        const expDate = new Date(entitlement.expirationDate);
+        const now = new Date();
+        success = expDate > now;
+        
+        console.log('[PREMIUM] Restore complete - Expiration:', entitlement.expirationDate);
+        console.log('[PREMIUM] Restore complete - Premium access:', success);
+        
+        setIsPremium(success);
+      } else {
+        console.log('[PREMIUM] Restore complete - No entitlement found');
+        setIsPremium(false);
+      }
       
       return {
         success,
@@ -335,21 +352,10 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     }
   }, [Purchases]);
 
-  // Check subscription status
+  // @deprecated - Use checkPremiumAccess instead
   const checkSubscriptionStatus = useCallback(async (): Promise<boolean> => {
-    if (!isNativePlatform || !Purchases) {
-      return false;
-    }
-
-    try {
-      const info = await Purchases.getCustomerInfo();
-      setCustomerInfo(info);
-      return hasProEntitlement(info);
-    } catch (err) {
-      console.error('RevenueCat: Failed to check subscription status', err);
-      return false;
-    }
-  }, [Purchases]);
+    return checkPremiumAccess();
+  }, [checkPremiumAccess]);
 
   // Login user (link RevenueCat with your user ID)
   const loginUser = useCallback(async (userId: string) => {
