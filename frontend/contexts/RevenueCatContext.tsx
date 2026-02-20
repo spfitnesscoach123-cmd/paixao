@@ -91,7 +91,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
    * SEMPRE busca do RevenueCat usando Purchases.getCustomerInfo()
    * NUNCA usa cache local como fonte de verdade
    * 
-   * REGRA: premium = expirationDate > now
+   * REGRA: isPro = expirationDate > now
    */
   const checkPremiumAccess = useCallback(async (): Promise<boolean> => {
     if (!isNativePlatform || !Purchases) {
