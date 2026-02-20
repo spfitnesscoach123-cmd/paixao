@@ -2,7 +2,11 @@
  * PremiumGate Component
  * 
  * Componente de gate para features premium do LoadManager Pro.
- * Bloqueia acesso a features se o usuário não estiver em trial ou assinatura ativa.
+ * Bloqueia acesso a features se o usuário não tiver premium ativo.
+ * 
+ * FONTE ÚNICA DA VERDADE: isPremium (baseado em expirationDate > now)
+ * 
+ * NÃO USAR: isPro, isTrialing, entitlements.active, isActive, cache local
  * 
  * IMPORTANTE: Este componente NÃO modifica nenhum cálculo, métrica ou gráfico.
  * Apenas controla o ACESSO às features.
@@ -39,15 +43,12 @@ interface PremiumGateProps {
 /**
  * PremiumGate - Componente de proteção para features premium
  * 
+ * FONTE ÚNICA DA VERDADE: isPremium = expirationDate > now
+ * 
  * Uso:
  * <PremiumGate featureName="VBT Camera">
  *   <VBTCameraContent />
  * </PremiumGate>
- * 
- * O gate verifica:
- * 1. isPro (assinatura ativa)
- * 2. isTrialing (trial ativo de 7 dias)
- * 3. expirationDate (acesso até expiração mesmo após cancelamento)
  */
 export const PremiumGate: React.FC<PremiumGateProps> = ({
   children,
@@ -59,9 +60,7 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
   const { locale } = useLanguage();
   const {
     isInitialized,
-    isPro,
-    isTrialing,
-    expirationDate,
+    isPremium,
     isLoading,
   } = useRevenueCat();
 
@@ -90,15 +89,14 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
     );
   }
 
-  // Verifica se tem acesso premium
-  const hasAccess = checkPremiumAccess(isPro, isTrialing, expirationDate);
-
-  // Se tem acesso, renderiza o conteúdo
-  if (hasAccess) {
+  // FONTE ÚNICA DA VERDADE: isPremium
+  // isPremium = expirationDate > now (verificado no RevenueCatContext)
+  if (isPremium) {
+    // Acesso liberado - renderiza o conteúdo
     return <>{children}</>;
   }
 
-  // Se não tem acesso, mostra tela de upgrade
+  // Se não tem acesso premium, mostra tela de upgrade
   const handleUpgrade = () => {
     if (onUpgradePress) {
       onUpgradePress();
@@ -198,48 +196,32 @@ export const PremiumGate: React.FC<PremiumGateProps> = ({
 };
 
 /**
- * Verifica se o usuário tem acesso premium
- * 
- * Regras:
- * 1. isPro === true -> Assinatura ativa
- * 2. isTrialing === true -> Trial ativo (7 dias)
- * 3. expirationDate > now -> Acesso até expiração (mesmo após cancelamento)
- */
-export const checkPremiumAccess = (
-  isPro: boolean,
-  isTrialing: boolean,
-  expirationDate: Date | null
-): boolean => {
-  // Assinatura ativa
-  if (isPro) return true;
-  
-  // Trial ativo
-  if (isTrialing) return true;
-  
-  // Verifica se ainda tem tempo de acesso (após cancelamento)
-  if (expirationDate) {
-    const now = new Date();
-    if (expirationDate > now) return true;
-  }
-  
-  return false;
-};
-
-/**
  * Hook para verificar acesso premium de forma programática
+ * 
+ * FONTE ÚNICA DA VERDADE: isPremium = expirationDate > now
+ * 
+ * Uso:
+ * const { isPremium } = usePremiumAccess();
+ * if (!isPremium) {
+ *   mostrarPaywall();
+ *   return;
+ * }
  */
 export const usePremiumAccess = () => {
-  const { isPro, isTrialing, expirationDate, isInitialized, isLoading } = useRevenueCat();
-  
-  const hasAccess = checkPremiumAccess(isPro, isTrialing, expirationDate);
+  const { isPremium, isInitialized, isLoading, checkPremiumAccess } = useRevenueCat();
   
   return {
-    hasAccess,
-    isPro,
-    isTrialing,
-    expirationDate,
+    // FONTE ÚNICA: isPremium baseado em expirationDate > now
+    isPremium,
+    // Aliases para compatibilidade
+    hasAccess: isPremium,
+    isPro: isPremium,
+    isTrialing: false, // Não usar para determinar acesso
+    // Estado
     isInitialized,
     isLoading,
+    // Action para forçar verificação
+    refreshPremiumStatus: checkPremiumAccess,
   };
 };
 
