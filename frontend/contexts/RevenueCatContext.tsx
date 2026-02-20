@@ -5,7 +5,7 @@ import {
   RevenueCatCustomerInfo, 
   RevenueCatPackage, 
   PurchaseResult,
-  hasProEntitlement,
+  checkPremiumAccessFromInfo,
   isInTrialPeriod,
   getSubscriptionExpirationDate,
   getManagementURL,
@@ -14,6 +14,13 @@ import {
 // Check if we're on a native platform where RevenueCat can work
 const isNativePlatform = Platform.OS === 'ios' || Platform.OS === 'android';
 
+/**
+ * FONTE ÚNICA DA VERDADE: expirationDate
+ * 
+ * isPremium = expirationDate > now
+ * 
+ * NÃO USAR: entitlements.active, isActive, isTrial, isSubscribed, isCancelled, cache
+ */
 interface RevenueCatContextType {
   // State
   isInitialized: boolean;
@@ -22,19 +29,27 @@ interface RevenueCatContextType {
   packages: RevenueCatPackage[];
   error: string | null;
   
-  // Computed
-  isPro: boolean;
+  // FONTE ÚNICA: isPremium baseado em expirationDate > now
+  isPremium: boolean;
+  
+  // Informativo apenas (NÃO usa para determinar acesso)
   isTrialing: boolean;
   expirationDate: Date | null;
   managementURL: string | null;
+  
+  // @deprecated - mantido para compatibilidade, usa isPremium
+  isPro: boolean;
   
   // Actions
   fetchOfferings: () => Promise<void>;
   purchasePackage: (pkg: RevenueCatPackage) => Promise<PurchaseResult>;
   restorePurchases: () => Promise<PurchaseResult>;
-  checkSubscriptionStatus: () => Promise<boolean>;
+  checkPremiumAccess: () => Promise<boolean>;
   loginUser: (userId: string) => Promise<void>;
   logoutUser: () => Promise<void>;
+  
+  // @deprecated - usa checkPremiumAccess
+  checkSubscriptionStatus: () => Promise<boolean>;
 }
 
 const RevenueCatContext = createContext<RevenueCatContextType | null>(null);
