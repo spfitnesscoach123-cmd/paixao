@@ -639,7 +639,24 @@ const RSIHistoryChart = ({ history, locale }: { history: Array<{ date: string; r
   );
 };
 
+/**
+ * JumpAssessment - Avaliação de saltos CMJ, DJ, SL-CMJ
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function JumpAssessment() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Avaliação de Saltos' : 'Jump Assessment';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <JumpAssessmentContent />
+    </PremiumGate>
+  );
+}
+
+function JumpAssessmentContent() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
