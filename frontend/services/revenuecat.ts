@@ -76,39 +76,108 @@ export interface PurchaseResult {
   userCancelled?: boolean;
 }
 
-// Helper to check if user has Pro access
-export const hasProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
-  if (!customerInfo) return false;
-  return typeof customerInfo.entitlements.active[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID] !== 'undefined';
-};
+/**
+ * FONTE ÚNICA DA VERDADE: expirationDate
+ * 
+ * O acesso premium é determinado EXCLUSIVAMENTE pela expirationDate do entitlement "premium".
+ * 
+ * Regras:
+ * - premium = expirationDate > now
+ * - NÃO usar: entitlements.active, isActive, isTrial, isSubscribed, isCancelled, cache
+ * 
+ * Comportamento:
+ * 1. Trial ativo → acesso completo
+ * 2. Trial cancelado mas dentro do período → acesso completo
+ * 3. Assinatura ativa → acesso completo
+ * 4. Assinatura cancelada mas dentro do período → acesso completo
+ * 5. expirationDate < now → bloquear acesso
+ */
 
-// Helper to get subscription expiration date
-export const getSubscriptionExpirationDate = (customerInfo: RevenueCatCustomerInfo | null): Date | null => {
+/**
+ * Obtém o entitlement "premium" de entitlements.all (NÃO de entitlements.active)
+ * Isso garante que temos acesso à expirationDate mesmo após cancelamento
+ */
+export const getPremiumEntitlement = (customerInfo: RevenueCatCustomerInfo | null): any | null => {
   if (!customerInfo) return null;
   
-  const proEntitlement = customerInfo.entitlements.active[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
-  if (!proEntitlement || !proEntitlement.expirationDate) return null;
+  // IMPORTANTE: Buscar de entitlements.all, NÃO de entitlements.active
+  // entitlements.all contém todos os entitlements, incluindo cancelados
+  const entitlement = customerInfo.entitlements.all[REVENUECAT_CONFIG.PREMIUM_ENTITLEMENT_ID];
   
-  return new Date(proEntitlement.expirationDate);
+  return entitlement || null;
 };
 
-// Helper to check if user is in trial period
+/**
+ * Obtém a data de expiração do entitlement premium
+ * Esta é a ÚNICA fonte de verdade para determinar acesso
+ */
+export const getSubscriptionExpirationDate = (customerInfo: RevenueCatCustomerInfo | null): Date | null => {
+  const entitlement = getPremiumEntitlement(customerInfo);
+  
+  if (!entitlement || !entitlement.expirationDate) {
+    return null;
+  }
+  
+  return new Date(entitlement.expirationDate);
+};
+
+/**
+ * FUNÇÃO PRINCIPAL: Verifica se o usuário tem acesso premium
+ * 
+ * REGRA ÚNICA: premium = expirationDate > now
+ * 
+ * NÃO usa: isActive, isTrial, entitlements.active, etc.
+ */
+export const checkPremiumAccessFromInfo = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
+  const entitlement = getPremiumEntitlement(customerInfo);
+  
+  if (!entitlement || !entitlement.expirationDate) {
+    console.log('[PREMIUM] No entitlement or expirationDate found');
+    return false;
+  }
+  
+  const expirationDate = new Date(entitlement.expirationDate);
+  const now = new Date();
+  const hasAccess = expirationDate > now;
+  
+  console.log('[PREMIUM] Premium entitlement:', entitlement);
+  console.log('[PREMIUM] Expiration date:', entitlement.expirationDate);
+  console.log('[PREMIUM] Current date:', now.toISOString());
+  console.log('[PREMIUM] Premium access:', hasAccess);
+  
+  return hasAccess;
+};
+
+/**
+ * @deprecated Use checkPremiumAccessFromInfo instead
+ * Mantido para compatibilidade, mas internamente usa a nova lógica
+ */
+export const hasProEntitlement = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
+  return checkPremiumAccessFromInfo(customerInfo);
+};
+
+/**
+ * Verifica se está em período de trial (informativo apenas, NÃO afeta acesso)
+ * O acesso é determinado EXCLUSIVAMENTE pela expirationDate
+ */
 export const isInTrialPeriod = (customerInfo: RevenueCatCustomerInfo | null): boolean => {
-  if (!customerInfo) return false;
+  const entitlement = getPremiumEntitlement(customerInfo);
+  if (!entitlement) return false;
   
-  const proEntitlement = customerInfo.entitlements.active[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
-  if (!proEntitlement) return false;
-  
-  return proEntitlement.periodType === 'trial';
+  return entitlement.periodType === 'trial';
 };
 
-// Helper to get management URL for subscription
+/**
+ * Helper to get management URL for subscription
+ */
 export const getManagementURL = (customerInfo: RevenueCatCustomerInfo | null): string | null => {
   if (!customerInfo) return null;
   return customerInfo.managementURL;
 };
 
-// Get platform-specific API key
+/**
+ * Get platform-specific API key
+ */
 export const getApiKey = (): string => {
   if (Platform.OS === 'ios') {
     return REVENUECAT_CONFIG.APPLE_API_KEY;
