@@ -238,10 +238,19 @@ export default function Subscription() {
       const { customerInfo } = await Purchases.purchasePackage(pkg);
       setRevenueCatCustomerInfo(customerInfo);
       
+      // IMPORTANTE: Atualizar o estado global do contexto
+      // Isso garante que o PremiumGate vai reconhecer a compra
+      await checkPremiumAccess();
+      
       const hasPro = customerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive;
       
       if (hasPro) {
-        Alert.alert('🎉', t.purchaseSuccess);
+        Alert.alert('🎉', t.purchaseSuccess, [
+          {
+            text: 'OK',
+            onPress: () => router.back() // Volta para a tela anterior após sucesso
+          }
+        ]);
         await fetchData(); // Refresh backend data
       }
     } catch (err: any) {
