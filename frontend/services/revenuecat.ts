@@ -8,8 +8,8 @@ export const REVENUECAT_CONFIG = {
   GOOGLE_API_KEY: process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY || '',
   
   // Entitlement identifier configured in RevenueCat dashboard
-  // IMPORTANTE: Usar "pro" como identificador do entitlement (configurado no RevenueCat)
-  PRO_ENTITLEMENT_ID: 'pro',
+  // IMPORTANTE: Usar o identifier exato configurado no RevenueCat
+  PRO_ENTITLEMENT_ID: 'LoadManager Pro Pro',
   
   // Product identifiers (must match App Store Connect / Google Play Console)
   PRODUCT_IDS: {
