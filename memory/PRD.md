@@ -13,13 +13,28 @@
 
 **Status: IMPLEMENTADO E CORRIGIDO**
 
+#### CORREÇÃO CRÍTICA: Entitlement ID
+
+**Problema encontrado:** O código estava usando `"premium"` como identificador do entitlement, mas no RevenueCat o entitlement configurado é `"pro"`.
+
+**Correção aplicada:**
+```javascript
+// ANTES (incorreto):
+PREMIUM_ENTITLEMENT_ID: 'premium'
+entitlements.all["premium"]
+
+// DEPOIS (correto):
+PRO_ENTITLEMENT_ID: 'pro'
+entitlements.all["pro"]
+```
+
 #### FONTE ÚNICA DA VERDADE: `expirationDate`
 
-A verificação de acesso premium agora usa **EXCLUSIVAMENTE** a `expirationDate` do entitlement "premium".
+A verificação de acesso premium agora usa **EXCLUSIVAMENTE** a `expirationDate` do entitlement "pro".
 
 **Regra implementada:**
 ```javascript
-isPremium = expirationDate > now
+isPro = expirationDate > now
 ```
 
 **O que NÃO é mais usado:**
