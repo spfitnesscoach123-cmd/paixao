@@ -72,7 +72,24 @@ interface WeeklyPrescription {
   acc_dec_total_multiplier: number;
 }
 
+/**
+ * CreatePeriodizationScreen - Criação de periodização semanal
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function CreatePeriodizationScreen() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Periodização' : 'Periodization';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <CreatePeriodizationContent />
+    </PremiumGate>
+  );
+}
+
+function CreatePeriodizationContent() {
   const { locale } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
