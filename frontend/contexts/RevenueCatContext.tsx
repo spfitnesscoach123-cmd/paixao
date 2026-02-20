@@ -5,7 +5,7 @@ import {
   RevenueCatCustomerInfo, 
   RevenueCatPackage, 
   PurchaseResult,
-  checkPremiumAccessFromInfo,
+  checkProAccessFromInfo,
   isInTrialPeriod,
   getSubscriptionExpirationDate,
   getManagementURL,
