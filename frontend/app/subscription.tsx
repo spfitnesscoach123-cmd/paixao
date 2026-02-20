@@ -150,9 +150,9 @@ export default function Subscription() {
   }, []);
 
   // Check if user has Pro via RevenueCat
-  const hasRevenueCatPro = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.isActive ?? false;
-  const revenueCatExpirationDate = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.expirationDate;
-  const isRevenueCatTrialing = revenueCatCustomerInfo?.entitlements?.active?.['pro']?.periodType === 'trial';
+  const hasRevenueCatPro = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive ?? false;
+  const revenueCatExpirationDate = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.expirationDate;
+  const isRevenueCatTrialing = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.periodType === 'trial';
 
   const fetchData = useCallback(async () => {
     try {
