@@ -373,7 +373,24 @@ const VelocityLossChart = ({ data }: { data: Array<{ set: number; velocity: numb
   );
 };
 
+/**
+ * VBTPage - Página de dados VBT do atleta
+ * 
+ * FEATURE PREMIUM - Requer trial ou assinatura ativa
+ */
 export default function VBTPage() {
+  const { locale } = useLanguage();
+  
+  const featureName = locale === 'pt' ? 'Dados VBT' : 'VBT Data';
+  
+  return (
+    <PremiumGate featureName={featureName}>
+      <VBTPageContent />
+    </PremiumGate>
+  );
+}
+
+function VBTPageContent() {
   const { id: athleteId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
