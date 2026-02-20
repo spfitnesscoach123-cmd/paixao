@@ -8,8 +8,8 @@ export const REVENUECAT_CONFIG = {
   GOOGLE_API_KEY: process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY || '',
   
   // Entitlement identifier configured in RevenueCat dashboard
-  // IMPORTANTE: Usar "premium" como identificador do entitlement
-  PREMIUM_ENTITLEMENT_ID: 'premium',
+  // IMPORTANTE: Usar "pro" como identificador do entitlement (configurado no RevenueCat)
+  PRO_ENTITLEMENT_ID: 'pro',
   
   // Product identifiers (must match App Store Connect / Google Play Console)
   PRODUCT_IDS: {
