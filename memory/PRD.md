@@ -2,234 +2,107 @@
 
 ## Informações Gerais
 - **Nome do Produto**: LoadManager Pro
-- **Versão**: 2.1
-- **Data de Atualização**: Fevereiro 2026
+- **Versão**: 2.2
+- **Data de Atualização**: 21 Fevereiro 2026
+
+---
+
+## Mudança Importante - Sistema de Assinaturas
+
+### ⚠️ SISTEMA DE ASSINATURAS REMOVIDO (21 Fevereiro 2026)
+
+O sistema de assinaturas foi **completamente removido** para reconstrução do zero.
+
+**Status atual:**
+- ✅ Todas as features estão **liberadas** (sem bloqueio)
+- ✅ PremiumGate é um **passthrough** (não bloqueia nada)
+- ✅ Página de assinatura existe mas está **vazia**
+- ✅ App funciona como versão sem monetização
+- ❌ RevenueCat SDK **não inicializa** (código desativado)
+- ❌ Nenhuma compra in-app disponível
+
+**Arquivos modificados:**
+1. `/app/frontend/components/PremiumGate.tsx` - Passthrough (sempre libera)
+2. `/app/frontend/contexts/RevenueCatContext.tsx` - Stub (não faz nada)
+3. `/app/frontend/services/revenuecat.ts` - Constantes vazias
+4. `/app/frontend/app/subscription.tsx` - Página vazia
+5. `/app/frontend/.env` - Removida chave RevenueCat
+6. `/app/frontend/eas.json` - Removidas variáveis de ambiente
+
+**Para reconstruir o sistema:**
+1. Implementar nova integração com RevenueCat
+2. Configurar produtos no App Store Connect
+3. Vincular produtos aos entitlements no RevenueCat
+4. Implementar lógica de verificação de acesso
+5. Atualizar PremiumGate para bloquear features
+6. Testar fluxo completo em Sandbox
 
 ---
 
 ## Funcionalidades Implementadas
 
-### Sistema de Assinaturas Premium - CORRIGIDO ✅ (Fevereiro 2026)
+### 1. Autenticação e Usuários
+- Login/Registro de coaches
+- Gerenciamento de perfil
+- Sessões persistentes
 
-**Status: IMPLEMENTADO E CORRIGIDO**
+### 2. Gestão de Atletas
+- CRUD completo de atletas
+- Fotos de perfil
+- Categorização por esporte/posição
 
-#### CORREÇÃO CRÍTICA: Entitlement ID
+### 3. Análise de Carga (ACWR)
+- Cálculo automático de ACWR
+- Visualização de tendências
+- Alertas de fadiga
 
-**Problema encontrado:** O código estava usando `"premium"` como identificador do entitlement, mas no RevenueCat o entitlement configurado é `"pro"`.
+### 4. Análise VBT (Velocity Based Training)
+- Captura de vídeo via câmera
+- Detecção de pose com MediaPipe
+- Cálculo de velocidade e potência
 
-**Correção aplicada:**
-```javascript
-// ANTES (incorreto):
-PREMIUM_ENTITLEMENT_ID: 'premium'
-entitlements.all["premium"]
+### 5. Periodização
+- Criação de semanas de treino
+- Planejamento de cargas
+- Notificações de periodização
 
-// DEPOIS (correto):
-PRO_ENTITLEMENT_ID: 'pro'
-entitlements.all["pro"]
-```
+### 6. Importação de Dados GPS
+- Upload de arquivos CSV
+- Integração com Catapult
 
-#### FONTE ÚNICA DA VERDADE: `expirationDate`
+### 7. Análise Científica
+- Relatórios detalhados
+- Exportação PDF (com bugs conhecidos)
 
-A verificação de acesso premium agora usa **EXCLUSIVAMENTE** a `expirationDate` do entitlement "pro".
-
-**Regra implementada:**
-```javascript
-isPro = expirationDate > now
-```
-
-**O que NÃO é mais usado:**
-- ❌ `entitlements.active`
-- ❌ `isActive`
-- ❌ `isTrial`
-- ❌ `isSubscribed`
-- ❌ `isCancelled`
-- ❌ Cache local/AsyncStorage como fonte de verdade
-
-#### Arquivos Modificados:
-1. **`/app/frontend/services/revenuecat.ts`**
-   - `PREMIUM_ENTITLEMENT_ID: 'premium'` (era 'pro')
-   - `getPremiumEntitlement()` - Busca de `entitlements.all` (não `.active`)
-   - `checkPremiumAccessFromInfo()` - Verifica apenas `expirationDate > now`
-   - `getSubscriptionExpirationDate()` - Obtém data de expiração
-
-2. **`/app/frontend/contexts/RevenueCatContext.tsx`**
-   - Novo state `isPremium` como fonte única de verdade
-   - `checkPremiumAccess()` - Função global que sempre busca do RevenueCat
-   - Verificação ao abrir o app (`useEffect` inicial)
-   - Verificação imediata após compra/trial (`purchasePackage`)
-   - Verificação imediata após restore (`restorePurchases`)
-   - Listener atualiza `isPremium` automaticamente
-
-3. **`/app/frontend/components/PremiumGate.tsx`**
-   - Usa apenas `isPremium` do contexto
-   - `usePremiumAccess()` hook simplificado
-
-#### Comportamento Obrigatório:
-| Situação | Acesso |
-|----------|--------|
-| Trial ativo | ✅ Liberado |
-| Trial cancelado mas dentro do período | ✅ Liberado |
-| Assinatura ativa | ✅ Liberado |
-| Assinatura cancelada mas dentro do período | ✅ Liberado |
-| expirationDate < now | ❌ Bloqueado |
-
-#### Quando é verificado:
-1. ✅ Ao abrir o app (useEffect inicial)
-2. ✅ Imediatamente após iniciar trial
-3. ✅ Imediatamente após compra
-4. ✅ Imediatamente após restore
-5. ✅ Via listener de customerInfo updates
+### 8. Internacionalização
+- Português (BR)
+- Inglês (EN)
 
 ---
 
-### Sistema de Gates Premium ✅ (Dezembro 2025)
-
-**Status: IMPLEMENTADO**
-
-#### Features Protegidas por Premium Gate:
-| Feature | Arquivo | Status |
-|---------|---------|--------|
-| VBT Camera | `/app/frontend/app/athlete/[id]/vbt-camera.tsx` | ✅ Protegido |
-| VBT Data | `/app/frontend/app/athlete/[id]/vbt.tsx` | ✅ Protegido |
-| Jump Assessment | `/app/frontend/app/athlete/[id]/jump-assessment.tsx` | ✅ Protegido |
-| Add GPS | `/app/frontend/app/athlete/[id]/add-gps.tsx` | ✅ Protegido |
-| Upload GPS | `/app/frontend/app/athlete/[id]/upload-gps.tsx` | ✅ Protegido |
-| Periodization Create | `/app/frontend/app/periodization/create.tsx` | ✅ Protegido |
-| Periodization Detail | `/app/frontend/app/periodization/[id].tsx` | ✅ Protegido |
-
----
-
-### FatigueVisualOverlay - VBT ✅ (Dezembro 2025)
-
-**Status: IMPLEMENTADO**
-
-**Arquivo**: `/app/frontend/components/vbt/FatigueVisualOverlay.tsx`
-
-**Funcionalidades**:
-1. **Transição Gradual de Cor** - Interpolação linear entre:
-   - 0% → Verde `#00C853`
-   - 15% → Laranja `#FF6D00`
-   - 30%+ → Vermelho `#D50000`
-
-2. **Animação Fade Suave** - 300ms ease-out
-
-3. **Indicador de Tendência** - `↓ ↑ →` baseado em mudança de valor
-
-4. **Indicador Percentual** - Exibe `-X%` em tempo real
-
-5. **Modo Elite** - Pulso sutil quando `velocityDropPercent > 25%`
-
----
-
-### ACWR (Acute:Chronic Workload Ratio) ✅
-
-**Status: IMPLEMENTADO (Backend)**
-
-- Cálculo correto com rolling window
-- Suporte a múltiplas métricas (Total Distance, HID Z3, HSR Z4, etc.)
-
-**Pendente**: Frontend UI para seletor de métricas no dashboard
-
----
-
-### Periodização ✅
-
-**Status: IMPLEMENTADO**
-
-- Criação de semanas com prescrições diárias
-- Tabela unificada dinâmica
-- Exportação PDF funcional
-- Cálculo de multiplicadores semanais
-
----
-
-### GPS Data ✅
-
-**Status: IMPLEMENTADO**
-
-- Upload CSV Catapult
-- Entrada manual de dados
-- Integração com periodização
-- Atualização de peak values do atleta
-
----
-
-## Backlog (Próximas Tarefas)
-
-### P0 - Crítico
-- [ ] Corrigir PDF em "Análise Científica" (bug recorrente)
+## Bugs Conhecidos
 
 ### P1 - Alta Prioridade
-- [ ] Seletor de métricas ACWR no Dashboard (frontend)
-- [ ] Internacionalização completa das páginas
+1. **PDF Export em Análise Científica** - Causa freeze/crash no app
 
 ### P2 - Média Prioridade
-- [ ] Testar pipeline `gps_import` com `identity_resolver`
-- [ ] Integrar identity resolution em `force_import` e `wellness_import`
-- [ ] UI para resolução manual de nomes ambíguos
-- [ ] Feature para merge de perfis duplicados
-
-### P3 - Baixa Prioridade
-- [ ] Resolver EAS Project Slug Conflict (`real-time-vbt` vs. `loadmanager-pro-vbt`)
+1. **Seletor ACWR no Dashboard** - Não implementado
+2. **Internacionalização incompleta** - Alguns textos não traduzidos
 
 ---
 
-## Arquitetura
+## Próximas Tarefas
 
-### Frontend (React Native / Expo)
-```
-/app/frontend/
-├── app/                          # Expo Router pages
-│   ├── _layout.tsx              # Root layout com providers
-│   ├── (tabs)/                  # Tab navigation
-│   ├── athlete/[id]/            # Athlete pages
-│   │   ├── vbt-camera.tsx       # VBT via câmera (Premium)
-│   │   ├── vbt.tsx              # VBT data (Premium)
-│   │   ├── jump-assessment.tsx  # Avaliação saltos (Premium)
-│   │   ├── add-gps.tsx          # GPS manual (Premium)
-│   │   └── upload-gps.tsx       # Upload CSV (Premium)
-│   ├── periodization/           # Periodização (Premium)
-│   └── subscription.tsx         # Página de assinatura
-├── components/
-│   ├── PremiumGate.tsx          # Gate de acesso premium
-│   └── vbt/
-│       └── FatigueVisualOverlay.tsx # Overlay de fadiga
-├── contexts/
-│   ├── RevenueCatContext.tsx    # Contexto de assinatura
-│   └── ...
-└── services/
-    └── revenuecat.ts            # Helpers RevenueCat
-```
+### Imediato
+1. Resolver problema de certificados iOS (Provisioning Profile)
+2. Reconstruir sistema de assinaturas do zero
 
-### Backend (FastAPI)
-```
-/app/backend/
-├── server.py                    # Main server
-│   ├── /api/subscription/*      # Endpoints de assinatura
-│   ├── /api/webhooks/revenuecat # Webhook RevenueCat
-│   ├── /api/vbt/*               # VBT endpoints
-│   ├── /api/gps-data/*          # GPS endpoints
-│   └── /api/periodization/*     # Periodização endpoints
-└── models.py                    # Data models
-```
+### Backlog
+1. Corrigir exportação PDF em Análise Científica
+2. Implementar seletor de métricas ACWR
+3. Completar internacionalização
 
 ---
 
 ## Credenciais de Teste
-
-- **Coach**: `coach_test@test.com` / `password`
-
----
-
-## Integrações
-
-- **RevenueCat**: Gerenciamento de assinaturas iOS/Android
-- **expo-print**: Geração de PDFs
-- **expo-sharing**: Compartilhamento de arquivos
-- **expo-camera**: Câmera VBT
-- **react-native-vision-camera**: Processamento de vídeo
-- **@thinksys/react-native-mediapipe**: Pose detection
-
----
-
-*Última atualização: Dezembro 2025*
+- **Coach**: coach_test@test.com / password
