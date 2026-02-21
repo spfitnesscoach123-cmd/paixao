@@ -10,6 +10,7 @@ import React, { ReactNode } from 'react';
 interface PremiumGateProps {
   children: ReactNode;
   feature?: string;
+  featureName?: string;
   onUpgradePress?: () => void;
 }
 
