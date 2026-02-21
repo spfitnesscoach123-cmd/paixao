@@ -108,6 +108,7 @@ class UserResponse(BaseModel):
     id: str
     email: str
     name: str
+    role: str = "coach"  # Padrão é coach (quem faz login no app)
     created_at: datetime
 
 class TokenResponse(BaseModel):
@@ -548,6 +549,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         id=current_user["_id"],
         email=current_user["email"],
         name=current_user["name"],
+        role=current_user.get("role", "coach"),  # Padrão é coach
         created_at=current_user["created_at"]
     )
 
