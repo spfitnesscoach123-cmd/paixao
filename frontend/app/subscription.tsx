@@ -263,8 +263,7 @@ export default function Subscription() {
 
   const handleCancelSubscription = async () => {
     // For RevenueCat subscriptions, direct to app store
-    const managementURL = revenueCatCustomerInfo?.managementURL;
-    
+    // USA managementURL do CONTEXTO GLOBAL
     if (managementURL) {
       Linking.openURL(managementURL);
       return;
@@ -295,17 +294,12 @@ export default function Subscription() {
     setIsProcessing(true);
     
     try {
-      // Try RevenueCat restore first on native
-      if (Purchases && isNativePlatform) {
-        const customerInfo = await Purchases.restorePurchases();
-        setRevenueCatCustomerInfo(customerInfo);
+      // USA restorePurchases do CONTEXTO GLOBAL
+      if (isNativePlatform) {
+        const result = await restorePurchases();
         
-        // IMPORTANTE: Atualizar o estado global do contexto
-        await checkPremiumAccess();
-        
-        const hasPro = customerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive;
-        
-        if (hasPro) {
+        // Verificar sucesso via contexto global (baseado em expirationDate > now)
+        if (result.success) {
           Alert.alert('✓', t.restoreSuccess, [
             {
               text: 'OK',
