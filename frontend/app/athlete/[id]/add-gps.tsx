@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import api from '../../../services/api';
 import { GPSData } from '../../../types';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { PremiumGate } from '../../../components/PremiumGate';
+import PremiumGate from '../../../components/PremiumGate';
 
 // CORREÇÃO 1: Padronização dos campos GPS conforme CSV Catapult
 // Campos padronizados:

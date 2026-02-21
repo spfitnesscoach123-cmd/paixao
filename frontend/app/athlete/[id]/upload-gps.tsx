@@ -16,7 +16,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import api from '../../../services/api';
 import { parseCatapultCSV, validateCatapultCSV } from '../../../utils/csvParser';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { PremiumGate } from '../../../components/PremiumGate';
+import PremiumGate from '../../../components/PremiumGate';
 
 /**
  * UploadGPS - Upload de dados GPS via CSV

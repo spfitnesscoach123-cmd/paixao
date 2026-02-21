@@ -25,7 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { PremiumGate } from '../../../components/PremiumGate';
+import PremiumGate from '../../../components/PremiumGate';
 import { 
   useProtectedBarTracking, 
   RECOMMENDED_TRACKING_POINTS,

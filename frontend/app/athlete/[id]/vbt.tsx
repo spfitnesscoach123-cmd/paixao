@@ -19,7 +19,7 @@ import Svg, { Line, Circle, Polyline, Rect, G, Text as SvgText, Path } from 'rea
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { PremiumGate } from '../../../components/PremiumGate';
+import PremiumGate from '../../../components/PremiumGate';
 
 const { width: screenWidth } = Dimensions.get('window');
 
