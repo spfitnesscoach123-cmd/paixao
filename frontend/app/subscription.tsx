@@ -374,7 +374,9 @@ export default function Subscription() {
   }
 
   const statusConfig = getStatusConfig();
-  const isTrialOrActive = hasRevenueCatPro || currentSubscription?.status === 'trial' || currentSubscription?.status === 'active';
+  // IMPORTANTE: Mostrar botão baseado APENAS no RevenueCat, ignorando backend
+  // O backend pode ter trial antigo que não é válido para RevenueCat
+  const isTrialOrActive = hasRevenueCatPro;
   const daysRemaining = getDaysRemaining();
 
   // Get price from RevenueCat if available, otherwise from backend
