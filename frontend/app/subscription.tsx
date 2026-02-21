@@ -180,23 +180,18 @@ export default function Subscription() {
     restoreNoFound: locale === 'pt' ? 'Nenhuma compra anterior encontrada' : 'No previous purchases found',
   };
 
-  // Handle purchase via RevenueCat
-  const handleRevenueCatPurchase = async (pkg: RevenueCatPackage) => {
-    if (!Purchases) return;
+  // Handle purchase via RevenueCat - USA CONTEXTO GLOBAL
+  const handleRevenueCatPurchase = async (pkg: any) => {
+    if (!isNativePlatform || revenueCatPackages.length === 0) return;
     
     setIsProcessing(true);
     
     try {
-      const { customerInfo } = await Purchases.purchasePackage(pkg);
-      setRevenueCatCustomerInfo(customerInfo);
+      // USA purchasePackage do contexto global
+      const result = await purchasePackage(pkg);
       
-      // IMPORTANTE: Atualizar o estado global do contexto
-      // Isso garante que o PremiumGate vai reconhecer a compra
-      await checkPremiumAccess();
-      
-      const hasPro = customerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive;
-      
-      if (hasPro) {
+      // Verificar sucesso via contexto global (baseado em expirationDate > now)
+      if (result.success) {
         Alert.alert('🎉', t.purchaseSuccess, [
           {
             text: 'OK',
@@ -219,7 +214,7 @@ export default function Subscription() {
 
   // Handle legacy subscription start (for web/testing)
   const handleStartTrial = async () => {
-    // On native with RevenueCat packages, use RevenueCat
+    // On native with RevenueCat packages, use RevenueCat via CONTEXTO GLOBAL
     if (isNativePlatform && revenueCatPackages.length > 0) {
       handleRevenueCatPurchase(revenueCatPackages[0]);
       return;
