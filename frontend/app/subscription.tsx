@@ -49,7 +49,7 @@ interface CurrentSubscription {
   trial_end_date: string | null;
 }
 
-// RevenueCat types
+// RevenueCat types - usando apenas para tipagem local de packages
 interface RevenueCatPackage {
   identifier: string;
   product: {
@@ -67,39 +67,31 @@ interface RevenueCatPackage {
   };
 }
 
-interface RevenueCatCustomerInfo {
-  entitlements: {
-    active: {
-      [key: string]: {
-        identifier: string;
-        isActive: boolean;
-        willRenew: boolean;
-        expirationDate: string | null;
-        periodType: string;
-      };
-    };
-  };
-  managementURL: string | null;
-}
-
 export default function Subscription() {
   const router = useRouter();
   const { locale } = useLanguage();
   
-  // USAR O CONTEXTO GLOBAL para atualizar isPremium após compra
-  const { checkPremiumAccess } = useRevenueCat();
+  // USAR EXCLUSIVAMENTE O CONTEXTO GLOBAL
+  // NÃO inicializar SDK aqui - já é feito no RevenueCatContext
+  const { 
+    isPremium,
+    isTrialing,
+    expirationDate,
+    managementURL,
+    packages: revenueCatPackages,
+    fetchOfferings,
+    purchasePackage,
+    restorePurchases,
+    checkPremiumAccess,
+    isInitialized: revenueCatInitialized,
+    isLoading: revenueCatLoading,
+  } = useRevenueCat();
   
   const [plan, setPlan] = useState<Plan | null>(null);
   const [currentSubscription, setCurrentSubscription] = useState<CurrentSubscription | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [region, setRegion] = useState<string>('BR');
-  
-  // RevenueCat state
-  const [revenueCatPackages, setRevenueCatPackages] = useState<RevenueCatPackage[]>([]);
-  const [revenueCatCustomerInfo, setRevenueCatCustomerInfo] = useState<RevenueCatCustomerInfo | null>(null);
-  const [revenueCatInitialized, setRevenueCatInitialized] = useState(false);
-  const [Purchases, setPurchases] = useState<any>(null);
 
   // Detect region based on device locale
   useEffect(() => {
@@ -107,57 +99,17 @@ export default function Subscription() {
     setRegion(detectedRegion);
   }, []);
 
-  // Initialize RevenueCat on native platforms
+  // Fetch offerings when context is initialized
   useEffect(() => {
-    const initRevenueCat = async () => {
-      if (!isNativePlatform) {
-        setRevenueCatInitialized(true);
-        return;
-      }
+    if (revenueCatInitialized && isNativePlatform) {
+      fetchOfferings();
+    }
+  }, [revenueCatInitialized, fetchOfferings]);
 
-      try {
-        const PurchasesModule = await import('react-native-purchases');
-        const PurchasesSDK = PurchasesModule.default;
-        setPurchases(PurchasesSDK);
-
-        // Get API key based on platform
-        const apiKey = Platform.OS === 'ios'
-          ? process.env.EXPO_PUBLIC_REVENUECAT_APPLE_KEY
-          : process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_KEY;
-
-        if (apiKey) {
-          await PurchasesSDK.configure({ apiKey });
-          
-          // Get customer info
-          const customerInfo = await PurchasesSDK.getCustomerInfo();
-          setRevenueCatCustomerInfo(customerInfo);
-          
-          // Get offerings
-          const offerings = await PurchasesSDK.getOfferings();
-          if (offerings.current?.availablePackages) {
-            setRevenueCatPackages(offerings.current.availablePackages);
-          }
-          
-          // Listen for updates
-          PurchasesSDK.addCustomerInfoUpdateListener((info: RevenueCatCustomerInfo) => {
-            setRevenueCatCustomerInfo(info);
-          });
-        }
-        
-        setRevenueCatInitialized(true);
-      } catch (err) {
-        console.log('RevenueCat initialization skipped:', err);
-        setRevenueCatInitialized(true);
-      }
-    };
-
-    initRevenueCat();
-  }, []);
-
-  // Check if user has Pro via RevenueCat
-  const hasRevenueCatPro = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.isActive ?? false;
-  const revenueCatExpirationDate = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.expirationDate;
-  const isRevenueCatTrialing = revenueCatCustomerInfo?.entitlements?.active?.['LoadManager Pro Pro']?.periodType === 'trial';
+  // USAR EXCLUSIVAMENTE isPremium do contexto global (baseado em expirationDate > now)
+  const hasRevenueCatPro = isPremium;
+  const revenueCatExpirationDate = expirationDate?.toISOString() ?? null;
+  const isRevenueCatTrialing = isTrialing;
 
   const fetchData = useCallback(async () => {
     try {
