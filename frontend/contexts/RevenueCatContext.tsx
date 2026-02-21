@@ -202,6 +202,20 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           setIsPremium(false);
         }
 
+        // CARREGAR OFFERINGS AUTOMATICAMENTE APÓS INICIALIZAÇÃO
+        try {
+          const offerings = await PurchasesSDK.getOfferings();
+          if (offerings.current?.availablePackages) {
+            setPackages(offerings.current.availablePackages);
+            console.log('RevenueCat: Loaded', offerings.current.availablePackages.length, 'packages at init');
+          } else {
+            console.log('RevenueCat: No packages available at init');
+            setPackages([]);
+          }
+        } catch (offeringsErr) {
+          console.error('RevenueCat: Failed to fetch offerings at init', offeringsErr);
+        }
+
         setIsInitialized(true);
         console.log('RevenueCat: Initialized successfully');
       } catch (err) {
