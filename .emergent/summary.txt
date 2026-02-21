@@ -1,79 +1,37 @@
 <analysis>**original_problem_statement:**
-The user's primary goal is to build a robust Load Manager application for sports coaches and athletes, with a key focus on implementing a flawless premium subscription system using RevenueCat.
+The user's primary goal is to build a Load Manager application for sports coaches and athletes. The immediate objective has shifted from fixing a broken RevenueCat implementation to completely removing it and rebuilding it from scratch.
 
-The work in this session was driven by a series of user requests to fix the subscription system, which was failing to unlock premium features after a user started a trial on TestFlight. The user provided multiple, highly specific prompts to audit and refactor the access logic.
+The user first provided a series of detailed prompts to debug a failing premium subscription system. After multiple failed attempts and extensive debugging that revealed deep architectural and configuration issues, the user made a decisive request to completely rip out all existing subscription and payment logic from the entire application.
 
-**Initial user requests from the previous fork:**
-1.  **VBT Overlay Implementation & Enhancement:** Implement and visually enhance a  for the VBT camera screen.
-2.  **Subscription & Premium Access Control:** Audit and implement a global premium access gate to secure all premium features behind a paywall managed by RevenueCat.
+Immediately following the removal, the user provided a new, detailed prompt to rewrite the subscription screen with a specific layout, textual content describing the Pro plan features, and two call-to-action (CTA) buttons: Start Free Trial and Cancel Subscription, with specified functionality for each.
 
-**Recent user requests in this session:**
-1.  **Refactor Premium Access Logic:** Mandated a refactor to base access *exclusively* on .
-2.  **Audit for Entitlement ID:** Requested a read-only audit to confirm the code was using the wrong entitlement ID ( instead of ).
-3.  **Guided RevenueCat Setup:** The user required step-by-step guidance to configure their RevenueCat dashboard, App Store Connect keys, and environment variables.
-4.  **Final Comprehensive Audit:** After previous fixes failed, the user requested a final, exhaustive, read-only audit to diagnose why the system was still broken. The agent performed this audit and delivered a detailed report identifying several critical issues, but was instructed **not to implement any fixes**.
+**PRODUCT REQUIREMENTS:**
+1.  **Remove All Subscription Logic:** Erase every trace of RevenueCat, StoreKit, premium gates, and payment-related code to create a clean slate.
+2.  **Rebuild Subscription UI:** Create a new, clean subscription page that statically displays the Pro plan features, price (R9,99/mês), and cancellation policy.
+3.  **Implement CTA Buttons:**
+    *   Add a Start Free Trial button that, on click, opens a pop-up explaining the 7-day free trial followed by an automatic charge of 39.99 USD.
+    *   Add a Cancel Subscription button.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The application has a subscription system that has undergone multiple refactoring and patching attempts. The core logic in  is designed to grant access based on the  of the user's entitlement. All premium features are wrapped in a  component that checks this global state.
+The application has been completely stripped of its previous (and broken) RevenueCat subscription system. All  components, contexts (), and environment variables related to payments have been removed or neutralized. As a result, all features of the app are currently unlocked and accessible to everyone.
 
-However, the last audit revealed several critical architectural flaws that prevent the system from working correctly. The RevenueCat SDK is initialized in two different places, and the subscription page () uses its own inconsistent logic () instead of relying on the global context, which leads to a broken user experience. The Product ID defined in the code also appears to be incorrect.
-
-The last action was a comprehensive, read-only audit that identified these specific flaws. The code is currently in a non-working state regarding subscriptions.
+A new, purely presentational subscription page has been created at . It statically displays the features of the Pro Plan, the price, and two non-functional buttons: Start Free Trial and Cancel Subscription.
 
 **Last working item**:
--   **Last item agent was working**: Performing a comprehensive, read-only audit of the entire subscription system as requested by the user. The goal was to produce a detailed diagnostic report explaining why the premium access was still failing.
--   **Status**: NONE (The task was a diagnostic audit, not an implementation, and it has been completed by delivering the report.)
--   **Agent Testing Done**: N/A
+-   **Last item agent was working**: Rebuilding the UI for the subscription page () based on a detailed prompt from the user. This included adding specific text content, feature lists, pricing information, and two placeholder CTA buttons.
+-   **Status**: IN PROGRESS
+-   **Agent Testing Done**: Y (Visual verification via screenshots only)
 -   **Which testing method agent to use?**: Frontend testing agent
--   **User Testing Done**: Y (The user has confirmed via TestFlight that the subscription flow is still broken, which prompted the final audit.)
+-   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Dual SDK Initialization (P0)
--   **Issue 2**: Inconsistent Entitlement Check Logic ( vs ) (P0)
--   **Issue 3**: Mismatched Product ID (P0)
--   **Issue 4**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
--   **Issue 5**: Frontend ACWR Metric Selector on Dashboard is missing (P2)
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing (P2)
 
 **Issues Detail**:
--   **Issue 1**: Dual SDK Initialization
-    -   **Attempted fixes**: None. This was discovered in the final audit.
-    -   **Next debug checklist**:
-        1.  The audit revealed that  is called in both  (line 166) and  (line 129).
-        2.  The call in  must be removed to ensure the SDK is only initialized once, globally, within .
-    -   **Why fix this issue and what will be achieved with the fix?**: Calling  twice can lead to race conditions, lost state, and unpredictable behavior. A single, global initialization is required for a stable subscription system.
-    -   **Status**: NOT STARTED
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend
-    -   **Blocked on other issue**: None
-
--   **Issue 2**: Inconsistent Entitlement Check Logic ( vs )
-    -   **Attempted fixes**: None. This was discovered in the final audit.
-    -   **Next debug checklist**:
-        1.  The audit found that  correctly uses  to determine access, which works even for canceled-but-still-valid subscriptions.
-        2.  However,  uses  for its local checks and to provide user feedback (e.g., success alert).
-        3.  Refactor  to completely remove its local verification logic (, checks on ). It should *only* rely on the  state and  function from the  context.
-    -   **Why fix this issue and what will be achieved with the fix?**: This will create a single source of truth for subscription status. It will fix the bug where the UI doesn't give success feedback even when the purchase was successful, which is confusing the user.
-    -   **Status**: NOT STARTED
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend
-    -   **Blocked on other issue**: None
-
--   **Issue 3**: Mismatched Product ID
-    -   **Attempted fixes**: None. This was discovered in the final audit.
-    -   **Next debug checklist**:
-        1.  The file  defines .
-        2.  This ID does not follow the app's bundle identifier pattern ().
-        3.  The agent must ask the user to confirm the exact Product ID from App Store Connect for their monthly subscription.
-        4.  Update the  value in  with the correct ID provided by the user.
-    -   **Why fix this issue and what will be achieved with the fix?**: If the product ID is wrong, RevenueCat cannot fetch the correct product to initiate a purchase, causing the entire flow to fail.
-    -   **Status**: BLOCKED (Requires user input for the correct Product ID)
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend
-    -   **Blocked on other issue**: None
-
--   **Issue 4**: PDF Generation in Análise Científica causes app to freeze/crash
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash
     -   **Attempted fixes**: Multiple failed attempts in previous sessions. Feature remains broken.
     -   **Next debug checklist**: Replicate the working PDF implementation from  into . Do not try a new approach.
     -   **Why fix this issue and what will be achieved with the fix?**: Fixes a critical, user-facing feature that is completely broken.
@@ -82,7 +40,7 @@ The last action was a comprehensive, read-only audit that identified these speci
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
--   **Issue 5**: Frontend ACWR Metric Selector on Dashboard is missing
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing
     -   **Attempted fixes**: None. This is a pending feature.
     -   **Next debug checklist**: Add a dropdown/selector to the dashboard UI to allow users to select an ACWR metric, and update the data queries to reflect the selection.
     -   **Why fix this issue and what will be achieved with the fix?**: Implements a requested core feature for load analysis.
@@ -92,27 +50,38 @@ The last action was a comprehensive, read-only audit that identified these speci
     -   **Blocked on other issue**: None
 
 **In progress Task List**:
-None.
+-   **Task 1**: Implement Subscription Page CTA Functionality (P0)
+
+**Task Detail**:
+-   **Task 1**: Implement Subscription Page CTA Functionality
+    -   **Where to resume**: The static UI for  is complete. The next step is to implement the logic for the buttons as specified in the user's prompt.
+    -   **What will be achieved with this?**: The subscription page will become interactive, preparing it for the full re-integration of a payment system.
+    -   **Status**: IN PROGRESS
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on something**: None
+    -   **Next Steps**:
+        1.  Create a modal/pop-up component.
+        2.  In , add an  handler to the Start Free Trial button to trigger the modal.
+        3.  The modal must display the text: 7 dias gratuitos e que após esse período será cobrado automaticamente o valor da assinatura 39.99 USD.
+        4.  Implement the Cancel Subscription button functionality (this will require re-integrating a subscription provider like RevenueCat).
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
+    -   (P0) Re-implement the RevenueCat subscription system from scratch. This will involve installing the SDK, creating a new context, and connecting the new UI buttons to the purchase flow.
     -   (P2) Complete the internationalization of the  component and the Avaliações (Assessments) page.
 -   **Future Tasks**:
     -   Test the  pipeline's integration with the .
     -   Integrate identity resolution into  and .
     -   Build a UI for manual resolution of ambiguous athlete names.
     -   Build a feature for merging duplicate athlete profiles.
-    -   Address the EAS Project Slug Conflict.
 
 **Completed work in this session**
--   Guided the user through resolving Git merge conflicts.
--   Refactored the subscription logic to use  as the source of truth.
--   Audited the codebase and corrected the entitlement identifier from  to  and finally to  to match the user's RevenueCat setup.
--   Corrected the  in  from  to  to match App Store Connect.
--   Guided the user through generating and configuring all necessary App Store Connect keys (P8 In-App Purchase, P8 API Key) and the Shared Secret in the RevenueCat dashboard.
--   Added the correct RevenueCat API keys ( and later ) to the project's  and  files.
--   Attempted a fix for the global state not updating by making  call .
--   Performed a final, comprehensive, read-only audit that successfully identified the remaining critical flaws in the subscription system.
+-   Performed extensive debugging and audits of the previous broken subscription system.
+-   Guided the user through correctly configuring their RevenueCat and App Store Connect settings.
+-   Diagnosed build failures related to iOS certificates and package dependency issues.
+-   Identified a hardcoded price in the backend () which was part of the old, now-removed logic.
+-   **Completely removed** all existing subscription and payment logic (RevenueCat SDK, , contexts, etc.) from the entire application.
+-   Rebuilt the  page with a new, clean, static UI based on detailed user specifications.
 
 **Earlier issues found/mentioned but not fixed**
 -   **VBT Rep Counting & Regressions:** The original issues from a previous handoff (rep counting for Deadlift, graph consistency) remain untested and their status is unknown.
@@ -125,73 +94,70 @@ None.
 
 **Key Technical Concepts**
 -   React Native (Expo)
--   RevenueCat SDK ()
--   React Context API for global state management
--   App Store Connect integration (API Keys, Product IDs, Bundle IDs)
--   Environment variable management (, )
+-   React Context API
+-   UI Development with static content
+-   The goal is to re-introduce RevenueCat for subscriptions.
 
 **key DB schema**
--   **subscriptions**: (in MongoDB) Caches subscription status received from RevenueCat webhooks.
+-   The  table in MongoDB is now unused as the backend logic relying on it was part of the removed subscription system.
 
 **changes in tech stack**
-None.
+-    (RevenueCat) has been effectively removed from the project's logic, though it may remain in .
 
 **All files of reference**
--   : **Critical.** Site of the primary  call and global state logic.
--   : **Critical.** Site of the secondary  call and inconsistent local logic ().
--   : **Critical.** Defines constants like  and .
--   : The component that enforces the paywall.
--   : Contains the app's .
--   : Contains the environment variables for local development.
--   : Contains the environment variables for EAS builds.
+-   : **Critical.** Completely rewritten to be a static UI page. The logic for its CTA buttons is the next task.
+-   : Rewritten to be a passthrough component that no longer blocks any features.
+-   : Emptied and neutralized.
+-   : Modified to remove the .
+-   : This file was identified as containing a hardcoded price of . Although the frontend logic that used it was removed, this backend file may still exist and should be noted for the rebuild.
 
 **Areas that need refactoring**:
--   The entire subscription flow needs to be refactored based on the findings of the last audit. Specifically,  must be simplified to remove its redundant logic and  call.
+-   The entire subscription system needs to be rebuilt from scratch, starting with implementing the logic for the buttons on the new  page.
 
 **key api endpoints**
--   : Receives real-time subscription events from RevenueCat.
+-   All previous subscription-related endpoints (like ) are now obsolete and will need to be re-evaluated during the rebuild.
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   **Your P0 task is to fix the subscription system.** The last audit report is your source of truth. DO NOT assume previous fixes worked. Create a plan to address the three critical issues identified in the audit:
-    1.  Remove the duplicate  call in .
-    2.  Refactor  to remove its local  logic and rely only on the global context.
-    3.  Ask the user for the correct Product ID and update .
--   Present this plan to the user before implementing any changes.
--   The user is technical and provides precise instructions. Follow them carefully.
--   The PDF generation bug is a recurring P1 issue to be addressed after the subscription system is definitively fixed and verified by the user.
+-   The previous subscription system was **intentionally and completely removed** at the user's request. Your task is to continue rebuilding it from scratch.
+-   The UI for the new subscription page () is already built. Your immediate P0 task is to implement the functionality for the CTA buttons on that page, as per the user's last detailed prompt.
+    -   Start Free Trial should open a pop-up with specific text.
+-   After implementing the button logic, you will need to re-integrate a payment provider (likely RevenueCat) from zero. Plan this carefully.
+-   Note the price discrepancy: the user requested R9,99/mês, but the agent implemented 9.99/month. Clarify this with the user before implementing payment logic.
 
 **documents and test reports created in this job**
--    was updated.
+-    was updated to reflect the removal of the old subscription system.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Asks why the app shows Premium when there are no premium plans, only PRO.
-2.  **Agent**: Clarifies that isPremium is just a variable name and the code is correctly checking for the  entitlement. Offers to rename variables for consistency.
-3.  **User**: Reports that the build is still not working; the features remain locked after starting a trial.
-4.  **Agent**: Identifies that  isn't updating the global state and applies a fix.
-5.  **User**: Requests a final, comprehensive, read-only audit to understand the current state and why it's still failing. (Latest request that was acted upon).
-6.  **Agent**: Performs the audit and delivers a detailed report identifying the dual SDK initialization and inconsistent logic as the likely root causes.
-7.  **User**: Asks for a final, detailed audit of the entire system.
-8.  **Agent**: Acknowledges the request.
-9.  **User**: Asks for a final, detailed audit of the entire system.
-10. **Agent**: Delivers the final audit report, which is the last major action of the session.
+1.  **User**: Confirms build  was successful after the agent's code corrections.
+2.  **Agent**: Acknowledges and prepares to investigate why packages are still not loading.
+3.  **Agent**: Identifies a potential race condition and corrects the code to load offerings automatically during SDK initialization.
+4.  **User**: Asks why RevenueCat shows Missing Metadata.
+5.  **Agent**: Explains it's a normal sync issue with App Store Connect and doesn't block testing.
+6.  **User**: Submits deployment logs showing a build failure.
+7.  **Agent**: Analyzes logs and correctly identifies the error as an iOS certificate mismatch, not a code issue.
+8.  **User**: Asks about a  price showing up in a backend-generated alert, questioning where it comes from.
+9.  **Agent**: Investigates and finds the  value is hardcoded in the backend.
+10. **User**: Provides a detailed prompt to **remove the entire subscription system completely** and start from a clean slate.
+11. **User**: Provides a second detailed prompt to **re-write the subscription page** with specific static content and CTA buttons. (This was the last actioned prompt).
 
 **Project Health Check:**
--   **Broken**: The core monetization flow (premium subscription) is non-functional in TestFlight builds, despite multiple attempts to fix it. The final audit has identified the likely architectural flaws.
+-   **Broken**: The app has no monetization system.
+-   **Mocked**: The new subscription page () is a static mock-up. Its buttons are placeholders with no functionality.
 
 **3rd Party Integrations**
--   **RevenueCat ()**: Central to the app's monetization.
--   **App Store Connect**: Linked to RevenueCat for handling real purchases.
+-   **RevenueCat ()**: Was the primary integration, but has been logically removed. The plan is to re-integrate it.
 
 **Testing status**
 -   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None
--   **Known regressions**: The subscription system is in a broken state. The  PDF export is a known, persistent regression.
+-   **Known regressions**: PDF export in  is a known, persistent regression.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
--   The user is testing on TestFlight with their own sandbox/real account.
+-   The user has a sandbox account () for TestFlight testing.
 
 **What agent forgot to execute**
--   The agent did not forget tasks, but rather followed a complex, user-driven debugging path. The final state leaves critical architectural flaws (dual SDK init, inconsistent logic) unfixed because the user's last instruction was to perform a **read-only audit** and **not implement any corrections**. The next agent's first job is to fix these identified issues.</analysis>
+-   The agent created the UI for the new subscription page but did not implement the functionality for the Start Free Trial (show a pop-up) and Cancel Subscription buttons, which was part of the user's detailed request.
+-   The agent implemented the price as  instead of the requested  on the new UI.</analysis>
