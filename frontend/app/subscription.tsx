@@ -1,9 +1,11 @@
 /**
  * Subscription Page
- * Tela de Assinaturas - Plano Pro
+ * 
+ * Tela de gerenciamento de assinatura com integração RevenueCat
+ * Mostra status atual, funcionalidades e opções de compra/cancelamento
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,128 +14,284 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
-  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useRevenueCat } from '../contexts/RevenueCatContext';
+import { formatPrice } from '../services/revenuecat';
+
+// ============================================
+// TIPOS E CONSTANTES
+// ============================================
 
 interface FeatureSection {
-  title: string;
+  title: { pt: string; en: string };
   icon: string;
-  features: string[];
+  features: { pt: string; en: string }[];
 }
 
 const FEATURE_SECTIONS: FeatureSection[] = [
   {
-    title: "What You'll Access",
+    title: { 
+      pt: "O que você terá acesso", 
+      en: "What You'll Access" 
+    },
     icon: "rocket-outline",
     features: [
-      "GPS-Based Automatic Load Management and Prescription",
-      "Individualized daily and weekly periodization in seconds",
-      "Based on the athlete's own history",
-      "Validated scientific models applied automatically",
-      "Precise control of external load and progression",
+      { pt: "Gestão automática de carga baseada em GPS", en: "GPS-Based Automatic Load Management and Prescription" },
+      { pt: "Periodização diária e semanal individualizada em segundos", en: "Individualized daily and weekly periodization in seconds" },
+      { pt: "Baseado no histórico próprio do atleta", en: "Based on the athlete's own history" },
+      { pt: "Modelos científicos validados aplicados automaticamente", en: "Validated scientific models applied automatically" },
+      { pt: "Controle preciso de carga externa e progressão", en: "Precise control of external load and progression" },
     ],
   },
   {
-    title: "Complete GPS Performance Metrics",
+    title: { 
+      pt: "Métricas Completas de Performance GPS", 
+      en: "Complete GPS Performance Metrics" 
+    },
     icon: "analytics-outline",
     features: [
-      "Total Distance",
-      "High Speed Running (HSR)",
-      "High Intensity Distance (HID)",
-      "Sprint Distance",
-      "Number of sprints",
-      "Accelerations and decelerations",
-      "Longitudinal monitoring and trend analysis",
+      { pt: "Distância Total", en: "Total Distance" },
+      { pt: "High Speed Running (HSR)", en: "High Speed Running (HSR)" },
+      { pt: "High Intensity Distance (HID)", en: "High Intensity Distance (HID)" },
+      { pt: "Distância de Sprint", en: "Sprint Distance" },
+      { pt: "Número de sprints", en: "Number of sprints" },
+      { pt: "Acelerações e desacelerações", en: "Accelerations and decelerations" },
+      { pt: "Monitoramento longitudinal e análise de tendências", en: "Longitudinal monitoring and trend analysis" },
     ],
   },
   {
-    title: "Integrated Video-Based Velocity Based Training (VBT) System",
+    title: { 
+      pt: "Sistema VBT Integrado via Vídeo", 
+      en: "Integrated Video-Based VBT System" 
+    },
     icon: "videocam-outline",
     features: [
-      "Real-time velocity measurement using the camera",
-      "Precise analysis of repetitions and execution",
-      "Immediate feedback for load adjustment",
-      "No additional hardware required",
+      { pt: "Medição de velocidade em tempo real usando a câmera", en: "Real-time velocity measurement using the camera" },
+      { pt: "Análise precisa de repetições e execução", en: "Precise analysis of repetitions and execution" },
+      { pt: "Feedback imediato para ajuste de carga", en: "Immediate feedback for load adjustment" },
+      { pt: "Sem necessidade de hardware adicional", en: "No additional hardware required" },
     ],
   },
   {
-    title: "Neuromuscular Assessment and Fatigue Monitoring",
+    title: { 
+      pt: "Avaliação Neuromuscular e Monitoramento de Fadiga", 
+      en: "Neuromuscular Assessment and Fatigue Monitoring" 
+    },
     icon: "fitness-outline",
     features: [
-      "Analysis of CMJ, DJ, and SL-CMJ",
-      "Automatic calculation of RSI (Reactive Strength Index)",
-      "Individualized fatigue index",
-      "Identification of lower limb asymmetries",
-      "Automatic insights for decision-making support",
+      { pt: "Análise de CMJ, DJ e SL-CMJ", en: "Analysis of CMJ, DJ, and SL-CMJ" },
+      { pt: "Cálculo automático de RSI (Reactive Strength Index)", en: "Automatic calculation of RSI (Reactive Strength Index)" },
+      { pt: "Índice de fadiga individualizado", en: "Individualized fatigue index" },
+      { pt: "Identificação de assimetrias de membros inferiores", en: "Identification of lower limb asymmetries" },
+      { pt: "Insights automáticos para suporte à decisão", en: "Automatic insights for decision-making support" },
     ],
   },
   {
-    title: "Physical Assessment and Body Composition",
+    title: { 
+      pt: "Avaliação Física e Composição Corporal", 
+      en: "Physical Assessment and Body Composition" 
+    },
     icon: "body-outline",
     features: [
-      "Structured record of physical assessments",
-      "Longitudinal monitoring of evolution",
-      "Centralization of all athlete data in a single environment",
+      { pt: "Registro estruturado de avaliações físicas", en: "Structured record of physical assessments" },
+      { pt: "Monitoramento longitudinal da evolução", en: "Longitudinal monitoring of evolution" },
+      { pt: "Centralização de todos os dados do atleta em um único ambiente", en: "Centralization of all athlete data in a single environment" },
     ],
   },
   {
-    title: "Intelligent Wellness Collection System via Token",
+    title: { 
+      pt: "Sistema Inteligente de Wellness via Token", 
+      en: "Intelligent Wellness Collection System via Token" 
+    },
     icon: "heart-outline",
     features: [
-      "Direct integration between coach and athlete",
-      "The coach sends a unique token",
-      "The athlete accesses without login and without needing an account",
-      "Fast and intuitive filling",
-      "Data sent automatically to the coach's dashboard",
-      "Instant database update",
+      { pt: "Integração direta entre treinador e atleta", en: "Direct integration between coach and athlete" },
+      { pt: "O treinador envia um token único", en: "The coach sends a unique token" },
+      { pt: "O atleta acessa sem login e sem precisar de conta", en: "The athlete accesses without login and without needing an account" },
+      { pt: "Preenchimento rápido e intuitivo", en: "Fast and intuitive filling" },
+      { pt: "Dados enviados automaticamente ao dashboard do treinador", en: "Data sent automatically to the coach's dashboard" },
     ],
   },
   {
-    title: "Professional Dashboard and Applied Intelligence",
+    title: { 
+      pt: "Dashboard Profissional e Inteligência Aplicada", 
+      en: "Professional Dashboard and Applied Intelligence" 
+    },
     icon: "bar-chart-outline",
     features: [
-      "Clear and structured data visualization",
-      "Automatic science-based insights",
-      "Identification of patterns, risks, and opportunities",
-      "Direct support for evidence-based decision making",
+      { pt: "Visualização clara e estruturada de dados", en: "Clear and structured data visualization" },
+      { pt: "Insights automáticos baseados em ciência", en: "Automatic science-based insights" },
+      { pt: "Identificação de padrões, riscos e oportunidades", en: "Identification of patterns, risks, and opportunities" },
+      { pt: "Suporte direto à tomada de decisão baseada em evidências", en: "Direct support for evidence-based decision making" },
     ],
   },
 ];
 
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
+
 export default function Subscription() {
   const router = useRouter();
   const { locale } = useLanguage();
-  const [showTrialModal, setShowTrialModal] = useState(false);
+  const {
+    isPro,
+    isTrialing,
+    isLoading,
+    daysRemaining,
+    expirationDate,
+    willRenew,
+    currentPackage,
+    startTrial,
+    purchaseSubscription,
+    restorePurchases,
+    openManageSubscriptions,
+    refreshStatus,
+  } = useRevenueCat();
 
-  const handleStartTrial = () => {
-    setShowTrialModal(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Atualiza status ao montar
+  useEffect(() => {
+    refreshStatus();
+  }, []);
+
+  // ============================================
+  // HANDLERS
+  // ============================================
+
+  const handleStartTrial = async () => {
+    setIsProcessing(true);
+    
+    try {
+      const result = await startTrial();
+      
+      if (result.success) {
+        Alert.alert(
+          locale === 'pt' ? 'Sucesso!' : 'Success!',
+          locale === 'pt'
+            ? 'Seu período de testes foi ativado! Aproveite todas as funcionalidades.'
+            : 'Your trial period is activated! Enjoy all features.',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else if (result.error === 'cancelled') {
+        // Usuário cancelou, não mostra alerta
+      } else {
+        Alert.alert(
+          locale === 'pt' ? 'Erro' : 'Error',
+          result.error || (locale === 'pt' ? 'Não foi possível iniciar o trial.' : 'Could not start trial.')
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Ocorreu um erro. Tente novamente.' : 'An error occurred. Please try again.'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleConfirmTrial = () => {
-    setShowTrialModal(false);
-    // TODO: Implementar início do trial via RevenueCat
-    Alert.alert(
-      locale === 'pt' ? 'Em Breve' : 'Coming Soon',
-      locale === 'pt' 
-        ? 'O sistema de pagamentos está sendo implementado.'
-        : 'The payment system is being implemented.'
+  const handleRestorePurchases = async () => {
+    setIsProcessing(true);
+    
+    try {
+      const result = await restorePurchases();
+      
+      if (result.success) {
+        Alert.alert(
+          locale === 'pt' ? 'Sucesso!' : 'Success!',
+          locale === 'pt'
+            ? 'Sua assinatura foi restaurada com sucesso!'
+            : 'Your subscription has been restored successfully!',
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } else {
+        Alert.alert(
+          locale === 'pt' ? 'Aviso' : 'Notice',
+          result.error || (locale === 'pt' 
+            ? 'Nenhuma compra anterior encontrada para esta conta.'
+            : 'No previous purchases found for this account.')
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Ocorreu um erro. Tente novamente.' : 'An error occurred. Please try again.'
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleManageSubscription = async () => {
+    await openManageSubscriptions();
+  };
+
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  const getPrice = () => {
+    if (currentPackage) {
+      return formatPrice(currentPackage);
+    }
+    return '$39.99';
+  };
+
+  const formatExpirationDate = () => {
+    if (!expirationDate) return '';
+    
+    return expirationDate.toLocaleDateString(locale === 'pt' ? 'pt-BR' : 'en-US', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  const getStatusBadge = () => {
+    if (isTrialing) {
+      return {
+        text: locale === 'pt' ? 'TRIAL ATIVO' : 'TRIAL ACTIVE',
+        color: colors.status.info,
+      };
+    }
+    if (isPro) {
+      return {
+        text: locale === 'pt' ? 'PRO ATIVO' : 'PRO ACTIVE',
+        color: colors.status.success,
+      };
+    }
+    return {
+      text: locale === 'pt' ? 'SEM ASSINATURA' : 'NO SUBSCRIPTION',
+      color: colors.status.error,
+    };
+  };
+
+  const statusBadge = getStatusBadge();
+
+  // ============================================
+  // RENDER
+  // ============================================
+
+  if (isLoading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.accent.primary} />
+          <Text style={styles.loadingText}>
+            {locale === 'pt' ? 'Carregando...' : 'Loading...'}
+          </Text>
+        </View>
+      </SafeAreaView>
     );
-  };
-
-  const handleCancelSubscription = () => {
-    Alert.alert(
-      locale === 'pt' ? 'Cancelar Assinatura' : 'Cancel Subscription',
-      locale === 'pt'
-        ? 'Para cancelar sua assinatura, acesse as configurações da App Store no seu dispositivo.'
-        : 'To cancel your subscription, access the App Store settings on your device.',
-      [{ text: 'OK' }]
-    );
-  };
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -143,8 +301,8 @@ export default function Subscription() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
+          <TouchableOpacity
+            onPress={() => router.back()}
             style={styles.backButton}
             data-testid="subscription-back-btn"
           >
@@ -156,11 +314,45 @@ export default function Subscription() {
           <View style={styles.placeholder} />
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Status Section (se tem assinatura ativa) */}
+          {isPro && (
+            <View style={styles.statusSection}>
+              <View style={[styles.statusBadge, { backgroundColor: statusBadge.color + '20' }]}>
+                <Ionicons
+                  name={isTrialing ? 'time' : 'checkmark-circle'}
+                  size={16}
+                  color={statusBadge.color}
+                />
+                <Text style={[styles.statusBadgeText, { color: statusBadge.color }]}>
+                  {statusBadge.text}
+                </Text>
+              </View>
+              
+              <View style={styles.statusInfo}>
+                {isTrialing && (
+                  <Text style={styles.statusText}>
+                    {locale === 'pt'
+                      ? `${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'} restantes do trial`
+                      : `${daysRemaining} ${daysRemaining === 1 ? 'day' : 'days'} remaining in trial`}
+                  </Text>
+                )}
+                
+                {expirationDate && (
+                  <Text style={styles.expirationText}>
+                    {locale === 'pt'
+                      ? `${willRenew ? 'Renova' : 'Expira'} em: ${formatExpirationDate()}`
+                      : `${willRenew ? 'Renews' : 'Expires'} on: ${formatExpirationDate()}`}
+                  </Text>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* Plan Header */}
           <View style={styles.planHeader}>
             <View style={styles.proBadge}>
@@ -170,7 +362,7 @@ export default function Subscription() {
               {locale === 'pt' ? 'Plano Pro' : 'Pro Plan'}
             </Text>
             <View style={styles.priceContainer}>
-              <Text style={styles.priceValue}>$39.99</Text>
+              <Text style={styles.priceValue}>{getPrice()}</Text>
               <Text style={styles.pricePeriod}>
                 /{locale === 'pt' ? 'mês' : 'month'}
               </Text>
@@ -182,9 +374,9 @@ export default function Subscription() {
               </Text>
             </View>
             <Text style={styles.cancelPolicySubtext}>
-              {locale === 'pt' 
-                ? 'A assinatura permanece ativa até o final do período de 30 dias.'
-                : 'Subscription remains active until the end of the 30-day period.'}
+              {locale === 'pt'
+                ? 'A assinatura permanece ativa até o final do período vigente.'
+                : 'Subscription remains active until the end of the current period.'}
             </Text>
           </View>
 
@@ -193,24 +385,28 @@ export default function Subscription() {
             <View key={index} style={styles.featureSection}>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionIconContainer}>
-                  <Ionicons 
-                    name={section.icon as any} 
-                    size={22} 
-                    color={colors.accent.primary} 
+                  <Ionicons
+                    name={section.icon as any}
+                    size={22}
+                    color={colors.accent.primary}
                   />
                 </View>
-                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <Text style={styles.sectionTitle}>
+                  {locale === 'pt' ? section.title.pt : section.title.en}
+                </Text>
               </View>
               <View style={styles.featureList}>
                 {section.features.map((feature, featureIndex) => (
                   <View key={featureIndex} style={styles.featureItem}>
-                    <Ionicons 
-                      name="checkmark" 
-                      size={16} 
-                      color={colors.accent.primary} 
+                    <Ionicons
+                      name="checkmark"
+                      size={16}
+                      color={colors.accent.primary}
                       style={styles.featureCheck}
                     />
-                    <Text style={styles.featureText}>{feature}</Text>
+                    <Text style={styles.featureText}>
+                      {locale === 'pt' ? feature.pt : feature.en}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -219,112 +415,89 @@ export default function Subscription() {
 
           {/* CTA Buttons */}
           <View style={styles.ctaContainer}>
-            <TouchableOpacity 
-              style={styles.trialButton}
-              onPress={handleStartTrial}
-              data-testid="start-trial-btn"
-            >
-              <LinearGradient
-                colors={[colors.accent.primary, colors.accent.secondary]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.trialButtonGradient}
-              >
-                <Ionicons name="play-circle" size={24} color="#FFFFFF" />
-                <Text style={styles.trialButtonText}>
-                  {locale === 'pt' ? 'Iniciar Período de Testes' : 'Start Free Trial'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={handleCancelSubscription}
-              data-testid="cancel-subscription-btn"
-            >
-              <Text style={styles.cancelButtonText}>
-                {locale === 'pt' ? 'Cancelar Assinatura' : 'Cancel Subscription'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Footer spacing */}
-          <View style={styles.footer} />
-        </ScrollView>
-
-        {/* Trial Modal */}
-        <Modal
-          visible={showTrialModal}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={() => setShowTrialModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Ionicons name="gift-outline" size={48} color={colors.accent.primary} />
-                <Text style={styles.modalTitle}>
-                  {locale === 'pt' ? 'Período de Testes Gratuito' : 'Free Trial Period'}
-                </Text>
-              </View>
-              
-              <View style={styles.modalBody}>
-                <View style={styles.trialInfoItem}>
-                  <Ionicons name="calendar-outline" size={24} color={colors.text.secondary} />
-                  <Text style={styles.trialInfoText}>
-                    {locale === 'pt' ? '7 dias gratuitos' : '7 days free'}
-                  </Text>
-                </View>
-                <View style={styles.trialInfoItem}>
-                  <Ionicons name="card-outline" size={24} color={colors.text.secondary} />
-                  <Text style={styles.trialInfoText}>
-                    {locale === 'pt' 
-                      ? 'Após o período de testes, será cobrado automaticamente $39.99 USD/mês'
-                      : 'After the trial period, $39.99 USD/month will be charged automatically'}
-                  </Text>
-                </View>
-                <View style={styles.trialInfoItem}>
-                  <Ionicons name="close-circle-outline" size={24} color={colors.text.secondary} />
-                  <Text style={styles.trialInfoText}>
-                    {locale === 'pt' 
-                      ? 'Cancele a qualquer momento antes do término do período de testes para não ser cobrado'
-                      : 'Cancel anytime before the trial ends to avoid being charged'}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity 
-                  style={styles.modalCancelButton}
-                  onPress={() => setShowTrialModal(false)}
-                >
-                  <Text style={styles.modalCancelButtonText}>
-                    {locale === 'pt' ? 'Voltar' : 'Back'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.modalConfirmButton}
-                  onPress={handleConfirmTrial}
+            {!isPro ? (
+              // Não tem assinatura - mostrar botão de trial
+              <>
+                <TouchableOpacity
+                  style={styles.trialButton}
+                  onPress={handleStartTrial}
+                  disabled={isProcessing}
+                  data-testid="start-trial-btn"
                 >
                   <LinearGradient
                     colors={[colors.accent.primary, colors.accent.secondary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
-                    style={styles.modalConfirmButtonGradient}
+                    style={styles.trialButtonGradient}
                   >
-                    <Text style={styles.modalConfirmButtonText}>
-                      {locale === 'pt' ? 'Iniciar Trial' : 'Start Trial'}
-                    </Text>
+                    {isProcessing ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="play-circle" size={24} color="#FFFFFF" />
+                        <Text style={styles.trialButtonText}>
+                          {locale === 'pt' ? 'Iniciar 7 Dias Grátis' : 'Start 7-Day Free Trial'}
+                        </Text>
+                      </>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
-              </View>
-            </View>
+
+                <TouchableOpacity
+                  style={styles.restoreButton}
+                  onPress={handleRestorePurchases}
+                  disabled={isProcessing}
+                  data-testid="restore-purchases-btn"
+                >
+                  <Text style={styles.restoreButtonText}>
+                    {locale === 'pt' ? 'Restaurar Compras' : 'Restore Purchases'}
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Trial Info */}
+                <View style={styles.trialInfoBox}>
+                  <Ionicons name="information-circle" size={20} color={colors.text.secondary} />
+                  <Text style={styles.trialInfoText}>
+                    {locale === 'pt'
+                      ? `7 dias gratuitos. Após o trial, será cobrado ${getPrice()} USD/mês automaticamente. Cancele a qualquer momento.`
+                      : `7 days free. After trial, ${getPrice()} USD/month will be charged automatically. Cancel anytime.`}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              // Tem assinatura - mostrar botão de gerenciar
+              <>
+                <TouchableOpacity
+                  style={styles.manageButton}
+                  onPress={handleManageSubscription}
+                  data-testid="manage-subscription-btn"
+                >
+                  <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
+                  <Text style={styles.manageButtonText}>
+                    {locale === 'pt' ? 'Gerenciar Assinatura' : 'Manage Subscription'}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={styles.manageHint}>
+                  {locale === 'pt'
+                    ? 'Você será redirecionado para as configurações da App Store para gerenciar ou cancelar sua assinatura.'
+                    : 'You will be redirected to App Store settings to manage or cancel your subscription.'}
+                </Text>
+              </>
+            )}
           </View>
-        </Modal>
+
+          {/* Footer spacing */}
+          <View style={styles.footer} />
+        </ScrollView>
       </LinearGradient>
     </SafeAreaView>
   );
 }
+
+// ============================================
+// ESTILOS
+// ============================================
 
 const styles = StyleSheet.create({
   container: {
@@ -333,6 +506,16 @@ const styles = StyleSheet.create({
   },
   gradient: {
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.text.secondary,
   },
   header: {
     flexDirection: 'row',
@@ -360,6 +543,40 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 20,
     paddingTop: 24,
+  },
+  statusSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  statusInfo: {
+    alignItems: 'center',
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 4,
+  },
+  expirationText: {
+    fontSize: 14,
+    color: colors.text.secondary,
   },
   planHeader: {
     alignItems: 'center',
@@ -485,92 +702,57 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginLeft: 10,
   },
-  cancelButton: {
+  restoreButton: {
     alignItems: 'center',
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
     borderRadius: 14,
+    marginBottom: 20,
   },
-  cancelButtonText: {
+  restoreButtonText: {
     color: colors.text.secondary,
     fontSize: 15,
     fontWeight: '600',
+  },
+  trialInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 14,
+  },
+  trialInfoText: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    marginLeft: 10,
+    flex: 1,
+    lineHeight: 18,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  manageButtonText: {
+    color: colors.text.primary,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
+  manageHint: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   footer: {
     height: 40,
-  },
-  // Modal styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 20,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  modalBody: {
-    marginBottom: 24,
-  },
-  trialInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-    paddingRight: 8,
-  },
-  trialInfoText: {
-    fontSize: 15,
-    color: colors.text.secondary,
-    marginLeft: 14,
-    flex: 1,
-    lineHeight: 22,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalCancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-  },
-  modalCancelButtonText: {
-    color: colors.text.secondary,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  modalConfirmButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  modalConfirmButtonGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  modalConfirmButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
   },
 });
