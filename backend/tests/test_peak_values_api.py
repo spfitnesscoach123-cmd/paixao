@@ -17,7 +17,7 @@ import requests
 import os
 
 # Use the public URL from frontend .env
-BASE_URL = "https://athlete-load-monitor.preview.emergentagent.com"
+BASE_URL = "https://subscription-audit-6.preview.emergentagent.com"
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"

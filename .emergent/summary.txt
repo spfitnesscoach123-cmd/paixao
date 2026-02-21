@@ -1,180 +1,197 @@
 <analysis>**original_problem_statement:**
-The user's primary goal is to build a robust Load Manager application for sports coaches and athletes. The work in this session was driven by a series of specific user requests:
+The user's primary goal is to build a robust Load Manager application for sports coaches and athletes, with a key focus on implementing a flawless premium subscription system using RevenueCat.
 
-1.  **VBT Overlay Implementation & Enhancement:**
-    *   The user first requested the implementation of a  component for the VBT camera screen. This overlay needed to display a colored border (green/orange/red) to indicate the percentage of velocity loss during an exercise. The implementation had to be purely visual, without interfering with the camera or VBT calculations.
-    *   Following the initial implementation, the user requested an audit to ensure perfect consistency between the calculated  value and the color displayed.
-    *   Finally, the user requested a major visual upgrade for the overlay, including a continuous color gradient, smooth fade animations, a trend indicator (up/down/stable arrow), a percentage display, and a subtle pulse effect for high fatigue levels. This had to be done by only modifying the  file.
+The work in this session was driven by a series of user requests to fix the subscription system, which was failing to unlock premium features after a user started a trial on TestFlight. The user provided multiple, highly specific prompts to audit and refactor the access logic.
 
-2.  **Subscription & Premium Access Control:**
-    *   The user requested a complete audit of the application's subscription system (free trial, auto-renewal, feature access control) to identify any security flaws or implementation gaps.
-    *   After the audit revealed critical vulnerabilities (premium features were accessible to all users), the user instructed the agent to implement a global premium access gate system. This involved ensuring all features are locked behind a paywall, accessible only to users with an active trial or subscription, managed through RevenueCat.
+**Initial user requests from the previous fork:**
+1.  **VBT Overlay Implementation & Enhancement:** Implement and visually enhance a  for the VBT camera screen.
+2.  **Subscription & Premium Access Control:** Audit and implement a global premium access gate to secure all premium features behind a paywall managed by RevenueCat.
+
+**Recent user requests in this session:**
+1.  **Refactor Premium Access Logic:** Mandated a refactor to base access *exclusively* on .
+2.  **Audit for Entitlement ID:** Requested a read-only audit to confirm the code was using the wrong entitlement ID ( instead of ).
+3.  **Guided RevenueCat Setup:** The user required step-by-step guidance to configure their RevenueCat dashboard, App Store Connect keys, and environment variables.
+4.  **Final Comprehensive Audit:** After previous fixes failed, the user requested a final, exhaustive, read-only audit to diagnose why the system was still broken. The agent performed this audit and delivered a detailed report identifying several critical issues, but was instructed **not to implement any fixes**.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent successfully completed two major user-driven tasks:
+The application has a subscription system that has undergone multiple refactoring and patching attempts. The core logic in  is designed to grant access based on the  of the user's entitlement. All premium features are wrapped in a  component that checks this global state.
 
-1.  **Advanced :** A visually rich  component was created and integrated. It now features a continuous color gradient, smooth animations, a trend indicator, and a pulse effect, all based on the  prop, without altering any underlying VBT logic.
-2.  **Global Premium Access System:** A comprehensive subscription gate system has been implemented across the application.
-    *   A new  component was created to act as a wrapper that checks the user's subscription status.
-    *   The app's root layout () was wrapped with the , making the subscription state globally available via the  hook.
-    *   All key premium features and pages, including , , , and data-entry screens, are now protected by the . This system is designed to block access for non-subscribed users after their trial period ends and display an upgrade prompt.
+However, the last audit revealed several critical architectural flaws that prevent the system from working correctly. The RevenueCat SDK is initialized in two different places, and the subscription page () uses its own inconsistent logic () instead of relying on the global context, which leads to a broken user experience. The Product ID defined in the code also appears to be incorrect.
 
-The core logic for RevenueCat integration (, ) now correctly underpins the entire application's access control.
+The last action was a comprehensive, read-only audit that identified these specific flaws. The code is currently in a non-working state regarding subscriptions.
 
 **Last working item**:
--   **Last item agent was working**: Implementing a global premium access gate system. The agent created a  component, wrapped the root layout in , and applied the gate to all premium features across the app (e.g., , , , etc.).
--   **Status**: USER VERIFICATION PENDING
--   **Agent Testing Done**: N
--   **Which testing method agent to use?**: Frontend testing agent. This is a critical, app-wide change. The test plan should include:
-    1.  Verifying that a non-subscribed user attempting to access a premium feature (like VBT Camera) is blocked and sees the 's upgrade message.
-    2.  Verifying that a user with a mocked pro or trial status can access the same feature without being blocked.
--   **User Testing Done**: N
+-   **Last item agent was working**: Performing a comprehensive, read-only audit of the entire subscription system as requested by the user. The goal was to produce a detailed diagnostic report explaining why the premium access was still failing.
+-   **Status**: NONE (The task was a diagnostic audit, not an implementation, and it has been completed by delivering the report.)
+-   **Agent Testing Done**: N/A
+-   **Which testing method agent to use?**: Frontend testing agent
+-   **User Testing Done**: Y (The user has confirmed via TestFlight that the subscription flow is still broken, which prompted the final audit.)
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Verify the new Premium Access Gate system (P0)
--   **Issue 2**: PDF Generation in Análise Científica causes app to freeze/crash (P0)
--   **Issue 3**: Frontend ACWR Metric Selector on Dashboard is missing (P1)
+-   **Issue 1**: Dual SDK Initialization (P0)
+-   **Issue 2**: Inconsistent Entitlement Check Logic ( vs ) (P0)
+-   **Issue 3**: Mismatched Product ID (P0)
+-   **Issue 4**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
+-   **Issue 5**: Frontend ACWR Metric Selector on Dashboard is missing (P2)
 
 **Issues Detail**:
--   **Issue 1**: Verify the new Premium Access Gate system
-    -   **Attempted fixes**: This is a new implementation, no fixes have been attempted.
-    -   **Next debug checklist**: Use the frontend testing agent to execute a test plan.
-        1.  Confirm the  component correctly blocks access when  and  are false.
-        2.  Confirm the  allows access when either  or  is true.
-        3.  Check multiple protected pages (, , ) to ensure the gate is active everywhere.
-        4.  Ensure the  in  is correctly providing the context to all child components.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is the core monetization feature of the app. Verifying its correctness ensures the business logic is sound and prevents revenue loss.
-    -   **Status**: USER VERIFICATION PENDING
+-   **Issue 1**: Dual SDK Initialization
+    -   **Attempted fixes**: None. This was discovered in the final audit.
+    -   **Next debug checklist**:
+        1.  The audit revealed that  is called in both  (line 166) and  (line 129).
+        2.  The call in  must be removed to ensure the SDK is only initialized once, globally, within .
+    -   **Why fix this issue and what will be achieved with the fix?**: Calling  twice can lead to race conditions, lost state, and unpredictable behavior. A single, global initialization is required for a stable subscription system.
+    -   **Status**: NOT STARTED
     -   **Is recurring issue?**: N
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
--   **Issue 2**: PDF Generation in Análise Científica causes app to freeze/crash
-    -   **Attempted fixes**: Multiple failed attempts, including removing a WebView modal, using a direct  call, and a direct-to-share flow. The feature remains critically broken.
+-   **Issue 2**: Inconsistent Entitlement Check Logic ( vs )
+    -   **Attempted fixes**: None. This was discovered in the final audit.
     -   **Next debug checklist**:
-        1.  Analyze the working PDF implementation in .
-        2.  Replicate the exact pattern (state management, HTML generation,  block, and  usage) in .
-        3.  The root cause is likely related to capturing the view () or a race condition that blocks the UI thread. Do not attempt a novel solution; copy the working one.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical, user-facing feature that is completely broken. Fixing it is essential for user satisfaction and app stability.
+        1.  The audit found that  correctly uses  to determine access, which works even for canceled-but-still-valid subscriptions.
+        2.  However,  uses  for its local checks and to provide user feedback (e.g., success alert).
+        3.  Refactor  to completely remove its local verification logic (, checks on ). It should *only* rely on the  state and  function from the  context.
+    -   **Why fix this issue and what will be achieved with the fix?**: This will create a single source of truth for subscription status. It will fix the bug where the UI doesn't give success feedback even when the purchase was successful, which is confusing the user.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: N
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None
+
+-   **Issue 3**: Mismatched Product ID
+    -   **Attempted fixes**: None. This was discovered in the final audit.
+    -   **Next debug checklist**:
+        1.  The file  defines .
+        2.  This ID does not follow the app's bundle identifier pattern ().
+        3.  The agent must ask the user to confirm the exact Product ID from App Store Connect for their monthly subscription.
+        4.  Update the  value in  with the correct ID provided by the user.
+    -   **Why fix this issue and what will be achieved with the fix?**: If the product ID is wrong, RevenueCat cannot fetch the correct product to initiate a purchase, causing the entire flow to fail.
+    -   **Status**: BLOCKED (Requires user input for the correct Product ID)
+    -   **Is recurring issue?**: N
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None
+
+-   **Issue 4**: PDF Generation in Análise Científica causes app to freeze/crash
+    -   **Attempted fixes**: Multiple failed attempts in previous sessions. Feature remains broken.
+    -   **Next debug checklist**: Replicate the working PDF implementation from  into . Do not try a new approach.
+    -   **Why fix this issue and what will be achieved with the fix?**: Fixes a critical, user-facing feature that is completely broken.
     -   **Status**: NOT STARTED
     -   **Is recurring issue?**: Y
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
--   **Issue 3**: Frontend ACWR Metric Selector on Dashboard is missing
-    -   **Attempted fixes**: None. The backend is ready, but the UI was never built.
-    -   **Next debug checklist**:
-        1.  Add a dropdown/selector component to the main dashboard.
-        2.  Populate it with ACWR metric options (e.g., Dist. Total, HID Z3).
-        3.  Use  to manage the selection.
-        4.  Update the data queries and displays on the dashboard to reflect the chosen metric.
-    -   **Why fix this issue and what will be achieved with the fix?**: Completes a core feature request, allowing coaches to analyze load across different metrics.
+-   **Issue 5**: Frontend ACWR Metric Selector on Dashboard is missing
+    -   **Attempted fixes**: None. This is a pending feature.
+    -   **Next debug checklist**: Add a dropdown/selector to the dashboard UI to allow users to select an ACWR metric, and update the data queries to reflect the selection.
+    -   **Why fix this issue and what will be achieved with the fix?**: Implements a requested core feature for load analysis.
     -   **Status**: NOT STARTED
     -   **Is recurring issue?**: N
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
 **In progress Task List**:
-None. The last task (premium gate implementation) is complete, pending verification.
+None.
 
 **Upcoming and Future Tasks**
 -   **Upcoming Tasks**:
-    -   (P1) Implement the frontend ACWR metric selector on the main dashboard.
     -   (P2) Complete the internationalization of the  component and the Avaliações (Assessments) page.
 -   **Future Tasks**:
     -   Test the  pipeline's integration with the .
     -   Integrate identity resolution into  and .
     -   Build a UI for manual resolution of ambiguous athlete names.
     -   Build a feature for merging duplicate athlete profiles.
-    -   Address the EAS Project Slug Conflict ( vs. ).
+    -   Address the EAS Project Slug Conflict.
 
 **Completed work in this session**
--   ** Implementation**: Created, audited, and enhanced the  component with advanced visual features (gradient color, animations, trend indicator, pulse effect).
--   **Subscription System Audit**: Performed a full audit of the subscription system, identifying critical flaws where premium features were not protected.
--   **Global Premium Access Gate**:
-    -   Created a reusable  component.
-    -   Wrapped the entire app in  in  to provide global subscription status.
-    -   Secured all premium features (, , , etc.) with the , effectively implementing the paywall.
+-   Guided the user through resolving Git merge conflicts.
+-   Refactored the subscription logic to use  as the source of truth.
+-   Audited the codebase and corrected the entitlement identifier from  to  and finally to  to match the user's RevenueCat setup.
+-   Corrected the  in  from  to  to match App Store Connect.
+-   Guided the user through generating and configuring all necessary App Store Connect keys (P8 In-App Purchase, P8 API Key) and the Shared Secret in the RevenueCat dashboard.
+-   Added the correct RevenueCat API keys ( and later ) to the project's  and  files.
+-   Attempted a fix for the global state not updating by making  call .
+-   Performed a final, comprehensive, read-only audit that successfully identified the remaining critical flaws in the subscription system.
 
 **Earlier issues found/mentioned but not fixed**
 -   **VBT Rep Counting & Regressions:** The original issues from a previous handoff (rep counting for Deadlift, graph consistency) remain untested and their status is unknown.
--   **ACWR Metric Selector on Dashboard:** As detailed in the Pending Issues section, the frontend for this feature was requested but never started.
 
 **Known issue recurrence from previous fork**
--   **PDF generation in **: This is a major recurring issue within the application's history, failing multiple times despite different fix attempts.
+-   **PDF generation in **: This is a major recurring issue that has failed to be fixed multiple times.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   React Native (Expo) development
--   FastAPI backend with webhooks
--   **RevenueCat SDK ()**: For managing in-app subscriptions, entitlements, and trials.
--   **React Context API**: Used to provide global subscription state (, ).
--   **Higher-Order Component (HOC) Pattern**: Implemented via  for reusable access control logic.
--   **React Native  API**: Used for advanced visual effects (color interpolation, opacity animations) in the .
--   React Hooks (, , , ).
+-   React Native (Expo)
+-   RevenueCat SDK ()
+-   React Context API for global state management
+-   App Store Connect integration (API Keys, Product IDs, Bundle IDs)
+-   Environment variable management (, )
 
 **key DB schema**
--   **subscriptions**: (in MongoDB) Caches subscription status received from RevenueCat webhooks. Contains fields like ,  ('trial', 'active', 'cancelled'), , .
+-   **subscriptions**: (in MongoDB) Caches subscription status received from RevenueCat webhooks.
 
 **changes in tech stack**
--   No new packages were added, but the usage of  (RevenueCat) was elevated from a single page to a core, app-wide dependency for access control.
+None.
 
 **All files of reference**
--   : **Critical.** Now wraps the entire application with .
--   : **Critical.** The new HOC that enforces the paywall.
--   : The context that provides ,  status.
--   : The file containing the advanced visual enhancements.
--   : An example of a premium page now protected by .
--   : Still contains the critical, broken PDF generation feature.
--   : Contains the webhook endpoint () that syncs subscription status.
+-   : **Critical.** Site of the primary  call and global state logic.
+-   : **Critical.** Site of the secondary  call and inconsistent local logic ().
+-   : **Critical.** Defines constants like  and .
+-   : The component that enforces the paywall.
+-   : Contains the app's .
+-   : Contains the environment variables for local development.
+-   : Contains the environment variables for EAS builds.
 
 **Areas that need refactoring**:
--   The PDF generation logic in  is broken and must be rewritten.
+-   The entire subscription flow needs to be refactored based on the findings of the last audit. Specifically,  must be simplified to remove its redundant logic and  call.
 
 **key api endpoints**
 -   : Receives real-time subscription events from RevenueCat.
--   : Backend endpoint to verify feature access (though the current implementation is frontend-first).
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   **Highest Priority (P0):** You MUST begin by verifying the newly implemented premium access gate system. It's a critical, app-wide feature that is completely untested. Use the frontend testing agent to confirm both blocked and allowed access scenarios.
--   **Second Priority (P0):** Once the subscription system is verified, the next task is to **definitively fix the PDF generation feature in **. Do not innovate; replicate the working logic from .
--   The  is complete. Do not modify it unless requested.
--   The implementation of the paywall was done by wrapping entire page components. This is a robust way to control access to routes.
+-   **Your P0 task is to fix the subscription system.** The last audit report is your source of truth. DO NOT assume previous fixes worked. Create a plan to address the three critical issues identified in the audit:
+    1.  Remove the duplicate  call in .
+    2.  Refactor  to remove its local  logic and rely only on the global context.
+    3.  Ask the user for the correct Product ID and update .
+-   Present this plan to the user before implementing any changes.
+-   The user is technical and provides precise instructions. Follow them carefully.
+-   The PDF generation bug is a recurring P1 issue to be addressed after the subscription system is definitively fixed and verified by the user.
 
 **documents and test reports created in this job**
 -    was updated.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User (latest):** Provided a detailed prompt to implement a global premium access gate system.
-2.  **User:** Requested a complete, read-only audit of the subscription system to find security holes.
-3.  **User:** Requested advanced visual enhancements for  (gradient color, animations, trend indicator, pulse effect).
-4.  **User:** Requested a full audit of  to ensure its color-changing logic was perfectly consistent with the data.
-5.  **User:** Provided detailed technical specifications for the  component, emphasizing it must be 100% visual and not interfere with any calculations.
-6.  (Older messages summarized for context): The user guided the agent through debugging and implementing the initial version of the .
+1.  **User**: Asks why the app shows Premium when there are no premium plans, only PRO.
+2.  **Agent**: Clarifies that isPremium is just a variable name and the code is correctly checking for the  entitlement. Offers to rename variables for consistency.
+3.  **User**: Reports that the build is still not working; the features remain locked after starting a trial.
+4.  **Agent**: Identifies that  isn't updating the global state and applies a fix.
+5.  **User**: Requests a final, comprehensive, read-only audit to understand the current state and why it's still failing. (Latest request that was acted upon).
+6.  **Agent**: Performs the audit and delivers a detailed report identifying the dual SDK initialization and inconsistent logic as the likely root causes.
+7.  **User**: Asks for a final, detailed audit of the entire system.
+8.  **Agent**: Acknowledges the request.
+9.  **User**: Asks for a final, detailed audit of the entire system.
+10. **Agent**: Delivers the final audit report, which is the last major action of the session.
 
 **Project Health Check:**
--   **Broken**: The PDF generation feature in Análise Científica remains critically broken and causes app instability.
--   **Unverified**: The entire premium access and subscription gate system is newly implemented and has not been tested. It is the most critical component to verify next.
+-   **Broken**: The core monetization flow (premium subscription) is non-functional in TestFlight builds, despite multiple attempts to fix it. The final audit has identified the likely architectural flaws.
 
 **3rd Party Integrations**
--   **RevenueCat ()**: Central to the app's monetization. Used for IAP, subscription status, and entitlement management.
--   , : Used for PDF features.
--   , , : Core of the VBT functionality.
+-   **RevenueCat ()**: Central to the app's monetization.
+-   **App Store Connect**: Linked to RevenueCat for handling real purchases.
 
 **Testing status**
 -   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None
--   **Known regressions**: The  PDF export is a known, persistent regression.
+-   **Known regressions**: The subscription system is in a broken state. The  PDF export is a known, persistent regression.
 
 **Credentials to test flow:**
 -   **Coach**:  / 
+-   The user is testing on TestFlight with their own sandbox/real account.
 
 **What agent forgot to execute**
--   The agent did not perform any testing or verification after implementing the app-wide premium access gate system. This is a significant oversight, as the change is critical and affects all users.
--   The agent did not address the pre-existing high-priority issues from the previous handoff (P0 PDF bug, P1 ACWR selector), as the user's new requests took precedence.</analysis>
+-   The agent did not forget tasks, but rather followed a complex, user-driven debugging path. The final state leaves critical architectural flaws (dual SDK init, inconsistent logic) unfixed because the user's last instruction was to perform a **read-only audit** and **not implement any corrections**. The next agent's first job is to fix these identified issues.</analysis>
