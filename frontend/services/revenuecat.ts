@@ -14,7 +14,7 @@ export const REVENUECAT_CONFIG = {
   // Product identifiers (must match App Store Connect / Google Play Console)
   // IMPORTANTE: Usar o Product ID exato configurado no App Store Connect
   PRODUCT_IDS: {
-    PRO_MONTHLY: 'loadmanagerpro_pro_monthly',
+    PRO_MONTHLY: 'pro_mensal',
   },
   
   // Offering identifier
