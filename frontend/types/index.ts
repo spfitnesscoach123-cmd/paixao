@@ -2,6 +2,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  role?: 'coach' | 'athlete'; // Papel do usuário no sistema
   created_at: string;
 }
 
