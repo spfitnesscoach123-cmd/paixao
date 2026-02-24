@@ -32,6 +32,7 @@ interface RevenueCatContextType {
   isPro: boolean;
   isTrialing: boolean;
   hasTrialAvailable: boolean;
+  periodType: 'trial' | 'intro' | 'normal' | null; // ISSUE 2 FIX: Adicionado periodType
   expirationDate: Date | null;
   daysRemaining: number;
   willRenew: boolean;
