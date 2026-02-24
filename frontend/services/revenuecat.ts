@@ -197,6 +197,7 @@ export const checkProAccess = (customerInfo: CustomerInfo | null): boolean => {
 
 /**
  * Verifica se o usuário está em período de trial
+ * ISSUE 2 FIX: Usa periodType do RevenueCat em vez de calcular dias
  */
 export const isInTrialPeriod = (customerInfo: CustomerInfo | null): boolean => {
   if (!customerInfo) return false;
@@ -204,19 +205,9 @@ export const isInTrialPeriod = (customerInfo: CustomerInfo | null): boolean => {
   const proEntitlement = customerInfo.entitlements.active[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
   if (!proEntitlement) return false;
   
-  // Verifica se a compra original foi há menos de 7 dias
-  const originalPurchaseDate = proEntitlement.originalPurchaseDate 
-    ? new Date(proEntitlement.originalPurchaseDate) 
-    : null;
-    
-  if (!originalPurchaseDate) return false;
-  
-  const now = new Date();
-  const daysSincePurchase = Math.floor(
-    (now.getTime() - originalPurchaseDate.getTime()) / (1000 * 60 * 60 * 24)
-  );
-  
-  return daysSincePurchase < REVENUECAT_CONFIG.TRIAL_DAYS;
+  // ISSUE 2 FIX: Verifica periodType diretamente do RevenueCat
+  // Valores possíveis: "trial", "intro", "normal"
+  return proEntitlement.periodType === 'TRIAL' || proEntitlement.periodType === 'trial';
 };
 
 /**
