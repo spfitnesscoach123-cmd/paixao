@@ -168,10 +168,17 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   }, []);
 
   // ============================================
-  // INICIALIZAÇÃO
+  // INICIALIZAÇÃO (SOMENTE APÓS AUTENTICAÇÃO)
   // ============================================
   
   const initialize = useCallback(async () => {
+    // ISSUE 1 FIX: Só inicializa se usuário está autenticado
+    if (!isAuthenticated || !user) {
+      console.log('[RevenueCat] Aguardando autenticação para inicializar');
+      setIsLoading(false);
+      return;
+    }
+    
     // Só inicializa em plataformas móveis
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
       console.log('[RevenueCat] Plataforma não suportada');
@@ -210,7 +217,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
+  }, [updateStatus, isAuthenticated, user]);
 
   // ============================================
   // EFEITOS
