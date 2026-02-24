@@ -622,6 +622,49 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         created_at=current_user["created_at"]
     )
 
+# ============= DEVICE MANAGEMENT =============
+
+@api_router.get("/auth/devices")
+async def get_registered_devices(current_user: dict = Depends(get_current_user)):
+    """Get list of registered devices for current user"""
+    devices = current_user.get("registered_devices", [])
+    return {
+        "devices": [
+            {
+                "device_id": d.get("device_id"),
+                "device_name": d.get("device_name"),
+                "platform": d.get("platform"),
+                "last_login": d.get("last_login").isoformat() if d.get("last_login") else None
+            }
+            for d in devices
+        ],
+        "count": len(devices),
+        "max_devices": MAX_DEVICES_PER_USER
+    }
+
+@api_router.delete("/auth/devices/{device_id}")
+async def remove_device(device_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a registered device from current user"""
+    devices = current_user.get("registered_devices", [])
+    
+    # Find device
+    device_exists = False
+    for d in devices:
+        if d.get("device_id") == device_id:
+            device_exists = True
+            break
+    
+    if not device_exists:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Remove device
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["_id"])},
+        {"$pull": {"registered_devices": {"device_id": device_id}}}
+    )
+    
+    return {"message": "Device removed successfully", "device_id": device_id}
+
 class UpdateProfileRequest(BaseModel):
     name: str
 
