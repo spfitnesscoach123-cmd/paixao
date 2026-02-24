@@ -540,6 +540,8 @@ async def login(credentials: UserLogin):
             id=user_id,
             email=user["email"],
             name=user["name"],
+            role=user.get("role", "coach"),
+            pro_access_override=user.get("pro_access_override", False),
             created_at=user["created_at"]
         )
     )
