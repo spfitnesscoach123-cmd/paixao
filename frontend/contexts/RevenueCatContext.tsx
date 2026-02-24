@@ -290,10 +290,11 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
   }, [isInitialized, isAuthenticated, updateStatus]);
   
-  // Atualiza quando app volta ao foreground
+  // Atualiza quando app volta ao foreground (SOMENTE se autenticado)
   useEffect(() => {
     const handleAppStateChange = async (nextState: AppStateStatus) => {
-      if (nextState === 'active' && isInitialized) {
+      // ISSUE 1 FIX: Só atualiza se autenticado e inicializado
+      if (nextState === 'active' && isInitialized && isAuthenticated) {
         console.log('[RevenueCat] App voltou ao foreground, atualizando status');
         const info = await RevenueCatService.refreshCustomerInfo();
         if (info) {
@@ -308,7 +309,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     return () => {
       subscription.remove();
     };
-  }, [isInitialized, updateStatus]);
+  }, [isInitialized, isAuthenticated, updateStatus]);
 
   // ============================================
   // AÇÕES
