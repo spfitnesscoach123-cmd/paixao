@@ -548,6 +548,44 @@ async def login(credentials: UserLogin):
         )
     
     user_id = str(user["_id"])
+    
+    # Device limit enforcement
+    if credentials.device_id:
+        registered_devices = user.get("registered_devices", [])
+        device_exists = False
+        
+        # Check if device already exists
+        for i, device in enumerate(registered_devices):
+            if device.get("device_id") == credentials.device_id:
+                device_exists = True
+                # Update last_login timestamp
+                registered_devices[i]["last_login"] = datetime.utcnow()
+                await db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"registered_devices": registered_devices}}
+                )
+                break
+        
+        if not device_exists:
+            # Check device limit
+            if len(registered_devices) >= MAX_DEVICES_PER_USER:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="DEVICE_LIMIT_REACHED"
+                )
+            
+            # Add new device
+            new_device = {
+                "device_id": credentials.device_id,
+                "device_name": credentials.device_name or "Unknown Device",
+                "platform": credentials.platform or "Unknown",
+                "last_login": datetime.utcnow()
+            }
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$push": {"registered_devices": new_device}}
+            )
+    
     access_token = create_access_token(data={"sub": user_id})
     
     return TokenResponse(
