@@ -150,6 +150,24 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   }, [user?.pro_access_override]);
 
   // ============================================
+  // CLEAR STATE (para logout)
+  // ============================================
+  
+  const clearRevenueCatState = useCallback(() => {
+    setCustomerInfo(null);
+    setCurrentPackage(null);
+    setIsPro(false);
+    setIsTrialing(false);
+    setHasTrialAvailable(true);
+    setExpirationDate(null);
+    setDaysRemaining(0);
+    setWillRenew(false);
+    setTrialPromptDismissed(false);
+    setRenewalWarningDismissed(false);
+    setIsInitialized(false);
+  }, []);
+
+  // ============================================
   // INICIALIZAÇÃO
   // ============================================
   
