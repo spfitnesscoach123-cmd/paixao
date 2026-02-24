@@ -2,8 +2,39 @@
 
 ## Informações Gerais
 - **Nome do Produto**: LoadManager Pro
-- **Versão**: 3.0
-- **Data de Atualização**: 21 Fevereiro 2026
+- **Versão**: 3.1
+- **Data de Atualização**: 24 Fevereiro 2026
+
+---
+
+## PRO Access Override - NOVO (24 Fevereiro 2026)
+
+### Status: ✅ IMPLEMENTADO E TESTADO
+
+Implementação de conta com acesso PRO permanente, sem depender de RevenueCat ou assinatura.
+
+**Credenciais da Conta Override:**
+- **Email**: `contato@loadmanagerpro.com.br`
+- **Senha**: `#UAE2026`
+
+**Arquitetura implementada:**
+1. **Backend** (`/app/backend/server.py`):
+   - Campo `pro_access_override: bool` adicionado ao modelo `UserResponse`
+   - Endpoints `/auth/login`, `/auth/register` e `/auth/me` retornam o campo
+   - Valor `true` indica acesso PRO permanente
+
+2. **Frontend** (`/app/frontend/types/index.ts`):
+   - Campo `pro_access_override?: boolean` adicionado à interface `User`
+
+3. **RevenueCat Context** (`/app/frontend/contexts/RevenueCatContext.tsx`):
+   - Verificação adicionada em `updateStatus()`: se `user?.pro_access_override === true`, define `isPro = true` imediatamente
+   - Ignora verificação RevenueCat para usuários com override
+
+**Comportamento:**
+- Login com a conta override → `pro_access_override: true` retornado
+- Frontend detecta o campo e concede acesso PRO instantâneo
+- Nenhum modal de trial/assinatura é exibido
+- Outros usuários continuam usando o fluxo normal do RevenueCat
 
 ---
 
