@@ -223,10 +223,32 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   // EFEITOS
   // ============================================
   
-  // Inicialização ao montar
+  // Inicialização SOMENTE quando autenticado
   useEffect(() => {
-    initialize();
-  }, [initialize]);
+    if (isAuthenticated && user) {
+      initialize();
+    }
+  }, [isAuthenticated, user, initialize]);
+  
+  // Logout do RevenueCat quando usuário desautentica
+  useEffect(() => {
+    const handleLogout = async () => {
+      if (!isAuthenticated && isInitialized) {
+        console.log('[RevenueCat] Usuário deslogou, limpando estado');
+        // ISSUE 1 FIX: Chamar Purchases.logOut() e limpar estado
+        if (Platform.OS === 'ios' || Platform.OS === 'android') {
+          try {
+            await RevenueCatService.logoutUser();
+          } catch (error) {
+            console.error('[RevenueCat] Erro ao fazer logout:', error);
+          }
+        }
+        clearRevenueCatState();
+      }
+    };
+    
+    handleLogout();
+  }, [isAuthenticated, isInitialized, clearRevenueCatState]);
   
   // Vincula usuário ao RevenueCat quando autenticado
   useEffect(() => {
