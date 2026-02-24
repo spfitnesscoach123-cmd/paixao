@@ -124,6 +124,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     if (user?.pro_access_override === true) {
       setIsPro(true);
       setIsTrialing(false);
+      setPeriodType(null); // ISSUE 2 FIX
       setExpirationDate(null);
       setDaysRemaining(999);
       setWillRenew(true);
@@ -134,6 +135,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     if (!info) {
       setIsPro(false);
       setIsTrialing(false);
+      setPeriodType(null); // ISSUE 2 FIX
       setExpirationDate(null);
       setDaysRemaining(0);
       setWillRenew(false);
@@ -144,6 +146,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     
     setIsPro(status.isPro);
     setIsTrialing(status.isTrialing);
+    setPeriodType(status.periodType); // ISSUE 2 FIX
     setExpirationDate(status.expirationDate);
     setDaysRemaining(status.daysRemaining);
     setWillRenew(status.willRenew);
@@ -161,6 +164,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     setCurrentPackage(null);
     setIsPro(false);
     setIsTrialing(false);
+    setPeriodType(null); // ISSUE 2 FIX
     setHasTrialAvailable(true);
     setExpirationDate(null);
     setDaysRemaining(0);
