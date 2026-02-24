@@ -512,14 +512,25 @@ async def register(user_data: UserRegister):
             detail="Email already registered"
         )
     
-    # Create new user
-    user = User(
-        email=user_data.email,
-        name=user_data.name,
-        hashed_password=hash_password(user_data.password)
-    )
+    # Create new user with device info
+    user_doc = {
+        "email": user_data.email,
+        "name": user_data.name,
+        "hashed_password": hash_password(user_data.password),
+        "created_at": datetime.utcnow(),
+        "registered_devices": []
+    }
     
-    result = await db.users.insert_one(user.model_dump(by_alias=True, exclude=["id"]))
+    # Add first device if provided
+    if user_data.device_id:
+        user_doc["registered_devices"].append({
+            "device_id": user_data.device_id,
+            "device_name": user_data.device_name or "Unknown Device",
+            "platform": user_data.platform or "Unknown",
+            "last_login": datetime.utcnow()
+        })
+    
+    result = await db.users.insert_one(user_doc)
     user_id = str(result.inserted_id)
     
     # Create access token
@@ -529,11 +540,11 @@ async def register(user_data: UserRegister):
         access_token=access_token,
         user=UserResponse(
             id=user_id,
-            email=user.email,
-            name=user.name,
+            email=user_data.email,
+            name=user_data.name,
             role="coach",  # Novos usuários são sempre coach
             pro_access_override=False,  # Novos usuários não têm override
-            created_at=user.created_at
+            created_at=user_doc["created_at"]
         )
     )
 
