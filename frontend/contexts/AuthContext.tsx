@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
+import { getDeviceInfo } from '../services/deviceId';
 import { User, AuthResponse } from '../types';
 
 // Simple storage abstraction that works on web and native
