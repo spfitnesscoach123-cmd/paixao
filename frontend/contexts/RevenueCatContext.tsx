@@ -105,6 +105,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   const [isPro, setIsPro] = useState(false);
   const [isTrialing, setIsTrialing] = useState(false);
   const [hasTrialAvailable, setHasTrialAvailable] = useState(true);
+  const [periodType, setPeriodType] = useState<'trial' | 'intro' | 'normal' | null>(null); // ISSUE 2 FIX
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [willRenew, setWillRenew] = useState(false);
