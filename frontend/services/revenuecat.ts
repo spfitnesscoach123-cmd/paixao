@@ -537,14 +537,27 @@ export const openManageSubscriptions = async (): Promise<void> => {
 export const addCustomerInfoListener = (
   callback: (customerInfo: CustomerInfo) => void
 ): (() => void) => {
-  const listener = Purchases.addCustomerInfoUpdateListener((info) => {
-    console.log('[RevenueCat] CustomerInfo atualizado');
-    callback(info);
-  });
+  // No modo web, não há suporte real ao RevenueCat
+  if (Platform.OS === 'web' || !isInitialized) {
+    console.log('[RevenueCat] Listener não disponível na plataforma web');
+    return () => {}; // Retorna função vazia
+  }
   
-  return () => {
-    listener.remove();
-  };
+  try {
+    const listener = Purchases.addCustomerInfoUpdateListener((info) => {
+      console.log('[RevenueCat] CustomerInfo atualizado');
+      callback(info);
+    });
+    
+    return () => {
+      if (listener && typeof listener.remove === 'function') {
+        listener.remove();
+      }
+    };
+  } catch (error) {
+    console.error('[RevenueCat] Erro ao adicionar listener:', error);
+    return () => {};
+  }
 };
 
 // ============================================
