@@ -84,13 +84,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Clear any existing cache before login to ensure clean state
       queryClient.clear();
       
+      // Get device info for device limit enforcement
+      const deviceInfo = await getDeviceInfo();
+      
       const response = await api.post<AuthResponse>('/auth/login', {
         email,
         password,
+        ...deviceInfo,
       });
       await storage.setItem('access_token', response.data.access_token);
       setUser(response.data.user);
     } catch (error: any) {
+      // Handle device limit error specifically
+      if (error.response?.data?.detail === 'DEVICE_LIMIT_REACHED') {
+        throw new Error('DEVICE_LIMIT_REACHED');
+      }
       throw new Error(error.response?.data?.detail || 'Login failed');
     }
   };
