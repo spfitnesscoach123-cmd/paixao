@@ -475,12 +475,14 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     !isLoading &&
     isInitialized;
   
-  // Mostra aviso de renovação se:
+  // ISSUE 2 FIX: Mostra aviso de renovação APENAS para assinatura paga (não trial)
   // - Tem acesso pro
+  // - NÃO está em trial (periodType !== 'trial')
   // - Faltam 3 dias ou menos
   // - Não dispensou o aviso
   const shouldShowRenewalWarning = 
     isPro && 
+    periodType === 'normal' && // ISSUE 2 FIX: Só para assinatura paga
     daysRemaining > 0 && 
     daysRemaining <= 3 && 
     !renewalWarningDismissed;
@@ -505,6 +507,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     isPro,
     isTrialing,
     hasTrialAvailable,
+    periodType, // ISSUE 2 FIX
     expirationDate,
     daysRemaining,
     willRenew,
