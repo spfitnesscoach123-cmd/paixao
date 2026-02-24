@@ -108,10 +108,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Clear any existing cache before registration to ensure clean state
       queryClient.clear();
       
+      // Get device info for device limit enforcement
+      const deviceInfo = await getDeviceInfo();
+      
       const response = await api.post<AuthResponse>('/auth/register', {
         email,
         password,
         name,
+        ...deviceInfo,
       });
       await storage.setItem('access_token', response.data.access_token);
       setUser(response.data.user);
