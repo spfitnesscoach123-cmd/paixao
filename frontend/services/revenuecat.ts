@@ -40,6 +40,7 @@ export interface SubscriptionStatus {
   isActive: boolean;
   isPro: boolean;
   isTrialing: boolean;
+  periodType: 'trial' | 'intro' | 'normal' | null; // ISSUE 2 FIX: Adicionado periodType
   expirationDate: Date | null;
   daysRemaining: number;
   willRenew: boolean;
