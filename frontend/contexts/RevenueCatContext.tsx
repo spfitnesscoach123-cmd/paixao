@@ -63,6 +63,7 @@ const defaultContext: RevenueCatContextType = {
   isPro: false,
   isTrialing: false,
   hasTrialAvailable: true,
+  periodType: null, // ISSUE 2 FIX
   expirationDate: null,
   daysRemaining: 0,
   willRenew: false,
