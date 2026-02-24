@@ -264,6 +264,7 @@ export const willAutoRenew = (customerInfo: CustomerInfo | null): boolean => {
 
 /**
  * Obtém o status completo da assinatura
+ * ISSUE 2 FIX: Inclui periodType para identificação correta de trial
  */
 export const getSubscriptionStatus = (customerInfo: CustomerInfo | null): SubscriptionStatus => {
   const isPro = checkProAccess(customerInfo);
@@ -271,6 +272,18 @@ export const getSubscriptionStatus = (customerInfo: CustomerInfo | null): Subscr
   const expirationDate = getExpirationDate(customerInfo);
   const daysRemaining = getDaysRemaining(expirationDate);
   const willRenew = willAutoRenew(customerInfo);
+  
+  // ISSUE 2 FIX: Extrai periodType diretamente do entitlement
+  let periodType: 'trial' | 'intro' | 'normal' | null = null;
+  if (customerInfo) {
+    const proEntitlement = customerInfo.entitlements.active[REVENUECAT_CONFIG.PRO_ENTITLEMENT_ID];
+    if (proEntitlement?.periodType) {
+      const pt = proEntitlement.periodType.toLowerCase();
+      if (pt === 'trial') periodType = 'trial';
+      else if (pt === 'intro') periodType = 'intro';
+      else if (pt === 'normal') periodType = 'normal';
+    }
+  }
   
   // URL de gerenciamento da assinatura
   let managementURL: string | null = null;
@@ -282,6 +295,7 @@ export const getSubscriptionStatus = (customerInfo: CustomerInfo | null): Subscr
     isActive: isPro,
     isPro,
     isTrialing,
+    periodType,
     expirationDate,
     daysRemaining,
     willRenew,
