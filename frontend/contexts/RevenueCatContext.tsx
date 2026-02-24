@@ -207,6 +207,12 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   useEffect(() => {
     const handleUserLogin = async () => {
       if (isAuthenticated && user?.id && isInitialized) {
+        // OVERRIDE: Se usuário tem pro_access_override, aplicar imediatamente
+        if (user?.pro_access_override === true) {
+          updateStatus(null);
+          return;
+        }
+        
         try {
           const info = await RevenueCatService.loginUser(user.id);
           if (info) {
@@ -220,7 +226,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
     
     handleUserLogin();
-  }, [isAuthenticated, user?.id, isInitialized, updateStatus]);
+  }, [isAuthenticated, user?.id, user?.pro_access_override, isInitialized, updateStatus]);
   
   // Listener de mudanças de status
   useEffect(() => {
