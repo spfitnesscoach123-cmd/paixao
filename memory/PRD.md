@@ -2,12 +2,50 @@
 
 ## Informações Gerais
 - **Nome do Produto**: LoadManager Pro
-- **Versão**: 3.1
+- **Versão**: 3.2
 - **Data de Atualização**: 24 Fevereiro 2026
 
 ---
 
-## PRO Access Override - NOVO (24 Fevereiro 2026)
+## Device Limit Enforcement - NOVO (24 Fevereiro 2026)
+
+### Status: ✅ IMPLEMENTADO E TESTADO
+
+Implementação de limite de dispositivos por conta (máximo 3 dispositivos simultâneos).
+
+**Arquitetura implementada:**
+
+1. **Backend** (`/app/backend/server.py`):
+   - Modelos `UserLogin` e `UserRegister` agora aceitam `device_id`, `device_name`, `platform`
+   - Campo `registered_devices: []` adicionado ao usuário
+   - Lógica de verificação no endpoint `/auth/login`:
+     - Device já existe → permite login, atualiza `last_login`
+     - Device novo e < 3 dispositivos → adiciona device e permite login
+     - Device novo e >= 3 dispositivos → retorna `DEVICE_LIMIT_REACHED` (HTTP 403)
+   - Endpoints de gerenciamento:
+     - `GET /api/auth/devices` - Lista dispositivos registrados
+     - `DELETE /api/auth/devices/{device_id}` - Remove um dispositivo
+
+2. **Frontend** (`/app/frontend/services/deviceId.ts`):
+   - Serviço para obter/gerar ID único do dispositivo
+   - Usa IDFV no iOS, Android ID no Android, UUID persistente como fallback
+   - Funções: `getDeviceId()`, `getDeviceName()`, `getPlatform()`, `getDeviceInfo()`
+
+3. **Frontend** (`/app/frontend/contexts/AuthContext.tsx`):
+   - Login agora envia `device_id`, `device_name`, `platform`
+   - Tratamento especial para erro `DEVICE_LIMIT_REACHED`
+
+**Comportamento:**
+- Cada conta pode ter máximo 3 dispositivos registrados
+- Dispositivos já registrados continuam funcionando normalmente
+- Tentativa de login de 4º dispositivo é bloqueada com HTTP 403
+- Usuário pode remover dispositivos via API para liberar slots
+
+**Constante configurável:** `MAX_DEVICES_PER_USER = 3`
+
+---
+
+## PRO Access Override - (24 Fevereiro 2026)
 
 ### Status: ✅ IMPLEMENTADO E TESTADO
 
