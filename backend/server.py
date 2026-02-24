@@ -517,6 +517,8 @@ async def register(user_data: UserRegister):
             id=user_id,
             email=user.email,
             name=user.name,
+            role="coach",  # Novos usuários são sempre coach
+            pro_access_override=False,  # Novos usuários não têm override
             created_at=user.created_at
         )
     )
