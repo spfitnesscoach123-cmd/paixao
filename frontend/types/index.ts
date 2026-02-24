@@ -3,6 +3,7 @@ export interface User {
   email: string;
   name: string;
   role?: 'coach' | 'athlete'; // Papel do usuário no sistema
+  pro_access_override?: boolean; // Override permanente de acesso PRO
   created_at: string;
 }
 

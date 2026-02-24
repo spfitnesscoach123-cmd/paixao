@@ -109,6 +109,7 @@ class UserResponse(BaseModel):
     email: str
     name: str
     role: str = "coach"  # Padrão é coach (quem faz login no app)
+    pro_access_override: bool = False  # Override permanente de acesso PRO
     created_at: datetime
 
 class TokenResponse(BaseModel):
@@ -550,6 +551,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         email=current_user["email"],
         name=current_user["name"],
         role=current_user.get("role", "coach"),  # Padrão é coach
+        pro_access_override=current_user.get("pro_access_override", False),  # Override PRO permanente
         created_at=current_user["created_at"]
     )
 

@@ -117,6 +117,17 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   // ============================================
   
   const updateStatus = useCallback((info: CustomerInfo | null) => {
+    // OVERRIDE: Se o usuário tem pro_access_override, sempre concede acesso PRO
+    if (user?.pro_access_override === true) {
+      setIsPro(true);
+      setIsTrialing(false);
+      setExpirationDate(null);
+      setDaysRemaining(999);
+      setWillRenew(true);
+      setHasTrialAvailable(false);
+      return;
+    }
+    
     if (!info) {
       setIsPro(false);
       setIsTrialing(false);
@@ -136,7 +147,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     
     // Se não tem acesso pro, trial está disponível
     setHasTrialAvailable(!status.isPro);
-  }, []);
+  }, [user?.pro_access_override]);
 
   // ============================================
   // INICIALIZAÇÃO
