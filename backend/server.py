@@ -88,10 +88,24 @@ class UserRegister(BaseModel):
     email: EmailStr
     password: str
     name: str
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
+
+class RegisteredDevice(BaseModel):
+    device_id: str
+    device_name: str
+    platform: str
+    last_login: datetime
+
+MAX_DEVICES_PER_USER = 3
 
 class User(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
