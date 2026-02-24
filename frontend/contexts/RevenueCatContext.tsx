@@ -275,9 +275,10 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     handleUserLogin();
   }, [isAuthenticated, user?.id, user?.pro_access_override, isInitialized, updateStatus]);
   
-  // Listener de mudanças de status
+  // Listener de mudanças de status (SOMENTE se autenticado e inicializado)
   useEffect(() => {
-    if (!isInitialized) return;
+    // ISSUE 1 FIX: Só adiciona listener se autenticado
+    if (!isInitialized || !isAuthenticated) return;
     
     const removeListener = RevenueCatService.addCustomerInfoListener((info) => {
       setCustomerInfo(info);
@@ -287,7 +288,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     return () => {
       removeListener();
     };
-  }, [isInitialized, updateStatus]);
+  }, [isInitialized, isAuthenticated, updateStatus]);
   
   // Atualiza quando app volta ao foreground
   useEffect(() => {
