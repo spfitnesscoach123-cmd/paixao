@@ -10037,6 +10037,12 @@ async def process_pending_deletions_job():
 @app.on_event("startup")
 async def startup_event():
     """Start background tasks on application startup"""
+    # Validate REVENUECAT_SECRET_KEY is configured
+    if not REVENUECAT_SECRET_KEY:
+        logging.error("[STARTUP] REVENUECAT_SECRET_KEY not configured - account deletion will not remove RevenueCat subscribers")
+    else:
+        logging.info("[STARTUP] REVENUECAT_SECRET_KEY configured successfully")
+    
     asyncio.create_task(process_pending_deletions_job())
     logging.info("[DeletionScheduler] Started automatic pending deletions scheduler (runs every 1 hour)")
 
