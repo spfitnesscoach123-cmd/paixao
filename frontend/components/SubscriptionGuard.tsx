@@ -214,6 +214,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
         daysRemaining={daysRemaining}
         onDismiss={handleDismissRenewal}
         onManageSubscription={handleManageSubscription}
+        isSandbox={customerInfo?.isSandbox ?? false}
       />
 
       {/* Modal de Assinatura Expirada */}
