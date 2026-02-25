@@ -9834,6 +9834,42 @@ async def request_account_deletion(
     )
 
 
+# RevenueCat Secret API Key (from environment)
+REVENUECAT_SECRET_API_KEY = os.environ.get('REVENUECAT_SECRET_API_KEY', '')
+
+
+async def delete_revenuecat_subscriber(app_user_id: str):
+    """
+    Delete subscriber from RevenueCat.
+    This function does not interrupt deletion if RevenueCat returns an error.
+    """
+    if not REVENUECAT_SECRET_API_KEY:
+        logging.warning(f"[RevenueCat] Secret API key not configured, skipping subscriber deletion for: {app_user_id}")
+        return
+    
+    url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
+    
+    headers = {
+        "Authorization": f"Bearer {REVENUECAT_SECRET_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(url, headers=headers, timeout=30.0)
+            
+            if response.status_code in [200, 204]:
+                logging.info(f"[RevenueCat] Subscriber deleted successfully: {app_user_id}")
+            elif response.status_code == 404:
+                logging.info(f"[RevenueCat] Subscriber not found (already deleted or never existed): {app_user_id}")
+            else:
+                logging.warning(f"[RevenueCat] Deletion failed: {response.status_code} - {response.text}")
+    except Exception as e:
+        logging.error(f"[RevenueCat] Deletion exception for {app_user_id}: {str(e)}")
+    
+    # Always continue with database deletion regardless of RevenueCat response
+
+
 async def execute_permanent_deletion(user_id: str):
     """
     Execute permanent and irreversible deletion of all user data.
