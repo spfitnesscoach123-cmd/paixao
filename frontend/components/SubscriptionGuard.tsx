@@ -36,6 +36,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     shouldShowRenewalWarning,
     daysRemaining,
     currentPackage,
+    customerInfo, // Adicionado para verificar isSandbox
     startTrial,
     purchaseSubscription,
     restorePurchases,
