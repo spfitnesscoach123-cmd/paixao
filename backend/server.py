@@ -9993,6 +9993,54 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ============= AUTOMATIC PENDING DELETIONS SCHEDULER =============
+
+async def process_pending_deletions_job():
+    """
+    Background job to process pending account deletions.
+    Executes every 1 hour.
+    """
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Wait 1 hour
+            
+            now = datetime.utcnow()
+            logging.info(f"[DeletionScheduler] Running pending deletions check at {now.isoformat()}")
+            
+            # Find users with PENDING status and scheduled deletion in the past
+            pending_users = await db.users.find({
+                "account_deletion_status": AccountDeletionStatus.PENDING.value,
+                "deletion_scheduled_for": {"$lte": now}
+            }).to_list(100)
+            
+            deleted_count = 0
+            
+            for user in pending_users:
+                user_id = str(user["_id"])
+                try:
+                    await execute_permanent_deletion(user_id)
+                    deleted_count += 1
+                    logging.info(f"[DeletionScheduler] Permanently deleted user: {user_id}")
+                except Exception as e:
+                    logging.error(f"[DeletionScheduler] Error deleting user {user_id}: {e}")
+            
+            logging.info(f"[DeletionScheduler] Processed {len(pending_users)} pending, deleted {deleted_count}")
+            
+        except asyncio.CancelledError:
+            logging.info("[DeletionScheduler] Scheduler stopped")
+            break
+        except Exception as e:
+            logging.error(f"[DeletionScheduler] Job error: {e}")
+            await asyncio.sleep(60)  # Wait 1 minute before retrying on error
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on application startup"""
+    asyncio.create_task(process_pending_deletions_job())
+    logging.info("[DeletionScheduler] Started automatic pending deletions scheduler (runs every 1 hour)")
+
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
