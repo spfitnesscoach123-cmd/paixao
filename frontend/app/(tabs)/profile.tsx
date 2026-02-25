@@ -109,6 +109,20 @@ export default function ProfileScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.menuItem, { backgroundColor: colors.dark.card }]} 
+            onPress={() => router.push('/account')}
+            data-testid="account-settings-btn"
+          >
+            <View style={styles.menuItemContent}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                <Ionicons name="settings-outline" size={22} color="#ef4444" />
+              </View>
+              <Text style={[styles.menuItemText, { color: colors.text.primary }]}>Conta</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
         </View>
 
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
