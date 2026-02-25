@@ -1,19 +1,19 @@
 /**
  * Subscription Guard
  * 
- * Componente wrapper que exibe paywall de assinatura com sistema de 3 estados:
- * - UNKNOWN: UI carrega normalmente, funcionalidades premium bloqueadas internamente
+ * Sistema de gate de assinatura com 3 estados:
+ * - UNKNOWN: UI carrega normalmente, sem paywall, sem bloqueio
  * - ACTIVE: Acesso completo liberado
  * - INACTIVE: Paywall exibido
  * 
- * NUNCA bloqueia a renderização da UI
- * NUNCA trava o app
- * Segue padrões Apple (Strava, Duolingo)
+ * REGRA: O app NUNCA trava
+ * REGRA: Paywall NUNCA aparece durante UNKNOWN
+ * REGRA: Children SEMPRE são renderizados
  */
 
 import React, { useState } from 'react';
 import { Alert, View, ActivityIndicator, StyleSheet, Text } from 'react-native';
-import { useRevenueCat, SubscriptionStatus } from '../contexts/RevenueCatContext';
+import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -33,15 +33,12 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   const { isAuthenticated, user } = useAuth();
   const {
     subscriptionStatus,
-    isPro,
-    isLoading,
     shouldShowPaywall,
     shouldShowRenewalWarning,
     daysRemaining,
     currentPackage,
     customerInfo,
     startTrial,
-    purchaseSubscription,
     restorePurchases,
     openManageSubscriptions,
     dismissPaywall,
@@ -136,23 +133,23 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     if (currentPackage) {
       return formatPrice(currentPackage);
     }
-    return '$39.99';
+    return 'R$ 39,99';
   };
 
   // ============================================
   // RENDER
   // ============================================
-
-  // REGRA CRÍTICA 1: UI SEMPRE carrega normalmente
-  // Mesmo durante UNKNOWN, children são renderizados
-  // Paywall só aparece quando status == INACTIVE
+  
+  // Children SEMPRE renderizados - UI NUNCA bloqueia
+  // Paywall só aparece quando subscriptionStatus === 'INACTIVE'
+  // Durante UNKNOWN: UI normal, sem paywall, sem bloqueio
   
   return (
     <>
-      {/* Children SEMPRE renderizados - UI nunca bloqueia */}
+      {/* Children SEMPRE renderizados */}
       {children}
 
-      {/* Indicador sutil de verificação durante UNKNOWN (opcional) */}
+      {/* Indicador sutil durante UNKNOWN (apenas visual) */}
       {subscriptionStatus === 'UNKNOWN' && isAuthenticated && user?.role === 'coach' && (
         <View style={styles.unknownIndicator}>
           <ActivityIndicator size="small" color={colors.accent.primary} />
@@ -162,7 +159,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
         </View>
       )}
 
-      {/* Paywall - SOMENTE quando status == INACTIVE (REGRA CRÍTICA 3) */}
+      {/* Paywall - SOMENTE quando status === 'INACTIVE' */}
       <TrialRequiredModal
         visible={shouldShowPaywall}
         onStartTrial={handleStartTrial}
@@ -186,7 +183,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
 const styles = StyleSheet.create({
   unknownIndicator: {
     position: 'absolute',
-    top: 60,
+    top: 50,
     left: 0,
     right: 0,
     flexDirection: 'row',
@@ -194,12 +191,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     zIndex: 1000,
     gap: 8,
   },
   unknownText: {
     fontSize: 12,
+    fontWeight: '500',
   },
 });
 
