@@ -9835,7 +9835,7 @@ async def request_account_deletion(
 
 
 # RevenueCat Secret API Key (from environment)
-REVENUECAT_SECRET_API_KEY = os.environ.get('REVENUECAT_SECRET_API_KEY', '')
+REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
 
 
 async def delete_revenuecat_subscriber(app_user_id: str):
@@ -9843,14 +9843,14 @@ async def delete_revenuecat_subscriber(app_user_id: str):
     Delete subscriber from RevenueCat.
     This function does not interrupt deletion if RevenueCat returns an error.
     """
-    if not REVENUECAT_SECRET_API_KEY:
+    if not REVENUECAT_SECRET_KEY:
         logging.warning(f"[RevenueCat] Secret API key not configured, skipping subscriber deletion for: {app_user_id}")
         return
     
     url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
     
     headers = {
-        "Authorization": f"Bearer {REVENUECAT_SECRET_API_KEY}",
+        "Authorization": f"Bearer {REVENUECAT_SECRET_KEY}",
         "Content-Type": "application/json"
     }
     
