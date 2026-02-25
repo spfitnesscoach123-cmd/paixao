@@ -567,6 +567,13 @@ async def login(credentials: UserLogin):
             detail="Incorrect email or password"
         )
     
+    # Check if account is deleted
+    if user.get("account_deletion_status") == AccountDeletionStatus.DELETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ACCOUNT_DELETED"
+        )
+    
     user_id = str(user["_id"])
     
     # Device limit enforcement
