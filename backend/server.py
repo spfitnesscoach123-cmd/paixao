@@ -107,6 +107,13 @@ class RegisteredDevice(BaseModel):
 
 MAX_DEVICES_PER_USER = 3
 
+# ============= ACCOUNT DELETION STATUS =============
+
+class AccountDeletionStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    DELETED = "DELETED"
+
 class User(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
     email: EmailStr
