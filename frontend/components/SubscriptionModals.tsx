@@ -41,6 +41,7 @@ interface RenewalWarningModalProps extends BaseModalProps {
   daysRemaining: number;
   onDismiss: () => void;
   onManageSubscription: () => void;
+  isSandbox?: boolean; // Indica se está em ambiente de teste (Sandbox/TestFlight)
 }
 
 interface SubscriptionExpiredModalProps extends BaseModalProps {
