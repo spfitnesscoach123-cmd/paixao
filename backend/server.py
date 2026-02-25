@@ -615,6 +615,10 @@ async def login(credentials: UserLogin):
     
     access_token = create_access_token(data={"sub": user_id})
     
+    # Format deletion_scheduled_for if exists
+    deletion_scheduled = user.get("deletion_scheduled_for")
+    deletion_scheduled_str = deletion_scheduled.isoformat() if deletion_scheduled else None
+    
     return TokenResponse(
         access_token=access_token,
         user=UserResponse(
@@ -623,18 +627,25 @@ async def login(credentials: UserLogin):
             name=user["name"],
             role=user.get("role", "coach"),
             pro_access_override=user.get("pro_access_override", False),
+            account_deletion_status=user.get("account_deletion_status", "ACTIVE"),
+            deletion_scheduled_for=deletion_scheduled_str,
             created_at=user["created_at"]
         )
     )
 
 @api_router.get("/auth/me", response_model=UserResponse)
 async def get_me(current_user: dict = Depends(get_current_user)):
+    deletion_scheduled = current_user.get("deletion_scheduled_for")
+    deletion_scheduled_str = deletion_scheduled.isoformat() if deletion_scheduled else None
+    
     return UserResponse(
         id=current_user["_id"],
         email=current_user["email"],
         name=current_user["name"],
-        role=current_user.get("role", "coach"),  # Padrão é coach
-        pro_access_override=current_user.get("pro_access_override", False),  # Override PRO permanente
+        role=current_user.get("role", "coach"),
+        pro_access_override=current_user.get("pro_access_override", False),
+        account_deletion_status=current_user.get("account_deletion_status", "ACTIVE"),
+        deletion_scheduled_for=deletion_scheduled_str,
         created_at=current_user["created_at"]
     )
 
