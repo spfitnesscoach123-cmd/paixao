@@ -18,6 +18,8 @@ from bson import ObjectId
 import uuid
 from io import BytesIO
 import io
+import asyncio
+import httpx
 
 from gps_import import (
     GPSCSVParser,
