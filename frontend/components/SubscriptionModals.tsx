@@ -210,21 +210,6 @@ export const RenewalWarningModal: React.FC<RenewalWarningModalProps> = ({
 }) => {
   const { locale } = useLanguage();
 
-  // Texto de exibição baseado no ambiente (Sandbox vs Produção)
-  const getStatusText = () => {
-    // SE isSandbox for verdadeiro: mostra 'Período de Testes Ativo'
-    if (isSandbox) {
-      return locale === 'pt' ? 'Período de Testes Ativo' : 'Test Period Active';
-    }
-    // SENÃO: mantém a lógica atual de contagem de dias
-    if (daysRemaining === 1) {
-      return locale === 'pt' ? 'Falta 1 dia para a renovação' : '1 day until renewal';
-    }
-    return locale === 'pt'
-      ? `Faltam ${daysRemaining} dias para a renovação`
-      : `${daysRemaining} days until renewal`;
-  };
-
   return (
     <Modal
       visible={visible}
@@ -240,25 +225,23 @@ export const RenewalWarningModal: React.FC<RenewalWarningModalProps> = ({
               <Ionicons name="time-outline" size={36} color={colors.status.warning} />
             </View>
             <Text style={styles.modalTitle}>
-              {isSandbox
-                ? (locale === 'pt' ? 'Ambiente de Testes' : 'Test Environment')
-                : (locale === 'pt' ? 'Sua assinatura está expirando!' : 'Your subscription is expiring!')}
+              {locale === 'pt' ? 'Sua assinatura está expirando!' : 'Your subscription is expiring!'}
             </Text>
           </View>
 
           {/* Content */}
           <View style={styles.warningContent}>
             <Text style={styles.daysRemainingText}>
-              {getStatusText()}
+              {isSandbox
+                ? (locale === 'pt' ? 'Período de Testes Ativo' : 'Test Period Active')
+                : (daysRemaining === 1
+                    ? (locale === 'pt' ? 'Falta 1 dia para a renovação' : '1 day until renewal')
+                    : (locale === 'pt' ? `Faltam ${daysRemaining} dias para a renovação` : `${daysRemaining} days until renewal`))}
             </Text>
             <Text style={styles.warningDesc}>
-              {isSandbox
-                ? (locale === 'pt'
-                    ? 'Você está usando o app em modo de teste (Sandbox/TestFlight).'
-                    : 'You are using the app in test mode (Sandbox/TestFlight).')
-                : (locale === 'pt'
-                    ? 'Mantenha sua assinatura ativa para continuar usando todas as funcionalidades e preservar seus dados.'
-                    : 'Keep your subscription active to continue using all features and preserve your data.')}
+              {locale === 'pt'
+                ? 'Mantenha sua assinatura ativa para continuar usando todas as funcionalidades e preservar seus dados.'
+                : 'Keep your subscription active to continue using all features and preserve your data.'}
             </Text>
           </View>
 
