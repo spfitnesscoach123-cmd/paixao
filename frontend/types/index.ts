@@ -4,6 +4,8 @@ export interface User {
   name: string;
   role?: 'coach' | 'athlete'; // Papel do usuário no sistema
   pro_access_override?: boolean; // Override permanente de acesso PRO
+  account_deletion_status?: 'ACTIVE' | 'PENDING' | 'DELETED'; // Status de exclusão da conta
+  deletion_scheduled_for?: string | null; // Data agendada para exclusão (ISO string)
   created_at: string;
 }
 
