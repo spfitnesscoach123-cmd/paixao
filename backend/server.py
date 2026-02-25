@@ -9840,7 +9840,10 @@ async def execute_permanent_deletion(user_id: str):
     """
     user_oid = ObjectId(user_id) if isinstance(user_id, str) else user_id
     
-    # Delete all user-related data
+    # STEP 1: Delete subscriber from RevenueCat BEFORE removing from database
+    await delete_revenuecat_subscriber(user_id)
+    
+    # STEP 2: Delete all user-related data from database
     # Athletes
     await db.athletes.delete_many({"coach_id": user_id})
     
