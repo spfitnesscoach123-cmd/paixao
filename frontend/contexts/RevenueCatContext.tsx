@@ -2,7 +2,8 @@
  * RevenueCat Context
  * 
  * Context completo para gerenciamento de assinaturas no LoadManager Pro
- * Implementa trial obrigatório de 7 dias, controle de acesso e sincronização
+ * Implementa sistema de 3 estados: UNKNOWN, ACTIVE, INACTIVE
+ * Garante que o app nunca trava e o paywall aparece corretamente
  */
 
 import React, {
@@ -11,6 +12,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
   ReactNode,
 } from 'react';
 import { AppState, AppStateStatus, Platform } from 'react-native';
@@ -19,28 +21,41 @@ import * as RevenueCatService from '../services/revenuecat';
 import { useAuth } from './AuthContext';
 
 // ============================================
-// TIPOS
+// TIPOS E CONSTANTES
 // ============================================
 
+/**
+ * Estados possíveis da assinatura
+ * UNKNOWN - Ainda verificando com RevenueCat
+ * ACTIVE - Assinatura ativa ou trial ativo
+ * INACTIVE - Sem assinatura, deve mostrar paywall
+ */
+export type SubscriptionStatus = 'UNKNOWN' | 'ACTIVE' | 'INACTIVE';
+
+// Timeout de segurança para RevenueCat (10 segundos)
+const REVENUECAT_TIMEOUT_MS = 10000;
+
 interface RevenueCatContextType {
+  // Estado principal da assinatura (3 estados)
+  subscriptionStatus: SubscriptionStatus;
+  
   // Estado de inicialização
   isInitialized: boolean;
   isLoading: boolean;
   error: string | null;
   
-  // Status da assinatura
+  // Status detalhado da assinatura
   isPro: boolean;
   isTrialing: boolean;
   hasTrialAvailable: boolean;
-  periodType: 'trial' | 'intro' | 'normal' | null; // ISSUE 2 FIX: Adicionado periodType
+  periodType: 'trial' | 'intro' | 'normal' | null;
   expirationDate: Date | null;
   daysRemaining: number;
   willRenew: boolean;
   
   // Flags de UI
-  shouldShowTrialPrompt: boolean;
+  shouldShowPaywall: boolean;
   shouldShowRenewalWarning: boolean;
-  shouldShowExpiredPrompt: boolean;
   
   // Dados
   customerInfo: CustomerInfo | null;
@@ -52,24 +67,24 @@ interface RevenueCatContextType {
   restorePurchases: () => Promise<{ success: boolean; error?: string }>;
   refreshStatus: () => Promise<void>;
   openManageSubscriptions: () => Promise<void>;
-  dismissTrialPrompt: () => void;
+  dismissPaywall: () => void;
   dismissRenewalWarning: () => void;
 }
 
 const defaultContext: RevenueCatContextType = {
+  subscriptionStatus: 'UNKNOWN',
   isInitialized: false,
-  isLoading: true,
+  isLoading: false,
   error: null,
   isPro: false,
   isTrialing: false,
   hasTrialAvailable: true,
-  periodType: null, // ISSUE 2 FIX
+  periodType: null,
   expirationDate: null,
   daysRemaining: 0,
   willRenew: false,
-  shouldShowTrialPrompt: false,
+  shouldShowPaywall: false,
   shouldShowRenewalWarning: false,
-  shouldShowExpiredPrompt: false,
   customerInfo: null,
   currentPackage: null,
   startTrial: async () => ({ success: false }),
@@ -77,7 +92,7 @@ const defaultContext: RevenueCatContextType = {
   restorePurchases: async () => ({ success: false }),
   refreshStatus: async () => {},
   openManageSubscriptions: async () => {},
-  dismissTrialPrompt: () => {},
+  dismissPaywall: () => {},
   dismissRenewalWarning: () => {},
 };
 
@@ -94,37 +109,64 @@ interface RevenueCatProviderProps {
 }
 
 export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children }) => {
-  // Estados
+  // Estado principal - 3 estados
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('UNKNOWN');
+  
+  // Estados de controle
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Dados do RevenueCat
   const [customerInfo, setCustomerInfo] = useState<CustomerInfo | null>(null);
   const [currentPackage, setCurrentPackage] = useState<PurchasesPackage | null>(null);
   
+  // Status detalhado
   const [isPro, setIsPro] = useState(false);
   const [isTrialing, setIsTrialing] = useState(false);
   const [hasTrialAvailable, setHasTrialAvailable] = useState(true);
-  const [periodType, setPeriodType] = useState<'trial' | 'intro' | 'normal' | null>(null); // ISSUE 2 FIX
+  const [periodType, setPeriodType] = useState<'trial' | 'intro' | 'normal' | null>(null);
   const [expirationDate, setExpirationDate] = useState<Date | null>(null);
   const [daysRemaining, setDaysRemaining] = useState(0);
   const [willRenew, setWillRenew] = useState(false);
   
-  const [trialPromptDismissed, setTrialPromptDismissed] = useState(false);
+  // Controle de UI
+  const [paywallDismissed, setPaywallDismissed] = useState(false);
   const [renewalWarningDismissed, setRenewalWarningDismissed] = useState(false);
   
+  // Refs para timeout
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initializingRef = useRef(false);
+  
   const { user, isAuthenticated } = useAuth();
+
+  // ============================================
+  // LOGGING
+  // ============================================
+  
+  const log = useCallback((message: string, data?: any) => {
+    const timestamp = new Date().toISOString();
+    if (data) {
+      console.log(`[RevenueCat ${timestamp}] ${message}`, data);
+    } else {
+      console.log(`[RevenueCat ${timestamp}] ${message}`);
+    }
+  }, []);
 
   // ============================================
   // ATUALIZAÇÃO DE STATUS
   // ============================================
   
-  const updateStatus = useCallback((info: CustomerInfo | null) => {
-    // OVERRIDE: Se o usuário tem pro_access_override, sempre concede acesso PRO
+  const updateSubscriptionStatus = useCallback((info: CustomerInfo | null, source: string) => {
+    log(`Updating status from: ${source}`);
+    
+    // OVERRIDE: Se o usuário tem pro_access_override, sempre ACTIVE
     if (user?.pro_access_override === true) {
+      log('PRO ACCESS OVERRIDE detected - setting ACTIVE');
+      setSubscriptionStatus('ACTIVE');
       setIsPro(true);
       setIsTrialing(false);
-      setPeriodType(null); // ISSUE 2 FIX
+      setPeriodType(null);
       setExpirationDate(null);
       setDaysRemaining(999);
       setWillRenew(true);
@@ -133,9 +175,11 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     }
     
     if (!info) {
+      log('No customerInfo - setting INACTIVE');
+      setSubscriptionStatus('INACTIVE');
       setIsPro(false);
       setIsTrialing(false);
-      setPeriodType(null); // ISSUE 2 FIX
+      setPeriodType(null);
       setExpirationDate(null);
       setDaysRemaining(0);
       setWillRenew(false);
@@ -144,65 +188,105 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     
     const status = RevenueCatService.getSubscriptionStatus(info);
     
+    if (status.isPro) {
+      log('Subscription status changed to ACTIVE', { isTrialing: status.isTrialing });
+      setSubscriptionStatus('ACTIVE');
+    } else {
+      log('Subscription status changed to INACTIVE');
+      setSubscriptionStatus('INACTIVE');
+    }
+    
     setIsPro(status.isPro);
     setIsTrialing(status.isTrialing);
-    setPeriodType(status.periodType); // ISSUE 2 FIX
+    setPeriodType(status.periodType);
     setExpirationDate(status.expirationDate);
     setDaysRemaining(status.daysRemaining);
     setWillRenew(status.willRenew);
-    
-    // Se não tem acesso pro, trial está disponível
     setHasTrialAvailable(!status.isPro);
-  }, [user?.pro_access_override]);
+  }, [user?.pro_access_override, log]);
 
   // ============================================
-  // CLEAR STATE (para logout)
+  // TIMEOUT DE SEGURANÇA
   // ============================================
   
-  const clearRevenueCatState = useCallback(() => {
-    setCustomerInfo(null);
-    setCurrentPackage(null);
-    setIsPro(false);
-    setIsTrialing(false);
-    setPeriodType(null); // ISSUE 2 FIX
-    setHasTrialAvailable(true);
-    setExpirationDate(null);
-    setDaysRemaining(0);
-    setWillRenew(false);
-    setTrialPromptDismissed(false);
-    setRenewalWarningDismissed(false);
-    setIsInitialized(false);
+  const startTimeout = useCallback(() => {
+    // Limpa timeout anterior se existir
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    
+    log(`Starting safety timeout (${REVENUECAT_TIMEOUT_MS}ms)`);
+    
+    timeoutRef.current = setTimeout(() => {
+      log('TIMEOUT: RevenueCat did not respond in time - setting INACTIVE');
+      if (subscriptionStatus === 'UNKNOWN') {
+        setSubscriptionStatus('INACTIVE');
+        setIsInitialized(true);
+        setIsLoading(false);
+      }
+    }, REVENUECAT_TIMEOUT_MS);
+  }, [subscriptionStatus, log]);
+  
+  const clearTimeoutSafely = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   }, []);
 
   // ============================================
-  // INICIALIZAÇÃO (SOMENTE APÓS AUTENTICAÇÃO)
+  // INICIALIZAÇÃO
   // ============================================
   
   const initialize = useCallback(async () => {
-    // ISSUE 1 FIX: Só inicializa se usuário está autenticado
+    // Evita múltiplas inicializações simultâneas
+    if (initializingRef.current) {
+      log('Already initializing, skipping...');
+      return;
+    }
+    
+    // Só inicializa se usuário está autenticado
     if (!isAuthenticated || !user) {
-      console.log('[RevenueCat] Aguardando autenticação para inicializar');
+      log('Waiting for authentication to initialize');
+      setSubscriptionStatus('UNKNOWN');
       setIsLoading(false);
       return;
     }
     
-    // Só inicializa em plataformas móveis
+    // Plataformas não-móveis (web) - define INACTIVE diretamente
     if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('[RevenueCat] Plataforma não suportada');
+      log('Non-mobile platform detected - setting INACTIVE');
+      setSubscriptionStatus('INACTIVE');
       setIsInitialized(true);
       setIsLoading(false);
       return;
     }
     
+    // Verifica PRO override primeiro
+    if (user?.pro_access_override === true) {
+      log('PRO ACCESS OVERRIDE - immediate ACTIVE');
+      setSubscriptionStatus('ACTIVE');
+      setIsPro(true);
+      setIsInitialized(true);
+      setIsLoading(false);
+      return;
+    }
+    
+    initializingRef.current = true;
+    log('RevenueCat fetch started');
+    setSubscriptionStatus('UNKNOWN');
+    setIsLoading(true);
+    setError(null);
+    
+    // Inicia timeout de segurança
+    startTimeout();
+    
     try {
-      setIsLoading(true);
-      setError(null);
-      
       // Inicializa o SDK
       const initSuccess = await RevenueCatService.initializeRevenueCat();
       
       if (!initSuccess) {
-        throw new Error('Falha ao inicializar RevenueCat');
+        throw new Error('Failed to initialize RevenueCat SDK');
       }
       
       // Carrega ofertas
@@ -214,23 +298,53 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       // Obtém info do cliente
       const info = await RevenueCatService.getCustomerInfo();
       setCustomerInfo(info);
-      updateStatus(info);
+      updateSubscriptionStatus(info, 'initialize');
       
+      log('RevenueCat fetch completed successfully');
       setIsInitialized(true);
-      console.log('[RevenueCat] Contexto inicializado com sucesso');
+      
     } catch (err: any) {
-      console.error('[RevenueCat] Erro na inicialização:', err);
-      setError(err.message || 'Erro ao inicializar');
+      log('RevenueCat initialization error', err.message);
+      setError(err.message || 'Error initializing RevenueCat');
+      // Em caso de erro, define como INACTIVE para mostrar paywall
+      setSubscriptionStatus('INACTIVE');
+      setIsInitialized(true);
+      
     } finally {
+      clearTimeoutSafely();
       setIsLoading(false);
+      initializingRef.current = false;
     }
-  }, [updateStatus, isAuthenticated, user]);
+  }, [isAuthenticated, user, startTimeout, clearTimeoutSafely, updateSubscriptionStatus, log]);
+
+  // ============================================
+  // CLEAR STATE (para logout)
+  // ============================================
+  
+  const clearRevenueCatState = useCallback(() => {
+    log('Clearing RevenueCat state (logout)');
+    clearTimeoutSafely();
+    setSubscriptionStatus('UNKNOWN');
+    setCustomerInfo(null);
+    setCurrentPackage(null);
+    setIsPro(false);
+    setIsTrialing(false);
+    setPeriodType(null);
+    setHasTrialAvailable(true);
+    setExpirationDate(null);
+    setDaysRemaining(0);
+    setWillRenew(false);
+    setPaywallDismissed(false);
+    setRenewalWarningDismissed(false);
+    setIsInitialized(false);
+    initializingRef.current = false;
+  }, [clearTimeoutSafely, log]);
 
   // ============================================
   // EFEITOS
   // ============================================
   
-  // Inicialização SOMENTE quando autenticado
+  // Inicialização quando autenticado
   useEffect(() => {
     if (isAuthenticated && user) {
       initialize();
@@ -241,13 +355,11 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   useEffect(() => {
     const handleLogout = async () => {
       if (!isAuthenticated && isInitialized) {
-        console.log('[RevenueCat] Usuário deslogou, limpando estado');
-        // ISSUE 1 FIX: Chamar Purchases.logOut() e limpar estado
         if (Platform.OS === 'ios' || Platform.OS === 'android') {
           try {
             await RevenueCatService.logoutUser();
           } catch (error) {
-            console.error('[RevenueCat] Erro ao fazer logout:', error);
+            log('Error during RevenueCat logout', error);
           }
         }
         clearRevenueCatState();
@@ -255,15 +367,14 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     };
     
     handleLogout();
-  }, [isAuthenticated, isInitialized, clearRevenueCatState]);
+  }, [isAuthenticated, isInitialized, clearRevenueCatState, log]);
   
   // Vincula usuário ao RevenueCat quando autenticado
   useEffect(() => {
     const handleUserLogin = async () => {
-      if (isAuthenticated && user?.id && isInitialized) {
-        // OVERRIDE: Se usuário tem pro_access_override, aplicar imediatamente
+      if (isAuthenticated && user?.id && isInitialized && subscriptionStatus !== 'UNKNOWN') {
         if (user?.pro_access_override === true) {
-          updateStatus(null);
+          updateSubscriptionStatus(null, 'pro_override');
           return;
         }
         
@@ -271,42 +382,48 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
           const info = await RevenueCatService.loginUser(user.id);
           if (info) {
             setCustomerInfo(info);
-            updateStatus(info);
+            updateSubscriptionStatus(info, 'user_login');
           }
         } catch (error) {
-          console.error('[RevenueCat] Erro ao vincular usuário:', error);
+          log('Error linking user to RevenueCat', error);
         }
       }
     };
     
     handleUserLogin();
-  }, [isAuthenticated, user?.id, user?.pro_access_override, isInitialized, updateStatus]);
+  }, [isAuthenticated, user?.id, user?.pro_access_override, isInitialized, subscriptionStatus, updateSubscriptionStatus, log]);
   
-  // Listener de mudanças de status (SOMENTE se autenticado e inicializado)
+  // Listener de mudanças de status (REGRA CRÍTICA 5)
   useEffect(() => {
-    // ISSUE 1 FIX: Só adiciona listener se autenticado
     if (!isInitialized || !isAuthenticated) return;
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+    
+    log('Adding customer info listener');
     
     const removeListener = RevenueCatService.addCustomerInfoListener((info) => {
+      log('Customer info updated via listener');
       setCustomerInfo(info);
-      updateStatus(info);
+      updateSubscriptionStatus(info, 'listener');
+      // Remove paywall automaticamente se assinatura ativar
+      if (info && RevenueCatService.checkProAccess(info)) {
+        setPaywallDismissed(false); // Reset para permitir re-exibição se necessário
+      }
     });
     
     return () => {
       removeListener();
     };
-  }, [isInitialized, isAuthenticated, updateStatus]);
+  }, [isInitialized, isAuthenticated, updateSubscriptionStatus, log]);
   
-  // Atualiza quando app volta ao foreground (SOMENTE se autenticado)
+  // Atualiza quando app volta ao foreground
   useEffect(() => {
     const handleAppStateChange = async (nextState: AppStateStatus) => {
-      // ISSUE 1 FIX: Só atualiza se autenticado e inicializado
       if (nextState === 'active' && isInitialized && isAuthenticated) {
-        console.log('[RevenueCat] App voltou ao foreground, atualizando status');
+        log('App returned to foreground - refreshing status');
         const info = await RevenueCatService.refreshCustomerInfo();
         if (info) {
           setCustomerInfo(info);
-          updateStatus(info);
+          updateSubscriptionStatus(info, 'foreground');
         }
       }
     };
@@ -316,18 +433,21 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     return () => {
       subscription.remove();
     };
-  }, [isInitialized, isAuthenticated, updateStatus]);
+  }, [isInitialized, isAuthenticated, updateSubscriptionStatus, log]);
+  
+  // Cleanup do timeout no unmount
+  useEffect(() => {
+    return () => {
+      clearTimeoutSafely();
+    };
+  }, [clearTimeoutSafely]);
 
   // ============================================
   // AÇÕES
   // ============================================
   
-  /**
-   * Inicia o período de trial (compra com trial)
-   */
   const startTrial = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!currentPackage) {
-      // Tenta recarregar ofertas
       const offeringsResult = await RevenueCatService.getOfferings();
       if (!offeringsResult.success || !offeringsResult.currentPackage) {
         return {
@@ -347,22 +467,21 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     }
     
     setIsLoading(true);
+    log('Starting trial purchase');
     
     try {
       const result = await RevenueCatService.purchasePackage(packageToPurchase);
       
       if (result.success && result.customerInfo) {
         setCustomerInfo(result.customerInfo);
-        updateStatus(result.customerInfo);
-        setTrialPromptDismissed(true);
+        updateSubscriptionStatus(result.customerInfo, 'purchase_success');
+        setPaywallDismissed(true);
+        log('Trial started successfully');
         return { success: true };
       }
       
       if (result.userCancelled) {
-        return {
-          success: false,
-          error: 'cancelled',
-        };
+        return { success: false, error: 'cancelled' };
       }
       
       return {
@@ -370,7 +489,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         error: result.error || 'Erro ao iniciar trial',
       };
     } catch (err: any) {
-      console.error('[RevenueCat] Erro ao iniciar trial:', err);
+      log('Error starting trial', err.message);
       return {
         success: false,
         error: err.message || 'Erro desconhecido',
@@ -378,27 +497,23 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     } finally {
       setIsLoading(false);
     }
-  }, [currentPackage, updateStatus]);
+  }, [currentPackage, updateSubscriptionStatus, log]);
   
-  /**
-   * Compra assinatura (mesma lógica do trial, RevenueCat decide se aplica trial)
-   */
   const purchaseSubscription = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     return startTrial();
   }, [startTrial]);
   
-  /**
-   * Restaura compras anteriores
-   */
   const restorePurchases = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
+    log('Restoring purchases');
     
     try {
       const result = await RevenueCatService.restorePurchases();
       
       if (result.success && result.customerInfo) {
         setCustomerInfo(result.customerInfo);
-        updateStatus(result.customerInfo);
+        updateSubscriptionStatus(result.customerInfo, 'restore_purchases');
+        log('Purchases restored successfully');
         return { success: true };
       }
       
@@ -407,7 +522,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         error: result.error || 'Nenhuma compra anterior encontrada',
       };
     } catch (err: any) {
-      console.error('[RevenueCat] Erro ao restaurar:', err);
+      log('Error restoring purchases', err.message);
       return {
         success: false,
         error: err.message || 'Erro ao restaurar compras',
@@ -415,105 +530,77 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     } finally {
       setIsLoading(false);
     }
-  }, [updateStatus]);
+  }, [updateSubscriptionStatus, log]);
   
-  /**
-   * Atualiza status manualmente
-   */
   const refreshStatus = useCallback(async (): Promise<void> => {
+    log('Manual status refresh');
     try {
       const info = await RevenueCatService.refreshCustomerInfo();
       if (info) {
         setCustomerInfo(info);
-        updateStatus(info);
+        updateSubscriptionStatus(info, 'manual_refresh');
       }
       
-      // Recarrega ofertas também
       const offeringsResult = await RevenueCatService.getOfferings();
       if (offeringsResult.success && offeringsResult.currentPackage) {
         setCurrentPackage(offeringsResult.currentPackage);
       }
     } catch (error) {
-      console.error('[RevenueCat] Erro ao atualizar status:', error);
+      log('Error refreshing status', error);
     }
-  }, [updateStatus]);
+  }, [updateSubscriptionStatus, log]);
   
-  /**
-   * Abre página de gerenciamento de assinaturas
-   */
   const openManageSubscriptions = useCallback(async (): Promise<void> => {
     await RevenueCatService.openManageSubscriptions();
   }, []);
   
-  /**
-   * Dispensa prompt de trial temporariamente
-   */
-  const dismissTrialPrompt = useCallback(() => {
-    setTrialPromptDismissed(true);
-  }, []);
+  const dismissPaywall = useCallback(() => {
+    log('Paywall dismissed by user');
+    setPaywallDismissed(true);
+  }, [log]);
   
-  /**
-   * Dispensa aviso de renovação temporariamente
-   */
   const dismissRenewalWarning = useCallback(() => {
     setRenewalWarningDismissed(true);
   }, []);
 
   // ============================================
-  // FLAGS DE UI
+  // FLAGS DE UI (REGRA CRÍTICA 3)
   // ============================================
   
-  // Mostra prompt de trial se:
-  // - Está autenticado
-  // - Não tem acesso pro
-  // - Não dispensou o prompt
-  // - Não está carregando
-  const shouldShowTrialPrompt = 
+  // Paywall aparece SOMENTE quando status == INACTIVE
+  // NUNCA durante UNKNOWN
+  const shouldShowPaywall = 
     isAuthenticated && 
-    !isPro && 
-    !trialPromptDismissed && 
-    !isLoading &&
-    isInitialized;
+    subscriptionStatus === 'INACTIVE' && 
+    !paywallDismissed &&
+    user?.role === 'coach';
   
-  // ISSUE 2 FIX: Mostra aviso de renovação APENAS para assinatura paga (não trial)
-  // - Tem acesso pro
-  // - NÃO está em trial (periodType !== 'trial')
-  // - Faltam 3 dias ou menos
-  // - Não dispensou o aviso
+  // Aviso de renovação apenas para assinatura paga prestes a expirar
   const shouldShowRenewalWarning = 
-    isPro && 
-    periodType === 'normal' && // ISSUE 2 FIX: Só para assinatura paga
+    subscriptionStatus === 'ACTIVE' && 
+    periodType === 'normal' &&
     daysRemaining > 0 && 
     daysRemaining <= 3 && 
     !renewalWarningDismissed;
-  
-  // Mostra prompt de expirado se:
-  // - Estava com pro mas expirou
-  // - Não tem mais acesso
-  const shouldShowExpiredPrompt = 
-    isAuthenticated &&
-    !isPro && 
-    customerInfo !== null && 
-    !isLoading;
 
   // ============================================
   // VALOR DO CONTEXTO
   // ============================================
   
   const value: RevenueCatContextType = {
+    subscriptionStatus,
     isInitialized,
     isLoading,
     error,
     isPro,
     isTrialing,
     hasTrialAvailable,
-    periodType, // ISSUE 2 FIX
+    periodType,
     expirationDate,
     daysRemaining,
     willRenew,
-    shouldShowTrialPrompt,
+    shouldShowPaywall,
     shouldShowRenewalWarning,
-    shouldShowExpiredPrompt,
     customerInfo,
     currentPackage,
     startTrial,
@@ -521,7 +608,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     restorePurchases,
     refreshStatus,
     openManageSubscriptions,
-    dismissTrialPrompt,
+    dismissPaywall,
     dismissRenewalWarning,
   };
 
