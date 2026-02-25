@@ -131,6 +131,8 @@ class UserResponse(BaseModel):
     name: str
     role: str = "coach"  # Padrão é coach (quem faz login no app)
     pro_access_override: bool = False  # Override permanente de acesso PRO
+    account_deletion_status: str = "ACTIVE"  # Status de exclusão da conta
+    deletion_scheduled_for: Optional[str] = None  # Data agendada para exclusão
     created_at: datetime
 
 class TokenResponse(BaseModel):
