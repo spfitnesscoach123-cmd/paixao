@@ -1,22 +1,25 @@
 /**
  * Subscription Guard
  * 
- * Componente wrapper que exibe modais obrigatórios de assinatura
- * Deve ser usado no layout principal para garantir que:
- * - Usuários novos vejam o modal de trial obrigatório
- * - Usuários com assinatura expirando vejam o aviso de renovação
- * - Usuários com assinatura expirada vejam o modal de renovação
+ * Componente wrapper que exibe paywall de assinatura com sistema de 3 estados:
+ * - UNKNOWN: UI carrega normalmente, funcionalidades premium bloqueadas internamente
+ * - ACTIVE: Acesso completo liberado
+ * - INACTIVE: Paywall exibido
+ * 
+ * NUNCA bloqueia a renderização da UI
+ * NUNCA trava o app
+ * Segue padrões Apple (Strava, Duolingo)
  */
 
-import React, { useEffect, useState } from 'react';
-import { Alert } from 'react-native';
-import { useRevenueCat } from '../contexts/RevenueCatContext';
+import React, { useState } from 'react';
+import { Alert, View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { useRevenueCat, SubscriptionStatus } from '../contexts/RevenueCatContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   TrialRequiredModal,
   RenewalWarningModal,
-  SubscriptionExpiredModal,
 } from './SubscriptionModals';
 import { formatPrice } from '../services/revenuecat';
 
@@ -26,41 +29,26 @@ interface SubscriptionGuardProps {
 
 const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   const { locale } = useLanguage();
+  const { colors } = useTheme();
   const { isAuthenticated, user } = useAuth();
   const {
+    subscriptionStatus,
     isPro,
-    isTrialing,
     isLoading,
-    isInitialized,
-    shouldShowTrialPrompt,
+    shouldShowPaywall,
     shouldShowRenewalWarning,
     daysRemaining,
     currentPackage,
-    customerInfo, // Adicionado para verificar isSandbox
+    customerInfo,
     startTrial,
     purchaseSubscription,
     restorePurchases,
     openManageSubscriptions,
-    dismissTrialPrompt,
+    dismissPaywall,
     dismissRenewalWarning,
   } = useRevenueCat();
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [showExpiredModal, setShowExpiredModal] = useState(false);
-
-  // Verifica se deve mostrar modal de expirado
-  useEffect(() => {
-    // Se o usuário estava autenticado, o SDK inicializou, 
-    // não está carregando e não tem acesso pro
-    if (isAuthenticated && isInitialized && !isLoading && !isPro) {
-      // Verifica se é um coach (não mostra para atletas)
-      if (user?.role === 'coach') {
-        setShowExpiredModal(true);
-      }
-    } else {
-      setShowExpiredModal(false);
-    }
-  }, [isAuthenticated, isInitialized, isLoading, isPro, user?.role]);
 
   // ============================================
   // HANDLERS
@@ -99,40 +87,6 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     }
   };
 
-  const handleSubscribe = async () => {
-    setIsProcessing(true);
-    
-    try {
-      const result = await purchaseSubscription();
-      
-      if (result.success) {
-        setShowExpiredModal(false);
-        Alert.alert(
-          locale === 'pt' ? 'Sucesso!' : 'Success!',
-          locale === 'pt'
-            ? 'Sua assinatura foi ativada! Bem-vindo de volta ao LoadManager Pro.'
-            : 'Your subscription is activated! Welcome back to LoadManager Pro.'
-        );
-      } else if (result.error !== 'cancelled') {
-        Alert.alert(
-          locale === 'pt' ? 'Erro' : 'Error',
-          result.error || (locale === 'pt' 
-            ? 'Não foi possível processar a assinatura.'
-            : 'Could not process subscription.')
-        );
-      }
-    } catch (error) {
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' 
-          ? 'Ocorreu um erro. Tente novamente.'
-          : 'An error occurred. Please try again.'
-      );
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleRestorePurchases = async () => {
     setIsProcessing(true);
     
@@ -140,7 +94,6 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
       const result = await restorePurchases();
       
       if (result.success) {
-        setShowExpiredModal(false);
         Alert.alert(
           locale === 'pt' ? 'Sucesso!' : 'Success!',
           locale === 'pt'
@@ -175,11 +128,6 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     dismissRenewalWarning();
   };
 
-  const handleCloseExpired = () => {
-    // Permite fechar apenas para ver o app, mas vai aparecer novamente
-    setShowExpiredModal(false);
-  };
-
   // ============================================
   // HELPERS
   // ============================================
@@ -195,13 +143,28 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   // RENDER
   // ============================================
 
+  // REGRA CRÍTICA 1: UI SEMPRE carrega normalmente
+  // Mesmo durante UNKNOWN, children são renderizados
+  // Paywall só aparece quando status == INACTIVE
+  
   return (
     <>
+      {/* Children SEMPRE renderizados - UI nunca bloqueia */}
       {children}
 
-      {/* Modal de Trial Obrigatório */}
+      {/* Indicador sutil de verificação durante UNKNOWN (opcional) */}
+      {subscriptionStatus === 'UNKNOWN' && isAuthenticated && user?.role === 'coach' && (
+        <View style={styles.unknownIndicator}>
+          <ActivityIndicator size="small" color={colors.accent.primary} />
+          <Text style={[styles.unknownText, { color: colors.text.secondary }]}>
+            {locale === 'pt' ? 'Verificando assinatura...' : 'Checking subscription...'}
+          </Text>
+        </View>
+      )}
+
+      {/* Paywall - SOMENTE quando status == INACTIVE (REGRA CRÍTICA 3) */}
       <TrialRequiredModal
-        visible={shouldShowTrialPrompt && user?.role === 'coach'}
+        visible={shouldShowPaywall}
         onStartTrial={handleStartTrial}
         onRestorePurchases={handleRestorePurchases}
         isLoading={isProcessing}
@@ -216,18 +179,28 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
         onManageSubscription={handleManageSubscription}
         isSandbox={customerInfo?.isSandbox ?? false}
       />
-
-      {/* Modal de Assinatura Expirada */}
-      <SubscriptionExpiredModal
-        visible={showExpiredModal && user?.role === 'coach'}
-        onClose={handleCloseExpired}
-        onSubscribe={handleSubscribe}
-        onRestorePurchases={handleRestorePurchases}
-        isLoading={isProcessing}
-        price={getPrice()}
-      />
     </>
   );
 };
+
+const styles = StyleSheet.create({
+  unknownIndicator: {
+    position: 'absolute',
+    top: 60,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 1000,
+    gap: 8,
+  },
+  unknownText: {
+    fontSize: 12,
+  },
+});
 
 export default SubscriptionGuard;
