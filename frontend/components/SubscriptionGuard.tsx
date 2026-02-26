@@ -22,6 +22,7 @@ import {
   RenewalWarningModal,
 } from './SubscriptionModals';
 import { formatPrice } from '../services/revenuecat';
+import { detectSandboxEnvironment } from '../utils/sandboxDetection';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
