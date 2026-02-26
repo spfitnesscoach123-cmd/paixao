@@ -540,8 +540,9 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   
   // Aviso de renovação
   // NOTA: Completamente desabilitado em Sandbox pois os tempos são comprimidos
-  // isSandbox === true em ambiente de teste (TestFlight/Sandbox)
-  const isSandboxEnvironment = customerInfo?.isSandbox === true;
+  // Verifica isSandbox no entitlement 'pro' E no customerInfo para maior confiabilidade
+  const proEntitlement = customerInfo?.entitlements?.active?.[ENTITLEMENT_ID];
+  const isSandboxEnvironment = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
   
   const shouldShowRenewalWarning = 
     !isSandboxEnvironment && // PRIORIDADE: Nunca mostrar em Sandbox
