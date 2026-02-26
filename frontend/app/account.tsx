@@ -25,6 +25,9 @@ export default function AccountScreen() {
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Ocultar informações de datas em Sandbox (tempos comprimidos)
+  const isSandbox = customerInfo?.isSandbox === true;
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
