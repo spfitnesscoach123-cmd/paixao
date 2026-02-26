@@ -80,28 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const login = async (email: string, password: string) => {
-    // MODO DEMO: Para screenshots no simulador
-    // Login com demo@demo.com bypassa o backend
-    const normalizedEmail = email.toLowerCase().trim();
-    if (normalizedEmail === 'demo@demo.com') {
-      console.log('[DEMO MODE] Ativado para screenshots');
-      queryClient.clear();
-      const demoUser: User = {
-        id: 'demo-user-001',
-        email: 'demo@demo.com',
-        name: 'Coach Demo',
-        role: 'coach',
-        pro_access_override: true,
-        account_deletion_status: 'ACTIVE',
-        deletion_scheduled_for: null,
-        created_at: new Date().toISOString(),
-      };
-      await storage.setItem('access_token', 'demo-token-for-screenshots');
-      setUser(demoUser);
-      return;
-    }
-    // FIM MODO DEMO
-    
     try {
       // Clear any existing cache before login to ensure clean state
       queryClient.clear();
