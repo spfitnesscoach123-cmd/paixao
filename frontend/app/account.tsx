@@ -16,7 +16,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
-import { detectSandboxEnvironment } from '../utils/sandboxDetection';
 
 export default function AccountScreen() {
   const { user, logout } = useAuth();
@@ -27,8 +26,8 @@ export default function AccountScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // SANDBOX DETECTION - Usa utilitário centralizado para detecção robusta
-  const isSandbox = detectSandboxEnvironment(customerInfo, 'pro');
+  // SANDBOX: Bloqueia banner de exclusão em ambiente de teste
+  const isSandbox = customerInfo?.isSandbox === true;
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
