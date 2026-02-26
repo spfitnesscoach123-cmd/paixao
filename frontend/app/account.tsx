@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
+import { detectSandboxEnvironment } from '../utils/sandboxDetection';
 
 export default function AccountScreen() {
   const { user, logout } = useAuth();
@@ -26,28 +27,8 @@ export default function AccountScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // SANDBOX DETECTION - Múltiplas verificações para garantir detecção
-  const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
-  
-  // Método 1: Flag direta do CustomerInfo
-  const isSandboxByCustomerInfo = customerInfo?.isSandbox === true;
-  
-  // Método 2: Flag do Entitlement
-  const isSandboxByEntitlement = proEntitlement?.isSandbox === true;
-  
-  // Método 3: Detecta pelo tempo curto entre compra e expiração
-  // Em sandbox, trials de 7 dias são comprimidos para ~3 minutos
-  let isSandboxByDuration = false;
-  if (proEntitlement?.expirationDate && proEntitlement?.latestPurchaseDate) {
-    const exp = new Date(proEntitlement.expirationDate);
-    const purchase = new Date(proEntitlement.latestPurchaseDate);
-    const diffHours = (exp.getTime() - purchase.getTime()) / (1000 * 60 * 60);
-    // Trial real de 7 dias = 168 horas, sandbox = minutos (< 1 hora)
-    isSandboxByDuration = diffHours < 24;
-  }
-  
-  // Combina todas as verificações
-  const isSandbox = isSandboxByCustomerInfo || isSandboxByEntitlement || isSandboxByDuration;
+  // SANDBOX DETECTION - Usa utilitário centralizado para detecção robusta
+  const isSandbox = detectSandboxEnvironment(customerInfo, 'pro');
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
