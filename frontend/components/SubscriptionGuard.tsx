@@ -172,13 +172,13 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
         price={getPrice()}
       />
 
-      {/* Modal de Aviso de Renovação */}
+      {/* Modal de Aviso de Renovação - Bloqueado em Sandbox */}
       <RenewalWarningModal
-        visible={shouldShowRenewalWarning}
+        visible={showRenewalModal}
         daysRemaining={daysRemaining}
         onDismiss={handleDismissRenewal}
         onManageSubscription={handleManageSubscription}
-        isSandbox={customerInfo?.isSandbox ?? false}
+        isSandbox={isSandboxEnv}
       />
     </>
   );
