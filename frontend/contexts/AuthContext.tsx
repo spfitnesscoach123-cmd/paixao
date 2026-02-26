@@ -82,7 +82,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     // MODO DEMO: Para screenshots no simulador
     // Login com demo@demo.com bypassa o backend
-    if (email === 'demo@demo.com') {
+    const normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail === 'demo@demo.com') {
+      console.log('[DEMO MODE] Ativado para screenshots');
       queryClient.clear();
       const demoUser: User = {
         id: 'demo-user-001',
