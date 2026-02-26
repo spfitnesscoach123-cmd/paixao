@@ -156,8 +156,10 @@ export default function Subscription() {
     refreshStatus,
   } = useRevenueCat();
   
-  // Ocultar informações de expiração em Sandbox (tempos comprimidos)
-  const isSandbox = customerInfo?.isSandbox === true;
+  // SANDBOX: Ocultar informações de expiração em ambiente de teste
+  // Verifica isSandbox no entitlement 'pro' pois é mais confiável
+  const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
+  const isSandbox = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
 
   const [isProcessing, setIsProcessing] = useState(false);
 
