@@ -22,7 +22,6 @@ import {
   RenewalWarningModal,
 } from './SubscriptionModals';
 import { formatPrice } from '../services/revenuecat';
-import { detectSandboxEnvironment } from '../utils/sandboxDetection';
 
 interface SubscriptionGuardProps {
   children: React.ReactNode;
@@ -48,9 +47,9 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // SANDBOX GUARD: Usa utilitário centralizado para detecção robusta
-  const isSandboxEnv = detectSandboxEnvironment(customerInfo, 'pro');
-  const showRenewalModal = shouldShowRenewalWarning && !isSandboxEnv;
+  // SANDBOX: Bloqueia modal de renovação em ambiente de teste
+  const isSandbox = customerInfo?.isSandbox === true;
+  const showRenewalModal = shouldShowRenewalWarning && !isSandbox;
 
   // ============================================
   // HANDLERS
