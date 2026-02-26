@@ -67,6 +67,20 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   
   const isSandboxEnv = isSandboxByCustomerInfo || isSandboxByEntitlement || isSandboxByDuration;
   const showRenewalModal = shouldShowRenewalWarning && !isSandboxEnv;
+  
+  // Debug log para rastrear detecção de sandbox
+  if (__DEV__ || shouldShowRenewalWarning) {
+    console.log('[SubscriptionGuard] Sandbox detection:', {
+      isSandboxByCustomerInfo,
+      isSandboxByEntitlement,
+      isSandboxByDuration,
+      isSandboxEnv,
+      shouldShowRenewalWarning,
+      showRenewalModal,
+      customerInfoIsSandbox: customerInfo?.isSandbox,
+      proEntitlementIsSandbox: proEntitlement?.isSandbox,
+    });
+  }
 
   // ============================================
   // HANDLERS
