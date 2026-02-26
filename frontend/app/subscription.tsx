@@ -338,7 +338,7 @@ export default function Subscription() {
               </View>
               
               <View style={styles.statusInfo}>
-                {isTrialing && (
+                {isTrialing && !isSandbox && (
                   <Text style={styles.statusText}>
                     {locale === 'pt'
                       ? `${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'} restantes do trial`
@@ -346,7 +346,7 @@ export default function Subscription() {
                   </Text>
                 )}
                 
-                {expirationDate && (
+                {expirationDate && !isSandbox && (
                   <Text style={styles.expirationText}>
                     {locale === 'pt'
                       ? `${willRenew ? 'Renova' : 'Expira'} em: ${formatExpirationDate()}`
