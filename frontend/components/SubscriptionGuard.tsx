@@ -46,6 +46,10 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   } = useRevenueCat();
 
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // SANDBOX GUARD: Bloqueia modal de renovação em ambiente de teste
+  const isSandboxEnv = customerInfo?.isSandbox === true;
+  const showRenewalModal = shouldShowRenewalWarning && !isSandboxEnv;
 
   // ============================================
   // HANDLERS
