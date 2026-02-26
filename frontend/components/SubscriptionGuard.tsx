@@ -50,22 +50,22 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   // SANDBOX GUARD: Bloqueia modal de renovação em ambiente de teste
   // Verifica múltiplas fontes para garantir detecção de sandbox
   const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
-  const isSandboxEnv = 
-    customerInfo?.isSandbox === true || 
-    proEntitlement?.isSandbox === true ||
-    (proEntitlement?.expirationDate && (() => {
-      // Em sandbox, trials de 7 dias expiram em minutos
-      // Se expiração < 24h do início, provavelmente é sandbox
-      const exp = new Date(proEntitlement.expirationDate);
-      const latestPurchase = proEntitlement.latestPurchaseDate ? new Date(proEntitlement.latestPurchaseDate) : null;
-      if (latestPurchase) {
-        const diffHours = (exp.getTime() - latestPurchase.getTime()) / (1000 * 60 * 60);
-        // Trial real de 7 dias = 168 horas, sandbox = minutos
-        return diffHours < 24;
-      }
-      return false;
-    })());
   
+  // Detecta sandbox de múltiplas formas
+  const isSandboxByCustomerInfo = customerInfo?.isSandbox === true;
+  const isSandboxByEntitlement = proEntitlement?.isSandbox === true;
+  
+  // Fallback: detecta sandbox pelo tempo curto entre compra e expiração
+  let isSandboxByDuration = false;
+  if (proEntitlement?.expirationDate && proEntitlement?.latestPurchaseDate) {
+    const exp = new Date(proEntitlement.expirationDate);
+    const purchase = new Date(proEntitlement.latestPurchaseDate);
+    const diffHours = (exp.getTime() - purchase.getTime()) / (1000 * 60 * 60);
+    // Trial real de 7 dias = 168 horas, sandbox = minutos
+    isSandboxByDuration = diffHours < 24;
+  }
+  
+  const isSandboxEnv = isSandboxByCustomerInfo || isSandboxByEntitlement || isSandboxByDuration;
   const showRenewalModal = shouldShowRenewalWarning && !isSandboxEnv;
 
   // ============================================
