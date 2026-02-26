@@ -57,6 +57,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAuthStatus = async () => {
     try {
+      // MODO DEMO: Auto-login para screenshots no simulador
+      console.log('[DEMO MODE] Auto-login ativado');
+      const demoUser: User = {
+        id: 'demo-user-001',
+        email: 'demo@demo.com',
+        name: 'Coach Demo',
+        role: 'coach',
+        pro_access_override: true,
+        account_deletion_status: 'ACTIVE',
+        deletion_scheduled_for: null,
+        created_at: new Date().toISOString(),
+      };
+      await storage.setItem('access_token', 'demo-token-for-screenshots');
+      setUser(demoUser);
+      setIsLoading(false);
+      return;
+      // FIM MODO DEMO
+      
       const token = await storage.getItem('access_token');
       if (token) {
         const response = await api.get('/auth/me');
