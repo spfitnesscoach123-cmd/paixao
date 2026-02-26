@@ -48,40 +48,9 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
 
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // SANDBOX GUARD: Bloqueia modal de renovação em ambiente de teste
-  // Verifica múltiplas fontes para garantir detecção de sandbox
-  const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
-  
-  // Detecta sandbox de múltiplas formas
-  const isSandboxByCustomerInfo = customerInfo?.isSandbox === true;
-  const isSandboxByEntitlement = proEntitlement?.isSandbox === true;
-  
-  // Fallback: detecta sandbox pelo tempo curto entre compra e expiração
-  let isSandboxByDuration = false;
-  if (proEntitlement?.expirationDate && proEntitlement?.latestPurchaseDate) {
-    const exp = new Date(proEntitlement.expirationDate);
-    const purchase = new Date(proEntitlement.latestPurchaseDate);
-    const diffHours = (exp.getTime() - purchase.getTime()) / (1000 * 60 * 60);
-    // Trial real de 7 dias = 168 horas, sandbox = minutos
-    isSandboxByDuration = diffHours < 24;
-  }
-  
-  const isSandboxEnv = isSandboxByCustomerInfo || isSandboxByEntitlement || isSandboxByDuration;
+  // SANDBOX GUARD: Usa utilitário centralizado para detecção robusta
+  const isSandboxEnv = detectSandboxEnvironment(customerInfo, 'pro');
   const showRenewalModal = shouldShowRenewalWarning && !isSandboxEnv;
-  
-  // Debug log para rastrear detecção de sandbox
-  if (__DEV__ || shouldShowRenewalWarning) {
-    console.log('[SubscriptionGuard] Sandbox detection:', {
-      isSandboxByCustomerInfo,
-      isSandboxByEntitlement,
-      isSandboxByDuration,
-      isSandboxEnv,
-      shouldShowRenewalWarning,
-      showRenewalModal,
-      customerInfoIsSandbox: customerInfo?.isSandbox,
-      proEntitlementIsSandbox: proEntitlement?.isSandbox,
-    });
-  }
 
   // ============================================
   // HANDLERS
