@@ -539,15 +539,18 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
     user?.email !== ADMIN_EMAIL;
   
   // Aviso de renovação
-  // NOTA: Bloqueado em Sandbox pois os tempos são comprimidos (7 dias → 3 minutos)
+  // NOTA: Completamente desabilitado em Sandbox pois os tempos são comprimidos
+  // isSandbox === true em ambiente de teste (TestFlight/Sandbox)
+  const isSandboxEnvironment = customerInfo?.isSandbox === true;
+  
   const shouldShowRenewalWarning = 
+    !isSandboxEnvironment && // PRIORIDADE: Nunca mostrar em Sandbox
     subscriptionStatus === 'ACTIVE' && 
     periodType === 'normal' &&
     daysRemaining > 0 && 
     daysRemaining <= 3 && 
     !renewalWarningDismissed &&
-    user?.email !== ADMIN_EMAIL &&
-    customerInfo?.isSandbox !== true;
+    user?.email !== ADMIN_EMAIL;
 
   // ============================================
   // VALOR DO CONTEXTO
