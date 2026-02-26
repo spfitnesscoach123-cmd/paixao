@@ -148,12 +148,16 @@ export default function Subscription() {
     expirationDate,
     willRenew,
     currentPackage,
+    customerInfo,
     startTrial,
     purchaseSubscription,
     restorePurchases,
     openManageSubscriptions,
     refreshStatus,
   } = useRevenueCat();
+  
+  // Ocultar informações de expiração em Sandbox (tempos comprimidos)
+  const isSandbox = customerInfo?.isSandbox === true;
 
   const [isProcessing, setIsProcessing] = useState(false);
 
