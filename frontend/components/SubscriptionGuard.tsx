@@ -48,7 +48,9 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   
   // SANDBOX: Bloqueia modal de renovação em ambiente de teste
-  const isSandbox = customerInfo?.isSandbox === true;
+  // Verifica isSandbox no entitlement 'pro' pois é mais confiável
+  const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
+  const isSandbox = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
   const showRenewalModal = shouldShowRenewalWarning && !isSandbox;
 
   // ============================================
