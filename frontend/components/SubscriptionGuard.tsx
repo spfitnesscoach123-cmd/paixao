@@ -178,7 +178,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
         daysRemaining={daysRemaining}
         onDismiss={handleDismissRenewal}
         onManageSubscription={handleManageSubscription}
-        isSandbox={isSandboxEnv}
+        isSandbox={isSandbox}
       />
     </>
   );
