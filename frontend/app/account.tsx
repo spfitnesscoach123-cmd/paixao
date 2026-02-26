@@ -27,7 +27,9 @@ export default function AccountScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   
   // SANDBOX: Bloqueia banner de exclusão em ambiente de teste
-  const isSandbox = customerInfo?.isSandbox === true;
+  // Verifica isSandbox no entitlement 'pro' pois é mais confiável
+  const proEntitlement = customerInfo?.entitlements?.active?.['pro'];
+  const isSandbox = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
