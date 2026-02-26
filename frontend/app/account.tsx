@@ -107,8 +107,8 @@ export default function AccountScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content}>
-        {/* Pending Deletion Warning */}
-        {isPending && user?.deletion_scheduled_for && (
+        {/* Pending Deletion Warning - Oculto em Sandbox */}
+        {isPending && user?.deletion_scheduled_for && !isSandbox && (
           <View style={[styles.warningCard, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
             <View style={styles.warningHeader}>
               <Ionicons name="warning" size={24} color="#ef4444" />
