@@ -15,12 +15,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../contexts/AuthContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLanguage } from '../contexts/LanguageContext';
 import api from '../services/api';
 
 export default function AccountScreen() {
   const { user, logout } = useAuth();
   const { customerInfo, expirationDate, isPro } = useRevenueCat();
   const { colors } = useTheme();
+  const { locale } = useLanguage();
   const router = useRouter();
   
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -48,8 +50,10 @@ export default function AccountScreen() {
       
       if (response.data.status === 'DELETED') {
         Alert.alert(
-          'Conta Excluída',
-          'Sua conta foi excluída permanentemente.',
+          locale === 'pt' ? 'Conta Excluída' : 'Account Deleted',
+          locale === 'pt' 
+            ? 'Sua conta foi excluída permanentemente.'
+            : 'Your account has been permanently deleted.',
           [
             {
               text: 'OK',
@@ -62,15 +66,17 @@ export default function AccountScreen() {
         );
       } else if (response.data.status === 'PENDING') {
         Alert.alert(
-          'Exclusão Agendada',
+          locale === 'pt' ? 'Exclusão Agendada' : 'Deletion Scheduled',
           response.data.message,
           [{ text: 'OK' }]
         );
       }
     } catch (error: any) {
       Alert.alert(
-        'Erro',
-        error.response?.data?.detail || 'Não foi possível processar sua solicitação.',
+        locale === 'pt' ? 'Erro' : 'Error',
+        error.response?.data?.detail || (locale === 'pt' 
+          ? 'Não foi possível processar sua solicitação.'
+          : 'Could not process your request.'),
         [{ text: 'OK' }]
       );
     } finally {
@@ -81,7 +87,7 @@ export default function AccountScreen() {
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
+    return date.toLocaleDateString(locale === 'pt' ? 'pt-BR' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
