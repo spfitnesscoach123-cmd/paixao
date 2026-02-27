@@ -110,7 +110,9 @@ export default function AccountScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Conta</Text>
+        <Text style={styles.headerTitle}>
+          {locale === 'pt' ? 'Conta' : 'Account'}
+        </Text>
         <View style={styles.headerSpacer} />
       </LinearGradient>
 
@@ -120,10 +122,14 @@ export default function AccountScreen() {
           <View style={[styles.warningCard, { backgroundColor: 'rgba(239, 68, 68, 0.1)' }]}>
             <View style={styles.warningHeader}>
               <Ionicons name="warning" size={24} color="#ef4444" />
-              <Text style={styles.warningTitle}>Exclusão Agendada</Text>
+              <Text style={styles.warningTitle}>
+                {locale === 'pt' ? 'Exclusão Agendada' : 'Deletion Scheduled'}
+              </Text>
             </View>
             <Text style={styles.warningText}>
-              Sua conta está agendada para exclusão em {formatDate(user.deletion_scheduled_for)}. Você continuará com acesso ao app até essa data.
+              {locale === 'pt'
+                ? `Sua conta está agendada para exclusão em ${formatDate(user.deletion_scheduled_for)}. Você continuará com acesso ao app até essa data.`
+                : `Your account is scheduled for deletion on ${formatDate(user.deletion_scheduled_for)}. You will continue to have access to the app until that date.`}
             </Text>
           </View>
         )}
@@ -131,11 +137,13 @@ export default function AccountScreen() {
         {/* Delete Account Section */}
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-            Excluir Conta
+            {locale === 'pt' ? 'Excluir Conta' : 'Delete Account'}
           </Text>
           
           <Text style={[styles.infoText, { color: colors.text.secondary }]}>
-            A exclusão da conta é permanente e resultará na remoção de todos os seus dados. Se você possuir uma assinatura ativa ou período de teste gratuito, sua conta será excluída automaticamente ao final do período vigente.
+            {locale === 'pt'
+              ? 'A exclusão da conta é permanente e resultará na remoção de todos os seus dados. Se você possuir uma assinatura ativa ou período de teste gratuito, sua conta será excluída automaticamente ao final do período vigente.'
+              : 'Account deletion is permanent and will result in the removal of all your data. If you have an active subscription or free trial period, your account will be automatically deleted at the end of the current period.'}
           </Text>
 
           <TouchableOpacity
@@ -145,7 +153,9 @@ export default function AccountScreen() {
             data-testid="delete-account-btn"
           >
             <Ionicons name="trash-outline" size={20} color="#ffffff" />
-            <Text style={styles.deleteButtonText}>Excluir Conta</Text>
+            <Text style={styles.deleteButtonText}>
+              {locale === 'pt' ? 'Excluir Conta' : 'Delete Account'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -164,12 +174,14 @@ export default function AccountScreen() {
                 <Ionicons name="warning" size={32} color="#ef4444" />
               </View>
               <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                Excluir Conta Permanentemente
+                {locale === 'pt' ? 'Excluir Conta Permanentemente' : 'Permanently Delete Account'}
               </Text>
             </View>
 
             <Text style={[styles.modalMessage, { color: colors.text.secondary }]}>
-              Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita. Se você possuir uma assinatura ativa ou período de teste gratuito, sua conta será excluída automaticamente ao final do período vigente.
+              {locale === 'pt'
+                ? 'Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita. Se você possuir uma assinatura ativa ou período de teste gratuito, sua conta será excluída automaticamente ao final do período vigente.'
+                : 'Are you sure you want to delete your account? This action cannot be undone. If you have an active subscription or free trial period, your account will be automatically deleted at the end of the current period.'}
             </Text>
 
             <View style={styles.modalButtons}>
@@ -179,7 +191,9 @@ export default function AccountScreen() {
                 disabled={isDeleting}
                 data-testid="delete-modal-cancel-btn"
               >
-                <Text style={styles.cancelButtonText}>Cancelar</Text>
+                <Text style={styles.cancelButtonText}>
+                  {locale === 'pt' ? 'Cancelar' : 'Cancel'}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -192,7 +206,7 @@ export default function AccountScreen() {
                   <ActivityIndicator color="#ffffff" size="small" />
                 ) : (
                   <Text style={styles.confirmDeleteButtonText}>
-                    Excluir Conta Permanentemente
+                    {locale === 'pt' ? 'Excluir Conta Permanentemente' : 'Permanently Delete Account'}
                   </Text>
                 )}
               </TouchableOpacity>
