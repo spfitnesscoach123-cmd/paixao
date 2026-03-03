@@ -711,11 +711,13 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   tableContainer: {
     marginBottom: 24,
+    width: '100%',
   },
   table: {
     backgroundColor: colors.dark.card,
     borderRadius: 12,
     overflow: 'hidden',
+    minWidth: '100%',
   },
   tableRow: {
     flexDirection: 'row',
@@ -723,7 +725,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   tableHeaderCell: {
-    width: 120,
+    minWidth: 120,
+    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 12,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
@@ -734,14 +737,16 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
   },
   tableMetricCell: {
-    width: 80,
+    minWidth: 80,
+    flex: 0.7,
     paddingVertical: 12,
     paddingHorizontal: 8,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
     alignItems: 'center',
   },
   tableNameCell: {
-    width: 120,
+    minWidth: 120,
+    flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 12,
   },
@@ -751,7 +756,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.primary,
   },
   tableValueCell: {
-    width: 80,
+    minWidth: 80,
+    flex: 0.7,
     paddingVertical: 12,
     paddingHorizontal: 8,
     alignItems: 'center',

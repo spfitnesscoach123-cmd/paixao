@@ -550,7 +550,7 @@ function CreatePeriodizationContent() {
             style={styles.headerBack}
             data-testid="back-to-periodization"
           >
-            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={24} color="#f1f5f9" />
             <Text style={styles.headerBackText}>
               {locale === 'pt' ? 'Voltar' : 'Back'}
             </Text>
@@ -596,10 +596,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 8,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   headerBackText: {
     fontSize: 14,
-    color: colors.text.primary,
+    color: '#f1f5f9',
+    fontWeight: '500',
   },
   headerTitle: {
     fontSize: 18,
