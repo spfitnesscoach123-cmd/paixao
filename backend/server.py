@@ -2414,6 +2414,18 @@ async def validate_wellness_token(data: TokenValidateRequest):
     """Validate a token entered by an athlete (public, no auth required)"""
     token_code = data.token.upper().strip()
     
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    if token_code == "APPLE-REVIEW-2026":
+        # Buscar coach demo pelo email fixo
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            return {
+                "valid": True,
+                "token_id": token_code,
+                "coach_id": str(demo_coach["_id"]),
+            }
+    # === FIM APPLE REVIEW TOKEN ===
+    
     # Find token
     token = await db.wellness_tokens.find_one({"token_id": token_code})
     
@@ -2453,6 +2465,16 @@ async def get_athletes_for_token(token_id: str):
     """Get list of athletes for a valid token (public, no auth required)"""
     token_code = token_id.upper().strip()
     
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    if token_code == "APPLE-REVIEW-2026":
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            athletes = await db.athletes.find({
+                "coach_id": str(demo_coach["_id"])
+            }).to_list(1000)
+            return [{"id": str(a["_id"]), "name": a["name"]} for a in athletes]
+    # === FIM APPLE REVIEW TOKEN ===
+    
     # Find and validate token
     token = await db.wellness_tokens.find_one({"token_id": token_code})
     
@@ -2481,6 +2503,14 @@ async def check_athlete_token_usage(token_id: str, athlete_id: str):
     """Check if an athlete has already used this token (public, no auth required)"""
     token_code = token_id.upper().strip()
     
+    # === APPLE REVIEW TOKEN - Sempre permite uso para App Review ===
+    if token_code == "APPLE-REVIEW-2026":
+        return {
+            "already_used": False,
+            "message": "OK"
+        }
+    # === FIM APPLE REVIEW TOKEN ===
+    
     # Check if usage already exists
     existing_usage = await db.token_usage.find_one({
         "token_id": token_code,
@@ -2502,6 +2532,83 @@ async def check_athlete_token_usage(token_id: str, athlete_id: str):
 async def submit_wellness_via_token(data: TokenWellnessSubmit):
     """Submit wellness questionnaire via token (public, no auth required)"""
     token_code = data.token.upper().strip()
+    
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    coach_id_for_record = None
+    if token_code == "APPLE-REVIEW-2026":
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            coach_id_for_record = str(demo_coach["_id"])
+            # Verificar se atleta pertence a este coach
+            athlete = await db.athletes.find_one({
+                "_id": ObjectId(data.athlete_id),
+                "coach_id": coach_id_for_record
+            })
+            if not athlete:
+                raise HTTPException(status_code=404, detail="Atleta não encontrado")
+            
+            # Verificar se já usou (permitir múltiplos usos para review)
+            # Não bloquear por uso anterior para Apple Review
+            
+            # Calculate readiness score
+            readiness_score = round(
+                (data.sleep_quality * 2 +
+                 (10 - data.fatigue) * 2 +
+                 (10 - data.muscle_soreness) * 1.5 +
+                 (10 - data.stress) * 1 +
+                 data.mood * 1.5) / 8, 1
+            )
+            
+            # Create wellness record
+            wellness_record = {
+                "athlete_id": data.athlete_id,
+                "coach_id": coach_id_for_record,
+                "date": data.date,
+                "sleep_hours": data.sleep_hours,
+                "sleep_quality": data.sleep_quality,
+                "fatigue": data.fatigue,
+                "muscle_soreness": data.muscle_soreness,
+                "stress": data.stress,
+                "mood": data.mood,
+                "hydration": data.hydration or 5,
+                "readiness_score": readiness_score,
+                "notes": data.notes,
+                "created_at": datetime.utcnow(),
+                "submitted_via": "apple_review_token",
+                "token_id": token_code,
+            }
+            
+            await db.wellness.insert_one(wellness_record)
+            
+            # Generate feedback
+            feedback = {
+                "athlete_name": athlete["name"],
+                "date": data.date,
+                "readiness_score": readiness_score,
+                "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
+                "recommendations": []
+            }
+            
+            if data.sleep_hours < 7:
+                feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
+            if data.sleep_quality < 6:
+                feedback["recommendations"].append("Considere melhorar sua higiene do sono")
+            if data.fatigue > 7:
+                feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
+            if data.muscle_soreness > 7:
+                feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
+            if data.stress > 7:
+                feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
+            
+            if not feedback["recommendations"]:
+                feedback["recommendations"].append("Ótimo! Você está em boas condições!")
+            
+            return {
+                "success": True,
+                "message": "Questionário enviado com sucesso!",
+                "feedback": feedback
+            }
+    # === FIM APPLE REVIEW TOKEN ===
     
     # Validate token
     token = await db.wellness_tokens.find_one({"token_id": token_code})
