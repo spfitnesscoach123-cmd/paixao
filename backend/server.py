@@ -2415,7 +2415,7 @@ async def validate_wellness_token(data: TokenValidateRequest):
     token_code = data.token.upper().strip()
     
     # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
-    if token_code == "APPLE-REVIEW-2026":
+    if token_code == "APPS26":
         # Buscar coach demo pelo email fixo
         demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
         if demo_coach:
@@ -2466,7 +2466,7 @@ async def get_athletes_for_token(token_id: str):
     token_code = token_id.upper().strip()
     
     # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
-    if token_code == "APPLE-REVIEW-2026":
+    if token_code == "APPS26":
         demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
         if demo_coach:
             athletes = await db.athletes.find({
@@ -2504,7 +2504,7 @@ async def check_athlete_token_usage(token_id: str, athlete_id: str):
     token_code = token_id.upper().strip()
     
     # === APPLE REVIEW TOKEN - Sempre permite uso para App Review ===
-    if token_code == "APPLE-REVIEW-2026":
+    if token_code == "APPS26":
         return {
             "already_used": False,
             "message": "OK"
@@ -2535,7 +2535,7 @@ async def submit_wellness_via_token(data: TokenWellnessSubmit):
     
     # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
     coach_id_for_record = None
-    if token_code == "APPLE-REVIEW-2026":
+    if token_code == "APPS26":
         demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
         if demo_coach:
             coach_id_for_record = str(demo_coach["_id"])

@@ -35,9 +35,14 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
   - `account.tsx` (linha 32)
 
 ### Versão Atual
-- `version`: 1.0.52
-- `buildNumber`: 1 (iOS)
-- `versionCode`: 52 (Android)
+- `version`: 1.0.53
+- `buildNumber`: 2 (iOS)
+- `versionCode`: 53 (Android)
+
+### Token App Review
+- Token: `APPS26`
+- Permanente, sem expiração, sem limite de uso
+- Vinculado à conta: `contato@loadmanagerpro.com.br`
 
 ## Backlog
 

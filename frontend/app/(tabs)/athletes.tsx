@@ -9,6 +9,7 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,7 @@ export default function AthletesScreen() {
   const queryClient = useQueryClient();
   const { t } = useLanguage();
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
 
   const { data: athletes, isLoading } = useQuery({
@@ -125,7 +127,7 @@ export default function AthletesScreen() {
         data={athletes}
         keyExtractor={(item) => item.id || item._id || ''}
         renderItem={renderAthleteCard}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingTop: insets.top + 16 }]}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 

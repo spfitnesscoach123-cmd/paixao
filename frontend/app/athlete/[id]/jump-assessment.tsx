@@ -11,6 +11,7 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -661,6 +662,7 @@ function JumpAssessmentContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
+  const insets = useSafeAreaInsets();
   
   // State
   const [showProtocolModal, setShowProtocolModal] = useState(false);
@@ -789,10 +791,15 @@ function JumpAssessmentContent() {
   
   return (
     <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton} data-testid="back-button">
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.backButton} 
+            data-testid="back-button"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.title}>{t.title}</Text>
@@ -1078,10 +1085,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 16,
-    paddingTop: 8,
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 4,
   },
   title: {
     fontSize: 20,
