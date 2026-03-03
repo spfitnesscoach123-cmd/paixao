@@ -1,60 +1,60 @@
 <analysis>**original_problem_statement:**
-The user initially requested the re-implementation of a subscription system from scratch. During this session, the user pivoted to two new, high-priority tasks:
-1.  Implement a permanent PRO access override for a specific user account ().
-2.  Implement a system to limit each user account to a maximum of 3 unique devices.
-
-Finally, the user reported a crash in the web simulator and a deployment failure, which the agent addressed.
+The user's initial request was to audit the pro plan's trial period configuration, which was incorrectly displaying 1 day instead of 7 days. This led to a series of investigations and fixes related to Apple's Sandbox environment. Subsequently, the user requested several other features and fixes to prepare the app for an Apple App Store review.
 
 **PRODUCT REQUIREMENTS:**
-1.  **PRO Access Override:** A specific account () must have permanent PRO access, bypassing all RevenueCat subscription checks. This must be an isolated change and not affect any other user.
-2.  **Device Limit:**
-    *   Restrict each user to 3 simultaneously logged-in devices.
-    *   Device identity must be persistent and generated client-side (IDFV or UUID).
-    *   Login from a 4th device must be blocked with a  error.
-    *   The check must happen on the backend during authentication.
-    *   The app must handle the error and prevent login.
+
+1.  **Sandbox UI Correction:**
+    *   Investigate why the 7-day trial appears as 1 day in TestFlight.
+    *   Hide all misleading time-sensitive UI elements when the app is running in a Sandbox/TestFlight environment. This includes:
+        *   The automatic modal warning about subscription expiration ().
+        *   The informational text showing X days remaining for a trial on the subscription page.
+        *   The banner showing the scheduled date for a pending account deletion.
+    *   These changes must be UI-only and must not alter any backend logic, subscription status, or time calculations.
+
+2.  **Build Versioning:**
+    *   Diagnose and fix build upload failures to TestFlight.
+    *   Increment the app version in  to be higher than the latest version in App Store Connect (), setting it to .
+
+3.  **App Store Review Preparations:**
+    *   **Translations:** Implement English translations for the Account Deletion page and its confirmation modal, consistent with the rest of the app.
+    *   **App Review Token:** Create a permanent, non-expiring token  for the App Review team. This token must be tied to the admin account (), grant immediate access to the Sou Atleta interface, and list pre-populated athlete data without affecting any other user's data or system metrics.
+    *   **Screenshots:** Help diagnose why the app is unusable on an Xcode simulator, which is preventing the user from taking required iPad screenshots for the App Store.
+
+4.  **Visual Bug Fixes (Periodization Page):**
+    *   Fix the invisible Back button on the New Week creation screen to ensure it has proper contrast and is always visible.
+    *   Make the periodization data table responsive, ensuring it uses the full width of the screen on larger devices like iPads and desktops, instead of having a fixed, narrow width.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The application now includes two new, fully-coded features on top of the existing codebase: a PRO access override and a device limit system.
--   **PRO Access Override**: A  boolean field was added to the backend user model and is returned by the , , and  endpoints. The frontend's  uses this flag to grant immediate PRO access, bypassing subscription checks. The specific user has been created in the database.
--   **Device Limit System**: The backend user model now contains a  array. The  and  endpoints enforce the 3-device limit. A new service () was created on the frontend to generate and persist a unique device ID using . The  now sends this device information during authentication. New backend endpoints (, ) were created for device management.
--   A fix for a web simulator crash related to the RevenueCat SDK was implemented.
--   A fix for a deployment failure caused by missing  and  packages was implemented.
+The application now includes several critical fixes and features to prepare it for App Store submission. The root cause of previous TestFlight issues (UI not updating) was identified as an incorrect build version in , which has now been fixed. Logic is in place to detect the Sandbox environment and hide misleading time-sensitive UI elements. For the App Review process, a special hardcoded token () has been implemented in the backend to provide reviewers with seamless access, and the admin account has been seeded with test athletes. The Account Deletion page is now fully translated into English. Finally, critical UI bugs on the Periodization page (invisible back button and non-responsive table) have been addressed.
 
 **Last working item**:
--   **Last item agent was working**: Fixing a deployment failure. The build logs showed an error , which was introduced when implementing the device limit feature. The agent identified that the  and  packages were used but not installed.
+-   **Last item agent was working**: Fixing two visual issues on the Periodization pages: an invisible back button on the New Week creation screen and a non-responsive data table that did not scale correctly on larger screens.
 -   **Status**: USER VERIFICATION PENDING
 -   **Agent Testing Done**: N
--   **Which testing method agent to use?**: NA. The fix addresses a build-time dependency issue. The user must attempt to deploy again to verify the fix.
+-   **Which testing method agent to use?**: Use the screenshot tool on both a small (phone) and large (iPad/desktop) screen size to verify the UI fixes.
+    1.  Navigate to the Periodization -> + New Week screen and capture a screenshot to confirm the Back button is visible and styled correctly.
+    2.  Navigate to a Periodization week's detail page () and capture a screenshot on a large screen preset to confirm the table now uses the full width.
 -   **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: Web simulator crash (P0)
--   **Issue 2**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
--   **Issue 3**: Frontend ACWR Metric Selector on Dashboard is missing (P2)
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing (P2)
+-   **Issue 3**: VBT Rep Counting & Regressions (P2)
+-   **Issue 4**: ESLint configuration for TypeScript is incorrect (P3)
 
 **Issues Detail**:
--   **Issue 1**: Web simulator crash
-    -   **Attempted fixes**: The agent identified the crash was caused by calling  on an  listener returned by  on the web platform. A fix was applied in  to add a platform check () and ensure the listener exists before calling .
-    -   **Next debug checklist**: Ask the user to refresh the web simulator to confirm the fix. Check the browser's developer console for any new errors if the issue persists.
-    -   **Why fix this issue and what will be achieved with the fix?**: Resolves a critical crash that makes the web version of the app unusable.
-    -   **Status**: USER VERIFICATION PENDING
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Frontend
-    -   **Blocked on other issue**: None
-
--   **Issue 2**: PDF Generation in Análise Científica causes app to freeze/crash
-    -   **Attempted fixes**: None in this session.
+-   **Issue 1**: PDF Generation in Análise Científica causes app to freeze/crash
+    -   **Attempted fixes**: None. This is a recurring issue from a previous session.
     -   **Next debug checklist**: Replicate the working PDF implementation from  into .
-    -   **Why fix this issue and what will be achieved with the fix?**: Fixes a critical, user-facing feature that is completely broken.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical, user-facing feature that is completely broken and has been a recurring problem.
     -   **Status**: NOT STARTED
     -   **Is recurring issue?**: Y
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
--   **Issue 3**: Frontend ACWR Metric Selector on Dashboard is missing
+-   **Issue 2**: Frontend ACWR Metric Selector on Dashboard is missing
     -   **Attempted fixes**: None.
     -   **Next debug checklist**: Add a dropdown/selector to the dashboard UI to allow users to select an ACWR metric and update the corresponding data queries.
     -   **Why fix this issue and what will be achieved with the fix?**: Implements a requested core feature for load analysis.
@@ -63,29 +63,47 @@ The application now includes two new, fully-coded features on top of the existin
     -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
+-   **Issue 3**: VBT Rep Counting & Regressions
+    -   **Attempted fixes**: None.
+    -   **Next debug checklist**: Test the rep counting functionality for exercises like Deadlift and check for graph consistency issues.
+    -   **Why fix this issue and what will be achieved with the fix?**: Addresses core functional regressions reported in a previous session.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: Frontend
+    -   **Blocked on other issue**: None
+
+-   **Issue 4**: ESLint configuration for TypeScript is incorrect
+    -   **Attempted fixes**: None. The agent encountered linting errors during the session but ignored them as they were pre-existing.
+    -   **Next debug checklist**: Review  and  to correctly configure ESLint for TypeScript files, resolving parsing errors.
+    -   **Why fix this issue and what will be achieved with the fix?**: A proper linting setup will improve code quality and prevent syntax errors.
+    -   **Status**: NOT STARTED
+    -   **Is recurring issue?**: Y
+    -   **Should Test frontend/backend/both after fix?**: N/A
+    -   **Blocked on other issue**: None
+
 **In progress Task List**:
--   **Task 1**: Verify the New Subscription System (P1)
--   **Task 2**: Verify the PRO Access Override Feature (P1)
--   **Task 3**: Verify the Device Limit System (P1)
+-   **Task 1**: Verify the visual fixes on the Periodization page (P0)
+-   **Task 2**: Verify the new Account Deletion feature (P1)
+-   **Task 3**: Verify the refactored Subscription System (P1)
 
 **Task Detail**:
--   **Task 1**: Verify the New Subscription System
-    -   **Where to resume**: This task was the original goal from the previous handoff but was superseded. The system is coded but remains entirely untested. A full E2E test plan is needed.
-    -   **What will be achieved with this?**: Validates the core monetization flow of the application for  users.
-    -   **Status**: NOT STARTED
-    -   **Should Test frontend/backend/both after fix?**: Both
+-   **Task 1**: Verify the visual fixes on the Periodization page
+    -   **Where to resume**: The code has been implemented. The next step is user verification.
+    -   **What will be achieved with this?**: Confirms that the UI for the periodization feature is now correct and responsive.
+    -   **Status**: USER VERIFICATION PENDING
+    -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on something**: None
 
--   **Task 2**: Verify the PRO Access Override Feature
-    -   **Where to resume**: The backend was tested with , but no frontend verification has been done. The next step is to log in as  and confirm that all PRO features are unlocked without any subscription prompts.
-    -   **What will be achieved with this?**: Confirms the special override account works as intended.
+-   **Task 2**: Verify the new Account Deletion feature
+    -   **Where to resume**: Needs full end-to-end testing, including the UI translation and the sandbox banner-hiding logic.
+    -   **What will be achieved with this?**: Validates the entire account deletion lifecycle and its UI.
     -   **Status**: TESTING PENDING
     -   **Should Test frontend/backend/both after fix?**: Both
     -   **Blocked on something**: None
 
--   **Task 3**: Verify the Device Limit System
-    -   **Where to resume**: The backend was tested with . The frontend implementation of generating and sending the device ID needs to be verified. Test logging in from the web simulator, then from a mobile device (if possible) to ensure device registration and limits work E2E.
-    -   **What will be achieved with this?**: Ensures the user account security and business logic for device limits are working correctly.
+-   **Task 3**: Verify the refactored Subscription System
+    -   **Where to resume**: Needs full end-to-end testing, including the new sandbox UI-hiding logic.
+    -   **What will be achieved with this?**: Validates the core monetization flow and ensures the app is robust.
     -   **Status**: TESTING PENDING
     -   **Should Test frontend/backend/both after fix?**: Both
     -   **Blocked on something**: None
@@ -100,20 +118,19 @@ The application now includes two new, fully-coded features on top of the existin
     -   Build a feature for merging duplicate athlete profiles.
 
 **Completed work in this session**
--   Implemented a permanent PRO access override account.
-    -   Modified , .
-    -   Modified , .
--   Implemented a 3-device limit per user account.
-    -   Modified , .
-    -   Created  and .
-    -   Created  and modified .
-    -   Installed , .
--   Fixed a web simulator crash by adding a platform check in .
--   Fixed a deployment failure by installing missing dependencies  and .
--   Updated .
+-   **Audited Trial Period Logic**: Investigated and confirmed that the trial period logic was correct and the 1 day display was due to Apple's Sandbox time compression.
+-   **Implemented Sandbox UI Hiding**: Added logic to , , , and  to detect  and hide misleading time-sensitive UI elements.
+-   **Fixed Build Versioning Issue**: Diagnosed that incorrect versioning in  was causing TestFlight upload failures. Updated the version to .
+-   **Audited Build Integrity**: Performed a full audit confirming that the local code was correct and the versioning was the root cause of past issues.
+-   **Implemented Account Page Translation**: Added English translations to .
+-   **Created App Review Token**: Modified  to include a hardcoded token () for App Review, which bypasses normal validation and is linked to the admin account. Seeded the admin account with three test athletes.
+-   **Fixed Periodization Page UI**:
+    -   Corrected the styling of the Back button in  to ensure it's always visible.
+    -   Made the data table in  responsive by using flexbox properties (, ) instead of fixed widths.
+-   **Diagnosed Simulator Connectivity Issue**: Determined that the Xcode simulator cannot connect to the remote backend due to network limitations of the development environment.
 
 **Earlier issues found/mentioned but not fixed**
--   **VBT Rep Counting & Regressions:** The original issues from a previous handoff (rep counting for Deadlift, graph consistency) remain untested and their status is unknown.
+-   **ESLint Configuration**: The ESLint configuration for the frontend project appears to be misconfigured for TypeScript and should be fixed to enable proper linting.
 
 **Known issue recurrence from previous fork**
 -   **PDF generation in **: This is a major recurring issue that has failed to be fixed multiple times.
@@ -122,80 +139,83 @@ The application now includes two new, fully-coded features on top of the existin
 
 
 **Key Technical Concepts**
--   **Backend Auth Logic**: Modified FastAPI login/registration to include checks for device limits and to return an access override flag.
--   **Persistent Client-Side ID**: Implemented a service using , , , and  to uniquely identify a device.
--   **Deployment Troubleshooting**: Analyzed build logs to identify and fix missing npm dependencies.
--   **Platform-Specific Code**: Used  to apply conditional logic for web builds, preventing crashes.
+-   **Sandbox Environment Detection**: Using a combination of  and  to conditionally hide UI elements in TestFlight builds.
+-   **App Store Versioning**: The critical need to increment  and  in  for successful TestFlight uploads.
+-   **Isolated Backend Logic**: Adding a hardcoded  condition for a specific token () in FastAPI endpoints to create a special path for App Review without altering the main authentication/validation logic.
+-   **Responsive UI (Flexbox)**: Using  and  on table cells to allow them to grow and shrink proportionally on different screen sizes, replacing rigid, fixed-width styling.
+-   **Internationalization (i18n)**: Using the  hook and a JSON structure to provide English and Portuguese strings for UI components.
 
 **key DB schema**
--   **users** collection:
-    -   :  (default: )
-    -   :  (Array of device objects, each with , , , )
+-   **users** collection: (No changes in this session)
+    -   : 
+    -   : 
+    -   :  (Enum: , , )
+    -   :  (nullable)
+    -   :  (nullable)
+    -   :  (nullable)
 
 **All files of reference**
--    (Modified)
--    (Modified)
--    (New)
--    (New)
--    (Modified)
--    (Modified)
--    (Modified)
--    (New)
--    (Modified)
--    (Modified)
+-    (Modified for App Review token)
+-    (Modified for version update)
+-    (Modified for translation and sandbox check)
+-    (Modified for sandbox check)
+-    (Modified for sandbox check)
+-    (Modified for sandbox check)
+-    (Modified for UI fix)
+-    (Modified for UI fix)
 
 **Areas that need refactoring**:
--   The ESLint configuration for the frontend project appears to be misconfigured for TypeScript and should be fixed to enable proper linting.
+-   The ESLint configuration for the frontend TypeScript project is still broken and produces parsing errors, hindering code quality checks.
 
 **key api endpoints**
--   : Modified to accept device info and perform device limit check.
--   : Modified to register the first device.
--   : Modified to return .
--   : **NEW** - Lists a user's registered devices.
--   : **NEW** - Removes a registered device.
+-    (Modified to accept )
+-    (Modified to accept )
+-    (Modified to accept )
+-    (Modified to accept )
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   The user's last action was to report a deployment failure. The immediate first step is to confirm with the user if the dependency fix resolved the deployment issue.
--   The user also reported a web simulator crash. The next step is to have them verify if the implemented fix has resolved it.
--   The two major features implemented in this session (PRO Override, Device Limit) and the original subscription system are all untested from an end-to-end perspective. They require comprehensive testing. Prioritize verifying the fixes first, then move to testing the new features.
-
-**documents and test reports created in this job**
--    (Updated).
+-   The most critical issue causing user frustration was the build version in  being lower than the one on TestFlight, preventing any new code from being tested. This is now fixed (), but be mindful of incrementing it for future builds.
+-   A hardcoded token  now exists for App Store Review. It provides access to the admin account's athlete data. Do not alter this logic.
+-   The standard way to handle TestFlight UI issues related to time is to check for the sandbox environment () and conditionally hide the UI element.
+-   **Testing via local simulator/Expo Go is not possible** as it cannot connect to the remote backend. All testing must be done via a TestFlight build or the web preview. Do not attempt to implement a demo mode again, as it failed and was reverted.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  User requested implementation of a 3-device limit system.
-2.  Agent implemented the backend and frontend logic for the device limit.
-3.  Agent tested the backend logic using .
-4.  Agent added and tested backend endpoints for managing devices.
-5.  Agent finalized the device limit task.
-6.  User reported a crash on the web simulator, providing a screenshot.
-7.  Agent identified the cause (RevenueCat SDK on web) and implemented a fix.
-8.  User reported that the app deployment was failing, providing build logs.
-9.  Agent called the , but it didn't find the root cause.
-10. Agent manually analyzed the logs, found the missing npm packages (, ), and installed them to fix the build error.
+1.  **User**: Asks to revert all demo mode changes. (Completed)
+2.  **User**: Confirms the code is clean and ends the session for the day. (Acknowledged)
+3.  **User**: New task: Implement English translation for the Account Deletion page and its modal. (Completed)
+4.  **User**: New task: Create a permanent, non-expiring token () for App Review. (Completed)
+5.  **User**: New task: Fix visual bugs on the Periodization page (invisible back button, non-responsive table). (Completed)
+6.  **User**: Provides details for the Periodization page UI fixes. (Acknowledged)
+7.  **Agent**: Implements the UI fixes. (Completed)
+8.  **User**: (No pending messages)
 
 **Project Health Check:**
--   **Broken**: The PDF Generation feature remains broken. The ACWR Metric Selector is a missing feature.
--   **Mocked**: None.
--   **Untested**: The entire subscription system, the new PRO access override, and the new device limit system are all functionally untested from an E2E perspective.
+-   **Broken**:
+    -   PDF Generation in Análise Científica is non-functional.
+    -   The ACWR Metric Selector on the dashboard is a missing feature.
+-   **Untested**:
+    -   The visual fixes on the Periodization page.
+    -   The English translations on the Account Deletion page.
+    -   The  token flow.
+    -   The end-to-end subscription and account deletion flows with the new sandbox UI-hiding logic.
 
 **3rd Party Integrations**
--   **RevenueCat** (): Core of the subscription system.
--   **Expo SDK** (, ): Used for the device ID service.
--   **UUID** (, ): Used for generating unique device IDs.
+-   **RevenueCat** (): For subscription and entitlement management.
+-   **Expo SDK** (, , etc.): Core of the frontend application.
+-   **UUID** (): For generating unique device IDs.
 
 **Testing status**
 -   **Testing agent used after significant changes**: NO
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**: None
--   **Known regressions**: PDF export in .
+-   **Known regressions**:
+    -   PDF export in .
+    -   VBT rep counting issues.
 
 **Credentials to test flow:**
 -   **Coach (PRO Override)**:  / 
--   **Coach (Normal Subscription)**:  / 
+-   **App Review Token**:  (for athlete-facing interface)
 
 **What agent forgot to execute**
--   The agent did not perform any end-to-end functional testing for the two major features implemented (PRO override and device limit). Backend  tests are insufficient.
--   The original P0 task to test the new subscription system from the previous handoff was not started.
--   The ESLint configuration issue mentioned in the previous handoff was not addressed.</analysis>
+-   The agent did not address the long-standing ESLint configuration issue, which was mentioned in the handoff and encountered during the session.</analysis>

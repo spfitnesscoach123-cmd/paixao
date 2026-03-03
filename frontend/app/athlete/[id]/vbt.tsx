@@ -11,6 +11,7 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -395,6 +396,7 @@ function VBTPageContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, locale } = useLanguage();
+  const insets = useSafeAreaInsets();
   
   const [selectedExercise, setSelectedExercise] = useState('Back Squat');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -474,8 +476,12 @@ function VBTPageContent() {
   
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <LinearGradient colors={['#7c3aed', '#4f46e5']} style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <TouchableOpacity 
+          onPress={() => router.back()} 
+          style={styles.backButton}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
           <Ionicons name="arrow-back" size={24} color="#ffffff" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
@@ -735,19 +741,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.dark.primary,
   },
   header: {
-    paddingTop: 48,
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 4,
   },
   headerContent: {
     flex: 1,

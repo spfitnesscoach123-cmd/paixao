@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://pro-override-test.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://account-deletion-28.preview.emergentagent.com')
 
 class TestTeamDashboard:
     """Team Dashboard endpoint tests"""
