@@ -596,8 +596,11 @@ async def login(credentials: UserLogin):
                 break
         
         if not device_exists:
-            # Check device limit
-            if len(registered_devices) >= MAX_DEVICES_PER_USER:
+            # Check device limit (bypass for demo account)
+            if user.get("email") == "contato@loadmanagerpro.com.br":
+                # Demo account: bypass device limit completely
+                pass
+            elif len(registered_devices) >= MAX_DEVICES_PER_USER:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="DEVICE_LIMIT_REACHED"

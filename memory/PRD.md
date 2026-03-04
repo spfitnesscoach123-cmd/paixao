@@ -25,6 +25,21 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 
 ## Implementado (Fev-Mar 2026)
 
+### Bypass Limite de Dispositivos - Conta Demo (04 Mar 2026)
+- **Tarefa**: Remover limite de dispositivos exclusivamente para conta demo
+- **Email**: `contato@loadmanagerpro.com.br`
+- **Arquivo modificado**: `backend/server.py` (linhas 598-607)
+- **Implementação**: Condição `if user.get("email") == "contato@loadmanagerpro.com.br"` antes da validação de limite
+- **Resultado**: Conta demo pode logar em dispositivos ilimitados; outras contas permanecem limitadas a 3
+- **Testado**: ✅ 5 dispositivos para demo, 4º bloqueado para conta normal
+
+### Bypass Limite de Dispositivos - Conta Demo (Mar 2026)
+- **Tarefa**: Remover limite de dispositivos exclusivamente para conta demo
+- **Email**: `contato@loadmanagerpro.com.br`
+- **Arquivo modificado**: `backend/server.py` (linhas 598-607)
+- **Implementação**: Condição `if user.get("email") == "contato@loadmanagerpro.com.br"` antes da validação de limite
+- **Resultado**: Conta demo pode logar em dispositivos ilimitados; outras contas permanecem limitadas a 3
+
 ### Fix Crítico: Crash macOS (Mar 2026)
 - **Problema**: App crashava no macOS (Mac Catalyst) ao scrollar lista de atletas no Wellness form
 - **Causa raiz**: `@react-native-picker/picker` incompatível com trackpad momentum scroll no Mac Catalyst (UIPickerView nativo)
