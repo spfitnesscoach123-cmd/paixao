@@ -318,7 +318,7 @@ function PeriodizationDetailContent() {
               </View>
               {METRICS.map(metric => (
                 <View key={metric.id} style={styles.tableMetricCell}>
-                  <Text style={styles.tableHeaderText}>{metric.label}</Text>
+                  <Text style={styles.tableMetricHeaderText}>{metric.label}</Text>
                 </View>
               ))}
             </View>
@@ -730,11 +730,13 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    justifyContent: 'center',
   },
   tableHeaderText: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.text.secondary,
+    textAlign: 'left',
   },
   tableMetricCell: {
     minWidth: 80,
@@ -742,29 +744,39 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 8,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tableMetricHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    textAlign: 'right',
   },
   tableNameCell: {
     minWidth: 120,
     flex: 1,
     paddingVertical: 12,
     paddingHorizontal: 12,
+    justifyContent: 'center',
   },
   tableNameText: {
     fontSize: 12,
     fontWeight: '500',
     color: colors.text.primary,
+    textAlign: 'left',
   },
   tableValueCell: {
     minWidth: 80,
     flex: 0.7,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    alignItems: 'center',
+    justifyContent: 'center',
   },
   tableValueText: {
     fontSize: 12,
     color: colors.text.primary,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
   },
   daySelector: {
     marginBottom: 16,
