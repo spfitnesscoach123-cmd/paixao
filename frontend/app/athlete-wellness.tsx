@@ -8,11 +8,12 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
 import api from '../services/api';
 import { colors } from '../constants/theme';
@@ -46,6 +47,7 @@ export default function AthleteWellness() {
 
   // Form state
   const [selectedAthlete, setSelectedAthlete] = useState('');
+  const [isAthleteModalVisible, setIsAthleteModalVisible] = useState(false);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [sleepHours, setSleepHours] = useState(7);
   const [sleepQuality, setSleepQuality] = useState(5);
@@ -284,24 +286,73 @@ export default function AthleteWellness() {
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Selecione seu nome:</Text>
-            <View style={styles.pickerContainer}>
-              <Picker
-                selectedValue={selectedAthlete}
-                onValueChange={(value) => setSelectedAthlete(value)}
-                style={styles.picker}
-                dropdownIconColor={colors.accent.primary}
-              >
-                {athletes.map(athlete => (
-                  <Picker.Item 
-                    key={athlete.id} 
-                    label={athlete.name} 
-                    value={athlete.id}
-                    color={Platform.OS === 'ios' ? colors.text.primary : undefined}
-                  />
-                ))}
-              </Picker>
-            </View>
+            <TouchableOpacity
+              style={styles.athleteSelector}
+              onPress={() => setIsAthleteModalVisible(true)}
+              activeOpacity={0.7}
+              testID="athlete-selector-button"
+            >
+              <Text style={styles.athleteSelectorText}>
+                {athletes.find(a => a.id === selectedAthlete)?.name || 'Selecionar atleta'}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color={colors.accent.primary} />
+            </TouchableOpacity>
           </View>
+
+          {/* Athlete Selection Modal */}
+          <Modal
+            visible={isAthleteModalVisible}
+            transparent={true}
+            animationType="fade"
+            presentationStyle="overFullScreen"
+            onRequestClose={() => setIsAthleteModalVisible(false)}
+          >
+            <TouchableOpacity
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setIsAthleteModalVisible(false)}
+            >
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Selecione seu nome</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsAthleteModalVisible(false)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={24} color={colors.text.secondary} />
+                  </TouchableOpacity>
+                </View>
+                <FlatList
+                  data={athletes}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => (
+                    <TouchableOpacity
+                      style={[
+                        styles.athleteItem,
+                        item.id === selectedAthlete && styles.athleteItemSelected
+                      ]}
+                      onPress={() => {
+                        setSelectedAthlete(item.id);
+                        setIsAthleteModalVisible(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[
+                        styles.athleteItemText,
+                        item.id === selectedAthlete && styles.athleteItemTextSelected
+                      ]}>
+                        {item.name}
+                      </Text>
+                      {item.id === selectedAthlete && (
+                        <Ionicons name="checkmark" size={20} color={colors.accent.primary} />
+                      )}
+                    </TouchableOpacity>
+                  )}
+                  showsVerticalScrollIndicator={false}
+                />
+              </View>
+            </TouchableOpacity>
+          </Modal>
 
           {/* Already Used Warning */}
           {alreadyUsedError && (
@@ -441,16 +492,71 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: 8,
   },
-  pickerContainer: {
+  athleteSelector: {
     backgroundColor: colors.dark.card,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border.default,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  athleteSelectorText: {
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContainer: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 400,
+    maxHeight: '60%',
+    borderWidth: 1,
+    borderColor: colors.border.default,
     overflow: 'hidden',
   },
-  picker: {
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: colors.text.primary,
-    backgroundColor: 'transparent',
+  },
+  athleteItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.default,
+  },
+  athleteItemSelected: {
+    backgroundColor: colors.accent.primary + '15',
+  },
+  athleteItemText: {
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  athleteItemTextSelected: {
+    color: colors.accent.primary,
+    fontWeight: '600',
   },
   warningContainer: {
     flexDirection: 'row',

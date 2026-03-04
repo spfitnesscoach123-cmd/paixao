@@ -9,7 +9,7 @@ import requests
 import os
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://account-deletion-28.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://picker-refactor.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"

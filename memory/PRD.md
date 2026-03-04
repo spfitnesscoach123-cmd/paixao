@@ -23,7 +23,14 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - `REVENUECAT_SECRET_KEY` em `backend/.env`
 - Validação na inicialização do backend
 
-## Implementado (Fev 2026)
+## Implementado (Fev-Mar 2026)
+
+### Fix Crítico: Crash macOS (Mar 2026)
+- **Problema**: App crashava no macOS (Mac Catalyst) ao scrollar lista de atletas no Wellness form
+- **Causa raiz**: `@react-native-picker/picker` incompatível com trackpad momentum scroll no Mac Catalyst (UIPickerView nativo)
+- **Solução**: Substituição completa do `<Picker>` por Modal + FlatList
+- **Arquivo modificado**: `frontend/app/athlete-wellness.tsx`
+- **Resultado**: Seleção de atleta agora usa interface unificada (iPhone/iPad/Mac) sem componentes nativos problemáticos
 
 ### Sandbox Detection
 - Avisos de expiração/renovação ocultos em ambiente Sandbox/TestFlight
@@ -34,8 +41,8 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
   - `subscription.tsx` (linha 162)
   - `account.tsx` (linha 32)
 
-### Versão Atual
-- `version`: 1.0.53
+### Versão Destino
+- `version`: 1.0.60
 - `buildNumber`: 2 (iOS)
 - `versionCode`: 53 (Android)
 
@@ -57,6 +64,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - [ ] Internacionalização de ScientificAnalysisTab.tsx
 
 ### P3 - Baixa Prioridade
+- [ ] ESLint configuration para TypeScript
 - [ ] Identity resolution para imports
 - [ ] UI para resolução manual de nomes de atletas
 - [ ] Merge de perfis duplicados de atletas

@@ -17,7 +17,7 @@ import requests
 import os
 import io
 
-BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://account-deletion-28.preview.emergentagent.com")
+BASE_URL = os.environ.get("EXPO_PUBLIC_BACKEND_URL", "https://picker-refactor.preview.emergentagent.com")
 ATHLETE_ID = "69862b75fc9efff29476e3ce"
 
 
