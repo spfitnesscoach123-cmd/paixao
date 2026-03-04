@@ -7528,12 +7528,34 @@ async def get_team_dashboard(
             latest_wellness = wellness_data[0]
             last_wellness_date = latest_wellness.get("date")
             wellness_score = latest_wellness.get("wellness_score")
+            
+            # If wellness_score is missing, calculate it from individual metrics
+            if wellness_score is None or wellness_score == 0:
+                fatigue_val = latest_wellness.get("fatigue", 5)
+                stress_val = latest_wellness.get("stress", 5)
+                mood_val = latest_wellness.get("mood", 5)
+                sleep_quality_val = latest_wellness.get("sleep_quality", 5)
+                muscle_soreness_val = latest_wellness.get("muscle_soreness", 5)
+                hydration_val = latest_wellness.get("hydration", 5)
+                
+                # Calculate wellness score (inverted scale for negative metrics)
+                calculated_wellness = (
+                    (10 - fatigue_val) * 0.20 +  # Lower fatigue = better (inverted)
+                    (10 - stress_val) * 0.15 +    # Lower stress = better (inverted)
+                    mood_val * 0.15 +              # Higher mood = better
+                    sleep_quality_val * 0.20 +    # Higher sleep quality = better
+                    (10 - muscle_soreness_val) * 0.15 +  # Lower soreness = better (inverted)
+                    hydration_val * 0.15           # Higher hydration = better
+                )
+                if calculated_wellness > 0:
+                    wellness_score = round(calculated_wellness, 2)
+            
             fatigue = latest_wellness.get("fatigue", 5)
             
             # Convert fatigue (1-10 where 10=very fatigued) to fatigue score percentage
             fatigue_score = fatigue * 10  # 0-100%
             
-            if wellness_score:
+            if wellness_score and wellness_score > 0:
                 total_wellness += wellness_score
                 wellness_count += 1
             
@@ -7565,13 +7587,33 @@ async def get_team_dashboard(
                         alert_msg = f"⚡ {athlete['name']}: Queda de potência de {power_drop:.0f}%" if lang == "pt" else f"⚡ {athlete['name']}: Power drop of {power_drop:.0f}%"
                         alerts.append(alert_msg)
         
-        # Get latest strength data for team averages
+        # Get latest strength data for team averages - check multiple sources
+        power_found = False
+        
+        # Source 1: Legacy strength assessments (db.assessments with assessment_type: "strength")
         if strength_assessments:
             latest_strength = strength_assessments[0].get("metrics", {})
             mean_power = latest_strength.get("mean_power")
-            if mean_power:
+            if mean_power and mean_power > 0:
                 total_power += mean_power
                 power_count += 1
+                power_found = True
+        
+        # Source 2: Jump assessments (db.jump_assessments) - preferred source for peak_power
+        if not power_found:
+            jump_assessments = await db.jump_assessments.find({
+                "athlete_id": athlete_id,
+                "coach_id": user_id
+            }).sort("date", -1).to_list(5)
+            
+            if jump_assessments:
+                latest_jump = jump_assessments[0]
+                # Use peak_power_w from jump assessments
+                peak_power = latest_jump.get("peak_power_w")
+                if peak_power and peak_power > 0:
+                    total_power += peak_power
+                    power_count += 1
+                    power_found = True
         
         # Get latest body composition for team averages
         latest_body_comp = await db.body_compositions.find_one(

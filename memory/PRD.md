@@ -40,6 +40,22 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - **Implementação**: Condição `if user.get("email") == "contato@loadmanagerpro.com.br"` antes da validação de limite
 - **Resultado**: Conta demo pode logar em dispositivos ilimitados; outras contas permanecem limitadas a 3
 
+### Fix Team Dashboard - Médias de Wellness e Power (04 Mar 2026)
+- **Problema**: Cards "Wellness Average" e "Power Average" mostravam 0 mesmo com dados preenchidos
+- **Causa raiz Wellness**: Campo `wellness_score` não estava sendo calculado quando ausente
+- **Causa raiz Power**: Código buscava apenas em `db.assessments`, mas dados estão em `db.jump_assessments`
+- **Solução Wellness**: Adicionado cálculo automático de `wellness_score` baseado em campos individuais (fatigue, stress, mood, sleep_quality, muscle_soreness, hydration)
+- **Solução Power**: Adicionada busca em `db.jump_assessments` como fonte alternativa para `peak_power_w`
+- **Arquivo modificado**: `backend/server.py` (linhas 7517-7620)
+- **Resultado**: Wellness Average agora calcula corretamente (5.3); Power Average retornará valor quando dados de potência existirem
+- **Testado**: ✅ API testada com curl, Wellness Average funcionando
+
+### Verificação de Seed Automático (04 Mar 2026)
+- **Investigação**: Verificado se existia seed automático criando perfis demo (João Silva, Maria Santos, Pedro Costa)
+- **Resultado**: **NÃO EXISTE** seed automático no código
+- **Conclusão**: Perfis existentes foram criados manualmente ou em teste anterior, não são recriados a cada build
+- **Arquivos verificados**: `backend/server.py` (startup event), busca em todo `/app/backend/`
+
 ### Fix Crítico: Crash macOS (Mar 2026)
 - **Problema**: App crashava no macOS (Mac Catalyst) ao scrollar lista de atletas no Wellness form
 - **Causa raiz**: `@react-native-picker/picker` incompatível com trackpad momentum scroll no Mac Catalyst (UIPickerView nativo)
