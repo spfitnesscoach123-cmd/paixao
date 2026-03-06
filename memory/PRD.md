@@ -25,6 +25,34 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 
 ## Implementado (Fev-Mar 2026)
 
+### Jump Assessment via Camera (06 Mar 2026)
+- **Tarefa**: Adicionar captura automática de métricas de salto via visão computacional
+- **Funcionalidade**: Usa MediaPipe para detectar eventos de salto (decolagem, aterrissagem) automaticamente
+- **Protocolos suportados**: CMJ, SL-CMJ (E/D), Drop Jump
+- **Métricas extraídas**: Flight Time (ms), Contact Time (ms - apenas DJ), Jump Height (cm)
+- **Fluxo de uso**:
+  1. Seleção de protocolo e configuração
+  2. Contagem regressiva (5s) com calibração de solo
+  3. Detecção automática de perna ativa (SL-CMJ)
+  4. Gravação do salto
+  5. Análise de frames e extração de métricas
+  6. Envio para pipeline existente (RSI, Potência, Z-Score calculados automaticamente)
+- **Arquivos criados**:
+  - `frontend/services/jump/types.ts` - Tipos e constantes
+  - `frontend/services/jump/jumpDetector.ts` - Algoritmos de detecção
+  - `frontend/services/jump/useJumpCamera.ts` - Hook React
+  - `frontend/services/jump/index.ts` - Exports
+  - `frontend/app/athlete/[id]/jump-camera.tsx` - Página principal
+- **Arquivo modificado**:
+  - `frontend/app/athlete/[id]/jump-assessment.tsx` - Adicionado botão "Jump Camera"
+- **Restrições respeitadas**: ✅ 
+  - Nenhum cálculo existente foi alterado (RSI, Fadiga, Z-Score, Assimetria)
+  - Nenhum gráfico foi modificado
+  - VBT Camera permanece inalterado
+  - Entrada manual continua funcionando
+- **Feature Premium**: Requer trial ou assinatura ativa
+- **Testado**: ✅ Lint passed, Metro bundled successfully
+
 ### ACWR Metric Selector no Team Dashboard (06 Mar 2026)
 - **Tarefa**: Permitir seleção de métrica GPS para cálculo de ACWR no Team Dashboard
 - **Métricas suportadas**: Total Distance, HID Z3, HSR Z4, Sprint Z5, Sprint, ACC + DEC

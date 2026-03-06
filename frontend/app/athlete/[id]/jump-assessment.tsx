@@ -933,6 +933,26 @@ function JumpAssessmentContent() {
           </TouchableOpacity>
         </View>
         
+        {/* Jump Camera Button */}
+        <TouchableOpacity
+          style={styles.jumpCameraButton}
+          onPress={() => router.push(`/athlete/${id}/jump-camera`)}
+          data-testid="jump-camera-btn"
+        >
+          <LinearGradient colors={['#10b981', '#059669']} style={styles.jumpCameraButtonGradient}>
+            <Ionicons name="camera" size={24} color="#ffffff" />
+            <View style={styles.jumpCameraTextContainer}>
+              <Text style={styles.jumpCameraTitle}>
+                {locale === 'pt' ? 'Jump Camera' : 'Jump Camera'}
+              </Text>
+              <Text style={styles.jumpCameraSubtitle}>
+                {locale === 'pt' ? 'Captura automática via visão computacional' : 'Automatic capture via computer vision'}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+          </LinearGradient>
+        </TouchableOpacity>
+        
         {/* Analysis Section */}
         {analysisLoading ? (
           <View style={styles.loadingContainer}>
@@ -1206,6 +1226,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  jumpCameraButton: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  jumpCameraButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  jumpCameraTextContainer: {
+    flex: 1,
+  },
+  jumpCameraTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  jumpCameraSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
   },
   loadingContainer: {
     padding: 40,

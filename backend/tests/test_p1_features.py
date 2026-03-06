@@ -11,7 +11,7 @@ import requests
 import os
 from datetime import datetime
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://team-perf-audit.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://gps-metric-dashboard.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "test@test.com"
