@@ -95,6 +95,9 @@ function JumpCameraContent() {
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   
+  // Camera mount control - prevents crash when transitioning to camera phase
+  const [shouldMountCamera, setShouldMountCamera] = useState(false);
+  
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
     protocol: selectedProtocol,
@@ -296,6 +299,10 @@ function JumpCameraContent() {
     setUiPhase('camera');
     frameCountRef.current = 0;
     setCameraReady(false);
+    // Mount camera after a small delay to prevent crash
+    setTimeout(() => {
+      setShouldMountCamera(true);
+    }, 100);
   }, [permission, requestPermission]);
 
   // Go to results when metrics are available
@@ -493,6 +500,7 @@ function JumpCameraContent() {
         <View style={[styles.cameraHeader, { paddingTop: insets.top }]}>
           <TouchableOpacity 
             onPress={() => {
+              setShouldMountCamera(false);
               jumpCamera.reset();
               setUiPhase('protocol');
             }} 
@@ -507,38 +515,52 @@ function JumpCameraContent() {
         
         {/* Camera View */}
         <View style={styles.cameraContainer}>
-          {Platform.OS !== 'web' && RNMediapipe ? (
-            <RNMediapipe
-              style={StyleSheet.absoluteFill}
-              height={screenHeight}
-              width={screenWidth}
-              onLandmark={handleMediapipeLandmark}
-              face={false}
-              leftArm={false}
-              rightArm={false}
-              leftWrist={false}
-              rightWrist={false}
-              torso={true}
-              leftLeg={true}
-              rightLeg={true}
-              leftAnkle={true}
-              rightAnkle={true}
-              frameLimit={60}
-            />
-          ) : (
-            <CameraView
-              style={styles.camera}
-              facing="back"
-              onCameraReady={() => setCameraReady(true)}
-            >
-              <View style={styles.webFallbackOverlay}>
-                <Text style={styles.webFallbackText}>
-                  {locale === 'pt' 
-                    ? 'MediaPipe não disponível. Use um dispositivo físico.'
-                    : 'MediaPipe not available. Use a physical device.'}
-                </Text>
+          {shouldMountCamera && (
+            Platform.OS !== 'web' && RNMediapipe ? (
+              <View style={styles.camera}>
+                <RNMediapipe
+                  style={StyleSheet.absoluteFill}
+                  height={screenHeight}
+                  width={screenWidth}
+                  onLandmark={handleMediapipeLandmark}
+                  face={false}
+                  leftArm={false}
+                  rightArm={false}
+                  leftWrist={false}
+                  rightWrist={false}
+                  torso={true}
+                  leftLeg={true}
+                  rightLeg={true}
+                  leftAnkle={true}
+                  rightAnkle={true}
+                  frameLimit={60}
+                />
               </View>
-            </CameraView>
+            ) : (
+              <CameraView
+                style={styles.camera}
+                facing="back"
+                onCameraReady={() => setCameraReady(true)}
+              >
+                <View style={styles.webFallbackOverlay}>
+                  <Text style={styles.webFallbackText}>
+                    {locale === 'pt' 
+                      ? 'MediaPipe não disponível. Use um dispositivo físico.'
+                      : 'MediaPipe not available. Use a physical device.'}
+                  </Text>
+                </View>
+              </CameraView>
+            )
+          )}
+          
+          {/* Loading indicator while camera is mounting */}
+          {!shouldMountCamera && (
+            <View style={styles.cameraLoadingOverlay}>
+              <ActivityIndicator size="large" color={colors.accent.primary} />
+              <Text style={styles.cameraLoadingText}>
+                {locale === 'pt' ? 'Iniciando câmera...' : 'Starting camera...'}
+              </Text>
+            </View>
           )}
           
           {/* Overlay based on phase */}
@@ -719,7 +741,10 @@ function JumpCameraContent() {
                 style={styles.tryAgainButton}
                 onPress={() => {
                   jumpCamera.reset();
+                  setShouldMountCamera(false);
                   setUiPhase('camera');
+                  // Re-mount camera after small delay
+                  setTimeout(() => setShouldMountCamera(true), 100);
                 }}
                 data-testid="try-again-btn"
               >
@@ -742,7 +767,10 @@ function JumpCameraContent() {
                 style={styles.tryAgainButtonLarge}
                 onPress={() => {
                   jumpCamera.reset();
+                  setShouldMountCamera(false);
                   setUiPhase('camera');
+                  // Re-mount camera after small delay
+                  setTimeout(() => setShouldMountCamera(true), 100);
                 }}
                 data-testid="error-try-again-btn"
               >
@@ -993,6 +1021,17 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     textAlign: 'center',
     padding: 20,
+  },
+  cameraLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.dark.primary,
+  },
+  cameraLoadingText: {
+    color: colors.text.secondary,
+    marginTop: 12,
+    fontSize: 16,
   },
   countdownOverlay: {
     alignItems: 'center',
