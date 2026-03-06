@@ -7415,7 +7415,7 @@ async def get_team_dashboard(
             "coach_id": user_id
         }).sort("date", -1).to_list(100)
         
-        # Calculate ACWR
+        # Calculate ACWR using correct rolling window (includes days without training as 0)
         acwr = None
         risk_level = "unknown"
         sessions_7d = 0
@@ -7425,8 +7425,8 @@ async def get_team_dashboard(
         if gps_data:
             last_gps_date = gps_data[0].get("date")
             
-            acute_load = 0
-            chronic_load = 0
+            # Build GPS data indexed by date for rolling window calculation
+            gps_data_by_date = {}
             
             # Track unique sessions by date+session_name
             unique_sessions_7d = set()
@@ -7434,30 +7434,84 @@ async def get_team_dashboard(
             
             for record in gps_data:
                 try:
-                    record_date = datetime.strptime(record["date"], "%Y-%m-%d")
+                    record_date_str = record["date"]
+                    record_date = datetime.strptime(record_date_str, "%Y-%m-%d")
                 except:
                     continue
-                    
-                dist = record.get("total_distance", 0)
-                hid = record.get("high_intensity_distance", 0)
-                session_key = f"{record.get('date')}_{record.get('session_name', 'default')}"
+                
+                # Aggregate data by date
+                if record_date_str not in gps_data_by_date:
+                    gps_data_by_date[record_date_str] = {
+                        "total_distance": 0,
+                        "high_intensity_distance": 0
+                    }
+                
+                dist = record.get("total_distance", 0) or 0
+                hid = record.get("high_intensity_distance", 0) or 0
+                
+                gps_data_by_date[record_date_str]["total_distance"] += dist
+                gps_data_by_date[record_date_str]["high_intensity_distance"] += hid
+                
+                session_key = f"{record_date_str}_{record.get('session_name', 'default')}"
                 
                 if record_date >= seven_days_ago:
-                    acute_load += dist
                     distance_7d += dist
                     unique_sessions_7d.add(session_key)
                     unique_sessions_total.add(session_key)
                     # Accumulate HID
                     total_hid += hid
                     hid_count += 1
-                    
-                if record_date >= twenty_eight_days_ago:
-                    chronic_load += dist
             
             # Count unique sessions (1 CSV = 1 session) - for athlete's own distance calculation
             sessions_7d = len(unique_sessions_7d)
-            # Note: total_sessions is now calculated globally at the start
             total_distance += distance_7d
+            
+            # CORRECTED ACWR CALCULATION using rolling window with zeros for missing days
+            # Calculate acute load (sum of last 7 days, including zeros)
+            acute_load = 0.0
+            for i in range(7):
+                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+                day_data = gps_data_by_date.get(date_str, {})
+                acute_load += day_data.get("total_distance", 0) or 0
+            
+            # Calculate chronic load (sum of last 28 days, including zeros)
+            chronic_load = 0.0
+            for i in range(28):
+                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+                day_data = gps_data_by_date.get(date_str, {})
+                chronic_load += day_data.get("total_distance", 0) or 0
+            
+            # Acute Load = sum of last 7 days
+            # Chronic Load = average weekly load over 4 weeks = sum of 28 days / 4
+            chronic_weekly_avg = chronic_load / 4 if chronic_load > 0 else 0
+            
+            # ACWR = Acute Load / Chronic Weekly Average
+            if chronic_weekly_avg > 0:
+                acwr = round(acute_load / chronic_weekly_avg, 2)
+                total_acwr += acwr
+                acwr_count += 1
+                
+                # Determine risk level (classification unchanged)
+                if acwr < 0.8:
+                    risk_level = "low"
+                elif acwr <= 1.3:
+                    risk_level = "optimal"
+                elif acwr <= 1.5:
+                    risk_level = "moderate"
+                else:
+                    risk_level = "high"
+                
+                risk_distribution[risk_level] += 1
+                
+                if risk_level == "high":
+                    position_summary[position]["high_risk_count"] += 1
+                    alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
+                    alerts.append(alert_msg)
+            else:
+                # No chronic data - cannot calculate meaningful ACWR
+                acwr = None
+                risk_level = "unknown"
+                risk_distribution["unknown"] += 1
             
             # Collect RSI values from new jump_assessments system (preferred) or legacy assessments
             athlete_jump_assessments = await db.jump_assessments.find({
@@ -7489,32 +7543,6 @@ async def get_team_dashboard(
                             "date": assessment.get("date"),
                             "athlete_id": athlete_id
                         })
-            
-            # Calculate ACWR
-            acute_weekly = acute_load / 7
-            chronic_weekly = chronic_load / 28 if chronic_load > 0 else 1
-            
-            if chronic_weekly > 0:
-                acwr = round(acute_weekly / chronic_weekly, 2)
-                total_acwr += acwr
-                acwr_count += 1
-                
-                # Determine risk level
-                if acwr < 0.8:
-                    risk_level = "low"
-                elif acwr <= 1.3:
-                    risk_level = "optimal"
-                elif acwr <= 1.5:
-                    risk_level = "moderate"
-                else:
-                    risk_level = "high"
-                
-                risk_distribution[risk_level] += 1
-                
-                if risk_level == "high":
-                    position_summary[position]["high_risk_count"] += 1
-                    alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
-                    alerts.append(alert_msg)
         else:
             risk_distribution["unknown"] += 1
         
