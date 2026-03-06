@@ -25,6 +25,23 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 
 ## Implementado (Fev-Mar 2026)
 
+### Fix: Gráficos DJ (Drop Jump) para Entrada Manual (06 Mar 2026)
+- **Problema**: Gráficos de Fatigue Index, Fatigue Classification e RSI Evolution não apareciam para assessments DJ com entrada manual
+- **Causa raiz**: Backend retorna `fatigue_analysis: null` para atletas com apenas dados DJ (sem CMJ). Frontend não tinha fallback.
+- **Solução**: Adicionada função `calculateDjFatigue()` que calcula status de fadiga localmente a partir do histórico de RSI do DJ
+- **Arquivos modificados**:
+  - `frontend/app/athlete/[id]/jump-assessment.tsx` - Adicionada função `calculateDjFatigue()` (linhas 208-254) e modificado `FatigueStatusCard` para usar fallback
+  - `frontend/components/JumpAnalysisCharts.tsx` - Já tinha `getDjFatigueStatus()` (linhas 201-240) e fallback de fatigue (linhas 287-305)
+- **Comportamento agora**:
+  - CMJ: Usa `fatigue_analysis` do backend (sem mudanças)
+  - DJ: Calcula `fatigue_analysis` localmente quando backend retorna null
+  - Cálculo usa mesma lógica: baseline RSI (5 primeiros entries), variação percentual, thresholds (-5%, -12%, -13%)
+- **Testado**: ✅ Testing agent verificou 4/4 features para atleta Maria Santos (DJ-only)
+  - Fatigue Index Card: ✅ Exibindo "Monitor Fatigue" (12.2%)
+  - RSI Evolution Chart: ✅ Gráfico de linha com histórico
+  - Power-Velocity Profile: ✅ Funcionando
+  - Recommendations: ✅ Funcionando
+
 ### Jump Assessment via Camera (06 Mar 2026)
 - **Tarefa**: Adicionar captura automática de métricas de salto via visão computacional
 - **Funcionalidade**: Usa MediaPipe para detectar eventos de salto (decolagem, aterrissagem) automaticamente
