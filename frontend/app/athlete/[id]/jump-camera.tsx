@@ -45,18 +45,29 @@ import {
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
 import { format } from 'date-fns';
 
-// Conditional import for native MediaPipe
+// Conditional import for native MediaPipe - SAFE GUARDED IMPORT
 let RNMediapipe: any = null;
 let MEDIAPIPE_AVAILABLE = false;
 
 if (Platform.OS !== 'web') {
   try {
     const mediapipe = require('@thinksys/react-native-mediapipe');
-    RNMediapipe = mediapipe.RNMediapipe;
-    MEDIAPIPE_AVAILABLE = !!RNMediapipe;
-    console.log('[JUMP_CAMERA] ✅ MediaPipe loaded successfully');
+    if (mediapipe && mediapipe.RNMediapipe) {
+      RNMediapipe = mediapipe.RNMediapipe;
+      MEDIAPIPE_AVAILABLE = true;
+      console.log('[JUMP_CAMERA] ✅ MediaPipe loaded successfully');
+    } else {
+      MEDIAPIPE_AVAILABLE = false;
+      console.log('[JUMP_CAMERA] ⚠️ MediaPipe module found but RNMediapipe component not available');
+    }
   } catch (e) {
-    console.warn('[JUMP_CAMERA] ⚠️ MediaPipe not available:', e);
+    // CRITICAL: Silent catch to prevent crash in production builds
+    MEDIAPIPE_AVAILABLE = false;
+    RNMediapipe = null;
+    // Only log in dev, not in production
+    if (__DEV__) {
+      console.log('[JUMP_CAMERA] MediaPipe not available:', e);
+    }
   }
 }
 
@@ -97,6 +108,12 @@ function JumpCameraContent() {
   
   // Camera mount control - prevents crash when transitioning to camera phase
   const [shouldMountCamera, setShouldMountCamera] = useState(false);
+  
+  // SAFETY: Frame processing guard to prevent simultaneous processing
+  const isProcessingFrameRef = useRef(false);
+  
+  // SAFETY: MediaPipe ready state (separate from cameraReady)
+  const [mediapipeReady, setMediapipeReady] = useState(false);
   
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
@@ -225,25 +242,51 @@ function JumpCameraContent() {
     return keypoints;
   }, []);
 
-  // Handle MediaPipe landmark callback
+  // Handle MediaPipe landmark callback - WITH SAFETY GUARDS
   const handleMediapipeLandmark = useCallback((event: any) => {
-    frameCountRef.current++;
+    // SAFETY GUARD 1: Prevent simultaneous frame processing
+    if (isProcessingFrameRef.current) {
+      return; // Skip frame if already processing
+    }
+    
+    // SAFETY GUARD 2: Check if event is valid
+    if (!event) {
+      return;
+    }
+    
+    isProcessingFrameRef.current = true;
     
     try {
+      frameCountRef.current++;
+      
       const landmarkData = event?.nativeEvent || event;
+      
+      // SAFETY GUARD 3: Validate landmark data exists
+      if (!landmarkData) {
+        isProcessingFrameRef.current = false;
+        return;
+      }
+      
       const keypoints = convertMediapipeLandmarks(landmarkData);
       
-      if (keypoints.length > 0) {
+      if (keypoints && keypoints.length > 0) {
         jumpCamera.processFrame(keypoints);
       }
       
-      // Log first frame
+      // Mark camera/mediapipe as ready on first valid frame
       if (frameCountRef.current === 1) {
         console.log('[JUMP_CAMERA] ✅ First frame received from MediaPipe');
         setCameraReady(true);
+        setMediapipeReady(true);
       }
     } catch (e) {
-      console.error('[JUMP_CAMERA] Error processing landmark:', e);
+      // SAFETY: Silent catch to prevent crash, only log in dev
+      if (__DEV__) {
+        console.log('[JUMP_CAMERA] Frame processing error:', e);
+      }
+    } finally {
+      // CRITICAL: Always release the processing lock
+      isProcessingFrameRef.current = false;
     }
   }, [jumpCamera, convertMediapipeLandmarks]);
 
@@ -304,6 +347,17 @@ function JumpCameraContent() {
       setShouldMountCamera(true);
     }, 100);
   }, [permission, requestPermission]);
+
+  // SAFETY: Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      // Reset states on unmount to prevent stale references
+      setShouldMountCamera(false);
+      setCameraReady(false);
+      setMediapipeReady(false);
+      isProcessingFrameRef.current = false;
+    };
+  }, []);
 
   // Go to results when metrics are available
   useEffect(() => {
@@ -515,43 +569,46 @@ function JumpCameraContent() {
         
         {/* Camera View */}
         <View style={styles.cameraContainer}>
-          {shouldMountCamera && (
-            Platform.OS !== 'web' && RNMediapipe ? (
-              <View style={styles.camera}>
-                <RNMediapipe
-                  style={StyleSheet.absoluteFill}
-                  height={screenHeight}
-                  width={screenWidth}
-                  onLandmark={handleMediapipeLandmark}
-                  face={false}
-                  leftArm={false}
-                  rightArm={false}
-                  leftWrist={false}
-                  rightWrist={false}
-                  torso={true}
-                  leftLeg={true}
-                  rightLeg={true}
-                  leftAnkle={true}
-                  rightAnkle={true}
-                  frameLimit={60}
-                />
+          {/* SAFETY: Only mount camera when ALL conditions are met */}
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+            <View style={styles.camera}>
+              <RNMediapipe
+                style={StyleSheet.absoluteFill}
+                height={screenHeight}
+                width={screenWidth}
+                onLandmark={handleMediapipeLandmark}
+                face={false}
+                leftArm={false}
+                rightArm={false}
+                leftWrist={false}
+                rightWrist={false}
+                torso={true}
+                leftLeg={true}
+                rightLeg={true}
+                leftAnkle={true}
+                rightAnkle={true}
+                frameLimit={60}
+              />
+            </View>
+          ) : shouldMountCamera ? (
+            // Fallback when MediaPipe not available but camera should mount
+            <CameraView
+              style={styles.camera}
+              facing="back"
+              onCameraReady={() => {
+                setCameraReady(true);
+                setMediapipeReady(false); // Mark that MediaPipe is not available
+              }}
+            >
+              <View style={styles.webFallbackOverlay}>
+                <Text style={styles.webFallbackText}>
+                  {locale === 'pt' 
+                    ? 'MediaPipe não disponível. Use um dispositivo físico com Dev Build.'
+                    : 'MediaPipe not available. Use a physical device with Dev Build.'}
+                </Text>
               </View>
-            ) : (
-              <CameraView
-                style={styles.camera}
-                facing="back"
-                onCameraReady={() => setCameraReady(true)}
-              >
-                <View style={styles.webFallbackOverlay}>
-                  <Text style={styles.webFallbackText}>
-                    {locale === 'pt' 
-                      ? 'MediaPipe não disponível. Use um dispositivo físico.'
-                      : 'MediaPipe not available. Use a physical device.'}
-                  </Text>
-                </View>
-              </CameraView>
-            )
-          )}
+            </CameraView>
+          ) : null}
           
           {/* Loading indicator while camera is mounting */}
           {!shouldMountCamera && (
@@ -612,6 +669,12 @@ function JumpCameraContent() {
             {jumpCamera.phase === 'setup' && (
               <View style={styles.idleOverlay}>
                 <Text style={styles.idleText}>{t.prepareJump}</Text>
+                {/* SAFETY: Show camera status */}
+                {!cameraReady && shouldMountCamera && (
+                  <Text style={styles.cameraStatusText}>
+                    {locale === 'pt' ? 'Aguardando câmera...' : 'Waiting for camera...'}
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -621,12 +684,24 @@ function JumpCameraContent() {
         <View style={[styles.cameraControls, { paddingBottom: insets.bottom + 20 }]}>
           {jumpCamera.phase === 'setup' && (
             <TouchableOpacity
-              style={styles.captureButton}
-              onPress={jumpCamera.startCountdown}
+              style={[
+                styles.captureButton,
+                // SAFETY: Visual feedback when button is disabled
+                (!cameraReady && Platform.OS !== 'web') && styles.captureButtonDisabled
+              ]}
+              onPress={() => {
+                // SAFETY GUARD: Only start if camera is ready
+                if (cameraReady || Platform.OS === 'web') {
+                  jumpCamera.startCountdown();
+                }
+              }}
               disabled={!cameraReady && Platform.OS !== 'web'}
               data-testid="start-countdown-btn"
             >
-              <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.captureButtonGradient}>
+              <LinearGradient 
+                colors={(!cameraReady && Platform.OS !== 'web') ? ['#6b7280', '#4b5563'] : ['#22c55e', '#16a34a']} 
+                style={styles.captureButtonGradient}
+              >
                 <Ionicons name="play" size={32} color="#ffffff" />
               </LinearGradient>
             </TouchableOpacity>
@@ -1119,6 +1194,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
   },
+  cameraStatusText: {
+    fontSize: 14,
+    color: '#f59e0b',
+    marginTop: 8,
+  },
   cameraControls: {
     position: 'absolute',
     bottom: 0,
@@ -1131,6 +1211,9 @@ const styles = StyleSheet.create({
   captureButton: {
     borderRadius: 40,
     overflow: 'hidden',
+  },
+  captureButtonDisabled: {
+    opacity: 0.6,
   },
   captureButtonGradient: {
     width: 80,
