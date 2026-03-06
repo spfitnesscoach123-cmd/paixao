@@ -938,82 +938,101 @@ function JumpAssessmentContent() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.accent.primary} />
           </View>
-        ) : analysis?.protocols?.cmj ? (
+        ) : (analysis?.protocols?.cmj || analysis?.protocols?.dj) ? (
           <View style={styles.analysisSection}>
-            <Text style={styles.sectionTitle}>
-              <Ionicons name="analytics" size={18} color={colors.accent.primary} /> {t.analysis}
-            </Text>
-            
-            {/* RSI Gauge */}
-            {analysis.protocols.cmj?.latest && (
-              <RSIGauge 
-                rsi={analysis.protocols.cmj.latest.rsi} 
-                classification={analysis.protocols.cmj.latest.rsi_classification}
-                locale={locale}
-              />
-            )}
-            
-            {/* Summary Cards */}
-            {analysis.protocols.cmj?.latest && (
-              <View style={styles.summaryGrid}>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryValue}>{analysis.protocols.cmj.latest.jump_height_cm.toFixed(1)}</Text>
-                  <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryValue}>{analysis.protocols.cmj.latest.peak_power_w.toFixed(0)}</Text>
-                  <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Potência (W)' : 'Power (W)'}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryValue}>{analysis.protocols.cmj.latest.peak_velocity_ms.toFixed(2)}</Text>
-                  <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}</Text>
-                </View>
-                <View style={styles.summaryCard}>
-                  <Text style={styles.summaryValue}>{analysis.protocols.cmj.latest.relative_power_wkg.toFixed(1)}</Text>
-                  <Text style={styles.summaryLabel}>W/kg</Text>
-                </View>
-              </View>
-            )}
-            
-            {/* Fatigue Status */}
-            <FatigueStatusCard fatigue={analysis.fatigue_analysis} locale={locale} />
-            
-            {/* Asymmetry */}
-            <AsymmetryCard asymmetry={analysis.asymmetry} slCmjData={analysis.protocols.sl_cmj} locale={locale} />
-            
-            {/* Power-Velocity Profile */}
-            <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />
-            
-            {/* Z-Score */}
-            <ZScoreCard data={analysis.z_score} locale={locale} />
-            
-            {/* RSI History Chart */}
-            {analysis.protocols.cmj?.history && (
-              <RSIHistoryChart history={analysis.protocols.cmj.history} locale={locale} />
-            )}
-            
-            {/* AI Insights */}
-            {analysis.ai_feedback && (
-              <View style={styles.aiInsightsCard}>
-                <View style={styles.aiInsightsHeader}>
-                  <Ionicons name="sparkles" size={20} color={colors.accent.primary} />
-                  <Text style={styles.aiInsightsTitle}>{t.aiInsights}</Text>
-                </View>
-                <Text style={styles.aiInsightsText}>{analysis.ai_feedback}</Text>
-              </View>
-            )}
-            
-            {/* Recommendations */}
-            {analysis.recommendations && analysis.recommendations.length > 0 && (
-              <View style={styles.recommendationsCard}>
-                <Text style={styles.recommendationsTitle}>{t.recommendations}</Text>
-                {analysis.recommendations.map((rec, i) => (
-                  <View key={i} style={styles.recommendationItem}>
-                    <Text style={styles.recommendationText}>{rec}</Text>
+            {/* Determine which protocol data to use */}
+            {(() => {
+              const hasCmj = analysis?.protocols?.cmj?.latest;
+              const hasDj = analysis?.protocols?.dj?.latest;
+              const activeProtocol = hasCmj ? 'cmj' : 'dj';
+              const protocolData = hasCmj ? analysis.protocols.cmj : analysis.protocols.dj;
+              const latestData = hasCmj ? analysis.protocols.cmj?.latest : analysis.protocols.dj?.latest;
+              const historyData = hasCmj ? analysis.protocols.cmj?.history : analysis.protocols.dj?.history;
+              
+              if (!latestData) return null;
+              
+              return (
+                <>
+                  <Text style={styles.sectionTitle}>
+                    <Ionicons name="analytics" size={18} color={colors.accent.primary} /> {t.analysis} ({activeProtocol === 'dj' ? 'Drop Jump' : 'CMJ'})
+                  </Text>
+                  
+                  {/* RSI Gauge */}
+                  <RSIGauge 
+                    rsi={latestData.rsi} 
+                    classification={latestData.rsi_classification || 'average'}
+                    locale={locale}
+                  />
+                  
+                  {/* Summary Cards */}
+                  <View style={styles.summaryGrid}>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryValue}>{latestData.jump_height_cm?.toFixed(1) || '-'}</Text>
+                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryValue}>{latestData.peak_power_w?.toFixed(0) || '-'}</Text>
+                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Potência (W)' : 'Power (W)'}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryValue}>{latestData.peak_velocity_ms?.toFixed(2) || '-'}</Text>
+                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}</Text>
+                    </View>
+                    <View style={styles.summaryCard}>
+                      <Text style={styles.summaryValue}>{latestData.relative_power_wkg?.toFixed(1) || '-'}</Text>
+                      <Text style={styles.summaryLabel}>W/kg</Text>
+                    </View>
+                    {/* DJ-specific: Box Height */}
+                    {activeProtocol === 'dj' && latestData.box_height_cm && (
+                      <View style={styles.summaryCard}>
+                        <Text style={styles.summaryValue}>{latestData.box_height_cm}</Text>
+                        <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
+                      </View>
+                    )}
                   </View>
-                ))}
-              </View>
-            )}
+                  
+                  {/* Fatigue Status */}
+                  <FatigueStatusCard fatigue={analysis.fatigue_analysis} locale={locale} />
+                  
+                  {/* Asymmetry */}
+                  <AsymmetryCard asymmetry={analysis.asymmetry} slCmjData={analysis.protocols.sl_cmj} locale={locale} />
+                  
+                  {/* Power-Velocity Profile */}
+                  <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />
+                  
+                  {/* Z-Score */}
+                  <ZScoreCard data={analysis.z_score} locale={locale} />
+                  
+                  {/* RSI History Chart */}
+                  {historyData && historyData.length > 0 && (
+                    <RSIHistoryChart history={historyData} locale={locale} />
+                  )}
+                  
+                  {/* AI Insights */}
+                  {analysis.ai_feedback && (
+                    <View style={styles.aiInsightsCard}>
+                      <View style={styles.aiInsightsHeader}>
+                        <Ionicons name="sparkles" size={20} color={colors.accent.primary} />
+                        <Text style={styles.aiInsightsTitle}>{t.aiInsights}</Text>
+                      </View>
+                      <Text style={styles.aiInsightsText}>{analysis.ai_feedback}</Text>
+                    </View>
+                  )}
+                  
+                  {/* Recommendations */}
+                  {analysis.recommendations && analysis.recommendations.length > 0 && (
+                    <View style={styles.recommendationsCard}>
+                      <Text style={styles.recommendationsTitle}>{t.recommendations}</Text>
+                      {analysis.recommendations.map((rec, i) => (
+                        <View key={i} style={styles.recommendationItem}>
+                          <Text style={styles.recommendationText}>{rec}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </>
+              );
+            })()}
           </View>
         ) : (
           <View style={styles.emptyState}>

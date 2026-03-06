@@ -46,6 +46,25 @@ interface JumpAnalysisData {
         peak_power_w: number;
       }>;
     };
+    dj?: {
+      latest: {
+        date: string;
+        box_height_cm: number;
+        jump_height_cm: number;
+        contact_time_ms: number;
+        rsi: number;
+        rsi_modified: number;
+        peak_power_w?: number;
+        peak_velocity_ms?: number;
+        relative_power_wkg?: number;
+        rsi_classification?: string;
+      };
+      history: Array<{
+        date: string;
+        rsi: number;
+        box_height_cm: number;
+      }>;
+    };
     sl_cmj?: {
       right: { date: string; jump_height_cm: number; rsi: number; peak_power_w: number };
       left: { date: string; jump_height_cm: number; rsi: number; peak_power_w: number };
@@ -152,7 +171,11 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
     );
   }
 
-  if (error || !data || !data.protocols?.cmj) {
+  // Check if we have CMJ or DJ data available
+  const hasCmjData = data?.protocols?.cmj?.latest;
+  const hasDjData = data?.protocols?.dj?.latest;
+  
+  if (error || !data || (!hasCmjData && !hasDjData)) {
     return (
       <View style={styles.emptyContainer}>
         <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
@@ -168,16 +191,66 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
     );
   }
 
+  // Use CMJ data if available, otherwise fall back to DJ data
+  // This allows DJ to use the same visualization pipeline as CMJ
+  const primaryProtocol = hasCmjData ? 'cmj' : 'dj';
   const cmj = data.protocols.cmj;
+  const dj = data.protocols.dj;
+  
+  // Create unified data object for rendering (CMJ takes priority, DJ as fallback)
+  const jumpData = hasCmjData ? {
+    latest: cmj!.latest,
+    history: cmj!.history,
+    baseline_rsi: cmj!.baseline_rsi,
+    rsi_variation_percent: cmj!.rsi_variation_percent,
+    fatigue_status: cmj!.fatigue_status,
+    z_score_height: cmj!.z_score_height,
+  } : hasDjData ? {
+    latest: {
+      date: dj!.latest.date,
+      jump_height_cm: dj!.latest.jump_height_cm,
+      flight_time_ms: 0, // DJ doesn't have this
+      contact_time_ms: dj!.latest.contact_time_ms,
+      rsi: dj!.latest.rsi,
+      rsi_classification: dj!.latest.rsi_classification || 'average',
+      peak_power_w: dj!.latest.peak_power_w || 0,
+      peak_velocity_ms: dj!.latest.peak_velocity_ms || 0,
+      relative_power_wkg: dj!.latest.relative_power_wkg || 0,
+    },
+    history: dj!.history.map(h => ({
+      date: h.date,
+      rsi: h.rsi,
+      jump_height_cm: 0,
+      peak_power_w: 0,
+    })),
+    baseline_rsi: 0,
+    rsi_variation_percent: 0,
+    fatigue_status: null,
+    z_score_height: 0,
+  } : null;
+  
+  if (!jumpData) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
+        <Text style={styles.emptyText}>{labels.noData}</Text>
+      </View>
+    );
+  }
   const fatigue = data.fatigue_analysis;
   const asymmetry = data.asymmetry;
   const pvProfile = data.power_velocity_insights;
   const zScore = data.z_score;
 
-  // RSI Gauge values
+  // RSI Gauge values - use unified jumpData
   const maxRSI = 3.5;
-  const normalizedRSI = Math.min(cmj.latest.rsi / maxRSI, 1);
-  const rsiColor = getClassificationColor(cmj.latest.rsi_classification);
+  const normalizedRSI = Math.min(jumpData.latest.rsi / maxRSI, 1);
+  const rsiColor = getClassificationColor(jumpData.latest.rsi_classification);
+  
+  // Protocol indicator for header
+  const protocolLabel = primaryProtocol === 'dj' 
+    ? (locale === 'pt' ? 'Drop Jump' : 'Drop Jump')
+    : 'CMJ';
 
   return (
     <View style={styles.container}>
@@ -185,8 +258,8 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
       <View style={styles.headerCard}>
         <View style={styles.headerRow}>
           <View>
-            <Text style={styles.title}>{labels.title}</Text>
-            <Text style={styles.date}>{cmj.latest.date}</Text>
+            <Text style={styles.title}>{labels.title} ({protocolLabel})</Text>
+            <Text style={styles.date}>{jumpData.latest.date}</Text>
           </View>
           <TouchableOpacity 
             style={styles.detailsButton}
@@ -219,10 +292,10 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
               />
               {/* Center value */}
               <SvgText x={chartWidth / 2} y={65} textAnchor="middle" fill={rsiColor} fontSize="28" fontWeight="bold">
-                {cmj.latest.rsi.toFixed(2)}
+                {jumpData.latest.rsi.toFixed(2)}
               </SvgText>
               <SvgText x={chartWidth / 2} y={85} textAnchor="middle" fill={rsiColor} fontSize="11" fontWeight="600">
-                {getClassificationLabel(cmj.latest.rsi_classification)}
+                {getClassificationLabel(jumpData.latest.rsi_classification)}
               </SvgText>
             </Svg>
           </View>
@@ -230,15 +303,15 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
           {/* Quick Stats */}
           <View style={styles.quickStats}>
             <View style={styles.quickStat}>
-              <Text style={styles.quickStatValue}>{cmj.latest.jump_height_cm.toFixed(1)}</Text>
+              <Text style={styles.quickStatValue}>{jumpData.latest.jump_height_cm.toFixed(1)}</Text>
               <Text style={styles.quickStatLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
             </View>
             <View style={styles.quickStat}>
-              <Text style={styles.quickStatValue}>{cmj.latest.peak_power_w.toFixed(0)}</Text>
+              <Text style={styles.quickStatValue}>{jumpData.latest.peak_power_w.toFixed(0)}</Text>
               <Text style={styles.quickStatLabel}>{locale === 'pt' ? 'Potência (W)' : 'Power (W)'}</Text>
             </View>
             <View style={styles.quickStat}>
-              <Text style={styles.quickStatValue}>{cmj.latest.relative_power_wkg.toFixed(1)}</Text>
+              <Text style={styles.quickStatValue}>{jumpData.latest.relative_power_wkg.toFixed(1)}</Text>
               <Text style={styles.quickStatLabel}>W/kg</Text>
             </View>
           </View>

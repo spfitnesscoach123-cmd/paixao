@@ -5321,7 +5321,11 @@ async def get_jump_analysis(
                 "jump_height_cm": latest_dj.get("jump_height_cm"),
                 "contact_time_ms": latest_dj.get("contact_time_ms"),
                 "rsi": latest_dj.get("rsi"),
-                "rsi_modified": latest_dj.get("rsi_modified")
+                "rsi_modified": latest_dj.get("rsi_modified"),
+                "peak_power_w": latest_dj.get("peak_power_w"),
+                "peak_velocity_ms": latest_dj.get("peak_velocity_ms"),
+                "relative_power_wkg": latest_dj.get("relative_power_wkg"),
+                "rsi_classification": latest_dj.get("rsi_classification", "average")
             },
             "history": [
                 {
