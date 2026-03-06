@@ -204,6 +204,55 @@ const RSIGauge = ({ rsi, classification, locale }: { rsi: number; classification
   );
 };
 
+// Helper function to calculate fatigue status from DJ RSI history
+const calculateDjFatigue = (history: Array<{date: string; rsi: number; box_height_cm: number}>, locale: string): JumpAnalysis['fatigue_analysis'] | null => {
+  if (!history || history.length < 2) return null;
+  
+  // Calculate baseline RSI from first 5 entries (or all if less than 5)
+  const baselineEntries = history.slice(0, Math.min(5, history.length));
+  const baselineRsi = baselineEntries.reduce((sum, h) => sum + h.rsi, 0) / baselineEntries.length;
+  
+  // Current RSI is the latest entry (first in array, sorted by date desc)
+  const currentRsi = history[0]?.rsi || 0;
+  
+  // Calculate variation
+  const rsiVariation = baselineRsi > 0 ? ((currentRsi - baselineRsi) / baselineRsi * 100) : 0;
+  
+  // Determine status based on variation
+  let status = 'green';
+  let statusLabel = locale === 'pt' ? 'SNC Recuperado' : 'CNS Recovered';
+  let color = '#10b981';
+  let interpretation = locale === 'pt' 
+    ? 'Sistema nervoso central recuperado. Treino normal permitido.'
+    : 'Central nervous system recovered. Normal training permitted.';
+  
+  if (rsiVariation <= -13) {
+    status = 'red';
+    statusLabel = locale === 'pt' ? 'Alto Risco de Fadiga' : 'High Fatigue Risk';
+    color = '#ef4444';
+    interpretation = locale === 'pt'
+      ? '⚠️ Fadiga significativa do SNC. Alto risco de lesão. Reduzir carga ou individualizar treino.'
+      : '⚠️ Significant CNS fatigue. High injury risk. Reduce load or individualize training.';
+  } else if (rsiVariation <= -6) {
+    status = 'yellow';
+    statusLabel = locale === 'pt' ? 'Monitorar Fadiga' : 'Monitor Fatigue';
+    color = '#f59e0b';
+    interpretation = locale === 'pt'
+      ? 'Possível fadiga do SNC detectada. Monitorar volume de sprints e exercícios de alta velocidade.'
+      : 'Possible CNS fatigue detected. Monitor sprint volume and high-speed exercises.';
+  }
+  
+  return {
+    status,
+    status_label: statusLabel,
+    color,
+    rsi_variation_percent: rsiVariation,
+    baseline_rsi: baselineRsi,
+    current_rsi: currentRsi,
+    interpretation,
+  };
+};
+
 // Fatigue Status Card
 const FatigueStatusCard = ({ fatigue, locale }: { fatigue: JumpAnalysis['fatigue_analysis']; locale: string }) => {
   if (!fatigue) return null;
@@ -1011,8 +1060,16 @@ function JumpAssessmentContent() {
                     )}
                   </View>
                   
-                  {/* Fatigue Status */}
-                  <FatigueStatusCard fatigue={analysis.fatigue_analysis} locale={locale} />
+                  {/* Fatigue Status - Use backend data for CMJ, calculate locally for DJ */}
+                  <FatigueStatusCard 
+                    fatigue={
+                      analysis.fatigue_analysis || 
+                      (activeProtocol === 'dj' && analysis.protocols.dj?.history 
+                        ? calculateDjFatigue(analysis.protocols.dj.history, locale)
+                        : null)
+                    } 
+                    locale={locale} 
+                  />
                   
                   {/* Asymmetry */}
                   <AsymmetryCard asymmetry={analysis.asymmetry} slCmjData={analysis.protocols.sl_cmj} locale={locale} />

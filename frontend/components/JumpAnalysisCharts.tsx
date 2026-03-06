@@ -197,6 +197,51 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
   const cmj = data.protocols.cmj;
   const dj = data.protocols.dj;
   
+  // Helper function to calculate fatigue status from RSI variation
+  const getDjFatigueStatus = (history: Array<{date: string; rsi: number; box_height_cm: number}>) => {
+    if (!history || history.length < 2) return null;
+    
+    // Calculate baseline RSI from first 5 entries (or all if less than 5)
+    const baselineEntries = history.slice(0, Math.min(5, history.length));
+    const baselineRsi = baselineEntries.reduce((sum, h) => sum + h.rsi, 0) / baselineEntries.length;
+    
+    // Current RSI is the latest entry
+    const currentRsi = history[0]?.rsi || 0;
+    
+    // Calculate variation
+    const rsiVariation = baselineRsi > 0 ? ((currentRsi - baselineRsi) / baselineRsi * 100) : 0;
+    
+    // Determine status based on variation
+    let status = 'green';
+    let statusPt = 'SNC Recuperado';
+    let statusEn = 'CNS Recovered';
+    let color = '#10b981';
+    
+    if (rsiVariation <= -13) {
+      status = 'red';
+      statusPt = 'Alto Risco de Fadiga';
+      statusEn = 'High Fatigue Risk';
+      color = '#ef4444';
+    } else if (rsiVariation <= -6) {
+      status = 'yellow';
+      statusPt = 'Monitorar Fadiga';
+      statusEn = 'Monitor Fatigue';
+      color = '#f59e0b';
+    }
+    
+    return {
+      status,
+      status_pt: statusPt,
+      status_en: statusEn,
+      color,
+      baseline_rsi: baselineRsi,
+      rsi_variation: rsiVariation,
+    };
+  };
+  
+  // Get DJ fatigue status if available
+  const djFatigueInfo = dj?.history ? getDjFatigueStatus(dj.history) : null;
+  
   // Create unified data object for rendering (CMJ takes priority, DJ as fallback)
   const jumpData = hasCmjData ? {
     latest: cmj!.latest,
@@ -223,9 +268,9 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
       jump_height_cm: 0,
       peak_power_w: 0,
     })),
-    baseline_rsi: 0,
-    rsi_variation_percent: 0,
-    fatigue_status: null,
+    baseline_rsi: djFatigueInfo?.baseline_rsi || 0,
+    rsi_variation_percent: djFatigueInfo?.rsi_variation || 0,
+    fatigue_status: djFatigueInfo,
     z_score_height: 0,
   } : null;
   
@@ -237,7 +282,28 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
       </View>
     );
   }
-  const fatigue = data.fatigue_analysis;
+  
+  // Use fatigue_analysis from backend if available, otherwise use calculated DJ fatigue
+  const fatigue = data.fatigue_analysis || (jumpData.fatigue_status ? {
+    status: jumpData.fatigue_status.status,
+    status_label: locale === 'pt' ? jumpData.fatigue_status.status_pt : jumpData.fatigue_status.status_en,
+    color: jumpData.fatigue_status.color,
+    rsi_variation_percent: jumpData.rsi_variation_percent,
+    baseline_rsi: jumpData.baseline_rsi,
+    current_rsi: jumpData.latest.rsi,
+    interpretation: locale === 'pt' 
+      ? (jumpData.rsi_variation_percent >= -5 
+          ? 'Sistema nervoso central recuperado. Treino normal permitido.'
+          : jumpData.rsi_variation_percent >= -12 
+            ? 'Possível fadiga do SNC detectada. Monitorar volume de sprints e exercícios de alta velocidade.'
+            : '⚠️ Fadiga significativa do SNC. Alto risco de lesão. Reduzir carga ou individualizar treino.')
+      : (jumpData.rsi_variation_percent >= -5 
+          ? 'Central nervous system recovered. Normal training permitted.'
+          : jumpData.rsi_variation_percent >= -12 
+            ? 'Possible CNS fatigue detected. Monitor sprint volume and high-speed exercises.'
+            : '⚠️ Significant CNS fatigue. High injury risk. Reduce load or individualize training.'),
+  } : null);
+  
   const asymmetry = data.asymmetry;
   const pvProfile = data.power_velocity_insights;
   const zScore = data.z_score;

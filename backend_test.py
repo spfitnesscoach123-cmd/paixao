@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional
 
 # Configuration
-BASE_URL = "https://gps-metric-dashboard.preview.emergentagent.com/api"
+BASE_URL = "https://dj-graphs-feature.preview.emergentagent.com/api"
 TEST_USER_EMAIL = "coach.testbackend@footballsystem.com"
 TEST_USER_PASSWORD = "TestCoach2025#"
 TEST_USER_NAME = "Backend Test Coach"
