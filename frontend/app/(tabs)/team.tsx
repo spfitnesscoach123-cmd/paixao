@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -17,6 +19,16 @@ import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
+
+// ACWR Metric options
+const ACWR_METRICS = [
+  { key: 'total_distance', labelPt: 'Total Distance', labelEn: 'Total Distance' },
+  { key: 'high_intensity_distance', labelPt: 'HID Z3', labelEn: 'HID Z3' },
+  { key: 'high_speed_running', labelPt: 'HSR Z4', labelEn: 'HSR Z4' },
+  { key: 'sprint_distance', labelPt: 'Sprint Z5', labelEn: 'Sprint Z5' },
+  { key: 'number_of_sprints', labelPt: 'Sprint', labelEn: 'Sprint' },
+  { key: 'acc_dec', labelPt: 'ACC + DEC', labelEn: 'ACC + DEC' },
+];
 
 interface TeamDashboardAthlete {
   id: string;
@@ -84,14 +96,27 @@ export default function TeamDashboard() {
   const { t, locale } = useLanguage();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
+  const [selectedMetric, setSelectedMetric] = React.useState('total_distance');
+  const [metricModalVisible, setMetricModalVisible] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['team-dashboard'],
+    queryKey: ['team-dashboard', selectedMetric],
     queryFn: async () => {
-      const response = await api.get<TeamDashboardResponse>(`/dashboard/team?lang=${locale}`);
+      const response = await api.get<TeamDashboardResponse>(`/dashboard/team?lang=${locale}&acwr_metric=${selectedMetric}`);
       return response.data;
     },
   });
+
+  // Get current metric label
+  const getCurrentMetricLabel = () => {
+    const metric = ACWR_METRICS.find(m => m.key === selectedMetric);
+    return metric ? (locale === 'pt' ? metric.labelPt : metric.labelEn) : 'Total Distance';
+  };
+
+  const handleMetricSelect = (metricKey: string) => {
+    setSelectedMetric(metricKey);
+    setMetricModalVisible(false);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -419,9 +444,19 @@ export default function TeamDashboard() {
 
           {/* Athletes List */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>
-              {locale === 'pt' ? 'Status dos Atletas' : 'Athletes Status'}
-            </Text>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>
+                {locale === 'pt' ? 'Status dos Atletas' : 'Athletes Status'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.metricSelectorButton}
+                onPress={() => setMetricModalVisible(true)}
+              >
+                <Ionicons name="options-outline" size={16} color={colors.accent.primary} />
+                <Text style={styles.metricSelectorText}>{getCurrentMetricLabel()}</Text>
+                <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            </View>
             
             {data.athletes.map((athlete) => (
               <TouchableOpacity
@@ -532,6 +567,67 @@ export default function TeamDashboard() {
           </View>
         </ScrollView>
       </LinearGradient>
+
+      {/* Metric Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={metricModalVisible}
+        onRequestClose={() => setMetricModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setMetricModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {locale === 'pt' ? 'Selecionar Métrica ACWR' : 'Select ACWR Metric'}
+              </Text>
+              <TouchableOpacity onPress={() => setMetricModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            <Text style={styles.modalSubtitle}>
+              {locale === 'pt' 
+                ? 'Escolha a métrica de carga para calcular o status dos atletas'
+                : 'Choose the load metric to calculate athlete status'}
+            </Text>
+            
+            {ACWR_METRICS.map((metric) => (
+              <TouchableOpacity
+                key={metric.key}
+                style={[
+                  styles.metricOption,
+                  selectedMetric === metric.key && styles.metricOptionSelected
+                ]}
+                onPress={() => handleMetricSelect(metric.key)}
+              >
+                <View style={styles.metricOptionContent}>
+                  <View style={[
+                    styles.metricRadio,
+                    selectedMetric === metric.key && styles.metricRadioSelected
+                  ]}>
+                    {selectedMetric === metric.key && (
+                      <View style={styles.metricRadioInner} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.metricOptionText,
+                    selectedMetric === metric.key && styles.metricOptionTextSelected
+                  ]}>
+                    {locale === 'pt' ? metric.labelPt : metric.labelEn}
+                  </Text>
+                </View>
+                {selectedMetric === metric.key && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -932,5 +1028,105 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 13,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+  },
+  // Card header with metric selector
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  metricSelectorButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.secondary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  metricSelectorText: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.dark.cardSolid,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: colors.text.tertiary,
+    marginBottom: 20,
+  },
+  metricOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    backgroundColor: colors.dark.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  metricOptionSelected: {
+    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+  },
+  metricOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  metricRadio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.text.tertiary,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  metricRadioSelected: {
+    borderColor: colors.accent.primary,
+  },
+  metricRadioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.accent.primary,
+  },
+  metricOptionText: {
+    fontSize: 15,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  metricOptionTextSelected: {
+    color: colors.text.primary,
+    fontWeight: '600',
   },
 });

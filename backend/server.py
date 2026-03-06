@@ -7302,11 +7302,34 @@ class TeamDashboardResponse(BaseModel):
 @api_router.get("/dashboard/team", response_model=TeamDashboardResponse)
 async def get_team_dashboard(
     lang: str = "pt",
+    acwr_metric: str = "total_distance",
     current_user: dict = Depends(get_current_user)
 ):
-    """Get aggregated team statistics and individual athlete status for team-wide overview"""
+    """Get aggregated team statistics and individual athlete status for team-wide overview
+    
+    Parameters:
+    - acwr_metric: Metric to use for ACWR calculation. Options:
+        - total_distance (default)
+        - high_intensity_distance (HID Z3)
+        - high_speed_running (HSR Z4)
+        - sprint_distance (Sprint Z5)
+        - number_of_sprints (Sprint count)
+        - acc_dec (ACC + DEC events)
+    """
     
     user_id = current_user["_id"]
+    
+    # Validate acwr_metric parameter
+    valid_metrics = [
+        "total_distance",
+        "high_intensity_distance",
+        "high_speed_running", 
+        "sprint_distance",
+        "number_of_sprints",
+        "acc_dec"
+    ]
+    if acwr_metric not in valid_metrics:
+        acwr_metric = "total_distance"
     
     # Get all athletes for this coach
     athletes_cursor = db.athletes.find({"coach_id": user_id})
@@ -7439,18 +7462,31 @@ async def get_team_dashboard(
                 except:
                     continue
                 
-                # Aggregate data by date
+                # Aggregate data by date - include all metrics for flexible ACWR calculation
                 if record_date_str not in gps_data_by_date:
                     gps_data_by_date[record_date_str] = {
                         "total_distance": 0,
-                        "high_intensity_distance": 0
+                        "high_intensity_distance": 0,
+                        "high_speed_running": 0,
+                        "sprint_distance": 0,
+                        "number_of_sprints": 0,
+                        "acc_dec": 0
                     }
                 
                 dist = record.get("total_distance", 0) or 0
                 hid = record.get("high_intensity_distance", 0) or 0
+                hsr = record.get("high_speed_running", 0) or 0
+                sprint_dist = record.get("sprint_distance", 0) or 0
+                sprint_count = record.get("number_of_sprints", 0) or 0
+                acc_count = record.get("number_of_accelerations", 0) or 0
+                dec_count = record.get("number_of_decelerations", 0) or 0
                 
                 gps_data_by_date[record_date_str]["total_distance"] += dist
                 gps_data_by_date[record_date_str]["high_intensity_distance"] += hid
+                gps_data_by_date[record_date_str]["high_speed_running"] += hsr
+                gps_data_by_date[record_date_str]["sprint_distance"] += sprint_dist
+                gps_data_by_date[record_date_str]["number_of_sprints"] += sprint_count
+                gps_data_by_date[record_date_str]["acc_dec"] += acc_count + dec_count
                 
                 session_key = f"{record_date_str}_{record.get('session_name', 'default')}"
                 
@@ -7468,18 +7504,19 @@ async def get_team_dashboard(
             
             # CORRECTED ACWR CALCULATION using rolling window with zeros for missing days
             # Calculate acute load (sum of last 7 days, including zeros)
+            # Uses the selected acwr_metric parameter
             acute_load = 0.0
             for i in range(7):
                 date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
                 day_data = gps_data_by_date.get(date_str, {})
-                acute_load += day_data.get("total_distance", 0) or 0
+                acute_load += day_data.get(acwr_metric, 0) or 0
             
             # Calculate chronic load (sum of last 28 days, including zeros)
             chronic_load = 0.0
             for i in range(28):
                 date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
                 day_data = gps_data_by_date.get(date_str, {})
-                chronic_load += day_data.get("total_distance", 0) or 0
+                chronic_load += day_data.get(acwr_metric, 0) or 0
             
             # Acute Load = sum of last 7 days
             # Chronic Load = average weekly load over 4 weeks = sum of 28 days / 4

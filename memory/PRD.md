@@ -25,6 +25,20 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 
 ## Implementado (Fev-Mar 2026)
 
+### ACWR Metric Selector no Team Dashboard (06 Mar 2026)
+- **Tarefa**: Permitir seleção de métrica GPS para cálculo de ACWR no Team Dashboard
+- **Métricas suportadas**: Total Distance, HID Z3, HSR Z4, Sprint Z5, Sprint, ACC + DEC
+- **Backend**: Parâmetro `acwr_metric` no endpoint `/dashboard/team`
+- **Frontend**: Botão seletor + Modal na seção "Status dos Atletas"
+- **Arquivos modificados**:
+  - `backend/server.py` (linhas 7302-7520) - Lógica de cálculo ACWR parametrizada
+  - `frontend/app/(tabs)/team.tsx` - Modal de seleção de métrica
+- **Comportamento**: 
+  - A métrica selecionada substitui `total_distance` no cálculo
+  - Mesma lógica de rolling window (7 dias acute, 28 dias chronic)
+  - Classificações de risco inalteradas (< 0.8 Low, 0.8-1.3 Optimal, 1.3-1.5 Moderate, > 1.5 High)
+- **Testado**: ✅ Todas as 6 métricas funcionando via curl
+
 ### Bypass Limite de Dispositivos - Conta Demo (04 Mar 2026)
 - **Tarefa**: Remover limite de dispositivos exclusivamente para conta demo
 - **Email**: `contato@loadmanagerpro.com.br`
@@ -90,7 +104,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - [ ] Verificar Subscription System refatorado
 
 ### P2 - Média Prioridade
-- [ ] ACWR Metric Selector no Dashboard
+- [x] ACWR Metric Selector no Dashboard - **IMPLEMENTADO** (06 Mar 2026)
 - [ ] VBT Rep Counting & Regressions
 - [ ] Internacionalização de ScientificAnalysisTab.tsx
 
