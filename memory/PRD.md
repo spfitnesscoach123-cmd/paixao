@@ -42,6 +42,27 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
   - Power-Velocity Profile: ✅ Funcionando
   - Recommendations: ✅ Funcionando
 
+### Fix: Jump Camera Crash - Phase Separation (06 Mar 2026)
+- **Problema**: App crashava no iPhone ao clicar "Start Capture" na Jump Camera
+- **Causa raiz**: O fluxo antigo tentava montar câmera, carregar MediaPipe e iniciar countdown tudo de uma vez
+- **Solução**: Implementada separação de fases seguindo o padrão do VBT Camera:
+  - **FASE 1 - Camera Preview**: Apenas abrir câmera e aguardar primeiro frame
+  - **FASE 2 - Recording**: Iniciar countdown e captura SOMENTE após câmera pronta
+- **Arquivos modificados**:
+  - `frontend/app/athlete/[id]/jump-camera.tsx`:
+    - Novo estado `uiPhase`: 'protocol' → 'cameraPreview' → 'recording' → 'results'
+    - Novo estado `firstFrameReceived`: indica quando MediaPipe está realmente pronto
+    - `handleStartCamera()`: agora vai para 'cameraPreview' apenas
+    - `handleStartRecording()`: nova função que só funciona após `firstFrameReceived=true`
+    - Botão "Start Recording" desabilitado até câmera estar pronta
+    - Overlays de status: "Aguardando câmera..." / "Câmera pronta!"
+- **Fluxo seguro implementado**:
+  1. Usuário clica "Start Capture" → abre câmera
+  2. Sistema aguarda câmera + MediaPipe inicializar
+  3. Mostra "Câmera pronta!" + habilita botão "Start Recording"
+  4. Usuário clica "Start Recording" → inicia countdown → captura
+- **Testado**: ⏳ Pendente validação do usuário no TestFlight
+
 ### Jump Assessment via Camera (06 Mar 2026)
 - **Tarefa**: Adicionar captura automática de métricas de salto via visão computacional
 - **Funcionalidade**: Usa MediaPipe para detectar eventos de salto (decolagem, aterrissagem) automaticamente

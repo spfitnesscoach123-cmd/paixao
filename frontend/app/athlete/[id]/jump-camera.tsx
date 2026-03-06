@@ -98,15 +98,16 @@ function JumpCameraContent() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
-  // UI State
-  const [uiPhase, setUiPhase] = useState<'protocol' | 'camera' | 'results'>('protocol');
+  // UI State - PHASE SEPARATION FOR SAFE INITIALIZATION
+  // 'protocol' -> 'cameraPreview' -> 'recording' -> 'results'
+  const [uiPhase, setUiPhase] = useState<'protocol' | 'cameraPreview' | 'recording' | 'results'>('protocol');
   const [selectedProtocol, setSelectedProtocol] = useState<JumpProtocol>('cmj');
   const [boxHeight, setBoxHeight] = useState('40');
   const [athleteHeight, setAthleteHeight] = useState('175');
   const [showProtocolModal, setShowProtocolModal] = useState(false);
-  const [cameraReady, setCameraReady] = useState(false);
   
-  // Camera mount control - prevents crash when transitioning to camera phase
+  // Camera state - PHASE 1: Camera initialization
+  const [cameraReady, setCameraReady] = useState(false);
   const [shouldMountCamera, setShouldMountCamera] = useState(false);
   
   // SAFETY: Frame processing guard to prevent simultaneous processing
@@ -114,6 +115,9 @@ function JumpCameraContent() {
   
   // SAFETY: MediaPipe ready state (separate from cameraReady)
   const [mediapipeReady, setMediapipeReady] = useState(false);
+  
+  // SAFETY: First frame received indicator (camera is truly ready)
+  const [firstFrameReceived, setFirstFrameReceived] = useState(false);
   
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
@@ -157,6 +161,11 @@ function JumpCameraContent() {
     left: locale === 'pt' ? 'Esquerda' : 'Left',
     right: locale === 'pt' ? 'Direita' : 'Right',
     framesRecorded: locale === 'pt' ? 'Frames Gravados' : 'Frames Recorded',
+    // NEW LABELS for phase separation
+    startRecording: locale === 'pt' ? 'Iniciar Gravação' : 'Start Recording',
+    waitingForCamera: locale === 'pt' ? 'Aguardando câmera...' : 'Waiting for camera...',
+    cameraReady: locale === 'pt' ? 'Câmera pronta!' : 'Camera ready!',
+    positionAthlete: locale === 'pt' ? 'Posicione o atleta no enquadramento' : 'Position athlete in frame',
   };
 
   // Convert MediaPipe landmarks to keypoints array
@@ -269,15 +278,18 @@ function JumpCameraContent() {
       
       const keypoints = convertMediapipeLandmarks(landmarkData);
       
-      if (keypoints && keypoints.length > 0) {
+      // PHASE 2: Only process frames for jump detection when in recording phase
+      if (keypoints && keypoints.length > 0 && uiPhase === 'recording') {
         jumpCamera.processFrame(keypoints);
       }
       
       // Mark camera/mediapipe as ready on first valid frame
+      // This is CRITICAL for phase separation - camera preview needs this
       if (frameCountRef.current === 1) {
         console.log('[JUMP_CAMERA] ✅ First frame received from MediaPipe');
         setCameraReady(true);
         setMediapipeReady(true);
+        setFirstFrameReceived(true);
       }
     } catch (e) {
       // SAFETY: Silent catch to prevent crash, only log in dev
@@ -288,7 +300,7 @@ function JumpCameraContent() {
       // CRITICAL: Always release the processing lock
       isProcessingFrameRef.current = false;
     }
-  }, [jumpCamera, convertMediapipeLandmarks]);
+  }, [jumpCamera, convertMediapipeLandmarks, uiPhase]);
 
   // Submit mutation to save assessment
   const submitMutation = useMutation({
@@ -333,20 +345,43 @@ function JumpCameraContent() {
     });
   }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, submitMutation]);
 
-  // Handle start camera
+  // Handle start camera - PHASE 1: Just open camera preview
+  // This ONLY opens the camera - does NOT start recording or countdown
   const handleStartCamera = useCallback(() => {
     if (!permission?.granted) {
       requestPermission();
       return;
     }
-    setUiPhase('camera');
+    
+    // Reset all camera state before transitioning
     frameCountRef.current = 0;
     setCameraReady(false);
+    setMediapipeReady(false);
+    setFirstFrameReceived(false);
+    
+    // Transition to camera preview phase
+    setUiPhase('cameraPreview');
+    
     // Mount camera after a small delay to prevent crash
+    // This gives React time to update the UI before mounting MediaPipe
     setTimeout(() => {
       setShouldMountCamera(true);
-    }, 100);
+      console.log('[JUMP_CAMERA] Camera mount triggered');
+    }, 150);
   }, [permission, requestPermission]);
+  
+  // Handle start recording - PHASE 2: Start countdown and capture
+  // This is called AFTER camera is ready (firstFrameReceived = true)
+  const handleStartRecording = useCallback(() => {
+    if (!firstFrameReceived && Platform.OS !== 'web') {
+      console.log('[JUMP_CAMERA] ⚠️ Cannot start recording - camera not ready');
+      return;
+    }
+    
+    console.log('[JUMP_CAMERA] Starting recording phase');
+    setUiPhase('recording');
+    jumpCamera.startCountdown();
+  }, [firstFrameReceived, jumpCamera]);
 
   // SAFETY: Cleanup when component unmounts
   useEffect(() => {
@@ -355,6 +390,7 @@ function JumpCameraContent() {
       setShouldMountCamera(false);
       setCameraReady(false);
       setMediapipeReady(false);
+      setFirstFrameReceived(false);
       isProcessingFrameRef.current = false;
     };
   }, []);
@@ -546,20 +582,27 @@ function JumpCameraContent() {
     );
   }
 
-  // Camera screen
-  if (uiPhase === 'camera') {
+  // Camera Preview screen - PHASE 1: Camera initialization only
+  // The camera preview phase shows the camera feed and waits for it to be ready
+  // The user can then click "Start Recording" to proceed to the recording phase
+  if (uiPhase === 'cameraPreview') {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         {/* Header */}
         <View style={[styles.cameraHeader, { paddingTop: insets.top }]}>
           <TouchableOpacity 
             onPress={() => {
+              // SAFETY: Unmount camera before transitioning back
               setShouldMountCamera(false);
+              setCameraReady(false);
+              setMediapipeReady(false);
+              setFirstFrameReceived(false);
+              frameCountRef.current = 0;
               jumpCamera.reset();
               setUiPhase('protocol');
             }} 
             style={styles.backButton}
-            data-testid="camera-back-btn"
+            data-testid="camera-preview-back-btn"
           >
             <Ionicons name="arrow-back" size={24} color="#ffffff" />
           </TouchableOpacity>
@@ -567,7 +610,7 @@ function JumpCameraContent() {
           <View style={{ width: 40 }} />
         </View>
         
-        {/* Camera View */}
+        {/* Camera View - Only preview, no processing */}
         <View style={styles.cameraContainer}>
           {/* SAFETY: Only mount camera when ALL conditions are met */}
           {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
@@ -597,6 +640,7 @@ function JumpCameraContent() {
               facing="back"
               onCameraReady={() => {
                 setCameraReady(true);
+                setFirstFrameReceived(true);
                 setMediapipeReady(false); // Mark that MediaPipe is not available
               }}
             >
@@ -615,12 +659,121 @@ function JumpCameraContent() {
             <View style={styles.cameraLoadingOverlay}>
               <ActivityIndicator size="large" color={colors.accent.primary} />
               <Text style={styles.cameraLoadingText}>
-                {locale === 'pt' ? 'Iniciando câmera...' : 'Starting camera...'}
+                {t.waitingForCamera}
               </Text>
             </View>
           )}
           
-          {/* Overlay based on phase */}
+          {/* Camera preview overlay - shows status */}
+          <View style={styles.cameraOverlay}>
+            <View style={styles.previewStatusOverlay}>
+              {/* Camera status indicator */}
+              {!firstFrameReceived && shouldMountCamera && (
+                <>
+                  <ActivityIndicator size="small" color="#f59e0b" />
+                  <Text style={styles.previewStatusText}>{t.waitingForCamera}</Text>
+                </>
+              )}
+              {firstFrameReceived && (
+                <>
+                  <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+                  <Text style={[styles.previewStatusText, { color: '#22c55e' }]}>{t.cameraReady}</Text>
+                </>
+              )}
+              <Text style={styles.previewInstructionText}>{t.positionAthlete}</Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Bottom Controls - Start Recording button */}
+        <View style={[styles.cameraControls, { paddingBottom: insets.bottom + 20 }]}>
+          <TouchableOpacity
+            style={[
+              styles.captureButton,
+              // SAFETY: Visual feedback when button is disabled
+              (!firstFrameReceived && Platform.OS !== 'web') && styles.captureButtonDisabled
+            ]}
+            onPress={handleStartRecording}
+            disabled={!firstFrameReceived && Platform.OS !== 'web'}
+            data-testid="start-recording-btn"
+          >
+            <LinearGradient 
+              colors={(!firstFrameReceived && Platform.OS !== 'web') ? ['#6b7280', '#4b5563'] : ['#22c55e', '#16a34a']} 
+              style={styles.captureButtonGradient}
+            >
+              <Ionicons name="play" size={32} color="#ffffff" />
+            </LinearGradient>
+          </TouchableOpacity>
+          <Text style={styles.captureButtonLabel}>
+            {t.startRecording}
+          </Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // Recording screen - PHASE 2: Countdown and jump capture
+  // This phase is entered ONLY after camera is ready
+  if (uiPhase === 'recording') {
+    return (
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
+        {/* Header */}
+        <View style={[styles.cameraHeader, { paddingTop: insets.top }]}>
+          <TouchableOpacity 
+            onPress={() => {
+              // Stop any ongoing recording
+              jumpCamera.reset();
+              // Go back to camera preview (not unmount camera)
+              setUiPhase('cameraPreview');
+            }} 
+            style={styles.backButton}
+            data-testid="recording-back-btn"
+          >
+            <Ionicons name="arrow-back" size={24} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={styles.cameraTitle}>{t.title}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        
+        {/* Camera View - Active processing */}
+        <View style={styles.cameraContainer}>
+          {/* Camera is already mounted from preview phase */}
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+            <View style={styles.camera}>
+              <RNMediapipe
+                style={StyleSheet.absoluteFill}
+                height={screenHeight}
+                width={screenWidth}
+                onLandmark={handleMediapipeLandmark}
+                face={false}
+                leftArm={false}
+                rightArm={false}
+                leftWrist={false}
+                rightWrist={false}
+                torso={true}
+                leftLeg={true}
+                rightLeg={true}
+                leftAnkle={true}
+                rightAnkle={true}
+                frameLimit={60}
+              />
+            </View>
+          ) : shouldMountCamera ? (
+            <CameraView
+              style={styles.camera}
+              facing="back"
+            >
+              <View style={styles.webFallbackOverlay}>
+                <Text style={styles.webFallbackText}>
+                  {locale === 'pt' 
+                    ? 'MediaPipe não disponível.'
+                    : 'MediaPipe not available.'}
+                </Text>
+              </View>
+            </CameraView>
+          ) : null}
+          
+          {/* Overlay based on jump detection phase */}
           <View style={styles.cameraOverlay}>
             {/* Countdown */}
             {jumpCamera.phase === 'countdown' && (
@@ -665,16 +818,10 @@ function JumpCameraContent() {
               </View>
             )}
             
-            {/* Idle state - waiting to start */}
+            {/* Setup state - should not normally be seen in recording phase */}
             {jumpCamera.phase === 'setup' && (
               <View style={styles.idleOverlay}>
                 <Text style={styles.idleText}>{t.prepareJump}</Text>
-                {/* SAFETY: Show camera status */}
-                {!cameraReady && shouldMountCamera && (
-                  <Text style={styles.cameraStatusText}>
-                    {locale === 'pt' ? 'Aguardando câmera...' : 'Waiting for camera...'}
-                  </Text>
-                )}
               </View>
             )}
           </View>
@@ -682,31 +829,6 @@ function JumpCameraContent() {
         
         {/* Bottom Controls */}
         <View style={[styles.cameraControls, { paddingBottom: insets.bottom + 20 }]}>
-          {jumpCamera.phase === 'setup' && (
-            <TouchableOpacity
-              style={[
-                styles.captureButton,
-                // SAFETY: Visual feedback when button is disabled
-                (!cameraReady && Platform.OS !== 'web') && styles.captureButtonDisabled
-              ]}
-              onPress={() => {
-                // SAFETY GUARD: Only start if camera is ready
-                if (cameraReady || Platform.OS === 'web') {
-                  jumpCamera.startCountdown();
-                }
-              }}
-              disabled={!cameraReady && Platform.OS !== 'web'}
-              data-testid="start-countdown-btn"
-            >
-              <LinearGradient 
-                colors={(!cameraReady && Platform.OS !== 'web') ? ['#6b7280', '#4b5563'] : ['#22c55e', '#16a34a']} 
-                style={styles.captureButtonGradient}
-              >
-                <Ionicons name="play" size={32} color="#ffffff" />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          
           {jumpCamera.phase === 'recording' && (
             <TouchableOpacity
               style={styles.stopButton}
@@ -816,10 +938,10 @@ function JumpCameraContent() {
                 style={styles.tryAgainButton}
                 onPress={() => {
                   jumpCamera.reset();
-                  setShouldMountCamera(false);
-                  setUiPhase('camera');
-                  // Re-mount camera after small delay
-                  setTimeout(() => setShouldMountCamera(true), 100);
+                  setFirstFrameReceived(false);
+                  frameCountRef.current = 0;
+                  // Go back to camera preview phase
+                  setUiPhase('cameraPreview');
                 }}
                 data-testid="try-again-btn"
               >
@@ -842,10 +964,10 @@ function JumpCameraContent() {
                 style={styles.tryAgainButtonLarge}
                 onPress={() => {
                   jumpCamera.reset();
-                  setShouldMountCamera(false);
-                  setUiPhase('camera');
-                  // Re-mount camera after small delay
-                  setTimeout(() => setShouldMountCamera(true), 100);
+                  setFirstFrameReceived(false);
+                  frameCountRef.current = 0;
+                  // Go back to camera preview phase
+                  setUiPhase('cameraPreview');
                 }}
                 data-testid="error-try-again-btn"
               >
@@ -1197,6 +1319,31 @@ const styles = StyleSheet.create({
   cameraStatusText: {
     fontSize: 14,
     color: '#f59e0b',
+    marginTop: 8,
+  },
+  // Camera Preview phase styles
+  previewStatusOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    gap: 8,
+  },
+  previewStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginTop: 4,
+  },
+  previewInstructionText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 8,
+  },
+  captureButtonLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
     marginTop: 8,
   },
   cameraControls: {
