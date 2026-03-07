@@ -26,12 +26,16 @@ const BIOMETRIC_EMAIL_KEY = 'biometric_email';
 const BIOMETRIC_PASSWORD_KEY = 'biometric_password';
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
+// Debug: Show the configured backend URL
+const DEBUG_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://paixao-production.up.railway.app';
+
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isBiometricSupported, setIsBiometricSupported] = useState(false);
   const [hasSavedCredentials, setHasSavedCredentials] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const { login } = useAuth();
   const { t } = useLanguage();
   const { colors } = useTheme();
@@ -156,13 +160,22 @@ export default function Login() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.header}>
-            <View style={styles.logoContainer}>
+            <TouchableOpacity 
+              style={styles.logoContainer}
+              onPress={() => setShowDebug(!showDebug)}
+              activeOpacity={0.9}
+            >
               <Image
                 source={require('../assets/logo.png')}
                 style={styles.logo}
                 resizeMode="contain"
               />
-            </View>
+            </TouchableOpacity>
+            {showDebug && (
+              <View style={styles.debugContainer}>
+                <Text style={styles.debugText}>API: {DEBUG_BACKEND_URL}</Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.form}>
@@ -424,5 +437,17 @@ const createLoginStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     color: colors.text.secondary,
     fontWeight: '600',
+  },
+  debugContainer: {
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
+  },
+  debugText: {
+    fontSize: 10,
+    color: colors.accent.primary,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    textAlign: 'center',
   },
 });

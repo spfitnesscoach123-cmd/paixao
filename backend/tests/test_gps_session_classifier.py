@@ -9,7 +9,7 @@ import requests
 import os
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://dj-graphs-feature.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://load-manager-qa.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"

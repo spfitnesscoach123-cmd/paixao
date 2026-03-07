@@ -12,7 +12,11 @@
       "distribution": "internal"
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "credentialsSource": "remote",
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://paixao-production.up.railway.app"
+      }
     }
   },
   "submit": {

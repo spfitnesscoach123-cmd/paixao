@@ -2,7 +2,11 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://paixao-production.up.railway.app';
+
+// Debug: Log the API URL being used (will appear in device logs)
+console.log('[API Config] EXPO_PUBLIC_BACKEND_URL:', process.env.EXPO_PUBLIC_BACKEND_URL);
+console.log('[API Config] Final API_URL:', API_URL);
 
 const api = axios.create({
   baseURL: `${API_URL}/api`,
