@@ -3469,7 +3469,15 @@ async def get_body_composition_analysis(
 
 # ============= AI ANALYSIS ROUTES =============
 
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+# Try to import emergentintegrations, fallback if not available (Railway deploy)
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    EMERGENT_AVAILABLE = True
+except ImportError:
+    EMERGENT_AVAILABLE = False
+    LlmChat = None
+    UserMessage = None
+
 import statistics
 
 class ACWRAnalysis(BaseModel):
@@ -6250,7 +6258,14 @@ async def generate_scientific_ai_insights(data: ScientificInsightsResponse, athl
     Generate AI-powered scientific insights based on comprehensive athlete data.
     Uses sports science terminology and evidence-based recommendations.
     """
-    from emergentintegrations.llm.chat import LlmChat
+    # Check if emergentintegrations is available
+    if not EMERGENT_AVAILABLE:
+        return None
+    
+    try:
+        from emergentintegrations.llm.chat import LlmChat
+    except ImportError:
+        return None
     
     llm_key = os.environ.get("EMERGENT_LLM_KEY")
     if not llm_key:
