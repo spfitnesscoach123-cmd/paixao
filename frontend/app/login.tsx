@@ -26,8 +26,15 @@ const BIOMETRIC_EMAIL_KEY = 'biometric_email';
 const BIOMETRIC_PASSWORD_KEY = 'biometric_password';
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 
-// Debug: Show the configured backend URL
-const DEBUG_BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://paixao-production.up.railway.app';
+// Debug: Show the configured backend URL (hardcoded to Railway for production)
+const RAILWAY_PRODUCTION_URL = 'https://paixao-production.up.railway.app';
+const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+const isValidEnvUrl = envUrl && (
+  envUrl.includes('localhost') || 
+  envUrl.includes('127.0.0.1') ||
+  envUrl === RAILWAY_PRODUCTION_URL
+);
+const DEBUG_BACKEND_URL = isValidEnvUrl ? envUrl : RAILWAY_PRODUCTION_URL;
 
 export default function Login() {
   const [email, setEmail] = useState('');

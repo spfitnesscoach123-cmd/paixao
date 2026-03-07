@@ -2,10 +2,24 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'https://paixao-production.up.railway.app';
+// PRODUCTION: Hardcoded Railway URL to prevent build system from overwriting
+// The Emergent deployment system was replacing env vars with wrong URLs
+const RAILWAY_PRODUCTION_URL = 'https://paixao-production.up.railway.app';
+
+// Use Railway URL directly for production builds
+// Only use env var for local development if it points to localhost or the correct Railway URL
+const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
+const isValidEnvUrl = envUrl && (
+  envUrl.includes('localhost') || 
+  envUrl.includes('127.0.0.1') ||
+  envUrl === RAILWAY_PRODUCTION_URL
+);
+
+const API_URL = isValidEnvUrl ? envUrl : RAILWAY_PRODUCTION_URL;
 
 // Debug: Log the API URL being used (will appear in device logs)
-console.log('[API Config] EXPO_PUBLIC_BACKEND_URL:', process.env.EXPO_PUBLIC_BACKEND_URL);
+console.log('[API Config] EXPO_PUBLIC_BACKEND_URL:', envUrl);
+console.log('[API Config] Using Railway URL:', RAILWAY_PRODUCTION_URL);
 console.log('[API Config] Final API_URL:', API_URL);
 
 const api = axios.create({
