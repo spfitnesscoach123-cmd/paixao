@@ -17,7 +17,7 @@ import requests
 import os
 
 # Use the public URL from frontend .env
-BASE_URL = "https://jump-assessment-fix.preview.emergentagent.com"
+BASE_URL = "https://infinite-loader-fix.preview.emergentagent.com"
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"
