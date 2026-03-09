@@ -162,15 +162,49 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - Permanente, sem expiração, sem limite de uso
 - Vinculado à conta: `contato@loadmanagerpro.com.br`
 
+### Rolling Load Engine (EWMA-based ACWR) (09 Mar 2026)
+- **Tarefa**: Implementar sistema de cálculo incremental de métricas de carga de treino
+- **Problema resolvido**: ACWR calculado em tempo real era impreciso (sempre 4.0 quando treino concentrado em 7 dias)
+- **Solução**: Engine que usa EWMA (Exponential Weighted Moving Average) para cálculos mais precisos
+- **Métricas calculadas**:
+  - EWMA Acute Load (7 dias equivalente, λ=0.25)
+  - EWMA Chronic Load (28 dias equivalente, λ=0.069)
+  - ACWR usando EWMA (mais responsivo que média simples)
+  - Monotony (variação de carga semanal)
+  - Strain (carga acumulada semanal × monotony)
+  - Spike Detection (classificação de risco)
+- **Métricas suportadas**: distance, HSR, sprint_distance, acc_dec_load
+- **Arquivos criados**:
+  - `backend/load_engine/load_metrics.py` - Tipos e constantes
+  - `backend/load_engine/ewma_calculator.py` - Calculadora EWMA
+  - `backend/load_engine/acwr_calculator.py` - Calculadora ACWR com zonas de risco
+  - `backend/load_engine/spike_detector.py` - Detector de picos e monotony/strain
+  - `backend/load_engine/rolling_load_engine.py` - Engine principal
+  - `backend/load_engine/__init__.py` - Exports
+  - `backend/tests/test_load_engine.py` - 27 testes unitários
+- **Endpoints criados**:
+  - `GET /api/load-metrics/{athlete_id}` - Métricas de um atleta
+  - `POST /api/load-metrics/{athlete_id}/recalculate` - Recalcular métricas
+  - `GET /api/load-metrics/team/latest` - Métricas da equipe toda
+- **Integração**: Engine é chamado automaticamente quando GPS data é criado/importado
+- **Database**: Nova coleção `athlete_load_metrics` com índices otimizados
+- **Testado**: ✅ 27/27 testes unitários passando
+
 ## Backlog
+
+### P0 - Crítico
+- [ ] Testar Jump Camera no TestFlight (aguardando build)
+- [ ] Verificar Login no TestFlight após build com Bundle ID correto
 
 ### P1 - Alta Prioridade
 - [ ] PDF Generation em "Análise Científica" - app congela/crasha
+- [ ] Backend `/api/jump/assessment` - validação de peso do atleta
 - [ ] Verificar Account Deletion flow end-to-end
 - [ ] Verificar Subscription System refatorado
 
 ### P2 - Média Prioridade
 - [x] ACWR Metric Selector no Dashboard - **IMPLEMENTADO** (06 Mar 2026)
+- [x] Rolling Load Engine (EWMA-based ACWR) - **IMPLEMENTADO** (09 Mar 2026)
 - [ ] VBT Rep Counting & Regressions
 - [ ] Internacionalização de ScientificAnalysisTab.tsx
 
@@ -179,6 +213,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - [ ] Identity resolution para imports
 - [ ] UI para resolução manual de nomes de atletas
 - [ ] Merge de perfis duplicados de atletas
+- [ ] Remover backup `ios_backup_before_removal/` após confirmar estabilidade
 
 ## Credenciais de Teste
 - **Admin**: `contato@loadmanagerpro.com.br` / `#UAE2026`

@@ -55,6 +55,14 @@ from identity_resolver import (
     AliasCreate,
 )
 
+from load_engine import (
+    RollingLoadEngine,
+    create_load_engine,
+    AthleteLoadMetrics,
+    ACWRZone,
+    SpikeStatus,
+)
+
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
@@ -62,6 +70,9 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
+
+# Initialize Rolling Load Engine
+load_engine = create_load_engine(db)
 
 # JWT Configuration
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
@@ -1170,6 +1181,16 @@ async def create_gps_data(
             session_date=gps_data.date,
             athlete_name=athlete.get("name", "")
         )
+    
+    # UPDATE ROLLING LOAD METRICS (EWMA, ACWR, etc.)
+    try:
+        await load_engine.update_athlete_metrics(
+            athlete_id=gps_data.athlete_id,
+            coach_id=coach_id_str,
+            date=gps_data.date
+        )
+    except Exception as e:
+        logging.warning(f"[LoadEngine] Failed to update metrics for {gps_data.athlete_id}: {e}")
     
     return gps
 
@@ -4385,6 +4406,212 @@ async def get_acwr_history(
         metric=metric,
         history=history
     )
+
+
+# ============= ROLLING LOAD ENGINE ENDPOINTS (EWMA-BASED ACWR) =============
+
+class EWMAMetricResponse(BaseModel):
+    """Response for a single EWMA-calculated metric"""
+    load: float
+    ewma_acute: float
+    ewma_chronic: float
+    acwr: Optional[float]
+    acwr_zone: str
+
+class AthleteLoadMetricsResponse(BaseModel):
+    """Complete load metrics for an athlete"""
+    athlete_id: str
+    date: str
+    
+    distance: EWMAMetricResponse
+    hsr: EWMAMetricResponse
+    sprint_distance: EWMAMetricResponse
+    acc_dec_load: EWMAMetricResponse
+    
+    monotony: float
+    strain: float
+    weekly_load: float
+    
+    has_spike: bool
+    spike_metrics: List[str]
+    spike_status: str
+
+class RecalculateResponse(BaseModel):
+    """Response for recalculation request"""
+    success: bool
+    athlete_id: str
+    dates_processed: int
+    message: str
+
+
+@api_router.get("/load-metrics/{athlete_id}", response_model=AthleteLoadMetricsResponse)
+async def get_athlete_load_metrics(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get EWMA-based load metrics for an athlete.
+    
+    Returns pre-calculated metrics including:
+    - EWMA Acute/Chronic loads
+    - ACWR (EWMA-based)
+    - Monotony
+    - Strain
+    - Spike detection
+    
+    These metrics are calculated incrementally when GPS data is added,
+    making this endpoint extremely fast.
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get latest metrics from load engine
+    metrics = await load_engine.get_latest_metrics(athlete_id)
+    
+    if not metrics:
+        raise HTTPException(
+            status_code=404,
+            detail="No load metrics available. Add training data first."
+        )
+    
+    def metric_to_response(m) -> EWMAMetricResponse:
+        if isinstance(m, dict):
+            return EWMAMetricResponse(
+                load=m.get("load", 0),
+                ewma_acute=m.get("ewma_acute", 0),
+                ewma_chronic=m.get("ewma_chronic", 0),
+                acwr=m.get("acwr"),
+                acwr_zone=m.get("acwr_zone", "unknown")
+            )
+        return EWMAMetricResponse(
+            load=m.load,
+            ewma_acute=m.ewma_acute,
+            ewma_chronic=m.ewma_chronic,
+            acwr=m.acwr,
+            acwr_zone=m.acwr_zone
+        )
+    
+    return AthleteLoadMetricsResponse(
+        athlete_id=athlete_id,
+        date=metrics.date,
+        distance=metric_to_response(metrics.distance),
+        hsr=metric_to_response(metrics.hsr),
+        sprint_distance=metric_to_response(metrics.sprint_distance),
+        acc_dec_load=metric_to_response(metrics.acc_dec_load),
+        monotony=metrics.monotony,
+        strain=metrics.strain,
+        weekly_load=metrics.weekly_load,
+        has_spike=metrics.has_spike,
+        spike_metrics=metrics.spike_metrics,
+        spike_status=metrics.spike_status
+    )
+
+
+@api_router.post("/load-metrics/{athlete_id}/recalculate", response_model=RecalculateResponse)
+async def recalculate_athlete_metrics(
+    athlete_id: str,
+    from_date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Recalculate load metrics for an athlete.
+    
+    Use this when:
+    - Historical training data has been modified
+    - Metrics appear incorrect
+    - Migrating existing data to the new EWMA system
+    
+    Parameters:
+    - from_date: Start recalculation from this date (YYYY-MM-DD). 
+                 Defaults to 60 days ago.
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Default to 60 days ago if not specified
+    if not from_date:
+        from_date = (datetime.utcnow() - timedelta(days=60)).strftime("%Y-%m-%d")
+    
+    coach_id = str(current_user["_id"])
+    
+    # Recalculate metrics
+    results = await load_engine.recalculate_from_date(
+        athlete_id=athlete_id,
+        coach_id=coach_id,
+        start_date=from_date
+    )
+    
+    success_count = sum(1 for r in results if r.success)
+    
+    return RecalculateResponse(
+        success=success_count > 0,
+        athlete_id=athlete_id,
+        dates_processed=len(results),
+        message=f"Recalculated {success_count} of {len(results)} dates"
+    )
+
+
+@api_router.get("/load-metrics/team/latest")
+async def get_team_load_metrics(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get latest load metrics for all athletes in a team.
+    
+    Returns pre-calculated EWMA-based ACWR and other metrics
+    for each athlete, optimized for the Team Dashboard.
+    """
+    coach_id = str(current_user["_id"])
+    
+    # Get all latest metrics
+    team_metrics = await load_engine.get_team_metrics(coach_id)
+    
+    # Get athlete names
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(100)
+    athlete_names = {str(a["_id"]): a.get("name", "Unknown") for a in athletes}
+    
+    # Format response
+    result = []
+    for m in team_metrics:
+        athlete_id = m.get("athlete_id")
+        
+        # Extract ACWR values for each metric
+        distance = m.get("distance", {})
+        hsr = m.get("hsr", {})
+        sprint = m.get("sprint_distance", {})
+        acc_dec = m.get("acc_dec_load", {})
+        
+        result.append({
+            "athlete_id": athlete_id,
+            "athlete_name": athlete_names.get(athlete_id, "Unknown"),
+            "date": m.get("date"),
+            "distance_acwr": distance.get("acwr") if isinstance(distance, dict) else None,
+            "distance_zone": distance.get("acwr_zone", "unknown") if isinstance(distance, dict) else "unknown",
+            "hsr_acwr": hsr.get("acwr") if isinstance(hsr, dict) else None,
+            "sprint_acwr": sprint.get("acwr") if isinstance(sprint, dict) else None,
+            "acc_dec_acwr": acc_dec.get("acwr") if isinstance(acc_dec, dict) else None,
+            "monotony": m.get("monotony", 0),
+            "strain": m.get("strain", 0),
+            "has_spike": m.get("has_spike", False),
+            "spike_status": m.get("spike_status", "none"),
+        })
+    
+    return {
+        "success": True,
+        "count": len(result),
+        "metrics": result
+    }
+
 
 @api_router.get("/analysis/fatigue/{athlete_id}")
 async def get_fatigue_analysis(
@@ -8011,6 +8238,16 @@ async def import_wearable_csv(
                 "has_session_total": consolidated.get("has_session_total", False),
                 "periods_count": len(consolidated.get("periods", [])),
             })
+            
+            # UPDATE ROLLING LOAD METRICS (EWMA, ACWR, etc.)
+            try:
+                await load_engine.update_athlete_metrics(
+                    athlete_id=athlete_id,
+                    coach_id=str(current_user["_id"]),
+                    date=consolidated.get("date")
+                )
+            except Exception as e:
+                logging.warning(f"[LoadEngine] Failed to update metrics after CSV import: {e}")
         except Exception as e:
             errors_list.append({"error": str(e)})
 
