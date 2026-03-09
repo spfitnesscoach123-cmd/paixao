@@ -6,6 +6,11 @@
  * 
  * IMPORTANT: This page ONLY captures and extracts raw metrics.
  * All calculations (RSI, Fatigue, Z-Score, etc.) are handled by the existing backend.
+ * 
+ * ARCHITECTURE:
+ * - Uses CameraMediapipeManager for safe lifecycle management
+ * - Sequential state transitions prevent race conditions
+ * - Safe cleanup on unmount/background
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
@@ -43,6 +48,7 @@ import {
   JUMP_DETECTION_CONFIG,
 } from '../../../services/jump/types';
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
+import { useJumpCameraLifecycle } from '../../../services/camera';
 import { format } from 'date-fns';
 
 // Conditional import for native MediaPipe - SAFE GUARDED IMPORT
@@ -55,16 +61,15 @@ if (Platform.OS !== 'web') {
     if (mediapipe && mediapipe.RNMediapipe) {
       RNMediapipe = mediapipe.RNMediapipe;
       MEDIAPIPE_AVAILABLE = true;
-      console.log('[JUMP_CAMERA] ✅ MediaPipe loaded successfully');
+      console.log('[JUMP_CAMERA] MediaPipe loaded successfully');
     } else {
       MEDIAPIPE_AVAILABLE = false;
-      console.log('[JUMP_CAMERA] ⚠️ MediaPipe module found but RNMediapipe component not available');
+      console.log('[JUMP_CAMERA] MediaPipe module found but RNMediapipe component not available');
     }
   } catch (e) {
     // CRITICAL: Silent catch to prevent crash in production builds
     MEDIAPIPE_AVAILABLE = false;
     RNMediapipe = null;
-    // Only log in dev, not in production
     if (__DEV__) {
       console.log('[JUMP_CAMERA] MediaPipe not available:', e);
     }
@@ -79,7 +84,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
  */
 export default function JumpCameraPage() {
   const { locale } = useLanguage();
-  const featureName = locale === 'pt' ? 'Avaliação de Salto via Câmera' : 'Jump Assessment via Camera';
+  const featureName = locale === 'pt' ? 'Avaliacao de Salto via Camera' : 'Jump Assessment via Camera';
   
   return (
     <PremiumGate featureName={featureName}>
@@ -98,6 +103,9 @@ function JumpCameraContent() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
+  // Camera lifecycle management - NEW SYSTEM
+  const lifecycle = useJumpCameraLifecycle();
+  
   // UI State - PHASE SEPARATION FOR SAFE INITIALIZATION
   // 'protocol' -> 'cameraPreview' -> 'recording' -> 'results'
   const [uiPhase, setUiPhase] = useState<'protocol' | 'cameraPreview' | 'recording' | 'results'>('protocol');
@@ -106,18 +114,11 @@ function JumpCameraContent() {
   const [athleteHeight, setAthleteHeight] = useState('175');
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   
-  // Camera state - PHASE 1: Camera initialization
-  const [cameraReady, setCameraReady] = useState(false);
-  const [shouldMountCamera, setShouldMountCamera] = useState(false);
-  
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
   
-  // SAFETY: MediaPipe ready state (separate from cameraReady)
-  const [mediapipeReady, setMediapipeReady] = useState(false);
-  
-  // SAFETY: First frame received indicator (camera is truly ready)
-  const [firstFrameReceived, setFirstFrameReceived] = useState(false);
+  // Frame counter for logging
+  const frameCountRef = useRef(0);
   
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
@@ -127,9 +128,6 @@ function JumpCameraContent() {
     athleteHeightCm: parseFloat(athleteHeight) || 175,
   });
 
-  // Frame counter for MediaPipe logging
-  const frameCountRef = useRef(0);
-
   // Labels
   const t = {
     title: locale === 'pt' ? 'Jump Camera' : 'Jump Camera',
@@ -137,8 +135,8 @@ function JumpCameraContent() {
     startCapture: locale === 'pt' ? 'Iniciar Captura' : 'Start Capture',
     stopCapture: locale === 'pt' ? 'Parar Captura' : 'Stop Capture',
     analyzing: locale === 'pt' ? 'Analisando...' : 'Analyzing...',
-    noPermission: locale === 'pt' ? 'Permissão de câmera necessária' : 'Camera permission required',
-    grantPermission: locale === 'pt' ? 'Conceder Permissão' : 'Grant Permission',
+    noPermission: locale === 'pt' ? 'Permissao de camera necessaria' : 'Camera permission required',
+    grantPermission: locale === 'pt' ? 'Conceder Permissao' : 'Grant Permission',
     boxHeight: locale === 'pt' ? 'Altura da Caixa (cm)' : 'Box Height (cm)',
     athleteHeight: locale === 'pt' ? 'Altura do Atleta (cm)' : 'Athlete Height (cm)',
     prepareJump: locale === 'pt' ? 'Prepare-se para o Salto' : 'Prepare for Jump',
@@ -150,22 +148,23 @@ function JumpCameraContent() {
     flightTime: locale === 'pt' ? 'Tempo de Voo' : 'Flight Time',
     contactTime: locale === 'pt' ? 'Tempo de Contato' : 'Contact Time',
     jumpHeight: locale === 'pt' ? 'Altura do Salto' : 'Jump Height',
-    saveAssessment: locale === 'pt' ? 'Salvar Avaliação' : 'Save Assessment',
+    saveAssessment: locale === 'pt' ? 'Salvar Avaliacao' : 'Save Assessment',
     tryAgain: locale === 'pt' ? 'Tentar Novamente' : 'Try Again',
-    detectionFailed: locale === 'pt' ? 'Não foi possível detectar o salto' : 'Could not detect jump',
+    detectionFailed: locale === 'pt' ? 'Nao foi possivel detectar o salto' : 'Could not detect jump',
     tips: locale === 'pt' ? 'Dicas' : 'Tips',
-    tip1: locale === 'pt' ? 'Posicione a câmera de lado (perfil)' : 'Position camera from the side (profile)',
-    tip2: locale === 'pt' ? 'Certifique-se que os pés e quadril estão visíveis' : 'Make sure feet and hips are visible',
-    tip3: locale === 'pt' ? 'Boa iluminação melhora a precisão' : 'Good lighting improves accuracy',
+    tip1: locale === 'pt' ? 'Posicione a camera de lado (perfil)' : 'Position camera from the side (profile)',
+    tip2: locale === 'pt' ? 'Certifique-se que os pes e quadril estao visiveis' : 'Make sure feet and hips are visible',
+    tip3: locale === 'pt' ? 'Boa iluminacao melhora a precisao' : 'Good lighting improves accuracy',
     activeLeg: locale === 'pt' ? 'Perna Ativa' : 'Active Leg',
     left: locale === 'pt' ? 'Esquerda' : 'Left',
     right: locale === 'pt' ? 'Direita' : 'Right',
     framesRecorded: locale === 'pt' ? 'Frames Gravados' : 'Frames Recorded',
-    // NEW LABELS for phase separation
-    startRecording: locale === 'pt' ? 'Iniciar Gravação' : 'Start Recording',
-    waitingForCamera: locale === 'pt' ? 'Aguardando câmera...' : 'Waiting for camera...',
-    cameraReady: locale === 'pt' ? 'Câmera pronta!' : 'Camera ready!',
+    startRecording: locale === 'pt' ? 'Iniciar Gravacao' : 'Start Recording',
+    waitingForCamera: locale === 'pt' ? 'Aguardando camera...' : 'Waiting for camera...',
+    cameraReady: locale === 'pt' ? 'Camera pronta!' : 'Camera ready!',
     positionAthlete: locale === 'pt' ? 'Posicione o atleta no enquadramento' : 'Position athlete in frame',
+    initializingCamera: locale === 'pt' ? 'Inicializando camera...' : 'Initializing camera...',
+    initializingMediapipe: locale === 'pt' ? 'Iniciando deteccao de pose...' : 'Starting pose detection...',
   };
 
   // Convert MediaPipe landmarks to keypoints array
@@ -251,15 +250,31 @@ function JumpCameraContent() {
     return keypoints;
   }, []);
 
-  // Handle MediaPipe landmark callback - WITH SAFETY GUARDS
+  // Handle MediaPipe landmark callback - WITH LIFECYCLE SAFETY
   const handleMediapipeLandmark = useCallback((event: any) => {
     // SAFETY GUARD 1: Prevent simultaneous frame processing
     if (isProcessingFrameRef.current) {
-      return; // Skip frame if already processing
+      return;
     }
     
-    // SAFETY GUARD 2: Check if event is valid
+    // SAFETY GUARD 2: Validate event exists
     if (!event) {
+      return;
+    }
+    
+    // SAFETY GUARD 3: Use lifecycle validation
+    // This handles all initialization state checks
+    const landmarkData = event?.nativeEvent || event;
+    if (!landmarkData) {
+      return;
+    }
+    
+    // Signal frame to lifecycle manager (handles state transitions)
+    lifecycle.signalFirstFrame();
+    
+    // Check if we should process this frame
+    if (!lifecycle.mediapipeReady) {
+      // Still initializing - don't process yet, but frame was recorded
       return;
     }
     
@@ -268,39 +283,25 @@ function JumpCameraContent() {
     try {
       frameCountRef.current++;
       
-      const landmarkData = event?.nativeEvent || event;
-      
-      // SAFETY GUARD 3: Validate landmark data exists
-      if (!landmarkData) {
-        isProcessingFrameRef.current = false;
-        return;
-      }
-      
       const keypoints = convertMediapipeLandmarks(landmarkData);
       
-      // PHASE 2: Only process frames for jump detection when in recording phase
+      // Only process frames for jump detection when in recording UI phase
       if (keypoints && keypoints.length > 0 && uiPhase === 'recording') {
         jumpCamera.processFrame(keypoints);
       }
       
-      // Mark camera/mediapipe as ready on first valid frame
-      // This is CRITICAL for phase separation - camera preview needs this
-      if (frameCountRef.current === 1) {
-        console.log('[JUMP_CAMERA] ✅ First frame received from MediaPipe');
-        setCameraReady(true);
-        setMediapipeReady(true);
-        setFirstFrameReceived(true);
+      // Log periodically
+      if (frameCountRef.current % 60 === 0) {
+        console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current}, phase: ${lifecycle.phase}, mediapipeReady: ${lifecycle.mediapipeReady}`);
       }
     } catch (e) {
-      // SAFETY: Silent catch to prevent crash, only log in dev
       if (__DEV__) {
         console.log('[JUMP_CAMERA] Frame processing error:', e);
       }
     } finally {
-      // CRITICAL: Always release the processing lock
       isProcessingFrameRef.current = false;
     }
-  }, [jumpCamera, convertMediapipeLandmarks, uiPhase]);
+  }, [lifecycle, convertMediapipeLandmarks, uiPhase, jumpCamera]);
 
   // Submit mutation to save assessment
   const submitMutation = useMutation({
@@ -314,9 +315,9 @@ function JumpCameraContent() {
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
       
       Alert.alert(
-        locale === 'pt' ? 'Avaliação Salva!' : 'Assessment Saved!',
+        locale === 'pt' ? 'Avaliacao Salva!' : 'Assessment Saved!',
         locale === 'pt' 
-          ? `RSI: ${data.calculations.rsi}\nPotência: ${data.calculations.peak_power_w}W`
+          ? `RSI: ${data.calculations.rsi}\nPotencia: ${data.calculations.peak_power_w}W`
           : `RSI: ${data.calculations.rsi}\nPower: ${data.calculations.peak_power_w}W`,
         [{ text: 'OK', onPress: () => router.back() }]
       );
@@ -345,55 +346,61 @@ function JumpCameraContent() {
     });
   }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, submitMutation]);
 
-  // Handle start camera - PHASE 1: Just open camera preview
-  // This ONLY opens the camera - does NOT start recording or countdown
+  // Handle start camera - USING LIFECYCLE MANAGER
   const handleStartCamera = useCallback(() => {
     if (!permission?.granted) {
       requestPermission();
       return;
     }
     
-    // Reset all camera state before transitioning
+    // Reset frame counter
     frameCountRef.current = 0;
-    setCameraReady(false);
-    setMediapipeReady(false);
-    setFirstFrameReceived(false);
     
-    // Transition to camera preview phase
-    setUiPhase('cameraPreview');
+    // Request camera through lifecycle manager
+    const success = lifecycle.requestCameraStart();
     
-    // Mount camera after a small delay to prevent crash
-    // This gives React time to update the UI before mounting MediaPipe
-    setTimeout(() => {
-      setShouldMountCamera(true);
-      console.log('[JUMP_CAMERA] Camera mount triggered');
-    }, 150);
-  }, [permission, requestPermission]);
+    if (success) {
+      console.log('[JUMP_CAMERA] Camera start requested successfully');
+      setUiPhase('cameraPreview');
+    } else {
+      console.warn('[JUMP_CAMERA] Camera start request failed');
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Nao foi possivel iniciar a camera' : 'Could not start camera'
+      );
+    }
+  }, [permission, requestPermission, lifecycle, locale]);
   
-  // Handle start recording - PHASE 2: Start countdown and capture
-  // This is called AFTER camera is ready (firstFrameReceived = true)
+  // Handle start recording - Called after camera is ready
   const handleStartRecording = useCallback(() => {
-    if (!firstFrameReceived && Platform.OS !== 'web') {
-      console.log('[JUMP_CAMERA] ⚠️ Cannot start recording - camera not ready');
+    if (!lifecycle.mediapipeReady && Platform.OS !== 'web') {
+      console.log('[JUMP_CAMERA] Cannot start recording - mediapipe not ready');
       return;
     }
     
     console.log('[JUMP_CAMERA] Starting recording phase');
+    lifecycle.signalCaptureStart();
     setUiPhase('recording');
     jumpCamera.startCountdown();
-  }, [firstFrameReceived, jumpCamera]);
+  }, [lifecycle, jumpCamera]);
 
-  // SAFETY: Cleanup when component unmounts
+  // Handle back from camera - SAFE CLEANUP
+  const handleBackFromCamera = useCallback(() => {
+    console.log('[JUMP_CAMERA] Exiting camera view');
+    lifecycle.releaseCamera();
+    frameCountRef.current = 0;
+    jumpCamera.reset();
+    setUiPhase('protocol');
+  }, [lifecycle, jumpCamera]);
+
+  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      // Reset states on unmount to prevent stale references
-      setShouldMountCamera(false);
-      setCameraReady(false);
-      setMediapipeReady(false);
-      setFirstFrameReceived(false);
+      console.log('[JUMP_CAMERA] Component unmounting - releasing resources');
+      lifecycle.releaseCamera();
       isProcessingFrameRef.current = false;
     };
-  }, []);
+  }, [lifecycle]);
 
   // Go to results when metrics are available
   useEffect(() => {
@@ -402,7 +409,7 @@ function JumpCameraContent() {
     }
   }, [jumpCamera.phase, jumpCamera.metrics]);
 
-  // Permission check
+  // Permission loading
   if (!permission) {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -461,7 +468,7 @@ function JumpCameraContent() {
           {/* Configuration Card */}
           <View style={styles.configCard}>
             <Text style={styles.configTitle}>
-              {locale === 'pt' ? 'Configuração' : 'Configuration'}
+              {locale === 'pt' ? 'Configuracao' : 'Configuration'}
             </Text>
             
             {/* Box Height (DJ only) */}
@@ -582,25 +589,32 @@ function JumpCameraContent() {
     );
   }
 
-  // Camera Preview screen - PHASE 1: Camera initialization only
-  // The camera preview phase shows the camera feed and waits for it to be ready
-  // The user can then click "Start Recording" to proceed to the recording phase
+  // Camera Preview screen - Uses lifecycle for safe initialization
   if (uiPhase === 'cameraPreview') {
+    // Determine status text based on lifecycle phase
+    const getStatusText = () => {
+      switch (lifecycle.phase) {
+        case 'INITIALIZING_CAMERA':
+          return t.initializingCamera;
+        case 'CAMERA_READY':
+        case 'INITIALIZING_MEDIAPIPE':
+          return t.initializingMediapipe;
+        case 'MEDIAPIPE_READY':
+        case 'CAPTURE_ACTIVE':
+          return t.cameraReady;
+        default:
+          return t.waitingForCamera;
+      }
+    };
+    
+    const isReady = lifecycle.mediapipeReady || Platform.OS === 'web';
+    
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         {/* Header */}
         <View style={[styles.cameraHeader, { paddingTop: insets.top }]}>
           <TouchableOpacity 
-            onPress={() => {
-              // SAFETY: Unmount camera before transitioning back
-              setShouldMountCamera(false);
-              setCameraReady(false);
-              setMediapipeReady(false);
-              setFirstFrameReceived(false);
-              frameCountRef.current = 0;
-              jumpCamera.reset();
-              setUiPhase('protocol');
-            }} 
+            onPress={handleBackFromCamera} 
             style={styles.backButton}
             data-testid="camera-preview-back-btn"
           >
@@ -610,10 +624,9 @@ function JumpCameraContent() {
           <View style={{ width: 40 }} />
         </View>
         
-        {/* Camera View - Only preview, no processing */}
+        {/* Camera View - Only mount when lifecycle allows */}
         <View style={styles.cameraContainer}>
-          {/* SAFETY: Only mount camera when ALL conditions are met */}
-          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {lifecycle.shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
             <View style={styles.camera}>
               <RNMediapipe
                 style={StyleSheet.absoluteFill}
@@ -633,33 +646,31 @@ function JumpCameraContent() {
                 frameLimit={60}
               />
             </View>
-          ) : shouldMountCamera ? (
-            // Fallback when MediaPipe not available but camera should mount
+          ) : lifecycle.shouldMountCamera ? (
+            // Fallback when MediaPipe not available
             <CameraView
               style={styles.camera}
               facing="back"
               onCameraReady={() => {
-                setCameraReady(true);
-                setFirstFrameReceived(true);
-                setMediapipeReady(false); // Mark that MediaPipe is not available
+                lifecycle.signalCameraReady();
+                // For web/fallback, manually signal mediapipe ready
+                setTimeout(() => lifecycle.signalFirstFrame(), 100);
               }}
             >
               <View style={styles.webFallbackOverlay}>
                 <Text style={styles.webFallbackText}>
                   {locale === 'pt' 
-                    ? 'MediaPipe não disponível. Use um dispositivo físico com Dev Build.'
+                    ? 'MediaPipe nao disponivel. Use um dispositivo fisico com Dev Build.'
                     : 'MediaPipe not available. Use a physical device with Dev Build.'}
                 </Text>
               </View>
             </CameraView>
-          ) : null}
-          
-          {/* Loading indicator while camera is mounting */}
-          {!shouldMountCamera && (
+          ) : (
+            // Loading state while waiting to mount
             <View style={styles.cameraLoadingOverlay}>
               <ActivityIndicator size="large" color={colors.accent.primary} />
               <Text style={styles.cameraLoadingText}>
-                {t.waitingForCamera}
+                {t.initializingCamera}
               </Text>
             </View>
           )}
@@ -668,19 +679,26 @@ function JumpCameraContent() {
           <View style={styles.cameraOverlay}>
             <View style={styles.previewStatusOverlay}>
               {/* Camera status indicator */}
-              {!firstFrameReceived && shouldMountCamera && (
+              {!isReady && (
                 <>
                   <ActivityIndicator size="small" color="#f59e0b" />
-                  <Text style={styles.previewStatusText}>{t.waitingForCamera}</Text>
+                  <Text style={styles.previewStatusText}>{getStatusText()}</Text>
                 </>
               )}
-              {firstFrameReceived && (
+              {isReady && (
                 <>
                   <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
                   <Text style={[styles.previewStatusText, { color: '#22c55e' }]}>{t.cameraReady}</Text>
                 </>
               )}
               <Text style={styles.previewInstructionText}>{t.positionAthlete}</Text>
+              
+              {/* Debug info */}
+              {__DEV__ && (
+                <Text style={styles.debugText}>
+                  Phase: {lifecycle.phase} | Frames: {lifecycle.frameCount}
+                </Text>
+              )}
             </View>
           </View>
         </View>
@@ -690,15 +708,14 @@ function JumpCameraContent() {
           <TouchableOpacity
             style={[
               styles.captureButton,
-              // SAFETY: Visual feedback when button is disabled
-              (!firstFrameReceived && Platform.OS !== 'web') && styles.captureButtonDisabled
+              !isReady && styles.captureButtonDisabled
             ]}
             onPress={handleStartRecording}
-            disabled={!firstFrameReceived && Platform.OS !== 'web'}
+            disabled={!isReady}
             data-testid="start-recording-btn"
           >
             <LinearGradient 
-              colors={(!firstFrameReceived && Platform.OS !== 'web') ? ['#6b7280', '#4b5563'] : ['#22c55e', '#16a34a']} 
+              colors={!isReady ? ['#6b7280', '#4b5563'] : ['#22c55e', '#16a34a']} 
               style={styles.captureButtonGradient}
             >
               <Ionicons name="play" size={32} color="#ffffff" />
@@ -712,8 +729,7 @@ function JumpCameraContent() {
     );
   }
 
-  // Recording screen - PHASE 2: Countdown and jump capture
-  // This phase is entered ONLY after camera is ready
+  // Recording screen - Active capture with countdown
   if (uiPhase === 'recording') {
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -721,9 +737,7 @@ function JumpCameraContent() {
         <View style={[styles.cameraHeader, { paddingTop: insets.top }]}>
           <TouchableOpacity 
             onPress={() => {
-              // Stop any ongoing recording
               jumpCamera.reset();
-              // Go back to camera preview (not unmount camera)
               setUiPhase('cameraPreview');
             }} 
             style={styles.backButton}
@@ -737,8 +751,7 @@ function JumpCameraContent() {
         
         {/* Camera View - Active processing */}
         <View style={styles.cameraContainer}>
-          {/* Camera is already mounted from preview phase */}
-          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {lifecycle.shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
             <View style={styles.camera}>
               <RNMediapipe
                 style={StyleSheet.absoluteFill}
@@ -758,7 +771,7 @@ function JumpCameraContent() {
                 frameLimit={60}
               />
             </View>
-          ) : shouldMountCamera ? (
+          ) : lifecycle.shouldMountCamera ? (
             <CameraView
               style={styles.camera}
               facing="back"
@@ -766,7 +779,7 @@ function JumpCameraContent() {
               <View style={styles.webFallbackOverlay}>
                 <Text style={styles.webFallbackText}>
                   {locale === 'pt' 
-                    ? 'MediaPipe não disponível.'
+                    ? 'MediaPipe nao disponivel.'
                     : 'MediaPipe not available.'}
                 </Text>
               </View>
@@ -818,7 +831,7 @@ function JumpCameraContent() {
               </View>
             )}
             
-            {/* Setup state - should not normally be seen in recording phase */}
+            {/* Setup state */}
             {jumpCamera.phase === 'setup' && (
               <View style={styles.idleOverlay}>
                 <Text style={styles.idleText}>{t.prepareJump}</Text>
@@ -857,6 +870,7 @@ function JumpCameraContent() {
           <View style={styles.header}>
             <TouchableOpacity 
               onPress={() => {
+                lifecycle.releaseCamera();
                 jumpCamera.reset();
                 setUiPhase('protocol');
               }} 
@@ -910,7 +924,7 @@ function JumpCameraContent() {
                 <Ionicons name="information-circle" size={20} color={colors.text.secondary} />
                 <Text style={styles.infoText}>
                   {locale === 'pt' 
-                    ? 'Os cálculos de RSI, Potência e outros indicadores serão feitos automaticamente ao salvar.'
+                    ? 'Os calculos de RSI, Potencia e outros indicadores serao feitos automaticamente ao salvar.'
                     : 'RSI, Power, and other metrics will be calculated automatically when you save.'}
                 </Text>
               </View>
@@ -938,9 +952,7 @@ function JumpCameraContent() {
                 style={styles.tryAgainButton}
                 onPress={() => {
                   jumpCamera.reset();
-                  setFirstFrameReceived(false);
                   frameCountRef.current = 0;
-                  // Go back to camera preview phase
                   setUiPhase('cameraPreview');
                 }}
                 data-testid="try-again-btn"
@@ -964,9 +976,7 @@ function JumpCameraContent() {
                 style={styles.tryAgainButtonLarge}
                 onPress={() => {
                   jumpCamera.reset();
-                  setFirstFrameReceived(false);
                   frameCountRef.current = 0;
-                  // Go back to camera preview phase
                   setUiPhase('cameraPreview');
                 }}
                 data-testid="error-try-again-btn"
@@ -1120,7 +1130,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ffffff',
   },
-  // Modal styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1177,7 +1186,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.text.secondary,
   },
-  // Camera screen styles
   cameraHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1229,6 +1237,62 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 12,
     fontSize: 16,
+  },
+  previewStatusOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 20,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+    gap: 8,
+  },
+  previewStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginTop: 4,
+  },
+  previewInstructionText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 8,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#f59e0b',
+    marginTop: 8,
+  },
+  captureButtonLabel: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 8,
+  },
+  cameraControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingTop: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  captureButton: {
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  captureButtonDisabled: {
+    opacity: 0.6,
+  },
+  captureButtonGradient: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  stopButton: {
+    borderRadius: 40,
+    overflow: 'hidden',
   },
   countdownOverlay: {
     alignItems: 'center',
@@ -1316,64 +1380,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
   },
-  cameraStatusText: {
-    fontSize: 14,
-    color: '#f59e0b',
-    marginTop: 8,
-  },
-  // Camera Preview phase styles
-  previewStatusOverlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingVertical: 20,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    gap: 8,
-  },
-  previewStatusText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginTop: 4,
-  },
-  previewInstructionText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 8,
-  },
-  captureButtonLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 8,
-  },
-  cameraControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    paddingTop: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  captureButton: {
-    borderRadius: 40,
-    overflow: 'hidden',
-  },
-  captureButtonDisabled: {
-    opacity: 0.6,
-  },
-  captureButtonGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stopButton: {
-    borderRadius: 40,
-    overflow: 'hidden',
-  },
-  // Results screen styles
   successBanner: {
     alignItems: 'center',
     padding: 24,
