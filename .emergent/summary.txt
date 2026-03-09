@@ -1,234 +1,213 @@
 <analysis>**original_problem_statement:**
-The user initiated a multi-faceted job with the following key objectives:
-1.  **Fix Feature Bug**: Correct an issue where analytics graphs (Fatigue Index, RSI Evolution) were not displaying for manually entered Drop Jumps (DJ), while they worked for Countermovement Jumps (CMJ).
-2.  **Fix Critical Crash**: Resolve an app crash that occurred when the user clicked the Start Capture button on the new Jump Assessment via Camera screen.
-3.  **Diagnose Login Failure**: Conduct a series of technical audits to determine why the demo account () could no longer log into the app on a specific TestFlight build.
-4.  **Establish Production Infrastructure**: After the audit identified the use of a temporary backend URL as the root cause of the login failure, the user requested assistance in setting up a permanent, production-ready backend and database infrastructure.
-5.  **Resolve Persistent Build/Login Issues**: After setting up the new infrastructure, the user continued to face login failures on new TestFlight builds, requiring further investigation into the build and deployment pipeline.
+The user's primary goal is to get a working version of their iOS application onto TestFlight to resolve a persistent login issue. This involved several sub-tasks:
+1.  **Diagnose and Fix Build Failures**: The user was initially blocked by an Emergent platform infrastructure error. The agent guided the user to perform a local build on their Mac as a workaround.
+2.  **Resolve App Store Connect Issue**: The local build succeeded but was uploaded as a *new, separate app* on App Store Connect. The user requested a forensic audit to find the cause.
+3.  **Fix Bundle Identifier Mismatch**: The audit revealed the root cause: an old, incorrect  () was hardcoded in the  file. Because the  directory existed, EAS Build was ignoring the correct  () from . The agent then removed the  directory to revert the project to an Expo Managed workflow, ensuring the correct ID is used.
+4.  **Create a Correct Build**: The user is now in the process of creating a new, version-incremented build locally to submit to the correct app on TestFlight.
+5.  **Diagnose Jump Camera Crash**: While waiting for builds, the user requested a full technical audit on a critical crash that occurs when clicking Start Capture in the Jump Camera feature. The agent completed this audit and provided a detailed report on the cause.
 
 **PRODUCT REQUIREMENTS**:
 - The mobile application must allow users to log in successfully on TestFlight builds.
-- The backend must be stable and deployed on a production-ready service (Railway).
-- The database must be permanent (MongoDB Atlas).
-- The Jump Camera and VBT Camera features must not conflict or cause crashes.
+- The build process must correctly update the existing app on App Store Connect, not create a new one.
+- The  feature must not crash when initiating a capture.
 - The  endpoint must handle cases where athlete weight is missing.
 - PDF generation feature should be stable.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The application is a full-stack solution with a React Native (Expo) frontend and a FastAPI backend deployed on Railway with a MongoDB Atlas database.
+The application is a full-stack Expo (React Native) app with a FastAPI backend. The user, guided by the agent, has been attempting to create a local iOS build to circumvent platform-side build issues. This process revealed a critical  mismatch, where a pre-existing  native folder was overriding the configuration in , causing new builds to create a separate app in App Store Connect.
 
-The primary issue is a persistent login failure on TestFlight builds. The agent diagnosed that the build system was incorrectly overwriting the backend URL environment variable. To fix this, the agent hardcoded the correct production backend URL directly into the frontend application code (). A visual debug feature was also added to the login screen (tapping the logo reveals the backend URL) to assist with verification on TestFlight.
+The agent performed a forensic audit, identified the root cause, and then removed the  directory from the project. This forces EAS Build to use the correct  from , effectively reverting the project to a cleaner, Expo-managed state. The user has updated the version number in  and is in the process of creating a new, correct local build.
 
-However, the user is now blocked from creating a new build by a recurring platform infrastructure error (), which indicates the build server is temporarily out of resources. The agent has identified this as a platform issue and provided the user with Emergent's support contact details.
+Additionally, a comprehensive, read-only audit of the Jump Camera crash was completed, identifying a race condition and resource management conflict as the likely cause. The project code itself has not been altered to fix this yet.
 
 **Last working item**:
-*   **Last item agent was working**: Providing the user with the correct contact information for Emergent support () to report a persistent infrastructure-related build failure ().
-*   **Status**: BLOCKED
-*   **Agent Testing Done**: N/A (The issue is an external platform error, not code-related.)
-*   **Which testing method agent to use?**: Manual guidance. The next agent must wait for the user to confirm the build infrastructure is stable and then guide them to perform a new, clean build.
-*   **User Testing Done**: N (User is unable to create a successful build.)
+*   **Last item agent was working**: Performing a comprehensive, read-only forensic audit to diagnose a crash in the Jump Camera feature, as requested by the user.
+*   **Status**: FINISHED (The audit is complete and a report has been delivered).
+*   **Agent Testing Done**: N/A (This was a diagnostic audit, not a code change).
+*   **Which testing method agent to use?**: The next step is to fix the identified bug. The fix will require a new frontend build and manual user testing on TestFlight.
+*   **User Testing Done**: N/A
 
 **All Pending/In progress Issue list**:
-*   **Issue 1**: Demo account login fails on TestFlight builds (P0)
-*   **Issue 2**: iOS build process failing due to platform infrastructure instability (P0)
-*   **Issue 3**:  crashes if athlete weight is not set (P1)
-*   **Issue 4**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
-*   **Issue 5**: Uncommitted changes exist in  from a previous session (P3)
-*   **Issue 6**: ESLint configuration for TypeScript is incorrect (P3)
+*   **Issue 1**: Create and deploy a correct iOS build to TestFlight (P0)
+*   **Issue 2**:  crashes when Start Capture is clicked (P0)
+*   **Issue 3**: Demo account login fails on TestFlight builds (P0)
+*   **Issue 4**:  crashes if athlete weight is not set (P1)
+*   **Issue 5**: PDF Generation in Análise Científica causes app to freeze/crash (P1)
+*   **Issue 6**: iOS build process failing on Emergent platform infrastructure (P2)
+*   **Issue 7**: Uncommitted changes exist in  (P3)
+*   **Issue 8**: Incorrect ESLint configuration for TypeScript (P3)
 
 **Issues Detail**:
-*   **Issue 1: Demo account login fails on TestFlight builds**
-    *   **Attempted fixes**:
-        1.  Extensive debugging confirmed the backend on Railway is working correctly.
-        2.  Audited the login code and confirmed the frontend logic for handling the API response is correct.
-        3.  Identified that the build system was injecting an incorrect backend URL, overwriting the correct configuration.
-        4.  **Implemented a hardcoded fix** in  to force the app to use the correct production URL, bypassing the faulty environment variable.
-        5.  Added a visual debug mechanism to the login screen to verify the URL being used in the TestFlight build.
+*   **Issue 1: Create and deploy a correct iOS build to TestFlight**
+    *   **Attempted fixes**: User built locally, but due to Issue 3, it went to the wrong app. User updated  version to  and started a new build.
     *   **Next debug checklist**:
-        1.  Wait for user confirmation that the platform build issue (Issue 2) is resolved.
-        2.  Instruct the user to run a completely fresh build: An Expo user account is required to proceed.
+        1.  Wait for the user's current local build (An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username) to complete.
+        2.  Guide the user to submit the new  file using An Expo user account is required to proceed.
 
 Log in to EAS with email or username (exit and run eas login --help to see other login options)
 Input is required, but stdin is not readable. Failed to display prompt: Email or username.
-        3.  Ask the user to install the new build from TestFlight, tap the logo on the login screen, and send a screenshot to confirm the correct URL () is displayed.
-        4.  Ask the user to test the login functionality.
-    *   **Why fix this issue and what will be achieved with the fix?**: This is the highest priority application-level blocker. Resolving it will unblock all user testing and allow progress on other features.
-    *   **Status**: IN PROGRESS (Code fix implemented, but BLOCKED by Issue 2).
+        3.  Confirm with the user that the new build () appears correctly in the *original* app on App Store Connect.
+    *   **Why fix this issue and what will be achieved with the fix?**: This will unblock all user testing and finally allow verification of the login fix.
+    *   **Status**: IN PROGRESS
     *   **Is recurring issue?**: Y
-    *   **Should Test frontend/backend/both after fix?**: Frontend (Native iOS build).
-    *   **Blocked on other issue**: Issue 2: iOS build process failing.
+    *   **Should Test frontend/backend/both after fix?**: Frontend (manual TestFlight install).
+    *   **Blocked on other issue**: None. This is the current user activity.
 
-*   **Issue 2: iOS build process failing due to platform infrastructure instability**
-    *   **Attempted fixes**: The agent correctly identified the error  as a server-side resource issue within the Emergent build environment, not a user code or configuration problem. The agent advised the user to wait and retry, and ultimately provided support contact information.
+*   **Issue 2:  crashes when Start Capture is clicked**
+    *   **Attempted fixes**: A detailed forensic audit was completed.
     *   **Next debug checklist**:
-        1.  Ask the user if they have tried building again after a waiting period.
-        2.  Ask if they have contacted Emergent support as advised.
-        3.  Wait for the user's signal that the build infrastructure is operational again before proceeding.
-    *   **Why fix this issue and what will be achieved with the fix?**: This is the immediate P0 blocker preventing any new version of the app from being created, thus halting all progress.
-    *   **Status**: BLOCKED
-    *   **Is recurring issue?**: Y (in this session)
-    *   **Should Test frontend/backend/both after fix?**: N/A (Infrastructure issue)
-    *   **Blocked on other issue**: None. This is the primary blocker.
+        1.  Based on the audit, the root cause is a race condition in . The  function is called before the camera is fully initialized and ready.
+        2.  The shared singleton  is not being properly cleaned up, causing conflicts between  and  sessions.
+        3.  **Fix**: Modify  to ensure  is only called *after* the camera device is active and the component is ready. Use a  with dependencies on the camera's  state.
+        4.  **Fix**: Implement a cleanup function in the 's return statement in both  and  to call a  method (which needs to be created) to destroy the MediaPipe instance and free resources.
+    *   **Why fix this issue and what will be achieved with the fix?**: This will restore a critical feature of the application.
+    *   **Status**: NOT STARTED (Diagnosis complete, implementation pending).
+    *   **Is recurring issue?**: Y
+    *   **Should Test frontend/backend/both after fix?**: Frontend (requires a new iOS build).
+    *   **Blocked on other issue**: Blocked on Issue 1 (getting a working build pipeline).
 
-*   **Issue 3:  crashes if athlete weight is not set**
-    *   **Attempted fixes**: None. This was identified during an audit in a previous session.
+*   **Issue 3: Demo account login fails on TestFlight builds**
+    *   **Attempted fixes**:
+        1.  Backend URL was hardcoded in  as a primary fix.
+        2.  The root cause of subsequent build issues was identified as a  mismatch.
+        3.  The  directory, which contained the wrong ID, was **deleted**. This forces EAS to use the correct ID from .
     *   **Next debug checklist**:
-        1.  In , locate the call to .
-        2.  Before the call, add a check to verify that  is not .
-        3.  If it is , return a  with a clear error message.
-    *   **Why fix this issue and what will be achieved with the fix?**: Prevents a server crash and provides clear user feedback.
-    *   **Status**: NOT STARTED
-    *   **Is recurring issue?**: N
-    *   **Should Test frontend/backend/both after fix?**: Backend.
-    *   **Blocked on other issue**: None.
+        1.  Once Issue 1 is resolved, instruct the user to install the new build from TestFlight.
+        2.  Ask the user to tap the logo to verify the backend URL is correct.
+        3.  Ask the user to test logging in with the demo account.
+    *   **Why fix this issue and what will be achieved with the fix?**: This is the original high-priority blocker for the application.
+    *   **Status**: USER VERIFICATION PENDING
+    *   **Is recurring issue?**: Y
+    *   **Should Test frontend/backend/both after fix?**: Frontend (manual TestFlight install).
+    *   **Blocked on other issue**: Issue 1.
 
 **In progress Task List**:
--   None.
+*   **Task 1: Complete the new local iOS build and submit to TestFlight**
+    *   **Where to resume**: The user is currently running An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username on their local machine after updating  to version .
+    *   **What will be achieved with this?**: A correctly versioned  file that can be submitted to the correct app in App Store Connect.
+    *   **Status**: IN PROGRESS
+    *   **Should Test frontend/backend/both after fix?**: Frontend.
+    *   **Blocked on something**: Waiting for the user's local machine to finish the build process.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks**:
-    *   **(P0) User Verification**: Confirm the **login issue** is resolved on a new TestFlight build once the build infrastructure is stable.
-    *   **(P1) Fix**:  crash when athlete weight is missing.
-    *   **(P1) Fix**: PDF Generation crash in Análise Científica.
+    *   **(P0) Fix Jump Camera Crash**: Implement the fix based on the completed audit.
+    *   **(P1) Fix Backend Crash**: Add a null check for  in the  endpoint in .
+    *   **(P1) Fix PDF Generation Crash**: Investigate and fix the recurring crash in Análise Científica.
 *   **Future Tasks**:
     *   Complete internationalization of  and the Avaliações page.
     *   Integrate and test  and other identity resolution features.
     *   Build a UI for merging duplicate athlete profiles.
-    *   Address potential conflicts between Jump Camera and VBT Camera modules as identified in the audit.
+    *   Remove the backup directory  after confirming builds are stable.
 
 **Completed work in this session**
--   **Diagnosed Build System Failure**: Correctly identified that the Emergent build system was overwriting the  with a wrong value, causing login failures.
--   **Implemented Login Fix**: Hardcoded the correct production backend URL () into  to make the app immune to build environment issues.
--   **Added Visual Debug Tool**: Implemented a feature on the login screen () where tapping the logo displays the backend URL the app is configured to use, for easy debugging on TestFlight.
--   **Diagnosed Infrastructure Error**: Correctly identified the  error as a temporary, server-side issue with the Emergent build platform and not a code problem.
--   **Provided User Support**: Guided the user on how to proceed with the infrastructure error by calling the  and providing the correct contact email.
--   **Camera Module Audit**: Conducted a comprehensive audit of  and , confirming they do not impact the login flow but identifying potential future conflicts (shared singleton, lack of frame guard) and providing mitigation recommendations.
+-   **Guided User Through Local Build**: Successfully walked the user through setting up their local Mac environment (
+up to date, audited 1097 packages in 3s
+
+203 packages are looking for funding
+  run `npm fund` for details
+
+3 vulnerabilities (1 moderate, 2 high)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details., , ) to build the iOS app.
+-   **Diagnosed Bundle ID Mismatch**: After a build was sent to the wrong App Store app, the agent correctly diagnosed that the  was incorrect.
+-   **Performed Forensic Audit for Bundle ID**: Ran a comprehensive, read-only audit and identified the root cause: the  file contained a hardcoded, incorrect , and its presence caused EAS Build to ignore the correct setting in .
+-   **Fixed Build Configuration**: Removed the entire  directory, reverting the project to a proper Expo Managed workflow. This is the definitive fix for the bundle ID issue. A backup was created at .
+-   **Guided App Version Update**: Instructed the user on how to edit  to increment the version number to  to ensure the next build is accepted by TestFlight.
+-   **Performed Forensic Audit for Jump Camera Crash**: Executed a detailed, read-only audit of the Jump Camera feature and delivered a report identifying a race condition and resource management conflict as the cause of the crash.
 
 **Earlier issues found/mentioned but not fixed**
--   **PDF Generation in **: A known, recurring crash.
 -   **VBT Rep Counting & Regressions**: A known issue from previous sessions.
 -   **Uncommitted changes in **: These still exist and should be addressed.
 -   **Incorrect ESLint configuration for TypeScript**: A low-priority technical debt item.
 
 **Known issue recurrence from previous fork**
--   **PDF generation crash**: This is a persistent, recurring issue. Status: NOT STARTED.
--   **Build/Login Failures**: The symptom is the same, but the root cause has evolved. Initially, it was due to temporary infrastructure and misconfiguration. The current cause is a platform-level build error blocking the deployment of a fix. Status: BLOCKED.
+*   **Build/Login Failures**: This issue has been the central theme. The symptom (login failure) was caused by build configuration errors. The root cause has evolved from a wrong backend URL to a wrong bundle identifier. The latest action (deleting the  folder) is believed to be the final fix, but it's pending verification. **Status**: USER VERIFICATION PENDING.
+*   **PDF generation crash**: This is a persistent, recurring issue. **Status**: NOT STARTED.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
--   **EAS Build Environment**: Deep understanding that build-time environment variables can be unreliable or overwritten by the build platform. Led to the decision to hardcode the URL in the source code as a robust workaround.
--   **Infrastructure vs. Code Issues**: Differentiating between application code errors and platform infrastructure errors (e.g., ), which is critical for providing the correct guidance to the user.
--   **Mobile App Debugging**: Using visual, on-device debugging tools (like the tap-to-show-URL feature) to diagnose runtime configuration issues that are invisible in local development.
-
-**key DB schema**
--   No changes.
+-   **Expo Managed vs. Bare Workflow**: The core issue was the project being in an unintentional bare-like state due to the  folder's existence. Deleting it reverted the project to a managed state, where  is the source of truth for native configuration like the .
+-   **EAS Build Process**: Deep understanding of how EAS handles local vs. cloud builds, credentials, and how the presence of an  directory changes its behavior.
+-   **Apple App Store Connect Credentials**: Navigated issues with Distribution Certificates (revoking old ones) and Bundle Identifiers, understanding that the Bundle ID is the unique link between a build and an app entry in the store.
+-   **Race Conditions in Hardware Initialization**: The Jump Camera audit revealed that the code attempts to use the camera and MediaPipe before they are guaranteed to be ready, a classic race condition leading to a crash.
 
 **All files of reference**
--   **Updated**:
-    -   : Agent attempted to enforce the correct backend URL via the KUBERNETES_SERVICE_PORT_HTTPS=443
-PYTHON_SHA256=8d3ed8ec5c88c1c95f5e558612a725450d2452813ddad5e58fdb1a53b1209b78
-KUBERNETES_SERVICE_PORT=443
-PYTHONUNBUFFERED=1
-PIP_NO_INPUT=1
-STRIPE_API_KEY=sk_test_emergent
-HOSTNAME=agent-env-1c32d687-f10a-4a40-82f1-b1a139b3d5e2
-PYTHON_VERSION=3.11.14
-base_url=https://demobackend.emergentagent.com
-run_id=1c32d687-f10a-4a40-82f1-b1a139b3d5e2
-UV_COMPILE_BYTECODE=1
-PLUGIN_VENV_PATH=/opt/plugins-venv
-PWD=/app/frontend
-code_server_password=d5f47536
-HOME=/root
-LANG=C.UTF-8
-KUBERNETES_PORT_443_TCP=tcp://34.118.224.1:443
-VIRTUAL_ENV=/root/.venv
-GPG_KEY=A035C8C19219BA821ECEA86B64E628F8D684696D
-PLAYWRIGHT_BROWSERS_PATH=/pw-browsers
-integration_proxy_url=https://integrations.emergentagent.com
-preview_endpoint=https://build-infra-recovery.preview.emergentagent.com
-ENABLE_RELOAD=true
-SHLVL=0
-KUBERNETES_PORT_443_TCP_PROTO=tcp
-KUBERNETES_PORT_443_TCP_ADDR=34.118.224.1
-KUBERNETES_SERVICE_HOST=34.118.224.1
-KUBERNETES_PORT=tcp://34.118.224.1:443
-KUBERNETES_PORT_443_TCP_PORT=443
-PATH=/root/.venv/bin:/opt/plugins-venv/bin:/opt/bin:/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-monitor_polling_interval=1
-NEXT_TELEMETRY_DISABLED=1
-NODE_VERSION=20
-DEBIAN_FRONTEND=noninteractive
-OLDPWD=/app
-_=/usr/bin/env block and set  to . This was superseded by the hardcoding fix.
-    -   : **Critically updated** to hardcode the production URL , making the app independent of the faulty build variable.
-    -   : Modified to add a  component around the logo that toggles the visibility of a  element displaying the backend URL from .
--   **Referenced for Audit**:
-    -   
-    -   
-    -   
-    -   
-    -   
-    -   
+-   ****: The source of truth for the correct . User manually updated the  to .
+-   ****: **(DELETED)** This was the source of the incorrect, hardcoded .
+-   ****: Audited to ensure no overrides.
+-   ****: Audited. The primary file to be modified to fix the camera crash.
+-   ****: Audited. A singleton service that needs a cleanup/release method to prevent resource conflicts.
 
 **key api endpoints**
--   The application is now hardcoded to use **** as the base URL for all API calls.
+-   The application remains hardcoded to use **** as the base URL.
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   The user is blocked by a platform infrastructure issue (). **DO NOT** attempt to debug the application code further until the user confirms they can successfully run an iOS build.
--   The login failure has been diagnosed, and a robust fix (hardcoding the backend URL) has been implemented. **DO NOT** change this logic.
--   Your first action should be to check with the user if the build servers are working again.
--   Once the user can build, guide them to:
-    1.  Run An Expo user account is required to proceed.
+-   The user is in the middle of a local build (An Expo user account is required to proceed.
 
 Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username.
-    2.  Install the new TestFlight build.
-    3.  Tap the logo on the login screen and send you a screenshot. This is to verify your implemented fix is working as expected.
+Input is required, but stdin is not readable. Failed to display prompt: Email or username). Your first action is to check in with them on the status of this build and the subsequent submission (An Expo user account is required to proceed.
+
+Log in to EAS with email or username (exit and run eas login --help to see other login options)
+Input is required, but stdin is not readable. Failed to display prompt: Email or username).
+-   The main goal is to get a correctly versioned build () onto TestFlight to verify the login fix.
+-   The root cause of the App Store Connect issue (a hardcoded  in the now-deleted  folder) has been resolved. **Do not** add or regenerate the  folder. The project should remain in Expo Managed mode.
+-   A detailed audit of the  crash is complete. The next major task, after the build is verified, is to implement the fix for the race condition in  and add a resource cleanup method to .
+-   Once a successful build is on TestFlight and the login is confirmed working, guide the user to commit and push the code changes (especially the deletion of the  folder) to their GitHub repository.
 
 **documents and test reports created in this job**
--   None in this session.
+-   None.
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Asks for the correct support contact email.
-2.  **Agent**: Provides the email  and Discord link.
-3.  **User**: Asks for the  to be called.
-4.  **Agent**: Calls the  and relays the information about the infrastructure issue.
-5.  **User**: Asks if the build error is from Apple or Emergent.
-6.  **Agent**: Explains the error is from Emergent's build infrastructure.
-7.  **User**: Asks for a complete audit of the camera modules and their potential impact on login.
-8.  **Agent**: Performs the audit and concludes the camera modules do not affect login.
-9.  **User**: Reports the same  build error again.
-10. **User**: Asks if they should use Deploy or Get iOS Builds.
-11. **Agent**: Clarifies that Get iOS Builds is the correct command.
+1.  **User**: Asks if the build they are running will have the correct version.
+2.  **Agent**: Confirms the version will be  and the build number will auto-increment to , which is correct.
+3.  **User**: Shows a screenshot of the  file with the updated version .
+4.  **Agent**: Confirms the  is correct and tells the user to proceed with the build.
+5.  **User**: Initiates a full forensic audit to find all instances of incorrect Bundle IDs in the entire repository.
+6.  **Agent**: Performs the detailed audit.
+7.  **Agent**: Delivers the final audit report, confirming the  was the culprit and that the solution (deleting the  folder) was correct.
+8.  **User**: Initiates a new task to carefully remove the  directory from the repository on the agent's side.
+9.  **Agent**: Performs the task, creating a backup, removing the folder, and validating that the project is still intact.
+10. **User**: Initiates a final read-only audit to diagnose the Jump Camera crash.
+11. **Agent**: Performs the audit on the camera crash and delivers the final report.
 
 **Project Health Check:**
 *   **Broken**:
-    *   **iOS Build Pipeline**: The entire process is blocked due to platform infrastructure instability ().
-    *   **Jump Assessment Creation**: Backend crashes if an athlete's weight is missing.
-    *   **PDF Generation**: This feature remains broken and causes crashes.
+    *   **Jump Camera**: Crashes on Start Capture. (Root cause identified).
+    *   **PDF Generation**: Known to cause crashes/freezes.
+    *   **Jump Assessment Creation**: Backend crashes if athlete's weight is missing.
+*   **Mocked**: N/A
 
 **3rd Party Integrations**
-*   **Railway**: For permanent backend hosting.
-*   **MongoDB Atlas**: For the permanent production database.
-*   **Expo Application Services (EAS)**: For building the iOS app.
-*   : For pose detection in Jump and VBT camera features.
+*   **Railway**: Backend hosting.
+*   **MongoDB Atlas**: Production database.
+*   **Expo Application Services (EAS)**: Used for building and submitting the iOS app.
+*   : For pose detection (identified as part of the camera crash issue).
 *    (RevenueCat)
 
 **Testing status**
--   **Testing agent used after significant changes**: NO (Build is failing, preventing any testing).
+-   **Testing agent used after significant changes**: NO.
 -   **Troubleshoot agent used after agent stuck in loop**: NO.
 -   **Test files created**: None.
--   **Known regressions**: None new in this session, but previous ones (PDF, VBT) persist.
+-   **Known regressions**: PDF and VBT issues persist from previous sessions.
 
 **Credentials to test flow:**
 *   **Coach (PRO Override)**:  / 
 *   **App Review Token**: 
 
 **What agent forgot to execute**
-The agent did not forget to execute any tasks. It successfully diagnosed the core login issue and implemented a fix. Progress is currently halted by an external factor (platform infrastructure instability) that is outside the agent's control. The agent correctly identified this and escalated by providing support contact information.</analysis>
+The agent diligently followed all of the user's requests, which were primarily focused on unblocking the build process and performing detailed diagnostic audits. No requested tasks were forgotten.</analysis>
