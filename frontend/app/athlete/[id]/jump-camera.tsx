@@ -100,10 +100,14 @@ function JumpCameraContent() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
-  // LOCAL CAMERA STATE - Deterministic control (like VBT Camera)
+  // LOCAL CAMERA STATE - Three-stage pipeline control
+  // STAGE 1: Camera sending frames
   const [shouldMountCamera, setShouldMountCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
+  // STAGE 2: MediaPipe landmarks active
   const [mediapipeReady, setMediapipeReady] = useState(false);
+  // STAGE 3: Jump engine initialized and ready to process
+  const [jumpEngineReady, setJumpEngineReady] = useState(false);
   
   // UI State - PHASE SEPARATION FOR SAFE INITIALIZATION
   // 'protocol' -> 'cameraPreview' -> 'recording' -> 'results'
@@ -249,7 +253,7 @@ function JumpCameraContent() {
     return keypoints;
   }, []);
 
-  // Handle MediaPipe landmark callback - WITH LOCAL STATE CONTROL
+  // Handle MediaPipe landmark callback - THREE-STAGE PIPELINE CONTROL
   const handleMediapipeLandmark = useCallback((event: any) => {
     // SAFETY GUARD 1: Prevent simultaneous frame processing
     if (isProcessingFrameRef.current) {
@@ -271,27 +275,40 @@ function JumpCameraContent() {
     try {
       frameCountRef.current++;
       
-      // FIRST FRAME: Mark camera and mediapipe as ready
-      if (frameCountRef.current === 1) {
-        console.log('[JUMP_CAMERA] ✅ FIRST FRAME RECEIVED! MediaPipe is working.');
-        if (!cameraReady) {
-          setCameraReady(true);
-        }
-        if (!mediapipeReady) {
-          setMediapipeReady(true);
-        }
-      }
-      
+      // Convert landmarks first
       const keypoints = convertMediapipeLandmarks(landmarkData);
       
-      // Only process frames for jump detection when in recording UI phase
+      // STAGE 1: Mark camera ready on first frame
+      if (!cameraReady) {
+        console.log('[JUMP_CAMERA] ✅ STAGE 1: First frame received - camera ready');
+        setCameraReady(true);
+      }
+      
+      // STAGE 2: Mark mediapipe ready when valid landmarks detected
+      if (!mediapipeReady && keypoints && keypoints.length > 0) {
+        console.log('[JUMP_CAMERA] ✅ STAGE 2: Valid landmarks detected - mediapipe ready');
+        setMediapipeReady(true);
+      }
+      
+      // STAGE 3: Only process frames when engine is ready
+      // CRITICAL: Frames MUST be ignored until jumpEngineReady === true
+      if (!jumpEngineReady) {
+        // Engine not ready - discard frame silently
+        if (frameCountRef.current % 30 === 0) {
+          console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current} discarded - waiting for engine (cameraReady: ${cameraReady}, mediapipeReady: ${mediapipeReady}, engineReady: ${jumpEngineReady})`);
+        }
+        return;
+      }
+      
+      // ALL THREE STAGES COMPLETE - Safe to process frames
+      // Only process when in recording UI phase
       if (keypoints && keypoints.length > 0 && uiPhase === 'recording') {
         jumpCamera.processFrame(keypoints);
       }
       
       // Log periodically
       if (frameCountRef.current % 60 === 0) {
-        console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current}, uiPhase: ${uiPhase}, cameraReady: ${cameraReady}, mediapipeReady: ${mediapipeReady}`);
+        console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current} processed, uiPhase: ${uiPhase}`);
       }
     } catch (e) {
       if (__DEV__) {
@@ -300,7 +317,7 @@ function JumpCameraContent() {
     } finally {
       isProcessingFrameRef.current = false;
     }
-  }, [convertMediapipeLandmarks, uiPhase, jumpCamera, cameraReady, mediapipeReady]);
+  }, [convertMediapipeLandmarks, uiPhase, jumpCamera, cameraReady, mediapipeReady, jumpEngineReady]);
 
   // Submit mutation to save assessment
   const submitMutation = useMutation({
@@ -355,11 +372,12 @@ function JumpCameraContent() {
     // Reset frame counter
     frameCountRef.current = 0;
     
-    // Reset readiness states
+    // Reset ALL THREE pipeline states
     setCameraReady(false);
     setMediapipeReady(false);
+    setJumpEngineReady(false);
     
-    console.log('[JUMP_CAMERA] Starting camera - setting shouldMountCamera = true');
+    console.log('[JUMP_CAMERA] Starting camera - resetting pipeline states');
     
     // STEP 1: Mount camera FIRST (synchronous)
     setShouldMountCamera(true);
@@ -368,17 +386,19 @@ function JumpCameraContent() {
     setUiPhase('cameraPreview');
   }, [permission, requestPermission]);
   
-  // Handle start recording - Called after camera is ready
+  // Handle start recording - Called after ALL THREE stages are ready
   const handleStartRecording = useCallback(() => {
-    if (!mediapipeReady && Platform.OS !== 'web') {
-      console.log('[JUMP_CAMERA] Cannot start recording - mediapipe not ready');
+    // CRITICAL: All three pipeline stages must be ready
+    if (!jumpEngineReady && Platform.OS !== 'web') {
+      console.log('[JUMP_CAMERA] Cannot start recording - engine not ready');
+      console.log(`[JUMP_CAMERA] Pipeline state: camera=${cameraReady}, mediapipe=${mediapipeReady}, engine=${jumpEngineReady}`);
       return;
     }
     
-    console.log('[JUMP_CAMERA] Starting recording phase');
+    console.log('[JUMP_CAMERA] Starting recording phase - all pipeline stages ready');
     setUiPhase('recording');
     jumpCamera.startCountdown();
-  }, [mediapipeReady, jumpCamera]);
+  }, [jumpEngineReady, cameraReady, mediapipeReady, jumpCamera]);
 
   // Handle back from camera - SAFE CLEANUP
   const handleBackFromCamera = useCallback(() => {
@@ -386,6 +406,7 @@ function JumpCameraContent() {
     setShouldMountCamera(false);
     setCameraReady(false);
     setMediapipeReady(false);
+    setJumpEngineReady(false);
     frameCountRef.current = 0;
     jumpCamera.reset();
     setUiPhase('protocol');
@@ -406,6 +427,19 @@ function JumpCameraContent() {
       setUiPhase('results');
     }
   }, [jumpCamera.phase, jumpCamera.metrics]);
+
+  // STAGE 3: Initialize jump engine when camera and mediapipe are ready
+  useEffect(() => {
+    if (cameraReady && mediapipeReady && !jumpEngineReady) {
+      console.log('[JUMP_CAMERA] Camera and MediaPipe ready - initializing jump engine');
+      // Small delay to ensure stability before enabling processing
+      const timer = setTimeout(() => {
+        setJumpEngineReady(true);
+        console.log('[JUMP_CAMERA] ✅ Jump engine ready - frame processing enabled');
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [cameraReady, mediapipeReady, jumpEngineReady]);
 
   // Permission loading
   if (!permission) {
@@ -587,9 +621,9 @@ function JumpCameraContent() {
     );
   }
 
-  // Camera Preview screen - Uses LOCAL STATE for safe initialization
+  // Camera Preview screen - Uses THREE-STAGE PIPELINE for safe initialization
   if (uiPhase === 'cameraPreview') {
-    // Determine status text based on local state
+    // Determine status text based on three-stage pipeline
     const getStatusText = () => {
       if (!cameraReady) {
         return t.initializingCamera;
@@ -597,10 +631,14 @@ function JumpCameraContent() {
       if (!mediapipeReady) {
         return t.initializingMediapipe;
       }
+      if (!jumpEngineReady) {
+        return locale === 'pt' ? 'Inicializando engine...' : 'Initializing engine...';
+      }
       return t.cameraReady;
     };
     
-    const isReady = mediapipeReady || Platform.OS === 'web';
+    // ALL THREE stages must be ready for processing
+    const isReady = jumpEngineReady || Platform.OS === 'web';
     
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -646,8 +684,11 @@ function JumpCameraContent() {
               facing="back"
               onCameraReady={() => {
                 setCameraReady(true);
-                // For web/fallback, manually mark mediapipe ready
-                setTimeout(() => setMediapipeReady(true), 100);
+                // For web/fallback, manually mark all stages ready
+                setTimeout(() => {
+                  setMediapipeReady(true);
+                  setJumpEngineReady(true);
+                }, 100);
               }}
             >
               <View style={styles.webFallbackOverlay}>
@@ -686,10 +727,10 @@ function JumpCameraContent() {
               )}
               <Text style={styles.previewInstructionText}>{t.positionAthlete}</Text>
               
-              {/* Debug info */}
+              {/* Debug info - Three-stage pipeline status */}
               {__DEV__ && (
                 <Text style={styles.debugText}>
-                  Frames: {frameCountRef.current} | Ready: {mediapipeReady ? 'YES' : 'NO'}
+                  Cam: {cameraReady ? '✓' : '○'} | MP: {mediapipeReady ? '✓' : '○'} | Eng: {jumpEngineReady ? '✓' : '○'}
                 </Text>
               )}
             </View>
@@ -866,6 +907,7 @@ function JumpCameraContent() {
                 setShouldMountCamera(false);
                 setCameraReady(false);
                 setMediapipeReady(false);
+                setJumpEngineReady(false);
                 jumpCamera.reset();
                 setUiPhase('protocol');
               }} 
