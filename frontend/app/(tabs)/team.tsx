@@ -9,12 +9,13 @@ import {
   RefreshControl,
   Modal,
   Pressable,
+  TextInput,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Text as SvgText, Rect, Line } from 'react-native-svg';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -28,6 +29,25 @@ const ACWR_METRICS = [
   { key: 'sprint_distance', labelPt: 'Sprint Z5', labelEn: 'Sprint Z5' },
   { key: 'number_of_sprints', labelPt: 'Sprint', labelEn: 'Sprint' },
   { key: 'acc_dec', labelPt: 'ACC + DEC', labelEn: 'ACC + DEC' },
+];
+
+// Date range options
+const DATE_RANGES = [
+  { key: '7d', labelPt: '7 dias', labelEn: '7 days' },
+  { key: '14d', labelPt: '14 dias', labelEn: '14 days' },
+  { key: '28d', labelPt: '28 dias', labelEn: '28 days' },
+  { key: '90d', labelPt: '90 dias', labelEn: '90 days' },
+];
+
+// Position options (will be populated from data)
+const POSITIONS = [
+  { key: 'all', labelPt: 'Todas', labelEn: 'All' },
+  { key: 'Goleiro', labelPt: 'Goleiro', labelEn: 'Goalkeeper' },
+  { key: 'Zagueiro', labelPt: 'Zagueiro', labelEn: 'Defender' },
+  { key: 'Lateral', labelPt: 'Lateral', labelEn: 'Full-back' },
+  { key: 'Volante', labelPt: 'Volante', labelEn: 'Defensive Mid' },
+  { key: 'Meia', labelPt: 'Meia', labelEn: 'Midfielder' },
+  { key: 'Atacante', labelPt: 'Atacante', labelEn: 'Forward' },
 ];
 
 interface TeamDashboardAthlete {
@@ -49,6 +69,11 @@ interface TeamDashboardAthlete {
   peak_power?: number;
   body_fat_percentage?: number;
   lean_mass_kg?: number;
+  // Extended fields for dashboard
+  monotony?: number;
+  strain?: number;
+  metric_value?: number;
+  metric_avg?: number;
 }
 
 interface TeamDashboardStats {
@@ -96,8 +121,21 @@ export default function TeamDashboard() {
   const { t, locale } = useLanguage();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
+  
+  // Filter states
   const [selectedMetric, setSelectedMetric] = React.useState('total_distance');
+  const [selectedDateRange, setSelectedDateRange] = React.useState('7d');
+  const [selectedPosition, setSelectedPosition] = React.useState('all');
+  const [athleteSearchText, setAthleteSearchText] = React.useState('');
+  
+  // Modal visibility states
   const [metricModalVisible, setMetricModalVisible] = React.useState(false);
+  const [dateModalVisible, setDateModalVisible] = React.useState(false);
+  const [positionModalVisible, setPositionModalVisible] = React.useState(false);
+  
+  // Section visibility states (collapsed by default)
+  const [showAlerts, setShowAlerts] = React.useState(false);
+  const [showAthleteStatus, setShowAthleteStatus] = React.useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['team-dashboard', selectedMetric],
@@ -113,10 +151,56 @@ export default function TeamDashboard() {
     return metric ? (locale === 'pt' ? metric.labelPt : metric.labelEn) : 'Total Distance';
   };
 
+  // Get current date range label
+  const getCurrentDateRangeLabel = () => {
+    const range = DATE_RANGES.find(r => r.key === selectedDateRange);
+    return range ? (locale === 'pt' ? range.labelPt : range.labelEn) : '7 days';
+  };
+
+  // Get current position label
+  const getCurrentPositionLabel = () => {
+    const pos = POSITIONS.find(p => p.key === selectedPosition);
+    return pos ? (locale === 'pt' ? pos.labelPt : pos.labelEn) : (locale === 'pt' ? 'Todas' : 'All');
+  };
+
   const handleMetricSelect = (metricKey: string) => {
     setSelectedMetric(metricKey);
     setMetricModalVisible(false);
   };
+
+  const handleDateRangeSelect = (rangeKey: string) => {
+    setSelectedDateRange(rangeKey);
+    setDateModalVisible(false);
+  };
+
+  const handlePositionSelect = (posKey: string) => {
+    setSelectedPosition(posKey);
+    setPositionModalVisible(false);
+  };
+
+  // Filter athletes based on selected filters (client-side filtering for performance)
+  const getFilteredAthletes = React.useMemo(() => {
+    if (!data?.athletes) return [];
+    
+    let filtered = data.athletes;
+    
+    // Filter by position
+    if (selectedPosition !== 'all') {
+      filtered = filtered.filter(a => 
+        a.position.toLowerCase().includes(selectedPosition.toLowerCase())
+      );
+    }
+    
+    // Filter by search text
+    if (athleteSearchText.trim()) {
+      const searchLower = athleteSearchText.toLowerCase();
+      filtered = filtered.filter(a => 
+        a.name.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return filtered;
+  }, [data?.athletes, selectedPosition, athleteSearchText]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -317,12 +401,77 @@ export default function TeamDashboard() {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          {/* Alerts Section */}
+          {/* FILTERS ROW */}
+          <View style={styles.filtersRow}>
+            {/* Metric Selector */}
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => setMetricModalVisible(true)}
+            >
+              <Ionicons name="analytics-outline" size={14} color={colors.accent.primary} />
+              <Text style={styles.filterButtonText} numberOfLines={1}>{getCurrentMetricLabel()}</Text>
+              <Ionicons name="chevron-down" size={12} color={colors.text.tertiary} />
+            </TouchableOpacity>
+            
+            {/* Date Range Selector */}
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => setDateModalVisible(true)}
+            >
+              <Ionicons name="calendar-outline" size={14} color={colors.accent.primary} />
+              <Text style={styles.filterButtonText} numberOfLines={1}>{getCurrentDateRangeLabel()}</Text>
+              <Ionicons name="chevron-down" size={12} color={colors.text.tertiary} />
+            </TouchableOpacity>
+            
+            {/* Position Selector */}
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => setPositionModalVisible(true)}
+            >
+              <Ionicons name="people-outline" size={14} color={colors.accent.primary} />
+              <Text style={styles.filterButtonText} numberOfLines={1}>{getCurrentPositionLabel()}</Text>
+              <Ionicons name="chevron-down" size={12} color={colors.text.tertiary} />
+            </TouchableOpacity>
+          </View>
+          
+          {/* Athlete Search */}
+          <View style={styles.searchContainer}>
+            <Ionicons name="search-outline" size={16} color={colors.text.tertiary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={locale === 'pt' ? 'Buscar atleta...' : 'Search athlete...'}
+              placeholderTextColor={colors.text.tertiary}
+              value={athleteSearchText}
+              onChangeText={setAthleteSearchText}
+            />
+            {athleteSearchText.length > 0 && (
+              <TouchableOpacity onPress={() => setAthleteSearchText('')}>
+                <Ionicons name="close-circle" size={16} color={colors.text.tertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Alerts Section - Collapsible */}
           {data.alerts.length > 0 && (
+            <TouchableOpacity 
+              style={styles.collapsibleHeader}
+              onPress={() => setShowAlerts(!showAlerts)}
+            >
+              <View style={styles.collapsibleHeaderLeft}>
+                <Ionicons name="warning" size={16} color={colors.status.warning} />
+                <Text style={styles.collapsibleTitle}>
+                  {locale === 'pt' ? 'Alertas' : 'Alerts'} ({data.alerts.length})
+                </Text>
+              </View>
+              <Ionicons 
+                name={showAlerts ? 'chevron-up' : 'chevron-down'} 
+                size={20} 
+                color={colors.text.tertiary} 
+              />
+            </TouchableOpacity>
+          )}
+          {showAlerts && data.alerts.length > 0 && (
             <View style={styles.alertsSection}>
-              <Text style={styles.sectionTitle}>
-                <Ionicons name="warning" size={16} color={colors.status.warning} /> {locale === 'pt' ? 'Alertas' : 'Alerts'}
-              </Text>
               {data.alerts.map((alert, index) => (
                 <View key={index} style={styles.alertItem}>
                   <Text style={styles.alertText}>{alert}</Text>
@@ -442,112 +591,112 @@ export default function TeamDashboard() {
             <RiskDonut distribution={data.risk_distribution} />
           </View>
 
-          {/* Athletes List */}
-          <View style={styles.card}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardTitle}>
-                {locale === 'pt' ? 'Status dos Atletas' : 'Athletes Status'}
+          {/* Athletes Status - Collapsible */}
+          <TouchableOpacity 
+            style={styles.collapsibleHeader}
+            onPress={() => setShowAthleteStatus(!showAthleteStatus)}
+          >
+            <View style={styles.collapsibleHeaderLeft}>
+              <Ionicons name="people" size={16} color={colors.accent.primary} />
+              <Text style={styles.collapsibleTitle}>
+                {locale === 'pt' ? 'Status dos Atletas' : 'Athletes Status'} ({getFilteredAthletes.length})
               </Text>
-              <TouchableOpacity 
-                style={styles.metricSelectorButton}
-                onPress={() => setMetricModalVisible(true)}
-              >
-                <Ionicons name="options-outline" size={16} color={colors.accent.primary} />
-                <Text style={styles.metricSelectorText}>{getCurrentMetricLabel()}</Text>
-                <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
-              </TouchableOpacity>
             </View>
-            
-            {data.athletes.map((athlete) => (
-              <TouchableOpacity
-                key={athlete.id}
-                style={[
-                  styles.athleteCard,
-                  athlete.injury_risk && styles.athleteCardAlert
-                ]}
-                onPress={() => router.push(`/athlete/${athlete.id}`)}
-              >
-                <View style={styles.athleteInfo}>
-                  <View style={styles.athleteHeader}>
-                    <Text style={styles.athleteName}>{athlete.name}</Text>
-                    {athlete.peripheral_fatigue && (
-                      <View style={styles.fatigueBadge}>
-                        <Ionicons name="flash" size={12} color="#f59e0b" />
+            <Ionicons 
+              name={showAthleteStatus ? 'chevron-up' : 'chevron-down'} 
+              size={20} 
+              color={colors.text.tertiary} 
+            />
+          </TouchableOpacity>
+          
+          {showAthleteStatus && (
+            <View style={styles.athletesSection}>
+              {getFilteredAthletes.map((athlete) => (
+                <View
+                  key={athlete.id}
+                  style={[
+                    styles.athleteCardExpanded,
+                    athlete.injury_risk && styles.athleteCardAlert
+                  ]}
+                >
+                  <View style={styles.athleteCardHeader}>
+                    <View style={styles.athleteInfo}>
+                      <View style={styles.athleteHeader}>
+                        <Text style={styles.athleteName}>{athlete.name}</Text>
+                        {athlete.peripheral_fatigue && (
+                          <View style={styles.fatigueBadge}>
+                            <Ionicons name="flash" size={12} color="#f59e0b" />
+                          </View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                  <Text style={styles.athletePosition}>{athlete.position}</Text>
-                </View>
-                
-                <View style={styles.athleteStats}>
-                  <View style={styles.athleteStat}>
-                    <Text style={styles.athleteStatLabel}>ACWR</Text>
-                    <ACWRBadge value={athlete.acwr} size="small" showLabel={false} locale={locale} />
-                  </View>
-                  
-                  <View style={styles.athleteStat}>
-                    <Text style={styles.athleteStatLabel}>{locale === 'pt' ? 'Fadiga' : 'Fatigue'}</Text>
-                    <Text style={[styles.athleteStatValue, { color: (athlete.fatigue_score || 0) > 70 ? '#ef4444' : colors.text.primary }]}>
-                      {athlete.fatigue_score ? `${athlete.fatigue_score}%` : '-'}
-                    </Text>
-                  </View>
-                  
-                  <View style={[styles.riskBadge, { backgroundColor: getACWRClassification(athlete.acwr, locale).bgColor }]}>
-                    <Text style={[styles.riskBadgeText, { color: getACWRClassification(athlete.acwr, locale).color }]}>
-                      {getACWRClassification(athlete.acwr, locale).labelShort}
-                    </Text>
-                  </View>
-                </View>
-                
-                <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Position Summary - Group Averages */}
-          {Object.keys(data.position_summary).length > 0 && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>
-                {locale === 'pt' ? 'Médias por Posição' : 'Position Group Averages'}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                {locale === 'pt' ? 'Métricas médias de cada grupo posicional' : 'Average metrics for each position group'}
-              </Text>
-              {Object.entries(data.position_summary).map(([position, stats]) => (
-                <View key={position} style={styles.positionCard}>
-                  <View style={styles.positionHeader}>
-                    <View style={styles.positionInfo}>
-                      <Text style={styles.positionName}>{position}</Text>
-                      <Text style={styles.positionCount}>{stats.count} {locale === 'pt' ? 'atletas' : 'athletes'}</Text>
+                      <Text style={styles.athletePosition}>{athlete.position}</Text>
                     </View>
-                    {stats.high_risk_count > 0 && (
-                      <View style={styles.positionAlert}>
-                        <Text style={styles.positionAlertText}>
-                          {stats.high_risk_count} {locale === 'pt' ? 'em risco' : 'at risk'}
+                    <TouchableOpacity 
+                      style={styles.athleteProfileButton}
+                      onPress={() => router.push(`/athlete/${athlete.id}`)}
+                    >
+                      <Text style={styles.athleteProfileButtonText}>
+                        {locale === 'pt' ? 'Perfil' : 'Profile'}
+                      </Text>
+                      <Ionicons name="chevron-forward" size={14} color={colors.accent.primary} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Athlete metrics grid */}
+                  <View style={styles.athleteMetricsGrid}>
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>ACWR</Text>
+                      <ACWRBadge value={athlete.acwr} size="small" showLabel={false} locale={locale} />
+                    </View>
+                    
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>{locale === 'pt' ? 'Fadiga' : 'Fatigue'}</Text>
+                      <Text style={[styles.athleteMetricValue, { color: (athlete.fatigue_score || 0) > 70 ? '#ef4444' : colors.text.primary }]}>
+                        {athlete.fatigue_score ? `${athlete.fatigue_score}%` : '-'}
+                      </Text>
+                    </View>
+                    
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>{locale === 'pt' ? 'Risco Lesão' : 'Injury Risk'}</Text>
+                      <View style={[styles.riskBadge, { backgroundColor: getACWRClassification(athlete.acwr, locale).bgColor }]}>
+                        <Text style={[styles.riskBadgeText, { color: getACWRClassification(athlete.acwr, locale).color }]}>
+                          {getACWRClassification(athlete.acwr, locale).labelShort}
                         </Text>
                       </View>
-                    )}
-                  </View>
-                  <View style={styles.positionMetrics}>
-                    <View style={styles.positionMetric}>
-                      <Text style={styles.positionMetricValue}>{stats.avg_acwr || '-'}</Text>
-                      <Text style={styles.positionMetricLabel}>ACWR</Text>
                     </View>
-                    <View style={styles.positionMetric}>
-                      <Text style={styles.positionMetricValue}>{stats.avg_distance ? `${(stats.avg_distance / 1000).toFixed(1)}km` : '-'}</Text>
-                      <Text style={styles.positionMetricLabel}>{locale === 'pt' ? 'Dist. Média' : 'Avg Dist.'}</Text>
+                    
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>{locale === 'pt' ? 'Monotonia' : 'Monotony'}</Text>
+                      <Text style={styles.athleteMetricValue}>
+                        {athlete.monotony?.toFixed(1) || '-'}
+                      </Text>
                     </View>
-                    <View style={styles.positionMetric}>
-                      <Text style={styles.positionMetricValue}>{stats.avg_sprints || '-'}</Text>
-                      <Text style={styles.positionMetricLabel}>Sprints</Text>
+                    
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>Strain</Text>
+                      <Text style={styles.athleteMetricValue}>
+                        {athlete.strain?.toFixed(0) || '-'}
+                      </Text>
                     </View>
-                    <View style={styles.positionMetric}>
-                      <Text style={styles.positionMetricValue}>{stats.avg_max_speed ? `${stats.avg_max_speed}` : '-'}</Text>
-                      <Text style={styles.positionMetricLabel}>Vmax (km/h)</Text>
+                    
+                    <View style={styles.athleteMetricItem}>
+                      <Text style={styles.athleteMetricLabel}>{getCurrentMetricLabel()}</Text>
+                      <Text style={styles.athleteMetricValue}>
+                        {athlete.metric_value?.toFixed(0) || athlete.avg_distance_7d?.toFixed(0) || '-'}
+                      </Text>
                     </View>
                   </View>
                 </View>
               ))}
+              
+              {getFilteredAthletes.length === 0 && (
+                <View style={styles.noResultsContainer}>
+                  <Ionicons name="search-outline" size={32} color={colors.text.tertiary} />
+                  <Text style={styles.noResultsText}>
+                    {locale === 'pt' ? 'Nenhum atleta encontrado' : 'No athletes found'}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
@@ -621,6 +770,116 @@ export default function TeamDashboard() {
                   </Text>
                 </View>
                 {selectedMetric === metric.key && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Date Range Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={dateModalVisible}
+        onRequestClose={() => setDateModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setDateModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {locale === 'pt' ? 'Selecionar Período' : 'Select Date Range'}
+              </Text>
+              <TouchableOpacity onPress={() => setDateModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {DATE_RANGES.map((range) => (
+              <TouchableOpacity
+                key={range.key}
+                style={[
+                  styles.metricOption,
+                  selectedDateRange === range.key && styles.metricOptionSelected
+                ]}
+                onPress={() => handleDateRangeSelect(range.key)}
+              >
+                <View style={styles.metricOptionContent}>
+                  <View style={[
+                    styles.metricRadio,
+                    selectedDateRange === range.key && styles.metricRadioSelected
+                  ]}>
+                    {selectedDateRange === range.key && (
+                      <View style={styles.metricRadioInner} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.metricOptionText,
+                    selectedDateRange === range.key && styles.metricOptionTextSelected
+                  ]}>
+                    {locale === 'pt' ? range.labelPt : range.labelEn}
+                  </Text>
+                </View>
+                {selectedDateRange === range.key && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Position Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={positionModalVisible}
+        onRequestClose={() => setPositionModalVisible(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setPositionModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {locale === 'pt' ? 'Filtrar por Posição' : 'Filter by Position'}
+              </Text>
+              <TouchableOpacity onPress={() => setPositionModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+            
+            {POSITIONS.map((pos) => (
+              <TouchableOpacity
+                key={pos.key}
+                style={[
+                  styles.metricOption,
+                  selectedPosition === pos.key && styles.metricOptionSelected
+                ]}
+                onPress={() => handlePositionSelect(pos.key)}
+              >
+                <View style={styles.metricOptionContent}>
+                  <View style={[
+                    styles.metricRadio,
+                    selectedPosition === pos.key && styles.metricRadioSelected
+                  ]}>
+                    {selectedPosition === pos.key && (
+                      <View style={styles.metricRadioInner} />
+                    )}
+                  </View>
+                  <Text style={[
+                    styles.metricOptionText,
+                    selectedPosition === pos.key && styles.metricOptionTextSelected
+                  ]}>
+                    {locale === 'pt' ? pos.labelPt : pos.labelEn}
+                  </Text>
+                </View>
+                {selectedPosition === pos.key && (
                   <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
                 )}
               </TouchableOpacity>
@@ -1128,5 +1387,133 @@ const createStyles = (colors: any) => StyleSheet.create({
   metricOptionTextSelected: {
     color: colors.text.primary,
     fontWeight: '600',
+  },
+  // New filter styles
+  filtersRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+    flexWrap: 'wrap',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    flex: 1,
+    minWidth: 90,
+  },
+  filterButtonText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    fontWeight: '500',
+    flex: 1,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text.primary,
+    paddingVertical: 0,
+  },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  collapsibleHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  collapsibleTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+  },
+  athletesSection: {
+    marginBottom: 16,
+  },
+  athleteCardExpanded: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  athleteCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  athleteProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(34, 211, 238, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    gap: 4,
+  },
+  athleteProfileButtonText: {
+    fontSize: 12,
+    color: colors.accent.primary,
+    fontWeight: '600',
+  },
+  athleteMetricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  athleteMetricItem: {
+    width: '30%',
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: colors.dark.secondary,
+    borderRadius: 8,
+  },
+  athleteMetricLabel: {
+    fontSize: 9,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  athleteMetricValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  noResultsText: {
+    fontSize: 14,
+    color: colors.text.tertiary,
+    marginTop: 8,
   },
 });
