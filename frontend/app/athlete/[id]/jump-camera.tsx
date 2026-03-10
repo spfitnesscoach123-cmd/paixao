@@ -8,7 +8,7 @@
  * All calculations (RSI, Fatigue, Z-Score, etc.) are handled by the existing backend.
  * 
  * ARCHITECTURE:
- * - Uses CameraMediapipeManager for safe lifecycle management
+ * - Uses LOCAL STATE for deterministic camera mounting (like VBT Camera)
  * - Sequential state transitions prevent race conditions
  * - Safe cleanup on unmount/background
  */
@@ -43,12 +43,9 @@ import {
 } from '../../../services/pose';
 import {
   JumpProtocol,
-  JumpCameraPhase,
   JUMP_PROTOCOL_INFO,
-  JUMP_DETECTION_CONFIG,
 } from '../../../services/jump/types';
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
-import { useJumpCameraLifecycle } from '../../../services/camera';
 import { format } from 'date-fns';
 
 // Conditional import for native MediaPipe - SAFE GUARDED IMPORT
@@ -103,8 +100,10 @@ function JumpCameraContent() {
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
-  // Camera lifecycle management - NEW SYSTEM
-  const lifecycle = useJumpCameraLifecycle();
+  // LOCAL CAMERA STATE - Deterministic control (like VBT Camera)
+  const [shouldMountCamera, setShouldMountCamera] = useState(false);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [mediapipeReady, setMediapipeReady] = useState(false);
   
   // UI State - PHASE SEPARATION FOR SAFE INITIALIZATION
   // 'protocol' -> 'cameraPreview' -> 'recording' -> 'results'
@@ -250,7 +249,7 @@ function JumpCameraContent() {
     return keypoints;
   }, []);
 
-  // Handle MediaPipe landmark callback - WITH LIFECYCLE SAFETY
+  // Handle MediaPipe landmark callback - WITH LOCAL STATE CONTROL
   const handleMediapipeLandmark = useCallback((event: any) => {
     // SAFETY GUARD 1: Prevent simultaneous frame processing
     if (isProcessingFrameRef.current) {
@@ -262,19 +261,8 @@ function JumpCameraContent() {
       return;
     }
     
-    // SAFETY GUARD 3: Use lifecycle validation
-    // This handles all initialization state checks
     const landmarkData = event?.nativeEvent || event;
     if (!landmarkData) {
-      return;
-    }
-    
-    // Signal frame to lifecycle manager (handles state transitions)
-    lifecycle.signalFirstFrame();
-    
-    // Check if we should process this frame
-    if (!lifecycle.mediapipeReady) {
-      // Still initializing - don't process yet, but frame was recorded
       return;
     }
     
@@ -282,6 +270,17 @@ function JumpCameraContent() {
     
     try {
       frameCountRef.current++;
+      
+      // FIRST FRAME: Mark camera and mediapipe as ready
+      if (frameCountRef.current === 1) {
+        console.log('[JUMP_CAMERA] ✅ FIRST FRAME RECEIVED! MediaPipe is working.');
+        if (!cameraReady) {
+          setCameraReady(true);
+        }
+        if (!mediapipeReady) {
+          setMediapipeReady(true);
+        }
+      }
       
       const keypoints = convertMediapipeLandmarks(landmarkData);
       
@@ -292,7 +291,7 @@ function JumpCameraContent() {
       
       // Log periodically
       if (frameCountRef.current % 60 === 0) {
-        console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current}, phase: ${lifecycle.phase}, mediapipeReady: ${lifecycle.mediapipeReady}`);
+        console.log(`[JUMP_CAMERA] Frame ${frameCountRef.current}, uiPhase: ${uiPhase}, cameraReady: ${cameraReady}, mediapipeReady: ${mediapipeReady}`);
       }
     } catch (e) {
       if (__DEV__) {
@@ -301,7 +300,7 @@ function JumpCameraContent() {
     } finally {
       isProcessingFrameRef.current = false;
     }
-  }, [lifecycle, convertMediapipeLandmarks, uiPhase, jumpCamera]);
+  }, [convertMediapipeLandmarks, uiPhase, jumpCamera, cameraReady, mediapipeReady]);
 
   // Submit mutation to save assessment
   const submitMutation = useMutation({
@@ -346,7 +345,7 @@ function JumpCameraContent() {
     });
   }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, submitMutation]);
 
-  // Handle start camera - USING LIFECYCLE MANAGER
+  // Handle start camera - DETERMINISTIC SYNC FLOW (like VBT Camera)
   const handleStartCamera = useCallback(() => {
     if (!permission?.granted) {
       requestPermission();
@@ -356,51 +355,50 @@ function JumpCameraContent() {
     // Reset frame counter
     frameCountRef.current = 0;
     
-    // Request camera through lifecycle manager
-    const success = lifecycle.requestCameraStart();
+    // Reset readiness states
+    setCameraReady(false);
+    setMediapipeReady(false);
     
-    if (success) {
-      console.log('[JUMP_CAMERA] Camera start requested successfully');
-      setUiPhase('cameraPreview');
-    } else {
-      console.warn('[JUMP_CAMERA] Camera start request failed');
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        locale === 'pt' ? 'Nao foi possivel iniciar a camera' : 'Could not start camera'
-      );
-    }
-  }, [permission, requestPermission, lifecycle, locale]);
+    console.log('[JUMP_CAMERA] Starting camera - setting shouldMountCamera = true');
+    
+    // STEP 1: Mount camera FIRST (synchronous)
+    setShouldMountCamera(true);
+    
+    // STEP 2: Change UI phase AFTER (synchronous)
+    setUiPhase('cameraPreview');
+  }, [permission, requestPermission]);
   
   // Handle start recording - Called after camera is ready
   const handleStartRecording = useCallback(() => {
-    if (!lifecycle.mediapipeReady && Platform.OS !== 'web') {
+    if (!mediapipeReady && Platform.OS !== 'web') {
       console.log('[JUMP_CAMERA] Cannot start recording - mediapipe not ready');
       return;
     }
     
     console.log('[JUMP_CAMERA] Starting recording phase');
-    lifecycle.signalCaptureStart();
     setUiPhase('recording');
     jumpCamera.startCountdown();
-  }, [lifecycle, jumpCamera]);
+  }, [mediapipeReady, jumpCamera]);
 
   // Handle back from camera - SAFE CLEANUP
   const handleBackFromCamera = useCallback(() => {
     console.log('[JUMP_CAMERA] Exiting camera view');
-    lifecycle.releaseCamera();
+    setShouldMountCamera(false);
+    setCameraReady(false);
+    setMediapipeReady(false);
     frameCountRef.current = 0;
     jumpCamera.reset();
     setUiPhase('protocol');
-  }, [lifecycle, jumpCamera]);
+  }, [jumpCamera]);
 
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       console.log('[JUMP_CAMERA] Component unmounting - releasing resources');
-      lifecycle.releaseCamera();
+      setShouldMountCamera(false);
       isProcessingFrameRef.current = false;
     };
-  }, [lifecycle]);
+  }, []);
 
   // Go to results when metrics are available
   useEffect(() => {
@@ -589,25 +587,20 @@ function JumpCameraContent() {
     );
   }
 
-  // Camera Preview screen - Uses lifecycle for safe initialization
+  // Camera Preview screen - Uses LOCAL STATE for safe initialization
   if (uiPhase === 'cameraPreview') {
-    // Determine status text based on lifecycle phase
+    // Determine status text based on local state
     const getStatusText = () => {
-      switch (lifecycle.phase) {
-        case 'INITIALIZING_CAMERA':
-          return t.initializingCamera;
-        case 'CAMERA_READY':
-        case 'INITIALIZING_MEDIAPIPE':
-          return t.initializingMediapipe;
-        case 'MEDIAPIPE_READY':
-        case 'CAPTURE_ACTIVE':
-          return t.cameraReady;
-        default:
-          return t.waitingForCamera;
+      if (!cameraReady) {
+        return t.initializingCamera;
       }
+      if (!mediapipeReady) {
+        return t.initializingMediapipe;
+      }
+      return t.cameraReady;
     };
     
-    const isReady = lifecycle.mediapipeReady || Platform.OS === 'web';
+    const isReady = mediapipeReady || Platform.OS === 'web';
     
     return (
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
@@ -624,9 +617,9 @@ function JumpCameraContent() {
           <View style={{ width: 40 }} />
         </View>
         
-        {/* Camera View - Only mount when lifecycle allows */}
+        {/* Camera View - Mount when shouldMountCamera is true (LOCAL STATE) */}
         <View style={styles.cameraContainer}>
-          {lifecycle.shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
             <View style={styles.camera}>
               <RNMediapipe
                 style={StyleSheet.absoluteFill}
@@ -646,15 +639,15 @@ function JumpCameraContent() {
                 frameLimit={60}
               />
             </View>
-          ) : lifecycle.shouldMountCamera ? (
+          ) : shouldMountCamera ? (
             // Fallback when MediaPipe not available
             <CameraView
               style={styles.camera}
               facing="back"
               onCameraReady={() => {
-                lifecycle.signalCameraReady();
-                // For web/fallback, manually signal mediapipe ready
-                setTimeout(() => lifecycle.signalFirstFrame(), 100);
+                setCameraReady(true);
+                // For web/fallback, manually mark mediapipe ready
+                setTimeout(() => setMediapipeReady(true), 100);
               }}
             >
               <View style={styles.webFallbackOverlay}>
@@ -696,7 +689,7 @@ function JumpCameraContent() {
               {/* Debug info */}
               {__DEV__ && (
                 <Text style={styles.debugText}>
-                  Phase: {lifecycle.phase} | Frames: {lifecycle.frameCount}
+                  Frames: {frameCountRef.current} | Ready: {mediapipeReady ? 'YES' : 'NO'}
                 </Text>
               )}
             </View>
@@ -751,7 +744,7 @@ function JumpCameraContent() {
         
         {/* Camera View - Active processing */}
         <View style={styles.cameraContainer}>
-          {lifecycle.shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
             <View style={styles.camera}>
               <RNMediapipe
                 style={StyleSheet.absoluteFill}
@@ -771,7 +764,7 @@ function JumpCameraContent() {
                 frameLimit={60}
               />
             </View>
-          ) : lifecycle.shouldMountCamera ? (
+          ) : shouldMountCamera ? (
             <CameraView
               style={styles.camera}
               facing="back"
@@ -870,7 +863,9 @@ function JumpCameraContent() {
           <View style={styles.header}>
             <TouchableOpacity 
               onPress={() => {
-                lifecycle.releaseCamera();
+                setShouldMountCamera(false);
+                setCameraReady(false);
+                setMediapipeReady(false);
                 jumpCamera.reset();
                 setUiPhase('protocol');
               }} 
