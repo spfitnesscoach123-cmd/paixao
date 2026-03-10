@@ -7515,6 +7515,10 @@ class TeamDashboardAthlete(BaseModel):
     avg_distance_7d: float = 0
     injury_risk: bool = False
     peripheral_fatigue: bool = False
+    # Extended fields for dashboard metrics
+    monotony: Optional[float] = None
+    strain: Optional[float] = None
+    metric_value: Optional[float] = None  # Value for selected ACWR metric
 
 class TeamDashboardStats(BaseModel):
     total_athletes: int
@@ -7545,6 +7549,7 @@ class TeamDashboardResponse(BaseModel):
 async def get_team_dashboard(
     lang: str = "pt",
     acwr_metric: str = "total_distance",
+    date_range: str = "7d",
     current_user: dict = Depends(get_current_user)
 ):
     """Get aggregated team statistics and individual athlete status for team-wide overview
@@ -7557,6 +7562,12 @@ async def get_team_dashboard(
         - sprint_distance (Sprint Z5)
         - number_of_sprints (Sprint count)
         - acc_dec (ACC + DEC events)
+    - date_range: Date range filter. Options:
+        - today (only today's data)
+        - 7d (default, last 7 days)
+        - 14d (last 14 days)
+        - 28d (last 28 days)
+        - 90d (last 90 days)
     """
     
     user_id = current_user["_id"]
@@ -7572,6 +7583,21 @@ async def get_team_dashboard(
     ]
     if acwr_metric not in valid_metrics:
         acwr_metric = "total_distance"
+    
+    # Parse date_range parameter
+    valid_date_ranges = ["today", "7d", "14d", "28d", "90d"]
+    if date_range not in valid_date_ranges:
+        date_range = "7d"
+    
+    # Calculate filter days based on date_range
+    date_range_days_map = {
+        "today": 0,
+        "7d": 7,
+        "14d": 14,
+        "28d": 28,
+        "90d": 90
+    }
+    filter_days = date_range_days_map.get(date_range, 7)
     
     # Get all athletes for this coach
     athletes_cursor = db.athletes.find({"coach_id": user_id})
@@ -7598,13 +7624,21 @@ async def get_team_dashboard(
     
     # Date ranges
     today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
     seven_days_ago = today - timedelta(days=7)
     twenty_eight_days_ago = today - timedelta(days=28)
+    
+    # Calculate filter start date based on date_range parameter
+    if filter_days == 0:  # today
+        filter_start_date = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start_date = today - timedelta(days=filter_days)
     
     # First, get ALL GPS data to count global sessions (1 CSV = 1 session for the team)
     all_gps_data = await db.gps_data.find({"coach_id": user_id}).to_list(10000)
     global_sessions_7d = set()
     global_sessions_total = set()
+    global_sessions_filtered = set()  # Sessions within selected date range
     
     for record in all_gps_data:
         try:
@@ -7613,12 +7647,15 @@ async def get_team_dashboard(
             global_sessions_total.add(session_key)
             if record_date >= seven_days_ago:
                 global_sessions_7d.add(session_key)
+            if record_date >= filter_start_date:
+                global_sessions_filtered.add(session_key)
         except:
             continue
     
     # Total sessions count is now global (1 CSV = 1 session)
     total_sessions = len(global_sessions_total)
     total_sessions_7d_global = len(global_sessions_7d)
+    total_sessions_filtered = len(global_sessions_filtered)
     
     athlete_data = []
     total_acwr = 0
@@ -7935,6 +7972,46 @@ async def get_team_dashboard(
             total_body_fat += latest_body_comp["body_fat_percentage"]
             body_fat_count += 1
         
+        # Calculate Monotony and Strain from GPS data
+        # Monotony = mean daily load / std deviation of daily load (7 days)
+        # Strain = weekly load * monotony
+        monotony_value = None
+        strain_value = None
+        metric_value_for_athlete = None
+        
+        if gps_data:
+            # Get daily loads for selected metric based on date range filter
+            # For "today" use only today's data, otherwise use the filter_days
+            days_to_check = max(1, filter_days) if filter_days == 0 else filter_days
+            days_to_check = min(days_to_check, 7)  # Cap at 7 for monotony calculation
+            
+            daily_loads = []
+            for i in range(days_to_check if filter_days > 0 else 1):
+                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+                day_data = gps_data_by_date.get(date_str, {})
+                daily_loads.append(day_data.get(acwr_metric, 0) or 0)
+            
+            # For "today" filter, only show today's metric value
+            if filter_days == 0:
+                metric_value_for_athlete = daily_loads[0] if daily_loads else 0
+            else:
+                # Calculate metric_value (sum of filtered days for selected metric)
+                metric_value_for_athlete = sum(daily_loads)
+            
+            # Calculate monotony (only if we have variance and at least 2 days)
+            if len(daily_loads) >= 2:
+                mean_load = sum(daily_loads) / len(daily_loads)
+                if mean_load > 0:
+                    # Calculate standard deviation
+                    variance = sum((x - mean_load) ** 2 for x in daily_loads) / len(daily_loads)
+                    std_dev = variance ** 0.5
+                    
+                    if std_dev > 0:
+                        monotony_value = round(mean_load / std_dev, 2)
+                        # Strain = weekly load * monotony
+                        weekly_load = sum(daily_loads)
+                        strain_value = round(weekly_load * monotony_value, 0)
+        
         athlete_data.append(TeamDashboardAthlete(
             id=athlete_id,
             name=athlete["name"],
@@ -7948,7 +8025,10 @@ async def get_team_dashboard(
             total_sessions_7d=sessions_7d,
             avg_distance_7d=round(distance_7d / sessions_7d, 0) if sessions_7d > 0 else 0,
             injury_risk=risk_level == "high" or (fatigue_score is not None and fatigue_score > 70),
-            peripheral_fatigue=peripheral_fatigue
+            peripheral_fatigue=peripheral_fatigue,
+            monotony=monotony_value,
+            strain=strain_value,
+            metric_value=metric_value_for_athlete
         ))
         
         # Update position averages - collect all metrics for group averaging

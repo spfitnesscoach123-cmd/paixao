@@ -91,6 +91,29 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - **Feature Premium**: Requer trial ou assinatura ativa
 - **Testado**: ✅ Lint passed, Metro bundled successfully
 
+### Team Dashboard Refactor (10 Mar 2026)
+- **Tarefa**: Implementar ajustes específicos no Team Dashboard conforme requisitos do usuário
+- **Implementações realizadas**:
+  1. **Reordenação das seções**: "Status dos Atletas" agora aparece antes de "Alertas"
+  2. **Correção do valor da métrica no card**: O valor exibido agora reflete corretamente a métrica selecionada no seletor global (Total Distance, HSR Z4, HID Z3, etc.)
+  3. **Exibição de Monotonia e Strain**: Novos campos calculados no backend e exibidos nos cards dos atletas
+  4. **Nova opção "Hoje" no seletor de datas**: Permite filtrar dados apenas do dia atual
+  5. **Seletor de posições dinâmico**: Agora busca posições reais dos perfis dos atletas (CB, LB, RW, etc.) em vez de usar valores pré-definidos
+  6. **Sincronização total dos filtros**: Todos os cards e dados respondem aos filtros de Métrica, Data, Atleta e Posição
+  7. **Otimização de performance**: useMemo implementado para evitar recálculos desnecessários
+- **Arquivos modificados**:
+  - `backend/server.py`:
+    - Adicionados campos `monotony`, `strain`, `metric_value` ao modelo `TeamDashboardAthlete`
+    - Adicionado parâmetro `date_range` ao endpoint `/dashboard/team`
+    - Implementado cálculo de Monotonia (mean/std_dev) e Strain (load * monotonia)
+  - `frontend/app/(tabs)/team.tsx`:
+    - Reordenada renderização das seções (Athletes Status → Alerts)
+    - Substituída lista estática de posições por `dynamicPositions` memoizado
+    - Query refetch quando `selectedDateRange` muda
+    - Card do atleta usa `metric_value` do backend
+- **Testado**: ✅ API testada via curl - campos retornando corretamente
+- **Pendente**: Validação pelo usuário no app
+
 ### ACWR Metric Selector no Team Dashboard (06 Mar 2026)
 - **Tarefa**: Permitir seleção de métrica GPS para cálculo de ACWR no Team Dashboard
 - **Métricas suportadas**: Total Distance, HID Z3, HSR Z4, Sprint Z5, Sprint, ACC + DEC
@@ -197,6 +220,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - [ ] Verificar Login no TestFlight após build com Bundle ID correto
 
 ### P1 - Alta Prioridade
+- [x] Team Dashboard Refactor - **IMPLEMENTADO** (10 Mar 2026)
 - [ ] PDF Generation em "Análise Científica" - app congela/crasha
 - [ ] Backend `/api/jump/assessment` - validação de peso do atleta
 - [ ] Verificar Account Deletion flow end-to-end
