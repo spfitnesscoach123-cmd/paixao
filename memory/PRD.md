@@ -63,6 +63,50 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
   4. Usuário clica "Start Recording" → inicia countdown → captura
 - **Testado**: ⏳ Pendente validação do usuário no TestFlight
 
+### Fix: Jump Camera - Correção Arquitetural (10 Mar 2026)
+- **Problema confirmado**: Crash imediato ao clicar "Iniciar Captura" em iPhone físico - câmera NUNCA aparece na tela
+- **Diagnóstico**: Auditorias em iPhone confirmaram que o RNMediapipe nunca renderizava antes do crash
+- **Causa raiz arquitetural**: Jump Camera tentava iniciar simultaneamente câmera, MediaPipe, engine e processamento de frames
+- **Solução**: Implementado pipeline de inicialização progressiva em 3 estágios obrigatórios:
+
+  **STAGE 1 - CAMERA READY**:
+  - RNMediapipe monta e exibe camera preview
+  - Primeiro frame recebido marca `cameraReady = true`
+  - Nesta fase: SEM MediaPipe ativo, SEM engine, SEM processamento
+
+  **STAGE 2 - MEDIAPIPE READY**:
+  - Somente após cameraReady = true
+  - Aguarda primeiro landmark válido (hip + ankle com score > 0.3)
+  - Primeiro landmark marca `mediapipeReady = true`
+
+  **STAGE 3 - ENGINE READY**:
+  - Somente após mediapipeReady = true
+  - Delay de 300ms para estabilização
+  - Marca `jumpEngineReady = true`
+  - Botão PLAY é habilitado
+
+- **Regra crítica no callback**:
+  ```javascript
+  if (!cameraReady) return; // STAGE 1 não completo
+  if (!mediapipeReady) return; // STAGE 2 não completo
+  if (!jumpEngineReady) return; // STAGE 3 não completo
+  // Somente aqui: jumpCamera.processFrame(keypoints)
+  ```
+
+- **Arquivos modificados**:
+  - `frontend/app/athlete/[id]/jump-camera.tsx`:
+    - Documentação completa da arquitetura no header
+    - Estados separados: `cameraReady`, `mediapipeReady`, `jumpEngineReady`
+    - `handleMediapipeLandmark`: callback com 3 guards progressivos
+    - `handleStartCamera`: reset de todos os estados antes de montar câmera
+    - `handleStartRecording`: verificação dos 3 estados antes de permitir gravação
+    - useEffect para STAGE 3 com delay de estabilização
+    - Cleanup completo em todos os pontos de saída
+    - Debug text mostrando status dos 3 estágios
+
+- **Versão**: 1.0.80
+- **Status**: ✅ Implementação completa, pendente teste em iPhone físico via TestFlight
+
 ### Jump Assessment via Camera (06 Mar 2026)
 - **Tarefa**: Adicionar captura automática de métricas de salto via visão computacional
 - **Funcionalidade**: Usa MediaPipe para detectar eventos de salto (decolagem, aterrissagem) automaticamente
@@ -216,11 +260,12 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 ## Backlog
 
 ### P0 - Crítico
-- [ ] Testar Jump Camera no TestFlight (aguardando build)
+- [ ] Testar Jump Camera no TestFlight (versão 1.0.80 - correção arquitetural implementada)
 - [ ] Verificar Login no TestFlight após build com Bundle ID correto
 
 ### P1 - Alta Prioridade
 - [x] Team Dashboard Refactor - **IMPLEMENTADO** (10 Mar 2026)
+- [x] Jump Camera - Correção Arquitetural - **IMPLEMENTADO** (10 Mar 2026)
 - [ ] PDF Generation em "Análise Científica" - app congela/crasha
 - [ ] Backend `/api/jump/assessment` - validação de peso do atleta
 - [ ] Verificar Account Deletion flow end-to-end
