@@ -492,12 +492,19 @@ export default function TeamDashboard() {
           
           {showAthleteStatus && (
             <View style={styles.athletesSection}>
-              {getFilteredAthletes.map((athlete) => (
+              {getFilteredAthletes.map((athlete) => {
+                // Get ACWR classification for dynamic card background
+                const acwrClass = getACWRClassification(athlete.acwr, locale);
+                
+                return (
                 <View
                   key={athlete.id}
                   style={[
                     styles.athleteCardExpanded,
-                    athlete.injury_risk && styles.athleteCardAlert
+                    { 
+                      backgroundColor: acwrClass.bgColor,
+                      borderColor: acwrClass.color + '40', // 25% opacity for border
+                    }
                   ]}
                 >
                   <View style={styles.athleteCardHeader}>
@@ -539,9 +546,9 @@ export default function TeamDashboard() {
                     
                     <View style={styles.athleteMetricItem}>
                       <Text style={styles.athleteMetricLabel}>{locale === 'pt' ? 'Risco Lesão' : 'Injury Risk'}</Text>
-                      <View style={[styles.riskBadge, { backgroundColor: getACWRClassification(athlete.acwr, locale).bgColor }]}>
-                        <Text style={[styles.riskBadgeText, { color: getACWRClassification(athlete.acwr, locale).color }]}>
-                          {getACWRClassification(athlete.acwr, locale).labelShort}
+                      <View style={[styles.riskBadge, { backgroundColor: acwrClass.bgColor }]}>
+                        <Text style={[styles.riskBadgeText, { color: acwrClass.color }]}>
+                          {acwrClass.labelShort}
                         </Text>
                       </View>
                     </View>
@@ -568,7 +575,7 @@ export default function TeamDashboard() {
                     </View>
                   </View>
                 </View>
-              ))}
+              );})}
               
               {getFilteredAthletes.length === 0 && (
                 <View style={styles.noResultsContainer}>
