@@ -67,45 +67,22 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 - **Problema confirmado**: Crash imediato ao clicar "Iniciar Captura" em iPhone físico - câmera NUNCA aparece na tela
 - **Diagnóstico**: Auditorias em iPhone confirmaram que o RNMediapipe nunca renderizava antes do crash
 - **Causa raiz arquitetural**: Jump Camera tentava iniciar simultaneamente câmera, MediaPipe, engine e processamento de frames
-- **Solução**: Implementado pipeline de inicialização progressiva em 3 estágios obrigatórios:
-
-  **STAGE 1 - CAMERA READY**:
-  - RNMediapipe monta e exibe camera preview
-  - Primeiro frame recebido marca `cameraReady = true`
-  - Nesta fase: SEM MediaPipe ativo, SEM engine, SEM processamento
-
-  **STAGE 2 - MEDIAPIPE READY**:
-  - Somente após cameraReady = true
-  - Aguarda primeiro landmark válido (hip + ankle com score > 0.3)
-  - Primeiro landmark marca `mediapipeReady = true`
-
-  **STAGE 3 - ENGINE READY**:
-  - Somente após mediapipeReady = true
-  - Delay de 300ms para estabilização
-  - Marca `jumpEngineReady = true`
-  - Botão PLAY é habilitado
-
-- **Regra crítica no callback**:
-  ```javascript
-  if (!cameraReady) return; // STAGE 1 não completo
-  if (!mediapipeReady) return; // STAGE 2 não completo
-  if (!jumpEngineReady) return; // STAGE 3 não completo
-  // Somente aqui: jumpCamera.processFrame(keypoints)
-  ```
-
-- **Arquivos modificados**:
-  - `frontend/app/athlete/[id]/jump-camera.tsx`:
-    - Documentação completa da arquitetura no header
-    - Estados separados: `cameraReady`, `mediapipeReady`, `jumpEngineReady`
-    - `handleMediapipeLandmark`: callback com 3 guards progressivos
-    - `handleStartCamera`: reset de todos os estados antes de montar câmera
-    - `handleStartRecording`: verificação dos 3 estados antes de permitir gravação
-    - useEffect para STAGE 3 com delay de estabilização
-    - Cleanup completo em todos os pontos de saída
-    - Debug text mostrando status dos 3 estágios
+- **Solução**: Implementado pipeline de inicialização progressiva em 3 estágios obrigatórios
 
 - **Versão**: 1.0.80
 - **Status**: ✅ Implementação completa, pendente teste em iPhone físico via TestFlight
+
+### Fix: Jump Camera - NSInvalidArgumentException FPS Crash (11 Mar 2026)
+- **Problema**: `NSInvalidArgumentException` em `setActiveVideoMinFrameDuration` ao abrir Jump Camera com câmera frontal
+- **Log real**: `*** Terminating app due to uncaught exception 'NSInvalidArgumentException', reason: *** -[AVCaptureDevice setActiveVideoMinFrameDuration:]`
+- **Causa raiz**: `CameraFeedService.swift` forçava FPS manualmente (`activeVideoMinFrameDuration = CMTime(value: 1, timescale: 20)`) sem verificar se o formato ativo da câmera frontal suporta esse frame rate
+- **Solução**: Removidas as chamadas `device.activeVideoMinFrameDuration` e `device.activeVideoMaxFrameDuration` do método `configureFrameRate()`. O AVFoundation agora escolhe automaticamente o FPS compatível
+- **Arquivo modificado**: `node_modules/@thinksys/react-native-mediapipe/ios/Services/CameraFeedService.swift`
+- **Patch atualizado**: `patches/@thinksys+react-native-mediapipe+0.0.19.patch` agora contém 2 correções:
+  1. CameraView.swift: MediaPipe inicializa após câmera ativa
+  2. CameraFeedService.swift: Remove FPS manual que causava NSInvalidArgumentException
+- **VBT Camera**: Zero alterações, completamente intacta
+- **Status**: ✅ Patch aplicado, pendente build TestFlight para validação
 
 ### Jump Assessment via Camera (06 Mar 2026)
 - **Tarefa**: Adicionar captura automática de métricas de salto via visão computacional
@@ -260,7 +237,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos com sistema de 
 ## Backlog
 
 ### P0 - Crítico
-- [ ] Testar Jump Camera no TestFlight (versão 1.0.80 - correção arquitetural implementada)
+- [ ] Testar Jump Camera no TestFlight (versão 1.0.80 - 2 correções: init order + FPS crash fix)
 - [ ] Verificar Login no TestFlight após build com Bundle ID correto
 
 ### P1 - Alta Prioridade
