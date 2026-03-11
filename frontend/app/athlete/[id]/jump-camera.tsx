@@ -836,7 +836,7 @@ function JumpCameraContent() {
                 rightLeg={true}
                 leftAnkle={true}
                 rightAnkle={true}
-                frameLimit={60}
+                frameLimit={30}
               />
             </View>
           ) : shouldMountCamera ? (
@@ -969,7 +969,7 @@ function JumpCameraContent() {
                 rightLeg={true}
                 leftAnkle={true}
                 rightAnkle={true}
-                frameLimit={60}
+                frameLimit={30}
               />
             </View>
           ) : shouldMountCamera ? (
