@@ -5291,7 +5291,7 @@ async def create_jump_assessment(
         raise HTTPException(status_code=404, detail="Athlete not found")
     
     # Get athlete weight for power calculations
-    body_mass_kg = athlete.get("weight", 70)  # Default 70kg if not set
+    body_mass_kg = athlete.get("weight") or 70  # Default 70kg if not set or None
     
     # Calculate jump height if not provided
     jump_height_cm = data.jump_height_cm

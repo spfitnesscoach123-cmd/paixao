@@ -34,6 +34,7 @@ export interface GroundCalibration {
   groundThreshold: number;    // Threshold to detect ground contact (groundLevel + margin)
   calibrationFrames: number;  // Number of frames used for calibration
   isCalibrated: boolean;
+  standingHipY: number;       // Average hip Y during calibration (for countermovement)
 }
 
 /**
@@ -42,9 +43,13 @@ export interface GroundCalibration {
 export interface JumpEvents {
   countdownStart: number | null;    // Countdown started
   countdownEnd: number | null;      // Countdown ended (recording starts)
+  countermovementStart: number | null; // Hip started descending (CMJ)
   takeoffTime: number | null;       // Feet left ground
   landingTime: number | null;       // First foot touched ground
   peakHeightTime: number | null;    // Maximum height reached
+  // DJ-specific
+  djInitialLandingTime: number | null; // First land from box (DJ)
+  djContactEndTime: number | null;     // Takeoff after ground contact (DJ)
 }
 
 /**
@@ -52,10 +57,12 @@ export interface JumpEvents {
  */
 export interface JumpMetrics {
   flightTimeMs: number;       // Time in air (milliseconds)
-  contactTimeMs: number;      // Ground contact time - only for DJ (milliseconds)
-  jumpHeightCm: number;       // Estimated jump height (cm)
+  contactTimeMs: number;      // Ground contact time - for DJ, or eccentric+concentric for CMJ
+  jumpHeightCm: number;       // Estimated jump height (cm) from flight time formula
   hipDisplacementCm: number;  // Vertical hip displacement (cm)
   takeoffVelocityMs: number;  // Estimated takeoff velocity (m/s)
+  eccentricDurationMs: number; // Countermovement/eccentric phase duration (CMJ)
+  rsiMod: number;             // RSI modified = jumpHeight / contactTime (for CMJ)
 }
 
 /**
@@ -71,6 +78,14 @@ export interface JumpFrameData {
   rightHipY: number;
   hipCenterY: number;         // Average of left and right hip
   confidence: number;         // Average landmark confidence
+}
+
+/**
+ * SL-CMJ Dual Jump Result
+ */
+export interface SlCmjLegResult {
+  leg: 'left' | 'right';
+  metrics: JumpMetrics;
 }
 
 /**
@@ -97,6 +112,7 @@ export type JumpCameraPhase =
   | 'countdown'       // Countdown before recording
   | 'recording'       // Active recording
   | 'processing'      // Analyzing video
+  | 'between_jumps'   // Between SL-CMJ jumps (leg 1 done, preparing leg 2)
   | 'review';         // Showing results
 
 /**
@@ -106,7 +122,7 @@ export interface JumpCameraConfig {
   protocol: JumpProtocol;
   boxHeightCm: number;        // Only for DJ protocol
   athleteHeightCm: number;    // For height estimation calibration
-  frameRate: number;          // Target FPS (60 or 120)
+  frameRate: number;          // Target FPS (30)
 }
 
 /**
@@ -122,31 +138,56 @@ export interface JumpPoseLandmarks {
 }
 
 /**
+ * Real-time metrics during recording
+ */
+export interface LiveMetrics {
+  currentHipY: number;
+  hipDelta: number;           // Difference from standing position
+  feetAboveGround: boolean;   // Whether both feet are above ground threshold
+  eccentricTimeMs: number;    // Running eccentric timer
+  flightTimeMs: number;       // Running flight timer
+  contactTimeMs: number;      // Running contact timer (DJ)
+  jumpDetected: boolean;      // Whether a complete jump has been detected
+}
+
+/**
  * Constants for jump detection
  */
 export const JUMP_DETECTION_CONFIG = {
   // Ground calibration
-  CALIBRATION_FRAMES: 60,            // Frames to use for ground calibration (~1 second at 60fps)
-  GROUND_THRESHOLD_MARGIN: 0.02,     // 2% of screen height as margin
+  CALIBRATION_FRAMES: 60,            // Frames to use for ground calibration (~2 seconds at 30fps)
+  GROUND_THRESHOLD_MARGIN: 0.025,    // 2.5% of screen height as margin
   
   // Event detection
-  MIN_FLIGHT_TIME_MS: 100,           // Minimum valid flight time
+  MIN_FLIGHT_TIME_MS: 80,            // Minimum valid flight time (lowered for sensitivity)
   MAX_FLIGHT_TIME_MS: 2000,          // Maximum valid flight time
   MIN_TAKEOFF_FRAMES: 2,             // Frames needed to confirm takeoff
+  
+  // Countermovement detection
+  COUNTERMOVEMENT_THRESHOLD: 0.008,  // Hip must move down by this ratio to start countermovement
   
   // Height estimation
   DEFAULT_ATHLETE_HEIGHT_CM: 175,    // Default height for estimation
   HIP_TO_HEIGHT_RATIO: 0.53,         // Hip height as ratio of total height (standing)
   
   // Confidence thresholds
-  MIN_LANDMARK_CONFIDENCE: 0.5,      // Minimum confidence for landmark detection
-  MIN_POSE_CONFIDENCE: 0.6,          // Minimum overall pose confidence
+  MIN_LANDMARK_CONFIDENCE: 0.4,      // Minimum confidence for landmark detection (lowered)
+  MIN_POSE_CONFIDENCE: 0.5,          // Minimum overall pose confidence
+  
+  // Smoothing
+  SMOOTHING_WINDOW: 3,               // Moving average window for noise reduction
   
   // Countdown
   COUNTDOWN_SECONDS: 5,              // Countdown duration
   
   // Frame processing
-  TARGET_FPS: 60,                    // Target frame rate
+  TARGET_FPS: 30,                    // Target frame rate
+  
+  // Recording
+  MAX_RECORDING_DURATION_MS: 6000,   // Max recording time (6 seconds)
+  
+  // SL-CMJ
+  BETWEEN_JUMPS_COUNTDOWN: 5,        // Seconds between SL-CMJ jumps
 } as const;
 
 /**
@@ -165,7 +206,7 @@ export const JUMP_PROTOCOL_INFO: Record<JumpProtocol, {
     name: 'Counter Movement Jump',
     namePt: 'Salto com Contra-Movimento',
     description: 'Standard jump with arm swing and knee bend',
-    descriptionPt: 'Salto padrão com movimento de braços e flexão de joelhos',
+    descriptionPt: 'Salto padrao com movimento de bracos e flexao de joelhos',
     icon: 'trending-up',
     requiresBoxHeight: false,
     requiresLegSelection: false,
@@ -192,7 +233,7 @@ export const JUMP_PROTOCOL_INFO: Record<JumpProtocol, {
     name: 'Drop Jump',
     namePt: 'Salto em Profundidade',
     description: 'Jump from box with quick ground contact',
-    descriptionPt: 'Salto a partir de caixa com contato rápido no solo',
+    descriptionPt: 'Salto a partir de caixa com contato rapido no solo',
     icon: 'arrow-down',
     requiresBoxHeight: true,
     requiresLegSelection: false,

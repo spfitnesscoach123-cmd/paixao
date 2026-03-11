@@ -199,6 +199,18 @@ function JumpCameraContent() {
     positionAthlete: locale === 'pt' ? 'Posicione o atleta no enquadramento' : 'Position athlete in frame',
     initializingCamera: locale === 'pt' ? 'Inicializando camera...' : 'Initializing camera...',
     initializingMediapipe: locale === 'pt' ? 'Iniciando deteccao de pose...' : 'Starting pose detection...',
+    eccentricTime: locale === 'pt' ? 'Tempo Excentrico' : 'Eccentric Time',
+    rsiMod: 'RSI mod',
+    takeoffVelocity: locale === 'pt' ? 'Vel. Decolagem' : 'Takeoff Velocity',
+    protocol: locale === 'pt' ? 'Protocolo' : 'Protocol',
+    repeatTest: locale === 'pt' ? 'Repetir Teste' : 'Repeat Test',
+    saveTest: locale === 'pt' ? 'Salvar Teste' : 'Save Test',
+    betweenJumps: locale === 'pt' ? 'Prepare-se para o proximo salto' : 'Prepare for next jump',
+    leg1Complete: locale === 'pt' ? 'Perna 1 completa!' : 'Leg 1 complete!',
+    switchLeg: locale === 'pt' ? 'Troque de perna' : 'Switch leg',
+    liveEccentric: locale === 'pt' ? 'Exc.' : 'Ecc.',
+    liveFlight: locale === 'pt' ? 'Voo' : 'Flight',
+    liveContact: locale === 'pt' ? 'Contato' : 'Contact',
   };
 
   // Convert MediaPipe landmarks to keypoints array
@@ -560,12 +572,17 @@ function JumpCameraContent() {
     };
   }, []);
 
-  // Go to results when metrics are available
+  // CRITICAL: Transition to results when analysis is complete
+  // Must transition regardless of whether metrics exist (null = detection failed)
+  // The results screen handles both success (metrics present) and error (metrics null)
   useEffect(() => {
-    if (jumpCamera.phase === 'review' && jumpCamera.metrics) {
+    if (jumpCamera.phase === 'review') {
+      console.log('[LOG_JUMP_RESULTS_SCREEN_OPENED] Transitioning to results screen');
+      console.log('[JUMP_CAMERA] metrics=' + (jumpCamera.metrics ? 'YES' : 'NULL'));
+      console.log('[JUMP_CAMERA] error=' + (jumpCamera.error || 'none'));
       setUiPhase('results');
     }
-  }, [jumpCamera.phase, jumpCamera.metrics]);
+  }, [jumpCamera.phase]);
 
   // ============================================================
   // STAGE 3: Jump Engine Initialization (useEffect)
@@ -1006,13 +1023,42 @@ function JumpCameraContent() {
               </View>
             )}
             
-            {/* Recording */}
+            {/* Recording - with live metrics overlay */}
             {jumpCamera.phase === 'recording' && (
               <View style={styles.recordingOverlay}>
                 <View style={styles.recordingBadge}>
                   <View style={styles.recordingDot} />
                   <Text style={styles.recordingText}>{t.jumpNow}</Text>
                 </View>
+                
+                {/* Real-time metrics overlay */}
+                <View style={styles.liveMetricsPanel} data-testid="live-metrics-panel">
+                  {jumpCamera.liveMetrics.eccentricTimeMs > 0 && (
+                    <View style={styles.liveMetricItem}>
+                      <Text style={styles.liveMetricLabel}>{t.liveEccentric}</Text>
+                      <Text style={styles.liveMetricValue}>
+                        {(jumpCamera.liveMetrics.eccentricTimeMs / 1000).toFixed(2)}s
+                      </Text>
+                    </View>
+                  )}
+                  {jumpCamera.liveMetrics.flightTimeMs > 0 && (
+                    <View style={styles.liveMetricItem}>
+                      <Text style={styles.liveMetricLabel}>{t.liveFlight}</Text>
+                      <Text style={styles.liveMetricValue}>
+                        {(jumpCamera.liveMetrics.flightTimeMs / 1000).toFixed(2)}s
+                      </Text>
+                    </View>
+                  )}
+                  {selectedProtocol === 'dj' && jumpCamera.liveMetrics.contactTimeMs > 0 && (
+                    <View style={styles.liveMetricItem}>
+                      <Text style={styles.liveMetricLabel}>{t.liveContact}</Text>
+                      <Text style={styles.liveMetricValue}>
+                        {(jumpCamera.liveMetrics.contactTimeMs / 1000).toFixed(2)}s
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
                 <Text style={styles.frameCountText}>
                   {t.framesRecorded}: {jumpCamera.frameCount}
                 </Text>
@@ -1021,6 +1067,23 @@ function JumpCameraContent() {
                     {t.activeLeg}: {jumpCamera.activeLeg === 'left' ? t.left : t.right}
                   </Text>
                 )}
+                {/* SL-CMJ jump number indicator */}
+                {(selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
+                  <Text style={styles.activeLegText}>
+                    Jump {jumpCamera.slCmjJumpNumber}/2
+                  </Text>
+                )}
+              </View>
+            )}
+            
+            {/* Between Jumps (SL-CMJ) */}
+            {jumpCamera.phase === 'between_jumps' && (
+              <View style={styles.betweenJumpsOverlay}>
+                <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
+                <Text style={styles.betweenJumpsTitle}>{t.leg1Complete}</Text>
+                <Text style={styles.betweenJumpsSubtitle}>{t.switchLeg}</Text>
+                <Text style={styles.betweenJumpsCountdown}>{t.betweenJumps}</Text>
+                <ActivityIndicator size="small" color={colors.accent.primary} style={{ marginTop: 12 }} />
               </View>
             )}
             
@@ -1095,33 +1158,99 @@ function JumpCameraContent() {
                 <Text style={styles.successText}>
                   {locale === 'pt' ? 'Salto Detectado!' : 'Jump Detected!'}
                 </Text>
+                <Text style={styles.protocolBadge}>
+                  {JUMP_PROTOCOL_INFO[selectedProtocol]?.[locale === 'pt' ? 'namePt' : 'name'] || selectedProtocol.toUpperCase()}
+                </Text>
               </View>
               
-              {/* Metrics Cards */}
+              {/* Primary Metrics Cards */}
               <View style={styles.metricsGrid}>
-                <View style={styles.metricCard}>
+                <View style={[styles.metricCard, styles.metricCardHighlight]} data-testid="metric-jump-height">
+                  <Text style={styles.metricValueLarge}>
+                    {jumpCamera.metrics.jumpHeightCm.toFixed(1)}
+                  </Text>
+                  <Text style={styles.metricLabel}>{t.jumpHeight} (cm)</Text>
+                </View>
+                
+                <View style={styles.metricCard} data-testid="metric-flight-time">
                   <Text style={styles.metricValue}>
                     {jumpCamera.metrics.flightTimeMs.toFixed(0)}
                   </Text>
                   <Text style={styles.metricLabel}>{t.flightTime} (ms)</Text>
                 </View>
                 
-                {selectedProtocol === 'dj' && (
-                  <View style={styles.metricCard}>
+                {(selectedProtocol === 'dj' || jumpCamera.metrics.contactTimeMs > 0) && (
+                  <View style={styles.metricCard} data-testid="metric-contact-time">
                     <Text style={styles.metricValue}>
                       {jumpCamera.metrics.contactTimeMs.toFixed(0)}
                     </Text>
                     <Text style={styles.metricLabel}>{t.contactTime} (ms)</Text>
                   </View>
                 )}
+              </View>
+              
+              {/* Secondary Metrics */}
+              <View style={styles.metricsGrid}>
+                {jumpCamera.metrics.eccentricDurationMs > 0 && (
+                  <View style={styles.metricCard} data-testid="metric-eccentric-time">
+                    <Text style={styles.metricValue}>
+                      {jumpCamera.metrics.eccentricDurationMs.toFixed(0)}
+                    </Text>
+                    <Text style={styles.metricLabel}>{t.eccentricTime} (ms)</Text>
+                  </View>
+                )}
                 
-                <View style={styles.metricCard}>
+                {jumpCamera.metrics.rsiMod > 0 && (
+                  <View style={styles.metricCard} data-testid="metric-rsi-mod">
+                    <Text style={styles.metricValue}>
+                      {jumpCamera.metrics.rsiMod.toFixed(2)}
+                    </Text>
+                    <Text style={styles.metricLabel}>{t.rsiMod}</Text>
+                  </View>
+                )}
+                
+                <View style={styles.metricCard} data-testid="metric-takeoff-velocity">
                   <Text style={styles.metricValue}>
-                    {jumpCamera.metrics.jumpHeightCm.toFixed(1)}
+                    {jumpCamera.metrics.takeoffVelocityMs.toFixed(2)}
                   </Text>
-                  <Text style={styles.metricLabel}>{t.jumpHeight} (cm)</Text>
+                  <Text style={styles.metricLabel}>{t.takeoffVelocity} (m/s)</Text>
                 </View>
               </View>
+              
+              {/* SL-CMJ Dual Jump Results */}
+              {jumpCamera.slCmjLeg1 && jumpCamera.slCmjLeg2 && (
+                <View style={styles.dualJumpCard} data-testid="sl-cmj-dual-results">
+                  <Text style={styles.dualJumpTitle}>
+                    {locale === 'pt' ? 'Comparacao Bilateral' : 'Bilateral Comparison'}
+                  </Text>
+                  <View style={styles.dualJumpRow}>
+                    <View style={styles.dualJumpLeg}>
+                      <Text style={styles.dualJumpLegLabel}>
+                        {jumpCamera.slCmjLeg1.leg === 'left' ? t.left : t.right}
+                      </Text>
+                      <Text style={styles.dualJumpLegValue}>
+                        {jumpCamera.slCmjLeg1.metrics.jumpHeightCm.toFixed(1)} cm
+                      </Text>
+                    </View>
+                    <View style={styles.dualJumpLeg}>
+                      <Text style={styles.dualJumpLegLabel}>
+                        {jumpCamera.slCmjLeg2.leg === 'left' ? t.left : t.right}
+                      </Text>
+                      <Text style={styles.dualJumpLegValue}>
+                        {jumpCamera.slCmjLeg2.metrics.jumpHeightCm.toFixed(1)} cm
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={styles.dualJumpAsymmetry}>
+                    {locale === 'pt' ? 'Assimetria' : 'Asymmetry'}: {
+                      Math.abs(
+                        ((jumpCamera.slCmjLeg1.metrics.jumpHeightCm - jumpCamera.slCmjLeg2.metrics.jumpHeightCm) /
+                        Math.max(jumpCamera.slCmjLeg1.metrics.jumpHeightCm, jumpCamera.slCmjLeg2.metrics.jumpHeightCm)) * 100
+                      ).toFixed(1)
+                    }%
+                  </Text>
+                </View>
+              )}
               
               {/* Info Text */}
               <View style={styles.infoCard}>
@@ -1146,7 +1275,7 @@ function JumpCameraContent() {
                   ) : (
                     <>
                       <Ionicons name="save" size={20} color="#ffffff" />
-                      <Text style={styles.saveButtonText}>{t.saveAssessment}</Text>
+                      <Text style={styles.saveButtonText}>{t.saveTest}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -1155,7 +1284,6 @@ function JumpCameraContent() {
               <TouchableOpacity
                 style={styles.tryAgainButton}
                 onPress={() => {
-                  // Reset pipeline states but keep camera mounted
                   setCameraReady(false);
                   setMediapipeReady(false);
                   setJumpEngineReady(false);
@@ -1163,10 +1291,10 @@ function JumpCameraContent() {
                   frameCountRef.current = 0;
                   setUiPhase('cameraPreview');
                 }}
-                data-testid="try-again-btn"
+                data-testid="repeat-test-btn"
               >
                 <Ionicons name="refresh" size={20} color={colors.text.secondary} />
-                <Text style={styles.tryAgainText}>{t.tryAgain}</Text>
+                <Text style={styles.tryAgainText}>{t.repeatTest}</Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -1707,5 +1835,111 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
+  },
+  // Live metrics panel during recording
+  liveMetricsPanel: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  liveMetricItem: {
+    alignItems: 'center',
+  },
+  liveMetricLabel: {
+    fontSize: 10,
+    color: 'rgba(255, 255, 255, 0.6)',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  liveMetricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#22c55e',
+  },
+  // Between jumps overlay (SL-CMJ)
+  betweenJumpsOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingVertical: 32,
+    paddingHorizontal: 40,
+    borderRadius: 20,
+  },
+  betweenJumpsTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#22c55e',
+    marginTop: 12,
+  },
+  betweenJumpsSubtitle: {
+    fontSize: 16,
+    color: '#ffffff',
+    marginTop: 8,
+  },
+  betweenJumpsCountdown: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginTop: 8,
+  },
+  // Enhanced results
+  protocolBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'rgba(34, 197, 94, 0.8)',
+    marginTop: 4,
+    textTransform: 'uppercase',
+  },
+  metricCardHighlight: {
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.4)',
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+  },
+  metricValueLarge: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#8b5cf6',
+  },
+  // SL-CMJ dual jump results
+  dualJumpCard: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.2)',
+  },
+  dualJumpTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.accent.primary,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  dualJumpRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  dualJumpLeg: {
+    alignItems: 'center',
+  },
+  dualJumpLegLabel: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    marginBottom: 4,
+  },
+  dualJumpLegValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+  },
+  dualJumpAsymmetry: {
+    fontSize: 13,
+    color: '#f59e0b',
+    textAlign: 'center',
+    marginTop: 12,
+    fontWeight: '600',
   },
 });
