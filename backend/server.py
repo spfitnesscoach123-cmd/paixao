@@ -7554,6 +7554,8 @@ async def get_team_dashboard(
 ):
     """Get aggregated team statistics and individual athlete status for team-wide overview
     
+    OPTIMIZED VERSION - Eliminates N+1 query problem by pre-loading all data
+    
     Parameters:
     - acwr_metric: Metric to use for ACWR calculation. Options:
         - total_distance (default)
@@ -7599,9 +7601,21 @@ async def get_team_dashboard(
     }
     filter_days = date_range_days_map.get(date_range, 7)
     
+    # Date ranges - calculated once
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    seven_days_ago = today - timedelta(days=7)
+    ninety_days_ago = today - timedelta(days=90)  # Max window for queries
+    ninety_days_ago_str = ninety_days_ago.strftime("%Y-%m-%d")
+    
+    # Calculate filter start date based on date_range parameter
+    if filter_days == 0:  # today
+        filter_start_date = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start_date = today - timedelta(days=filter_days)
+    
     # Get all athletes for this coach
-    athletes_cursor = db.athletes.find({"coach_id": user_id})
-    athletes = await athletes_cursor.to_list(100)
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(100)
     
     if not athletes:
         return TeamDashboardResponse(
@@ -7622,23 +7636,96 @@ async def get_team_dashboard(
             alerts=[]
         )
     
-    # Date ranges
-    today = datetime.utcnow()
-    today_str = today.strftime("%Y-%m-%d")
-    seven_days_ago = today - timedelta(days=7)
-    twenty_eight_days_ago = today - timedelta(days=28)
+    # Create athlete ID list for bulk queries
+    athlete_ids = [str(a["_id"]) for a in athletes]
     
-    # Calculate filter start date based on date_range parameter
-    if filter_days == 0:  # today
-        filter_start_date = datetime.strptime(today_str, "%Y-%m-%d")
-    else:
-        filter_start_date = today - timedelta(days=filter_days)
+    # ============================================================
+    # OPTIMIZED: BULK LOAD ALL DATA BEFORE PROCESSING (5-6 queries total)
+    # ============================================================
     
-    # First, get ALL GPS data to count global sessions (1 CSV = 1 session for the team)
-    all_gps_data = await db.gps_data.find({"coach_id": user_id}).to_list(10000)
+    # Query 1: GPS data - limited to 90 days max
+    all_gps_data = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": ninety_days_ago_str}
+    }).to_list(5000)
+    
+    # Query 2: Wellness data - last 7 days per athlete is enough
+    all_wellness_data = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(1000)
+    
+    # Query 3: Jump assessments
+    all_jump_assessments = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Query 4: Legacy assessments (strength)
+    all_assessments = await db.assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Query 5: Body compositions
+    all_body_compositions = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    # ============================================================
+    # BUILD INDEXED DATA STRUCTURES FOR O(1) LOOKUPS
+    # ============================================================
+    
+    # GPS data indexed by athlete_id
+    gps_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_gps_data:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in gps_by_athlete:
+                gps_by_athlete[aid] = []
+            gps_by_athlete[aid].append(record)
+    
+    # Sort GPS data by date descending for each athlete
+    for aid in gps_by_athlete:
+        gps_by_athlete[aid].sort(key=lambda x: x.get("date", ""), reverse=True)
+    
+    # Wellness data indexed by athlete_id (already sorted by date desc)
+    wellness_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_wellness_data:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in wellness_by_athlete:
+                wellness_by_athlete[aid] = []
+            wellness_by_athlete[aid].append(record)
+    
+    # Jump assessments indexed by athlete_id
+    jump_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_jump_assessments:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in jump_by_athlete:
+                jump_by_athlete[aid] = []
+            jump_by_athlete[aid].append(record)
+    
+    # Assessments indexed by athlete_id
+    assessments_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_assessments:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in assessments_by_athlete:
+                assessments_by_athlete[aid] = []
+            assessments_by_athlete[aid].append(record)
+    
+    # Body compositions indexed by athlete_id (only need latest per athlete)
+    body_comp_by_athlete: Dict[str, dict] = {}
+    for record in all_body_compositions:
+        aid = record.get("athlete_id")
+        if aid and aid not in body_comp_by_athlete:  # Keep only first (latest)
+            body_comp_by_athlete[aid] = record
+    
+    # ============================================================
+    # CALCULATE GLOBAL SESSION COUNTS FROM PRE-LOADED DATA
+    # ============================================================
     global_sessions_7d = set()
     global_sessions_total = set()
-    global_sessions_filtered = set()  # Sessions within selected date range
+    global_sessions_filtered = set()
     
     for record in all_gps_data:
         try:
@@ -7652,11 +7739,11 @@ async def get_team_dashboard(
         except:
             continue
     
-    # Total sessions count is now global (1 CSV = 1 session)
-    total_sessions = len(global_sessions_total)
     total_sessions_7d_global = len(global_sessions_7d)
-    total_sessions_filtered = len(global_sessions_filtered)
     
+    # ============================================================
+    # PROCESS EACH ATHLETE (NO DATABASE QUERIES IN THIS LOOP)
+    # ============================================================
     athlete_data = []
     total_acwr = 0
     acwr_count = 0
@@ -7671,14 +7758,11 @@ async def get_team_dashboard(
     body_fat_count = 0
     total_hid = 0
     hid_count = 0
-    all_rsi_values = []  # To calculate percentile and trend
+    all_rsi_values = []
     
     risk_distribution = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
     position_summary: Dict[str, Dict[str, Any]] = {}
     alerts = []
-    
-    # Get all assessments to calculate RSI
-    all_assessments = await db.assessments.find({"coach_id": user_id}).sort("date", -1).to_list(1000)
     
     for athlete in athletes:
         athlete_id = str(athlete["_id"])
@@ -7686,54 +7770,33 @@ async def get_team_dashboard(
         if not position or position == "Unknown":
             position = "Não especificado" if lang == "pt" else "Not specified"
         
-        # Initialize position summary with all metrics for group averaging
+        # Initialize position summary
         if position not in position_summary:
             position_summary[position] = {
-                "count": 0,
-                "avg_acwr": 0,
-                "avg_wellness": 0,
-                "avg_fatigue": 0,
-                "avg_distance": 0,
-                "avg_sprints": 0,
-                "avg_max_speed": 0,
-                "high_risk_count": 0,
-                # Accumulators for calculating averages
-                "_total_acwr": 0,
-                "_total_wellness": 0,
-                "_total_fatigue": 0,
-                "_total_distance": 0,
-                "_total_sprints": 0,
-                "_total_max_speed": 0,
-                "_acwr_count": 0,
-                "_wellness_count": 0,
-                "_fatigue_count": 0,
-                "_gps_count": 0
+                "count": 0, "avg_acwr": 0, "avg_wellness": 0, "avg_fatigue": 0,
+                "avg_distance": 0, "avg_sprints": 0, "avg_max_speed": 0, "high_risk_count": 0,
+                "_total_acwr": 0, "_total_wellness": 0, "_total_fatigue": 0,
+                "_total_distance": 0, "_total_sprints": 0, "_total_max_speed": 0,
+                "_acwr_count": 0, "_wellness_count": 0, "_fatigue_count": 0, "_gps_count": 0
             }
         position_summary[position]["count"] += 1
         
-        # Get recent GPS data
-        gps_data = await db.gps_data.find({
-            "athlete_id": athlete_id,
-            "coach_id": user_id
-        }).sort("date", -1).to_list(100)
+        # Get athlete's GPS data from pre-loaded index (O(1) lookup)
+        gps_data = gps_by_athlete.get(athlete_id, [])
         
-        # Calculate ACWR using correct rolling window (includes days without training as 0)
+        # Calculate ACWR
         acwr = None
         risk_level = "unknown"
         sessions_7d = 0
         distance_7d = 0
         last_gps_date = None
+        gps_data_by_date = {}
         
         if gps_data:
             last_gps_date = gps_data[0].get("date")
-            
-            # Build GPS data indexed by date for rolling window calculation
-            gps_data_by_date = {}
-            
-            # Track unique sessions by date+session_name
             unique_sessions_7d = set()
-            unique_sessions_total = set()
             
+            # Build GPS data indexed by date
             for record in gps_data:
                 try:
                     record_date_str = record["date"]
@@ -7741,15 +7804,11 @@ async def get_team_dashboard(
                 except:
                     continue
                 
-                # Aggregate data by date - include all metrics for flexible ACWR calculation
                 if record_date_str not in gps_data_by_date:
                     gps_data_by_date[record_date_str] = {
-                        "total_distance": 0,
-                        "high_intensity_distance": 0,
-                        "high_speed_running": 0,
-                        "sprint_distance": 0,
-                        "number_of_sprints": 0,
-                        "acc_dec": 0
+                        "total_distance": 0, "high_intensity_distance": 0,
+                        "high_speed_running": 0, "sprint_distance": 0,
+                        "number_of_sprints": 0, "acc_dec": 0
                     }
                 
                 dist = record.get("total_distance", 0) or 0
@@ -7772,42 +7831,32 @@ async def get_team_dashboard(
                 if record_date >= seven_days_ago:
                     distance_7d += dist
                     unique_sessions_7d.add(session_key)
-                    unique_sessions_total.add(session_key)
-                    # Accumulate HID
                     total_hid += hid
                     hid_count += 1
             
-            # Count unique sessions (1 CSV = 1 session) - for athlete's own distance calculation
             sessions_7d = len(unique_sessions_7d)
             total_distance += distance_7d
             
-            # CORRECTED ACWR CALCULATION using rolling window with zeros for missing days
-            # Calculate acute load (sum of last 7 days, including zeros)
-            # Uses the selected acwr_metric parameter
+            # ACWR CALCULATION (logic unchanged)
             acute_load = 0.0
             for i in range(7):
                 date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
                 day_data = gps_data_by_date.get(date_str, {})
                 acute_load += day_data.get(acwr_metric, 0) or 0
             
-            # Calculate chronic load (sum of last 28 days, including zeros)
             chronic_load = 0.0
             for i in range(28):
                 date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
                 day_data = gps_data_by_date.get(date_str, {})
                 chronic_load += day_data.get(acwr_metric, 0) or 0
             
-            # Acute Load = sum of last 7 days
-            # Chronic Load = average weekly load over 4 weeks = sum of 28 days / 4
             chronic_weekly_avg = chronic_load / 4 if chronic_load > 0 else 0
             
-            # ACWR = Acute Load / Chronic Weekly Average
             if chronic_weekly_avg > 0:
                 acwr = round(acute_load / chronic_weekly_avg, 2)
                 total_acwr += acwr
                 acwr_count += 1
                 
-                # Determine risk level (classification unchanged)
                 if acwr < 0.8:
                     risk_level = "low"
                 elif acwr <= 1.3:
@@ -7824,50 +7873,29 @@ async def get_team_dashboard(
                     alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
                     alerts.append(alert_msg)
             else:
-                # No chronic data - cannot calculate meaningful ACWR
-                acwr = None
-                risk_level = "unknown"
                 risk_distribution["unknown"] += 1
             
-            # Collect RSI values from new jump_assessments system (preferred) or legacy assessments
-            athlete_jump_assessments = await db.jump_assessments.find({
-                "athlete_id": athlete_id,
-                "coach_id": user_id,
-                "protocol": "cmj"
-            }).sort("date", -1).to_list(10)
+            # RSI from jump assessments (from pre-loaded data)
+            athlete_jump_assessments = [j for j in jump_by_athlete.get(athlete_id, []) if j.get("protocol") == "cmj"][:10]
             
             if athlete_jump_assessments:
-                # Use new jump assessment system
                 for jump_assessment in athlete_jump_assessments:
                     rsi = jump_assessment.get("rsi")
                     if rsi and rsi > 0:
-                        all_rsi_values.append({
-                            "value": rsi,
-                            "date": jump_assessment.get("date"),
-                            "athlete_id": athlete_id
-                        })
+                        all_rsi_values.append({"value": rsi, "date": jump_assessment.get("date"), "athlete_id": athlete_id})
             else:
                 # Fallback to legacy assessments
-                athlete_assessments = [a for a in all_assessments if a.get("athlete_id") == athlete_id]
+                athlete_assessments = assessments_by_athlete.get(athlete_id, [])
                 for assessment in athlete_assessments:
-                    # RSI is stored inside metrics, not at root level
                     metrics = assessment.get("metrics", {})
                     rsi = metrics.get("rsi") if isinstance(metrics, dict) else None
                     if rsi and rsi > 0:
-                        all_rsi_values.append({
-                            "value": rsi,
-                            "date": assessment.get("date"),
-                            "athlete_id": athlete_id
-                        })
+                        all_rsi_values.append({"value": rsi, "date": assessment.get("date"), "athlete_id": athlete_id})
         else:
             risk_distribution["unknown"] += 1
         
-        # Get recent wellness data
-        wellness_data = await db.wellness.find({
-            "athlete_id": athlete_id,
-            "coach_id": user_id
-        }).sort("date", -1).to_list(7)
-        
+        # Wellness data (from pre-loaded data)
+        wellness_data = wellness_by_athlete.get(athlete_id, [])[:7]
         wellness_score = None
         fatigue_score = None
         last_wellness_date = None
@@ -7877,7 +7905,6 @@ async def get_team_dashboard(
             last_wellness_date = latest_wellness.get("date")
             wellness_score = latest_wellness.get("wellness_score")
             
-            # If wellness_score is missing, calculate it from individual metrics
             if wellness_score is None or wellness_score == 0:
                 fatigue_val = latest_wellness.get("fatigue", 5)
                 stress_val = latest_wellness.get("stress", 5)
@@ -7886,22 +7913,16 @@ async def get_team_dashboard(
                 muscle_soreness_val = latest_wellness.get("muscle_soreness", 5)
                 hydration_val = latest_wellness.get("hydration", 5)
                 
-                # Calculate wellness score (inverted scale for negative metrics)
                 calculated_wellness = (
-                    (10 - fatigue_val) * 0.20 +  # Lower fatigue = better (inverted)
-                    (10 - stress_val) * 0.15 +    # Lower stress = better (inverted)
-                    mood_val * 0.15 +              # Higher mood = better
-                    sleep_quality_val * 0.20 +    # Higher sleep quality = better
-                    (10 - muscle_soreness_val) * 0.15 +  # Lower soreness = better (inverted)
-                    hydration_val * 0.15           # Higher hydration = better
+                    (10 - fatigue_val) * 0.20 + (10 - stress_val) * 0.15 +
+                    mood_val * 0.15 + sleep_quality_val * 0.20 +
+                    (10 - muscle_soreness_val) * 0.15 + hydration_val * 0.15
                 )
                 if calculated_wellness > 0:
                     wellness_score = round(calculated_wellness, 2)
             
             fatigue = latest_wellness.get("fatigue", 5)
-            
-            # Convert fatigue (1-10 where 10=very fatigued) to fatigue score percentage
-            fatigue_score = fatigue * 10  # 0-100%
+            fatigue_score = fatigue * 10
             
             if wellness_score and wellness_score > 0:
                 total_wellness += wellness_score
@@ -7914,13 +7935,9 @@ async def get_team_dashboard(
                 alert_msg = f"🔴 {athlete['name']}: Fadiga alta ({fatigue_score}%)" if lang == "pt" else f"🔴 {athlete['name']}: High fatigue ({fatigue_score}%)"
                 alerts.append(alert_msg)
         
-        # Check for peripheral fatigue from strength assessments
+        # Peripheral fatigue (from pre-loaded data)
         peripheral_fatigue = False
-        strength_assessments = await db.assessments.find({
-            "athlete_id": athlete_id,
-            "coach_id": user_id,
-            "assessment_type": "strength"
-        }).sort("date", -1).to_list(10)
+        strength_assessments = [a for a in assessments_by_athlete.get(athlete_id, []) if a.get("assessment_type") == "strength"][:10]
         
         if len(strength_assessments) >= 2:
             latest = strength_assessments[0].get("metrics", {})
@@ -7935,10 +7952,8 @@ async def get_team_dashboard(
                         alert_msg = f"⚡ {athlete['name']}: Queda de potência de {power_drop:.0f}%" if lang == "pt" else f"⚡ {athlete['name']}: Power drop of {power_drop:.0f}%"
                         alerts.append(alert_msg)
         
-        # Get latest strength data for team averages - check multiple sources
+        # Power data (from pre-loaded data)
         power_found = False
-        
-        # Source 1: Legacy strength assessments (db.assessments with assessment_type: "strength")
         if strength_assessments:
             latest_strength = strength_assessments[0].get("metrics", {})
             mean_power = latest_strength.get("mean_power")
@@ -7947,43 +7962,28 @@ async def get_team_dashboard(
                 power_count += 1
                 power_found = True
         
-        # Source 2: Jump assessments (db.jump_assessments) - preferred source for peak_power
         if not power_found:
-            jump_assessments = await db.jump_assessments.find({
-                "athlete_id": athlete_id,
-                "coach_id": user_id
-            }).sort("date", -1).to_list(5)
-            
+            jump_assessments = jump_by_athlete.get(athlete_id, [])[:5]
             if jump_assessments:
-                latest_jump = jump_assessments[0]
-                # Use peak_power_w from jump assessments
-                peak_power = latest_jump.get("peak_power_w")
+                peak_power = jump_assessments[0].get("peak_power_w")
                 if peak_power and peak_power > 0:
                     total_power += peak_power
                     power_count += 1
-                    power_found = True
         
-        # Get latest body composition for team averages
-        latest_body_comp = await db.body_compositions.find_one(
-            {"athlete_id": athlete_id, "coach_id": user_id},
-            sort=[("date", -1)]
-        )
+        # Body composition (from pre-loaded data)
+        latest_body_comp = body_comp_by_athlete.get(athlete_id)
         if latest_body_comp and latest_body_comp.get("body_fat_percentage"):
             total_body_fat += latest_body_comp["body_fat_percentage"]
             body_fat_count += 1
         
-        # Calculate Monotony and Strain from GPS data
-        # Monotony = mean daily load / std deviation of daily load (7 days)
-        # Strain = weekly load * monotony
+        # Monotony and Strain (logic unchanged)
         monotony_value = None
         strain_value = None
         metric_value_for_athlete = None
         
         if gps_data:
-            # Get daily loads for selected metric based on date range filter
-            # For "today" use only today's data, otherwise use the filter_days
             days_to_check = max(1, filter_days) if filter_days == 0 else filter_days
-            days_to_check = min(days_to_check, 7)  # Cap at 7 for monotony calculation
+            days_to_check = min(days_to_check, 7)
             
             daily_loads = []
             for i in range(days_to_check if filter_days > 0 else 1):
@@ -7991,24 +7991,18 @@ async def get_team_dashboard(
                 day_data = gps_data_by_date.get(date_str, {})
                 daily_loads.append(day_data.get(acwr_metric, 0) or 0)
             
-            # For "today" filter, only show today's metric value
             if filter_days == 0:
                 metric_value_for_athlete = daily_loads[0] if daily_loads else 0
             else:
-                # Calculate metric_value (sum of filtered days for selected metric)
                 metric_value_for_athlete = sum(daily_loads)
             
-            # Calculate monotony (only if we have variance and at least 2 days)
             if len(daily_loads) >= 2:
                 mean_load = sum(daily_loads) / len(daily_loads)
                 if mean_load > 0:
-                    # Calculate standard deviation
                     variance = sum((x - mean_load) ** 2 for x in daily_loads) / len(daily_loads)
                     std_dev = variance ** 0.5
-                    
                     if std_dev > 0:
                         monotony_value = round(mean_load / std_dev, 2)
-                        # Strain = weekly load * monotony
                         weekly_load = sum(daily_loads)
                         strain_value = round(weekly_load * monotony_value, 0)
         
@@ -8031,23 +8025,19 @@ async def get_team_dashboard(
             metric_value=metric_value_for_athlete
         ))
         
-        # Update position averages - collect all metrics for group averaging
+        # Update position averages
         if acwr:
             position_summary[position]["_total_acwr"] += acwr
             position_summary[position]["_acwr_count"] += 1
-        
         if wellness_score:
             position_summary[position]["_total_wellness"] += wellness_score
             position_summary[position]["_wellness_count"] += 1
-        
         if fatigue_score:
             position_summary[position]["_total_fatigue"] += fatigue_score
             position_summary[position]["_fatigue_count"] += 1
         
-        # Aggregate GPS metrics for position group
         if gps_data:
-            # Calculate average metrics from this athlete's recent GPS data
-            recent_gps = [g for g in gps_data[:7]]  # Last 7 records
+            recent_gps = gps_data[:7]
             if recent_gps:
                 avg_dist = sum(g.get("total_distance", 0) for g in recent_gps) / len(recent_gps)
                 avg_sprints = sum(g.get("number_of_sprints", 0) for g in recent_gps) / len(recent_gps)
@@ -8059,37 +8049,25 @@ async def get_team_dashboard(
                 position_summary[position]["_total_max_speed"] += avg_max_speed
                 position_summary[position]["_gps_count"] += 1
     
-    # Calculate averages for positions and clean up accumulators
+    # Calculate position averages and cleanup
     for pos in position_summary:
         ps = position_summary[pos]
-        
-        # Calculate ACWR average
         if ps["_acwr_count"] > 0:
             ps["avg_acwr"] = round(ps["_total_acwr"] / ps["_acwr_count"], 2)
-        
-        # Calculate wellness average
         if ps["_wellness_count"] > 0:
             ps["avg_wellness"] = round(ps["_total_wellness"] / ps["_wellness_count"], 1)
-        
-        # Calculate fatigue average
         if ps["_fatigue_count"] > 0:
             ps["avg_fatigue"] = round(ps["_total_fatigue"] / ps["_fatigue_count"], 1)
-        
-        # Calculate GPS metrics averages (group averages)
         if ps["_gps_count"] > 0:
             ps["avg_distance"] = round(ps["_total_distance"] / ps["_gps_count"], 0)
             ps["avg_sprints"] = round(ps["_total_sprints"] / ps["_gps_count"], 1)
             ps["avg_max_speed"] = round(ps["_total_max_speed"] / ps["_gps_count"], 1)
-        
-        # Remove accumulator fields from response
         for key in list(ps.keys()):
             if key.startswith("_"):
                 del ps[key]
     
-    # Sort alerts by severity (⚠️ warnings last, 🔴 critical first)
+    # Sort alerts and athletes
     alerts.sort(key=lambda x: (0 if "🔴" in x else (1 if "⚡" in x else 2)))
-    
-    # Sort athletes by risk (high risk first)
     risk_order = {"high": 0, "moderate": 1, "optimal": 2, "low": 3, "unknown": 4}
     athlete_data.sort(key=lambda x: risk_order.get(x.risk_level, 4))
     
@@ -8099,43 +8077,20 @@ async def get_team_dashboard(
     rsi_percentile = None
     
     if all_rsi_values:
-        # Sort by date to calculate trend
         sorted_rsi = sorted(all_rsi_values, key=lambda x: x.get("date", ""))
         rsi_values_only = [r["value"] for r in sorted_rsi]
         team_avg_rsi = round(sum(rsi_values_only) / len(rsi_values_only), 2)
         
-        # Calculate trend (compare last 3 vs previous 3)
         if len(rsi_values_only) >= 6:
             recent_avg = sum(rsi_values_only[-3:]) / 3
             previous_avg = sum(rsi_values_only[-6:-3]) / 3
-            if recent_avg > previous_avg * 1.05:
-                rsi_trend = "up"
-            elif recent_avg < previous_avg * 0.95:
-                rsi_trend = "down"
-            else:
-                rsi_trend = "stable"
+            rsi_trend = "up" if recent_avg > previous_avg * 1.05 else ("down" if recent_avg < previous_avg * 0.95 else "stable")
         elif len(rsi_values_only) >= 2:
-            if rsi_values_only[-1] > rsi_values_only[-2] * 1.05:
-                rsi_trend = "up"
-            elif rsi_values_only[-1] < rsi_values_only[-2] * 0.95:
-                rsi_trend = "down"
-            else:
-                rsi_trend = "stable"
+            rsi_trend = "up" if rsi_values_only[-1] > rsi_values_only[-2] * 1.05 else ("down" if rsi_values_only[-1] < rsi_values_only[-2] * 0.95 else "stable")
         
-        # Calculate percentile (simple percentile based on RSI classification)
-        if team_avg_rsi < 1.0:
-            rsi_percentile = 25.0
-        elif team_avg_rsi < 2.0:
-            rsi_percentile = 50.0
-        elif team_avg_rsi < 3.0:
-            rsi_percentile = 75.0
-        else:
-            rsi_percentile = 95.0
+        rsi_percentile = 25.0 if team_avg_rsi < 1.0 else (50.0 if team_avg_rsi < 2.0 else (75.0 if team_avg_rsi < 3.0 else 95.0))
     
-    # Calculate average distance per session
-    avg_distance_per_session = None
-    if total_sessions_7d_global > 0 and total_distance > 0:
-        avg_distance_per_session = round(total_distance / total_sessions_7d_global, 0)
+    avg_distance_per_session = round(total_distance / total_sessions_7d_global, 0) if total_sessions_7d_global > 0 and total_distance > 0 else None
     
     return TeamDashboardResponse(
         stats=TeamDashboardStats(
