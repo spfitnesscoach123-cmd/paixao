@@ -5069,9 +5069,10 @@ class JumpAssessmentCreate(BaseModel):
     date: str
     protocol: JumpProtocol
     flight_time_ms: float  # Tempo de Voo em milissegundos
-    contact_time_ms: float  # Tempo de Contato em milissegundos
+    contact_time_ms: float  # Tempo de Contato em milissegundos (DJ only)
     jump_height_cm: Optional[float] = None  # Altura do salto (pode ser calculada)
     box_height_cm: Optional[float] = None  # Altura da caixa (apenas para DJ)
+    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (CMJ/SL-CMJ: eccentric+concentric)
     notes: Optional[str] = None
 
 class JumpAssessment(BaseModel):
@@ -5084,9 +5085,10 @@ class JumpAssessment(BaseModel):
     contact_time_ms: float
     jump_height_cm: float
     box_height_cm: Optional[float] = None
+    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (CMJ/SL-CMJ)
     # Calculated metrics
     rsi: float  # Reactive Strength Index
-    rsi_modified: Optional[float] = None  # RSI modificado (Jump Height / Contact Time)
+    rsi_modified: Optional[float] = None  # RSI modificado
     peak_power_w: float  # Pico de Potência (Sayers Equation)
     peak_velocity_ms: float  # Pico de Velocidade
     relative_power_wkg: float  # Potência Relativa (W/kg)
@@ -5298,9 +5300,22 @@ async def create_jump_assessment(
     if not jump_height_cm or jump_height_cm <= 0:
         jump_height_cm = calculate_jump_height_from_flight_time(data.flight_time_ms)
     
-    # Calculate RSI
-    rsi = calculate_rsi(jump_height_cm, data.contact_time_ms)
-    rsi_modified = calculate_rsi_modified(data.flight_time_ms, data.contact_time_ms)
+    # Calculate RSI - protocol-specific
+    # CMJ/SL-CMJ: RSImod = jumpHeight(m) / timeToTakeoff(s) — NEVER use contactTime
+    # DJ: RSI = jumpHeight(m) / contactTime(s) — classic reactive strength index
+    if data.protocol.value in ("cmj", "sl_cmj_left", "sl_cmj_right"):
+        # For CMJ/SL-CMJ use time_to_takeoff_ms (eccentric + concentric phase)
+        ttt = data.time_to_takeoff_ms or 0
+        if ttt > 0:
+            rsi = round((jump_height_cm / 100) / (ttt / 1000), 2)
+            rsi_modified = rsi  # RSImod = same formula for CMJ
+        else:
+            rsi = 0.0
+            rsi_modified = 0.0
+    else:
+        # DJ: use contactTime as before
+        rsi = calculate_rsi(jump_height_cm, data.contact_time_ms)
+        rsi_modified = calculate_rsi_modified(data.flight_time_ms, data.contact_time_ms)
     
     # Calculate Peak Power (Sayers Equation)
     peak_power = calculate_peak_power_sayers(jump_height_cm, body_mass_kg)
@@ -5345,6 +5360,7 @@ async def create_jump_assessment(
         contact_time_ms=data.contact_time_ms,
         jump_height_cm=jump_height_cm,
         box_height_cm=data.box_height_cm,
+        time_to_takeoff_ms=data.time_to_takeoff_ms,
         rsi=rsi,
         rsi_modified=rsi_modified,
         peak_power_w=peak_power,
@@ -5479,7 +5495,9 @@ async def get_jump_analysis(
                 "jump_height_cm": latest_cmj.get("jump_height_cm"),
                 "flight_time_ms": latest_cmj.get("flight_time_ms"),
                 "contact_time_ms": latest_cmj.get("contact_time_ms"),
+                "time_to_takeoff_ms": latest_cmj.get("time_to_takeoff_ms"),
                 "rsi": latest_cmj.get("rsi"),
+                "rsi_modified": latest_cmj.get("rsi_modified"),
                 "rsi_classification": latest_cmj.get("rsi_classification"),
                 "peak_power_w": latest_cmj.get("peak_power_w"),
                 "peak_velocity_ms": latest_cmj.get("peak_velocity_ms"),
@@ -5530,12 +5548,16 @@ async def get_jump_analysis(
                 "date": latest_sl_right.get("date"),
                 "jump_height_cm": right_height,
                 "rsi": right_rsi,
+                "rsi_modified": latest_sl_right.get("rsi_modified"),
+                "time_to_takeoff_ms": latest_sl_right.get("time_to_takeoff_ms"),
                 "peak_power_w": latest_sl_right.get("peak_power_w")
             },
             "left": {
                 "date": latest_sl_left.get("date"),
                 "jump_height_cm": left_height,
                 "rsi": left_rsi,
+                "rsi_modified": latest_sl_left.get("rsi_modified"),
+                "time_to_takeoff_ms": latest_sl_left.get("time_to_takeoff_ms"),
                 "peak_power_w": latest_sl_left.get("peak_power_w")
             }
         }

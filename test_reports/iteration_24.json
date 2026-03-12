@@ -1,0 +1,109 @@
+{
+  "summary": "Jump Camera RSI TimeToTakeoff Fix - All 9 backend API tests passed (100%). Validated: CMJ/SL-CMJ RSI uses timeToTakeoff (not contactTime), DJ still uses contactTime, SL-CMJ dual leg save works, analysis endpoint returns time_to_takeoff_ms and rsi_modified fields, asymmetry calculation works when both legs exist.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_jump_rsi_ttt_fix.xml",
+    "/app/backend/tests/test_jump_rsi_ttt_fix.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED: /app/backend/server.py lines 5304-5318 - CMJ/SL-CMJ uses time_to_takeoff_ms for RSI calculation, DJ uses contact_time_ms",
+    "VERIFIED: /app/backend/server.py line 5363 - time_to_takeoff_ms persisted to DB for all protocols",
+    "VERIFIED: /app/backend/server.py lines 5552, 5560 - Analysis endpoint returns time_to_takeoff_ms for SL-CMJ right and left",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-camera.tsx lines 462-484 - handleSaveAssessment uses Promise.all to save BOTH SL-CMJ legs",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-camera.tsx lines 470, 480, 517 - time_to_takeoff_ms=eccentricDurationMs sent for CMJ/SL-CMJ",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-assessment.tsx lines 397-399 - AsymmetryCard shows 'RSImod' label (not RSI)",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-assessment.tsx lines 453-479 - Takeoff Time R/L comparison bars added",
+    "VERIFIED: /app/frontend/services/jump/jumpDetector.ts lines 513-519 - CMJ contactTimeMs=0, RSImod uses timeToTakeoffMs",
+    "VERIFIED: /app/frontend/services/jump/jumpDetector.ts lines 631, 646 - DJ still uses contactTimeMs for RSI calculation",
+    "VERIFIED: /app/frontend/app/athlete/[id]/vbt-camera.tsx - NO imports from services/jump (isolation maintained)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_jump_rsi_ttt_fix.py - Created comprehensive test file for RSI TTT fix validation"
+  ],
+  "success_rate": {
+    "backend": "100% (9/9 tests passed)",
+    "frontend": "N/A - React Native/Expo app, verified via code review only (not browser testable)"
+  },
+  "test_credentials": {
+    "email": "contato@loadmanagerpro.com.br",
+    "password": "#UAE2026"
+  },
+  "seed_data_creation": "TEST_CMJ_RSI_TTT_FIX, TEST_CMJ_NO_TTT, TEST_SL_CMJ_LEFT_TTT, TEST_SL_CMJ_RIGHT_TTT, TEST_DJ_CONTACT_TIME_REGRESSION assessments created during testing",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Jump Camera RSI fix validated. CMJ/SL-CMJ now correctly uses time_to_takeoff_ms (not contact_time_ms) for RSI calculation. Analysis endpoint returns rsi_modified and time_to_takeoff_ms fields for all protocols. Frontend AsymmetryCard shows RSImod label and Takeoff Time R/L comparison. DJ protocol still uses contactTime for RSI (regression test passed).",
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "tests_executed": {
+    "backend_api_tests": {
+      "total": 9,
+      "passed": 9,
+      "failed": 0,
+      "tests": [
+        "test_cmj_with_time_to_takeoff_calculates_rsimod - PASSED (RSI=0.19 = jumpHeight/timeToTakeoff)",
+        "test_cmj_rsi_is_zero_without_time_to_takeoff - PASSED (RSI=0 when TTT=null)",
+        "test_sl_cmj_left_saves_with_time_to_takeoff - PASSED (RSI=0.15)",
+        "test_sl_cmj_right_saves_with_time_to_takeoff - PASSED (RSI=0.18)",
+        "test_dj_rsi_uses_contact_time_not_time_to_takeoff - PASSED (RSI=1.2 uses contactTime, not TTT)",
+        "test_analysis_returns_sl_cmj_data - PASSED (time_to_takeoff_ms and rsi_modified fields exist)",
+        "test_analysis_returns_cmj_with_new_fields - PASSED",
+        "test_asymmetry_data_when_both_legs_exist - PASSED (red_flag=True when >10%)",
+        "test_vbt_endpoints_still_work - PASSED (VBT isolated)"
+      ]
+    },
+    "code_review_verifications": [
+      "Backend RSI calculation - CMJ/SL-CMJ uses timeToTakeoff (lines 5304-5318)",
+      "Backend RSI calculation - DJ still uses contactTime (line 5317)",
+      "Frontend handleSaveAssessment - Promise.all saves BOTH SL-CMJ legs (line 462)",
+      "Frontend handleSaveAssessment - time_to_takeoff_ms=eccentricDurationMs sent (lines 470, 480, 517)",
+      "Frontend AsymmetryCard - 'RSImod' label used (line 399)",
+      "Frontend AsymmetryCard - Takeoff Time R/L bars added (lines 453-479)",
+      "Frontend jumpDetector.ts - CMJ contactTimeMs=0, rsiMod uses timeToTakeoffMs (lines 513-519)",
+      "Frontend jumpDetector.ts - DJ uses contactTimeMs for RSI (line 631, 646)",
+      "VBT Camera - NO imports from services/jump (isolation verified)"
+    ]
+  },
+  "bug_fixes_verified": {
+    "issue_1_rsi_formula": {
+      "status": "FIXED",
+      "description": "RSImod must use jumpHeight/timeToTakeoff (not contactTime) for CMJ/SL-CMJ",
+      "verification": "Backend line 5310: rsi = round((jump_height_cm / 100) / (ttt / 1000), 2)",
+      "test_result": "RSI=0.19 for jumpHeight=16.7cm, TTT=865ms (expected: 0.167/0.865=0.19)"
+    },
+    "issue_2_sl_cmj_persistence": {
+      "status": "FIXED",
+      "description": "SL-CMJ metrics persisted to DB",
+      "verification": "Backend line 5363: time_to_takeoff_ms=data.time_to_takeoff_ms saved",
+      "test_result": "SL-CMJ Left RSI=0.15, SL-CMJ Right RSI=0.18 saved with time_to_takeoff_ms"
+    },
+    "issue_3_sl_cmj_dual_save": {
+      "status": "FIXED",
+      "description": "Save pipeline includes SL-CMJ dual legs",
+      "verification": "Frontend line 462: Promise.all saves both legs as separate assessments",
+      "test_result": "Code review confirms Promise.all([api.post leg1, api.post leg2])"
+    },
+    "issue_4_analysis_new_fields": {
+      "status": "FIXED",
+      "description": "Charts load SL-CMJ data with rsi_modified and time_to_takeoff_ms",
+      "verification": "Backend lines 5552, 5560: time_to_takeoff_ms included in analysis response",
+      "test_result": "Analysis returns time_to_takeoff_ms=800.0, rsi_modified=0.18 for SL-CMJ Right"
+    },
+    "issue_5_asymmetry_charts": {
+      "status": "FIXED",
+      "description": "Charts show R/L comparison for SL-CMJ (Jump Height, RSImod, Takeoff Time)",
+      "verification": "Frontend lines 397-479: RSImod, Height, Takeoff Time bars rendered",
+      "test_result": "Code review confirms all three comparison bars added to AsymmetryCard"
+    }
+  }
+}

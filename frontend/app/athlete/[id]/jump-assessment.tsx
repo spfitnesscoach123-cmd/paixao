@@ -360,8 +360,21 @@ const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalys
     };
   };
   
+  const getTakeoffTimeBarWidths = () => {
+    if (!slCmjData) return { right: 50, left: 50 };
+    const rightTTT = slCmjData.right?.time_to_takeoff_ms || 0;
+    const leftTTT = slCmjData.left?.time_to_takeoff_ms || 0;
+    const maxTTT = Math.max(rightTTT, leftTTT);
+    if (maxTTT === 0) return { right: 50, left: 50 };
+    return {
+      right: (rightTTT / maxTTT) * 100,
+      left: (leftTTT / maxTTT) * 100
+    };
+  };
+  
   const rsiWidths = getRsiBarWidths();
   const heightWidths = getHeightBarWidths();
+  const tttWidths = getTakeoffTimeBarWidths();
   
   return (
     <View style={[styles.asymmetryCard, asymmetry.red_flag && styles.asymmetryCardRedFlag]}>
@@ -381,9 +394,9 @@ const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalys
         )}
       </View>
       
-      {/* RSI Comparison Bars */}
+      {/* RSImod Comparison Bars */}
       <View style={styles.asymmetryBarSection}>
-        <Text style={styles.asymmetryMetricTitle}>RSI</Text>
+        <Text style={styles.asymmetryMetricTitle}>RSImod</Text>
         <View style={styles.asymmetryComparisonRow}>
           <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
           <View style={styles.asymmetryBarContainer}>
@@ -436,6 +449,35 @@ const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalys
           Δ {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
         </Text>
       </View>
+      
+      {/* Takeoff Time Comparison Bars */}
+      {slCmjData?.right?.time_to_takeoff_ms && slCmjData?.left?.time_to_takeoff_ms && (
+        <View style={styles.asymmetryBarSection}>
+          <Text style={styles.asymmetryMetricTitle}>
+            {locale === 'pt' ? 'Tempo Decolagem (ms)' : 'Takeoff Time (ms)'}
+          </Text>
+          <View style={styles.asymmetryComparisonRow}>
+            <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
+            <View style={styles.asymmetryBarContainer}>
+              <View style={[styles.asymmetryBarFill, { 
+                width: `${tttWidths.right}%`,
+                backgroundColor: '#a78bfa'
+              }]} />
+            </View>
+            <Text style={styles.asymmetryValueText}>{slCmjData.right.time_to_takeoff_ms.toFixed(0)}</Text>
+          </View>
+          <View style={styles.asymmetryComparisonRow}>
+            <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
+            <View style={styles.asymmetryBarContainer}>
+              <View style={[styles.asymmetryBarFill, { 
+                width: `${tttWidths.left}%`,
+                backgroundColor: '#818cf8'
+              }]} />
+            </View>
+            <Text style={styles.asymmetryValueText}>{slCmjData.left.time_to_takeoff_ms.toFixed(0)}</Text>
+          </View>
+        </View>
+      )}
       
       <Text style={styles.asymmetryInterpretation}>{asymmetry.interpretation}</Text>
       

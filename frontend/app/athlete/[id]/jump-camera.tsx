@@ -447,20 +447,77 @@ function JumpCameraContent() {
   });
 
   // Handle save
-  const handleSaveAssessment = useCallback(() => {
+  const handleSaveAssessment = useCallback(async () => {
     if (!jumpCamera.metrics) return;
     
+    const isSlCmj = selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right';
+    const today = format(new Date(), 'yyyy-MM-dd');
+    
+    // SL-CMJ: Save BOTH legs as separate assessments
+    if (isSlCmj && jumpCamera.slCmjLeg1 && jumpCamera.slCmjLeg2) {
+      try {
+        const leg1Protocol = jumpCamera.slCmjLeg1.leg === 'left' ? 'sl_cmj_left' : 'sl_cmj_right';
+        const leg2Protocol = jumpCamera.slCmjLeg2.leg === 'left' ? 'sl_cmj_left' : 'sl_cmj_right';
+        
+        const [res1, res2] = await Promise.all([
+          api.post('/jump/assessment', {
+            athlete_id: athleteId,
+            date: today,
+            protocol: leg1Protocol,
+            flight_time_ms: jumpCamera.slCmjLeg1.metrics.flightTimeMs,
+            contact_time_ms: 0,
+            jump_height_cm: jumpCamera.slCmjLeg1.metrics.jumpHeightCm,
+            time_to_takeoff_ms: jumpCamera.slCmjLeg1.metrics.eccentricDurationMs,
+            notes: 'data_source: camera',
+          }),
+          api.post('/jump/assessment', {
+            athlete_id: athleteId,
+            date: today,
+            protocol: leg2Protocol,
+            flight_time_ms: jumpCamera.slCmjLeg2.metrics.flightTimeMs,
+            contact_time_ms: 0,
+            jump_height_cm: jumpCamera.slCmjLeg2.metrics.jumpHeightCm,
+            time_to_takeoff_ms: jumpCamera.slCmjLeg2.metrics.eccentricDurationMs,
+            notes: 'data_source: camera',
+          }),
+        ]);
+        
+        queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
+        queryClient.invalidateQueries({ queryKey: ['jump-assessments'] });
+        queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
+        
+        const r1 = res1.data?.calculations;
+        const r2 = res2.data?.calculations;
+        
+        Alert.alert(
+          locale === 'pt' ? 'SL-CMJ Salvo!' : 'SL-CMJ Saved!',
+          locale === 'pt'
+            ? `${jumpCamera.slCmjLeg1.leg === 'left' ? 'Esq' : 'Dir'}: ${r1?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r1?.rsi?.toFixed(2)}\n${jumpCamera.slCmjLeg2.leg === 'left' ? 'Esq' : 'Dir'}: ${r2?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r2?.rsi?.toFixed(2)}`
+            : `${jumpCamera.slCmjLeg1.leg === 'left' ? 'L' : 'R'}: ${r1?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r1?.rsi?.toFixed(2)}\n${jumpCamera.slCmjLeg2.leg === 'left' ? 'L' : 'R'}: ${r2?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r2?.rsi?.toFixed(2)}`,
+          [{ text: 'OK', onPress: () => router.back() }]
+        );
+      } catch (error: any) {
+        Alert.alert(
+          locale === 'pt' ? 'Erro' : 'Error',
+          error.response?.data?.detail || (locale === 'pt' ? 'Erro ao salvar SL-CMJ' : 'Error saving SL-CMJ')
+        );
+      }
+      return;
+    }
+    
+    // CMJ or DJ: Save single assessment with time_to_takeoff_ms
     submitMutation.mutate({
       athlete_id: athleteId,
-      date: format(new Date(), 'yyyy-MM-dd'),
+      date: today,
       protocol: selectedProtocol,
       flight_time_ms: jumpCamera.metrics.flightTimeMs,
       contact_time_ms: jumpCamera.metrics.contactTimeMs,
       jump_height_cm: jumpCamera.metrics.jumpHeightCm,
       box_height_cm: selectedProtocol === 'dj' ? parseFloat(boxHeight) : null,
+      time_to_takeoff_ms: jumpCamera.metrics.eccentricDurationMs || null,
       notes: `data_source: camera`,
     });
-  }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, submitMutation]);
+  }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
 
   // ============================================================
   // handleStartCamera - Initiates the progressive initialization
