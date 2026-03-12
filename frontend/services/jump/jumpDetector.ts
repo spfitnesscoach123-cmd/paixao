@@ -510,11 +510,13 @@ function analyzeCMJ(
         eccentricDurationMs = frames[takeoffFrameIdx].timestamp - frames[countermovementStartIdx].timestamp;
       }
       
-      // Contact time for CMJ = eccentric + concentric (countermovement to takeoff)
-      const contactTimeMs = eccentricDurationMs > 0 ? eccentricDurationMs : 250;
+      // For CMJ: contactTimeMs is NOT applicable (reactive contact is a DJ concept)
+      // timeToTakeoff = eccentricDuration (from movement start to takeoff)
+      const contactTimeMs = 0;
+      const timeToTakeoffMs = eccentricDurationMs;
       
-      // RSI modified = jump_height_cm / (contact_time_ms / 1000)
-      const rsiMod = contactTimeMs > 0 ? (jumpHeightCm / 100) / (contactTimeMs / 1000) : 0;
+      // RSI modified for CMJ = jumpHeight (m) / timeToTakeoff (s)
+      const rsiMod = timeToTakeoffMs > 0 ? (jumpHeightCm / 100) / (timeToTakeoffMs / 1000) : 0;
       
       const metrics: JumpMetrics = {
         flightTimeMs,
@@ -530,7 +532,8 @@ function analyzeCMJ(
       console.log('[LOG_JUMP_METRICS_CALCULATED]   flightTime=' + flightTimeMs + 'ms');
       console.log('[LOG_JUMP_METRICS_CALCULATED]   jumpHeight=' + jumpHeightCm.toFixed(1) + 'cm');
       console.log('[LOG_JUMP_METRICS_CALCULATED]   eccentricDuration=' + eccentricDurationMs + 'ms');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   rsiMod=' + rsiMod.toFixed(2));
+      console.log('[LOG_JUMP_METRICS_CALCULATED]   timeToTakeoff=' + timeToTakeoffMs + 'ms');
+      console.log('[LOG_JUMP_METRICS_CALCULATED]   rsiMod=' + rsiMod.toFixed(2) + ' (jumpHeight/timeToTakeoff)');
       
       return {
         events,

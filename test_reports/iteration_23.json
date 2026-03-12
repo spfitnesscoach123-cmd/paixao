@@ -1,0 +1,84 @@
+{
+  "summary": "Bug fix validation complete. Two specific bugs tested: (1) CMJ RSImod calculation now correctly uses timeToTakeoff instead of contactTime, and contactTimeMs=0 for CMJ protocol. (2) useFocusEffect added to jump-assessment.tsx to refetch analysis on screen focus. All 5 backend API tests passed. Frontend code review verified all changes.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_cmj_rsi_bugfix.xml",
+    "/app/backend/tests/test_cmj_rsi_bugfix.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED: /app/frontend/services/jump/jumpDetector.ts lines 513-522 - CMJ contactTimeMs now set to 0, RSImod uses timeToTakeoffMs (eccentricDurationMs) instead of contactTimeMs",
+    "VERIFIED: /app/frontend/services/jump/jumpDetector.ts lines 630-656 - DJ still uses contactTimeMs for RSI calculation (NOT affected by CMJ fix)",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-assessment.tsx line 20 - Added useFocusEffect import from @react-navigation/core",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-assessment.tsx lines 751-755 - useFocusEffect callback calls refetchAnalysis() on screen focus to update charts",
+    "VERIFIED: /app/frontend/app/athlete/[id]/jump-camera.tsx line 1182 - Contact time card hidden when contactTimeMs=0 (CMJ protocol)",
+    "VERIFIED: VBT Camera (vbt-camera.tsx) has NO imports from services/jump - isolation maintained"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_cmj_rsi_bugfix.py - Created test file for CMJ RSI bug fix validation"
+  ],
+  "success_rate": {
+    "backend": "100% (5/5 tests passed)",
+    "frontend": "N/A - React Native app, code review only (not browser testable)"
+  },
+  "test_credentials": {
+    "email": "contato@loadmanagerpro.com.br",
+    "password": "#UAE2026"
+  },
+  "seed_data_creation": "TEST_CMJ_CONTACT_ZERO and TEST_DJ_CONTACT_TIME assessments created during testing",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Bug fixes validated. CMJ RSImod now uses timeToTakeoff (eccentricDurationMs) instead of contactTime. useFocusEffect added to jump-assessment.tsx for chart updates on screen focus. Backend correctly handles contact_time_ms=0 for CMJ protocol.",
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "tests_executed": {
+    "backend_api_tests": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": [
+        "test_cmj_assessment_with_contact_time_zero_saves_without_error - PASSED",
+        "test_cmj_rsi_is_zero_when_contact_time_is_zero - PASSED",
+        "test_dj_assessment_with_contact_time_calculates_rsi - PASSED (regression test)",
+        "test_analysis_endpoint_returns_data - PASSED",
+        "test_get_protocols - PASSED"
+      ]
+    },
+    "code_review_verifications": [
+      "jumpDetector.ts CMJ analysis - contactTimeMs = 0 (line 515)",
+      "jumpDetector.ts CMJ analysis - rsiMod uses timeToTakeoffMs (line 519)",
+      "jumpDetector.ts DJ analysis - contactTimeMs still calculated from timestamps (line 631)",
+      "jumpDetector.ts DJ analysis - RSI uses contactTimeMs (line 646)",
+      "jump-assessment.tsx - useFocusEffect import from @react-navigation/core (line 20)",
+      "jump-assessment.tsx - useFocusEffect callback refetches analysis (lines 751-755)",
+      "jump-camera.tsx - Contact time card hidden when contactTimeMs=0 (line 1182)",
+      "vbt-camera.tsx - NO imports from services/jump (isolation verified)"
+    ]
+  },
+  "bug_fixes_verified": {
+    "bug_1_rsimod_calculation": {
+      "status": "FIXED",
+      "description": "CMJ RSImod incorrectly used contactTime, now uses timeToTakeoff",
+      "files_changed": ["/app/frontend/services/jump/jumpDetector.ts"],
+      "lines_changed": "513-522",
+      "verification": "Code review confirms contactTimeMs=0 for CMJ and rsiMod uses timeToTakeoffMs"
+    },
+    "bug_2_chart_refetch": {
+      "status": "FIXED",
+      "description": "Chart in assessment page didn't update after subsequent tests",
+      "files_changed": ["/app/frontend/app/athlete/[id]/jump-assessment.tsx"],
+      "lines_changed": "20, 751-755",
+      "verification": "Code review confirms useFocusEffect from @react-navigation/core triggers refetchAnalysis() on screen focus"
+    }
+  }
+}

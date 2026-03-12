@@ -17,6 +17,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Line, Circle, Rect, G, Text as SvgText, Path, Polyline } from 'react-native-svg';
+import { useFocusEffect } from '@react-navigation/core';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
@@ -744,6 +745,14 @@ function JumpAssessmentContent() {
     staleTime: 0, // Always fetch fresh data to ensure dynamic updates
     refetchOnMount: 'always', // Refetch when component mounts
   });
+  
+  // Refetch analysis data when screen gains focus (e.g. returning from Jump Camera)
+  // This ensures charts and metrics always show the latest data
+  useFocusEffect(
+    useCallback(() => {
+      refetchAnalysis();
+    }, [refetchAnalysis])
+  );
   
   // Submit mutation
   const submitMutation = useMutation({
