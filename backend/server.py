@@ -7530,6 +7530,7 @@ class TeamDashboardAthlete(BaseModel):
     acwr: Optional[float] = None
     risk_level: str = "unknown"
     fatigue_score: Optional[float] = None
+    readiness_score: Optional[float] = None  # Wellness readiness 0-100%
     last_gps_date: Optional[str] = None
     last_wellness_date: Optional[str] = None
     wellness_score: Optional[float] = None
@@ -7550,6 +7551,7 @@ class TeamDashboardStats(BaseModel):
     team_avg_acwr: float
     team_avg_wellness: float
     team_avg_fatigue: float
+    team_avg_readiness: Optional[float] = None  # Wellness readiness 0-100%
     sessions_this_week: int
     total_distance_this_week: float
     team_avg_power: Optional[float] = None
@@ -7773,6 +7775,8 @@ async def get_team_dashboard(
     wellness_count = 0
     total_fatigue = 0
     fatigue_count = 0
+    total_readiness = 0
+    readiness_count = 0
     total_distance = 0
     total_power = 0
     power_count = 0
@@ -7818,14 +7822,27 @@ async def get_team_dashboard(
             last_gps_date = gps_data[0].get("date")
             unique_sessions_7d = set()
             
-            # Build GPS data indexed by date
+            # ============================================================
+            # GPS AGGREGATION FIX: Avoid double-counting periods
+            # Group records by (date, session_name), then apply session/period logic
+            # ============================================================
+            _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+            _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+            
+            # Step 1: Group records by (date, session_name)
+            grouped: Dict[str, Dict[str, list]] = {}  # date -> session_name -> [records]
             for record in gps_data:
                 try:
                     record_date_str = record["date"]
-                    record_date = datetime.strptime(record_date_str, "%Y-%m-%d")
+                    datetime.strptime(record_date_str, "%Y-%m-%d")
                 except:
                     continue
-                
+                sname = record.get("session_name") or "default"
+                grouped.setdefault(record_date_str, {}).setdefault(sname, []).append(record)
+            
+            # Step 2: For each (date, session), pick session-total or sum periods
+            for record_date_str, sessions_map in grouped.items():
+                record_date = datetime.strptime(record_date_str, "%Y-%m-%d")
                 if record_date_str not in gps_data_by_date:
                     gps_data_by_date[record_date_str] = {
                         "total_distance": 0, "high_intensity_distance": 0,
@@ -7833,28 +7850,46 @@ async def get_team_dashboard(
                         "number_of_sprints": 0, "acc_dec": 0
                     }
                 
-                dist = record.get("total_distance", 0) or 0
-                hid = record.get("high_intensity_distance", 0) or 0
-                hsr = record.get("high_speed_running", 0) or 0
-                sprint_dist = record.get("sprint_distance", 0) or 0
-                sprint_count = record.get("number_of_sprints", 0) or 0
-                acc_count = record.get("number_of_accelerations", 0) or 0
-                dec_count = record.get("number_of_decelerations", 0) or 0
-                
-                gps_data_by_date[record_date_str]["total_distance"] += dist
-                gps_data_by_date[record_date_str]["high_intensity_distance"] += hid
-                gps_data_by_date[record_date_str]["high_speed_running"] += hsr
-                gps_data_by_date[record_date_str]["sprint_distance"] += sprint_dist
-                gps_data_by_date[record_date_str]["number_of_sprints"] += sprint_count
-                gps_data_by_date[record_date_str]["acc_dec"] += acc_count + dec_count
-                
-                session_key = f"{record_date_str}_{record.get('session_name', 'default')}"
-                
-                if record_date >= seven_days_ago:
-                    distance_7d += dist
-                    unique_sessions_7d.add(session_key)
-                    total_hid += hid
-                    hid_count += 1
+                for sname, records in sessions_map.items():
+                    session_key = f"{record_date_str}_{sname}"
+                    
+                    # Apply session/period dedup logic (same as extract_gps_metrics_from_session)
+                    session_total_rec = None
+                    period_recs = []
+                    for r in records:
+                        pname = (r.get("period_name") or "").lower()
+                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
+                        if is_sess and not is_period:
+                            if session_total_rec is None:
+                                session_total_rec = r
+                        else:
+                            period_recs.append(r)
+                    
+                    # Choose source: session total > periods > all records
+                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    
+                    for r in source:
+                        dist = r.get("total_distance", 0) or 0
+                        hid = r.get("high_intensity_distance", 0) or 0
+                        hsr = r.get("high_speed_running", 0) or 0
+                        sprint_dist = r.get("sprint_distance", 0) or 0
+                        sprint_count = r.get("number_of_sprints", 0) or 0
+                        acc_count = r.get("number_of_accelerations", 0) or 0
+                        dec_count = r.get("number_of_decelerations", 0) or 0
+                        
+                        gps_data_by_date[record_date_str]["total_distance"] += dist
+                        gps_data_by_date[record_date_str]["high_intensity_distance"] += hid
+                        gps_data_by_date[record_date_str]["high_speed_running"] += hsr
+                        gps_data_by_date[record_date_str]["sprint_distance"] += sprint_dist
+                        gps_data_by_date[record_date_str]["number_of_sprints"] += sprint_count
+                        gps_data_by_date[record_date_str]["acc_dec"] += acc_count + dec_count
+                        
+                        if record_date >= seven_days_ago:
+                            distance_7d += dist
+                            unique_sessions_7d.add(session_key)
+                            total_hid += hid
+                            hid_count += 1
             
             sessions_7d = len(unique_sessions_7d)
             total_distance += distance_7d
@@ -7920,6 +7955,7 @@ async def get_team_dashboard(
         wellness_data = wellness_by_athlete.get(athlete_id, [])[:7]
         wellness_score = None
         fatigue_score = None
+        readiness_score_pct = None  # Readiness as 0-100%
         last_wellness_date = None
         
         if wellness_data:
@@ -7946,12 +7982,22 @@ async def get_team_dashboard(
             fatigue = latest_wellness.get("fatigue", 5)
             fatigue_score = fatigue * 10
             
+            # Extract readiness_score (0-10 scale) and convert to 0-100%
+            raw_readiness = latest_wellness.get("readiness_score")
+            if raw_readiness is not None:
+                readiness_score_pct = round(raw_readiness * 10, 1)
+            
             if wellness_score and wellness_score > 0:
                 total_wellness += wellness_score
                 wellness_count += 1
             
             total_fatigue += fatigue_score
             fatigue_count += 1
+            
+            # Accumulate readiness for team average
+            if readiness_score_pct is not None:
+                total_readiness += readiness_score_pct
+                readiness_count += 1
             
             if fatigue_score > 70:
                 alert_msg = f"🔴 {athlete['name']}: Fadiga alta ({fatigue_score}%)" if lang == "pt" else f"🔴 {athlete['name']}: High fatigue ({fatigue_score}%)"
@@ -8035,6 +8081,7 @@ async def get_team_dashboard(
             acwr=acwr,
             risk_level=risk_level,
             fatigue_score=fatigue_score,
+            readiness_score=readiness_score_pct,
             last_gps_date=last_gps_date,
             last_wellness_date=last_wellness_date,
             wellness_score=wellness_score,
@@ -8123,6 +8170,7 @@ async def get_team_dashboard(
             team_avg_acwr=round(total_acwr / acwr_count, 2) if acwr_count > 0 else 0,
             team_avg_wellness=round(total_wellness / wellness_count, 1) if wellness_count > 0 else 0,
             team_avg_fatigue=round(total_fatigue / fatigue_count, 1) if fatigue_count > 0 else 0,
+            team_avg_readiness=round(total_readiness / readiness_count, 1) if readiness_count > 0 else None,
             sessions_this_week=total_sessions_7d_global,
             total_distance_this_week=round(total_distance, 0),
             team_avg_power=round(total_power / power_count, 0) if power_count > 0 else None,

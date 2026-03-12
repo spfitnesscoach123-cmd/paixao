@@ -53,6 +53,7 @@ interface TeamDashboardAthlete {
   acwr: number | null;
   risk_level: string;
   fatigue_score: number | null;
+  readiness_score: number | null;
   last_gps_date: string | null;
   last_wellness_date: string | null;
   wellness_score: number | null;
@@ -80,6 +81,7 @@ interface TeamDashboardStats {
   team_avg_acwr: number;
   team_avg_wellness: number;
   team_avg_fatigue: number;
+  team_avg_readiness: number | null;
   sessions_this_week: number;
   total_distance_this_week: number;
   // New team averages
@@ -538,9 +540,9 @@ export default function TeamDashboard() {
                     </View>
                     
                     <View style={styles.athleteMetricItem}>
-                      <Text style={styles.athleteMetricLabel}>{locale === 'pt' ? 'Fadiga' : 'Fatigue'}</Text>
-                      <Text style={[styles.athleteMetricValue, { color: (athlete.fatigue_score || 0) > 70 ? '#ef4444' : colors.text.primary }]}>
-                        {athlete.fatigue_score ? `${athlete.fatigue_score}%` : '-'}
+                      <Text style={styles.athleteMetricLabel}>Readiness</Text>
+                      <Text style={[styles.athleteMetricValue, { color: (athlete.readiness_score || 0) >= 80 ? '#10b981' : (athlete.readiness_score || 0) >= 60 ? '#22d3ee' : (athlete.readiness_score || 0) >= 40 ? '#f59e0b' : '#ef4444' }]}>
+                        {athlete.readiness_score ? `${athlete.readiness_score}%` : '-'}
                       </Text>
                     </View>
                     
@@ -636,10 +638,10 @@ export default function TeamDashboard() {
             </View>
             
             <View style={styles.statCard}>
-              <LinearGradient colors={['rgba(245, 158, 11, 0.15)', 'rgba(245, 158, 11, 0.05)']} style={styles.statCardGradient}>
-                <Ionicons name="flame" size={24} color="#f59e0b" />
-                <Text style={styles.statValue}>{data.stats.team_avg_fatigue}%</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Fadiga Média' : 'Avg Fatigue'}</Text>
+              <LinearGradient colors={['rgba(16, 185, 129, 0.15)', 'rgba(34, 211, 238, 0.05)']} style={styles.statCardGradient}>
+                <Ionicons name="pulse" size={24} color="#10b981" />
+                <Text style={styles.statValue}>{data.stats.team_avg_readiness != null ? `${data.stats.team_avg_readiness}%` : '-'}</Text>
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Readiness Médio' : 'Avg Readiness'}</Text>
               </LinearGradient>
             </View>
             
