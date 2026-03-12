@@ -285,6 +285,34 @@ function PeriodizationDetailContent() {
 
     return (
       <View style={styles.tableContainer}>
+        {/* Functional day selector - moved above table */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
+          {calculations.days_config.map((day: any) => {
+            const classification = DAY_CLASSIFICATIONS.find(c => c.id === day.day_classification);
+            const isSelected = selectedDay === day.date;
+            return (
+              <TouchableOpacity
+                key={day.date}
+                style={[
+                  styles.daySelectorItem,
+                  isSelected && { borderColor: classification?.color, borderWidth: 2, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
+                ]}
+                onPress={() => handleDaySelect(day.date)}
+              >
+                <Text style={styles.daySelectorDate}>
+                  {format(parseISO(day.date), 'EEE', { locale: dateLocale })}
+                </Text>
+                <Text style={styles.daySelectorDay}>
+                  {format(parseISO(day.date), 'dd')}
+                </Text>
+                <View style={[styles.daySelectorBadge, { backgroundColor: classification?.color }]}>
+                  <Text style={styles.daySelectorBadgeText}>{classification?.label}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
         {/* Unified Table Header with dynamic title */}
         <View style={styles.sectionHeader}>
           <Ionicons 
@@ -341,41 +369,6 @@ function PeriodizationDetailContent() {
               </View>
             ))}
           </View>
-        </ScrollView>
-
-        {/* Day selector */}
-        <View style={[styles.sectionHeader, { marginTop: 24 }]}>
-          <Ionicons name="calendar-outline" size={20} color={colors.accent.primary} />
-          <Text style={styles.sectionTitle}>
-            {locale === 'pt' ? 'Selecionar Dia' : 'Select Day'}
-          </Text>
-        </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelector}>
-          {calculations.days_config.map((day: any) => {
-            const classification = DAY_CLASSIFICATIONS.find(c => c.id === day.day_classification);
-            const isSelected = selectedDay === day.date;
-            return (
-              <TouchableOpacity
-                key={day.date}
-                style={[
-                  styles.daySelectorItem,
-                  isSelected && { borderColor: classification?.color, borderWidth: 2, backgroundColor: 'rgba(139, 92, 246, 0.1)' },
-                ]}
-                onPress={() => handleDaySelect(day.date)}
-              >
-                <Text style={styles.daySelectorDate}>
-                  {format(parseISO(day.date), 'EEE', { locale: dateLocale })}
-                </Text>
-                <Text style={styles.daySelectorDay}>
-                  {format(parseISO(day.date), 'dd')}
-                </Text>
-                <View style={[styles.daySelectorBadge, { backgroundColor: classification?.color }]}>
-                  <Text style={styles.daySelectorBadgeText}>{classification?.label}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
         </ScrollView>
       </View>
     );
@@ -538,20 +531,7 @@ function PeriodizationDetailContent() {
         </TouchableOpacity>
       </View>
 
-      {/* Days overview */}
-      <View style={styles.daysOverview}>
-        {week.days.map((day: any) => {
-          const classification = DAY_CLASSIFICATIONS.find(c => c.id === day.day_classification);
-          return (
-            <View 
-              key={day.date} 
-              style={[styles.dayOverviewItem, { backgroundColor: classification?.color }]}
-            >
-              <Text style={styles.dayOverviewText}>{classification?.label}</Text>
-            </View>
-          );
-        })}
-      </View>
+      {/* Non-functional day overview badges removed — functional day selector is inside the table view */}
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {viewMode === 'table' ? renderTableView() : renderCardsView()}
@@ -750,7 +730,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     color: colors.text.secondary,
-    textAlign: 'right',
+    textAlign: 'center',
   },
   tableNameCell: {
     minWidth: 120,
@@ -775,7 +755,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   tableValueText: {
     fontSize: 12,
     color: colors.text.primary,
-    textAlign: 'right',
+    textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
   daySelector: {

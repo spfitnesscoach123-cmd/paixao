@@ -79,6 +79,13 @@ class JumpAssessmentCreate(BaseModel):
 - Source of truth: `frontend/package.json` -> version 1.0.83
 - Auto-sync: `frontend/scripts/sync-version.js`
 
+## Periodization Page Visual Fixes (Mar 2026)
+### Changes Applied
+1. **Table alignment**: Metric column headers and values changed from `textAlign: 'right'` to `'center'`. "Atleta" column remains left-aligned.
+2. **Non-functional buttons removed**: `daysOverview` static badges (D.O, MD-5, etc.) removed from rendering. No code deleted — only JSX block replaced.
+3. **Functional day selector moved above table**: Interactive day buttons (with onPress) relocated from below to above the table in `renderTableView`.
+4. **Zero logic changes**: Only `textAlign` style properties and JSX ordering modified.
+
 ## Backlog
 - P1: PDF generation crash in "Analise Cientifica"
 - P1: Refactor dashboards to use Rolling Load Engine API
