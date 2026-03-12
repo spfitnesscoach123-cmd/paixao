@@ -79,6 +79,12 @@ class JumpAssessmentCreate(BaseModel):
 - Source of truth: `frontend/package.json` -> version 1.0.83
 - Auto-sync: `frontend/scripts/sync-version.js`
 
+## Deployment Fix (Mar 2026)
+### Root Cause
+EAS iOS build failed because `eslint-import-resolver-typescript@3.10.1` pulled in `unrs-resolver@1.11.1` which has 57 platform-specific native binaries as optional dependencies. Yarn v1 on the EAS macOS builder hit a 500 error downloading `@unrs/resolver-binding-linux-arm-musleabihf`, causing the entire `yarn install` to fail — which cascaded into `@types/jest` appearing "not installed".
+### Fix
+Added `"resolutions": { "eslint-import-resolver-typescript": "3.6.3" }` in package.json. Version 3.6.3 uses `enhanced-resolve` (pure JS) instead of `unrs-resolver` (native binaries), eliminating all 57 platform-specific packages from yarn.lock.
+
 ## Periodization Page Visual Fixes (Mar 2026)
 ### Changes Applied
 1. **Table alignment**: Metric column headers and values changed from `textAlign: 'right'` to `'center'`. "Atleta" column remains left-aligned.
