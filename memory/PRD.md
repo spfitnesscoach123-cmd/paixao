@@ -14,7 +14,7 @@ A comprehensive athlete load management platform for coaches, featuring VBT (Vel
 - Rolling Load Engine (backend)
 - RevenueCat subscription management
 
-## Jump Camera Pipeline (Implemented - Feb 2026)
+## Jump Camera Pipeline
 
 ### Architecture
 ```
@@ -25,71 +25,68 @@ services/jump/
   index.ts          - Public exports
 
 app/athlete/[id]/jump-camera.tsx - Full UI (protocol selection, camera, results)
+app/athlete/[id]/jump-assessment.tsx - Analysis dashboard with charts
 ```
 
 ### Supported Protocols
-- **CMJ** (Counter Movement Jump) - with countermovement/eccentric detection, RSImod = jumpHeight/timeToTakeoff
-- **DJ** (Drop Jump) - with ground contact time and RSI = flightTime/contactTime
-- **SL-CMJ Left/Right** - with automatic two-jump sequence and bilateral comparison
-
-### Pipeline Flow
-```
-Start Capture -> Camera Ready -> Pose Detection Active -> Record Pressed
--> Countdown (calibration) -> Jump Performed -> Recording Stops
--> Jump Analysis -> Metrics Calculated -> Results Screen
--> Save or Repeat -> Graphs Updated
-```
+- **CMJ** - RSImod = jumpHeight(m) / timeToTakeoff(s). contactTime = 0.
+- **DJ** - RSI = jumpHeight(m) / contactTime(s). Classic reactive strength.
+- **SL-CMJ Left/Right** - Two-jump sequence, bilateral comparison, asymmetry detection.
 
 ### Key Metrics
 - Flight Time (ms)
-- Contact Time (ms) - **DJ only** (set to 0 for CMJ)
-- Jump Height (cm) - from flight time formula: h = (g * t^2) / 8
+- Contact Time (ms) - **DJ only**
+- Jump Height (cm) - h = (g * t^2) / 8
+- Time to Takeoff (ms) - CMJ/SL-CMJ: eccentric + concentric phase
 - Eccentric Duration (ms) - CMJ countermovement phase
-- RSI modified - jumpHeight(m) / timeToTakeoff(s) for CMJ
-- RSI classic - flightTime / contactTime for DJ
+- RSImod - jumpHeight / timeToTakeoff (CMJ/SL-CMJ)
+- RSI classic - jumpHeight / contactTime (DJ)
 - Takeoff Velocity (m/s)
-- Bilateral asymmetry (%) - SL-CMJ
+- Bilateral asymmetry (%) - SL-CMJ with red flag >10%
 
-### Bug Fixes Applied
+### SL-CMJ Save Pipeline
+- When user saves SL-CMJ, BOTH legs saved via Promise.all (two separate API calls)
+- Each leg: sl_cmj_left or sl_cmj_right protocol with time_to_takeoff_ms
+- Analysis endpoint returns R/L data with rsi_modified and time_to_takeoff_ms
+- AsymmetryCard shows: RSImod R/L, Jump Height R/L, Takeoff Time R/L
 
-#### Critical Pipeline Fix (Feb 2026)
-- **useEffect transition bug**: Previously required `phase === 'review' && metrics`. Now transitions on `phase === 'review'` regardless of metrics.
+### Bug Fix History
+- **Pipeline break** (Feb 2026): useEffect transition required metrics (now transitions on phase='review')
+- **RSImod formula** (Mar 2026): CMJ was using contactTime. Fixed to use timeToTakeoff.
+- **SL-CMJ persistence** (Mar 2026): Only leg2 was saved. Fixed to save BOTH legs.
+- **Chart refresh** (Mar 2026): useFocusEffect added for refetch on screen focus.
+- **Backend weight null** (Feb 2026): `athlete.get('weight') or 70` fix.
 
-#### RSImod Fix (Mar 2026)
-- **contactTimeMs was incorrectly populated for CMJ** with eccentricDurationMs. Now `contactTimeMs = 0` for CMJ.
-- **RSImod now uses `timeToTakeoffMs`** directly (= eccentricDurationMs), not contactTimeMs.
-- **DJ RSI calculation unchanged** - still uses contactTimeMs correctly.
-
-#### Chart Refetch Fix (Mar 2026)
-- **Assessment page charts didn't update** after returning from Jump Camera.
-- **Added `useFocusEffect`** to refetch analysis data every time the screen gains focus.
+### Backend Schema
+```python
+class JumpAssessmentCreate(BaseModel):
+    athlete_id: str
+    date: str
+    protocol: JumpProtocol  # cmj, sl_cmj_left, sl_cmj_right, dj
+    flight_time_ms: float
+    contact_time_ms: float  # DJ only, 0 for CMJ/SL-CMJ
+    jump_height_cm: Optional[float]
+    box_height_cm: Optional[float]  # DJ only
+    time_to_takeoff_ms: Optional[float]  # CMJ/SL-CMJ: eccentric+concentric
+    notes: Optional[str]
+```
 
 ### Safety Isolation
 - Jump Camera and VBT Camera share ZERO imports
-- Jump Camera only uses `services/jump/*`
-- VBT Camera only uses `services/vbt/*`
+- No shared camera config or MediaPipe initialization modified
 
 ## Versioning System
-- Single source of truth: `frontend/package.json` -> version field
-- Auto-sync script: `frontend/scripts/sync-version.js`
-- Current version: **1.0.83**
-
-## Tech Stack
-- **Frontend**: React Native, Expo, TypeScript
-- **Backend**: FastAPI, Python
-- **Database**: MongoDB Atlas
-- **Hosting**: Railway (backend), EAS (iOS builds)
-- **Pose Detection**: @thinksys/react-native-mediapipe (patched)
-- **Subscriptions**: RevenueCat
+- Source of truth: `frontend/package.json` -> version 1.0.83
+- Auto-sync: `frontend/scripts/sync-version.js`
 
 ## Backlog
-- P1: Refactor frontend dashboards to use Rolling Load Engine API
 - P1: PDF generation crash in "Analise Cientifica"
-- P2: Internationalization of ScientificAnalysisTab and Avaliacoes
+- P1: Refactor dashboards to use Rolling Load Engine API
+- P2: Internationalization
 - P2: UI for merging duplicate athlete profiles
-- P3: Remove frontend/ios_backup_before_removal/
-- P3: Extract RiskDonut component with React.memo
-- P3: ESLint configuration for TypeScript
+- P3: Remove ios_backup_before_removal/
+- P3: Extract RiskDonut component
+- P3: ESLint config for TypeScript
 
 ## Credentials
 - Coach (PRO): contato@loadmanagerpro.com.br / #UAE2026
