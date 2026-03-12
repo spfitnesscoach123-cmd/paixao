@@ -88,6 +88,17 @@ class JumpAssessmentCreate(BaseModel):
 - P3: Extract RiskDonut component
 - P3: ESLint config for TypeScript
 
+## Team Dashboard Metrics Audit (Mar 2026)
+### Changes Applied
+1. **FADIGA → READINESS**: Athlete cards and stats now display "Readiness" (0-100%) from wellness `readiness_score * 10` instead of fatigue. Fatigue code preserved (not deleted).
+2. **GPS Period Dedup**: Dashboard now uses only "Session" records when aggregating GPS data. Prevents double-counting when Session + 1st Half + 2nd Half exist for same date/session.
+3. **Monotony/Strain Audit**: Confirmed already using `acwr_metric` selector correctly. No code changes needed.
+
+### Key Implementation Details
+- Backend: `TeamDashboardAthlete.readiness_score` (0-100%), `TeamDashboardStats.team_avg_readiness`
+- GPS dedup uses keywords: session/total/full vs half/1st/2nd/period
+- Readiness color thresholds: ≥80 green, ≥60 cyan, ≥40 amber, <40 red
+
 ## Credentials
 - Coach (PRO): contato@loadmanagerpro.com.br / #UAE2026
 - App Review Token: APPS26
