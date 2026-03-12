@@ -69,6 +69,9 @@ if (Platform.OS !== 'web') {
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
 
+// Debug UI visibility flag — set to true to re-enable debug overlays
+const SHOW_VBT_DEBUG_UI = false;
+
 // Tutorial storage key
 const TUTORIAL_COMPLETED_KEY = '@vbt_camera_tutorial_completed';
 
@@ -1403,6 +1406,7 @@ function VBTCameraContent() {
                       )}
                       
                       {/* Debug info: detected keypoints count */}
+                      {SHOW_VBT_DEBUG_UI && (
                       <View style={styles.debugOverlay}>
                         <Text style={styles.debugOverlayText}>
                           {detectedKeypoints.size > 0 
@@ -1410,6 +1414,7 @@ function VBTCameraContent() {
                             : 'Aguardando detecção...'}
                         </Text>
                       </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 </View>
@@ -1696,7 +1701,7 @@ function VBTCameraContent() {
                     </View>
                     
                     {/* Debug Landmarks Display */}
-                    {debugLandmarks && (
+                    {SHOW_VBT_DEBUG_UI && debugLandmarks && (
                       <View style={styles.debugBanner}>
                         <Text style={styles.debugText}>Landmarks: {debugLandmarks}</Text>
                       </View>
@@ -1943,6 +1948,7 @@ function VBTCameraContent() {
           </View>
           
           {/* Diagnostic Toggle Button */}
+          {SHOW_VBT_DEBUG_UI && (
           <TouchableOpacity
             style={styles.diagnosticToggleButton}
             onPress={() => setShowDiagnosticOverlay(!showDiagnosticOverlay)}
@@ -1954,8 +1960,10 @@ function VBTCameraContent() {
               color={showDiagnosticOverlay ? '#10b981' : '#6b7280'} 
             />
           </TouchableOpacity>
+          )}
           
           {/* VBT Diagnostic Overlay - Real-time debugging */}
+          {SHOW_VBT_DEBUG_UI && (
           <VBTDiagnosticOverlay 
             visible={showDiagnosticOverlay}
             compact={isTracking} /* Use compact mode during active recording */
@@ -1964,6 +1972,7 @@ function VBTCameraContent() {
             mediapipeAvailable={MEDIAPIPE_AVAILABLE}
             currentPlatform={Platform.OS}
           />
+          )}
         </View>
       )}
       
