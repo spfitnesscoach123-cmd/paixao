@@ -28,39 +28,49 @@ app/athlete/[id]/jump-camera.tsx - Full UI (protocol selection, camera, results)
 ```
 
 ### Supported Protocols
-- **CMJ** (Counter Movement Jump) - with countermovement/eccentric detection
-- **DJ** (Drop Jump) - with ground contact time and RSI
+- **CMJ** (Counter Movement Jump) - with countermovement/eccentric detection, RSImod = jumpHeight/timeToTakeoff
+- **DJ** (Drop Jump) - with ground contact time and RSI = flightTime/contactTime
 - **SL-CMJ Left/Right** - with automatic two-jump sequence and bilateral comparison
 
 ### Pipeline Flow
 ```
-Start Capture → Camera Ready → Pose Detection Active → Record Pressed
-→ Countdown (calibration) → Jump Performed → Recording Stops
-→ Jump Analysis → Metrics Calculated → Results Screen
-→ Save or Repeat → Graphs Updated
+Start Capture -> Camera Ready -> Pose Detection Active -> Record Pressed
+-> Countdown (calibration) -> Jump Performed -> Recording Stops
+-> Jump Analysis -> Metrics Calculated -> Results Screen
+-> Save or Repeat -> Graphs Updated
 ```
 
 ### Key Metrics
 - Flight Time (ms)
-- Contact Time (ms) - DJ and CMJ
-- Jump Height (cm) - from flight time formula: h = (g * t²) / 8
+- Contact Time (ms) - **DJ only** (set to 0 for CMJ)
+- Jump Height (cm) - from flight time formula: h = (g * t^2) / 8
 - Eccentric Duration (ms) - CMJ countermovement phase
-- RSI modified - jumpHeight / contactTime
+- RSI modified - jumpHeight(m) / timeToTakeoff(s) for CMJ
+- RSI classic - flightTime / contactTime for DJ
 - Takeoff Velocity (m/s)
 - Bilateral asymmetry (%) - SL-CMJ
 
-### Critical Bug Fixed (Feb 2026)
-- **useEffect transition bug**: Previously required `phase === 'review' && metrics` to show results. Now transitions to results on `phase === 'review'` regardless of metrics (null = detection failed, shows error UI)
-- **Backend weight null bug**: `athlete.get('weight', 70)` returned None when weight key exists but value is None. Fixed to `athlete.get('weight') or 70`
+### Bug Fixes Applied
+
+#### Critical Pipeline Fix (Feb 2026)
+- **useEffect transition bug**: Previously required `phase === 'review' && metrics`. Now transitions on `phase === 'review'` regardless of metrics.
+
+#### RSImod Fix (Mar 2026)
+- **contactTimeMs was incorrectly populated for CMJ** with eccentricDurationMs. Now `contactTimeMs = 0` for CMJ.
+- **RSImod now uses `timeToTakeoffMs`** directly (= eccentricDurationMs), not contactTimeMs.
+- **DJ RSI calculation unchanged** - still uses contactTimeMs correctly.
+
+#### Chart Refetch Fix (Mar 2026)
+- **Assessment page charts didn't update** after returning from Jump Camera.
+- **Added `useFocusEffect`** to refetch analysis data every time the screen gains focus.
 
 ### Safety Isolation
 - Jump Camera and VBT Camera share ZERO imports
 - Jump Camera only uses `services/jump/*`
 - VBT Camera only uses `services/vbt/*`
-- No shared camera configuration or MediaPipe initialization modified
 
 ## Versioning System
-- Single source of truth: `frontend/package.json` → version field
+- Single source of truth: `frontend/package.json` -> version field
 - Auto-sync script: `frontend/scripts/sync-version.js`
 - Current version: **1.0.83**
 
@@ -72,17 +82,10 @@ Start Capture → Camera Ready → Pose Detection Active → Record Pressed
 - **Pose Detection**: @thinksys/react-native-mediapipe (patched)
 - **Subscriptions**: RevenueCat
 
-## Pending Verification
-- Jump Camera crash fix on physical iOS device
-- Deployment stability (npx patch-package)
-- Version 1.0.83 in TestFlight
-- Team Dashboard backend optimization
-- Team Dashboard UI refactor
-
 ## Backlog
 - P1: Refactor frontend dashboards to use Rolling Load Engine API
-- P1: PDF generation crash in "Análise Científica"
-- P2: Internationalization of ScientificAnalysisTab and Avaliações
+- P1: PDF generation crash in "Analise Cientifica"
+- P2: Internationalization of ScientificAnalysisTab and Avaliacoes
 - P2: UI for merging duplicate athlete profiles
 - P3: Remove frontend/ios_backup_before_removal/
 - P3: Extract RiskDonut component with React.memo
