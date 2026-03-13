@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Line, Circle, Rect, G, Text as SvgText, Path, Polyline } from 'react-native-svg';
+import Svg, { Line, Circle, Rect, G, Text as SvgText, Path, Polyline, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/core';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
@@ -26,722 +26,388 @@ import { format } from 'date-fns';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-// Jump Protocol Types
 type JumpProtocol = 'cmj' | 'sl_cmj_right' | 'sl_cmj_left' | 'dj';
 
-interface JumpProtocolInfo {
-  id: string;
-  name: string;
-  full_name: string;
-  description: string;
-  required_fields: string[];
-  optional_fields: string[];
+interface ProtocolOption {
+  id: JumpProtocol;
+  label: string;
+  labelPt: string;
   icon: string;
 }
 
-interface JumpAnalysis {
-  athlete_id: string;
-  athlete_name: string;
-  body_mass_kg: number;
-  analysis_date: string;
-  protocols: {
-    cmj?: {
-      latest: {
-        date: string;
-        jump_height_cm: number;
-        flight_time_ms: number;
-        contact_time_ms: number;
-        rsi: number;
-        rsi_classification: string;
-        peak_power_w: number;
-        peak_velocity_ms: number;
-        relative_power_wkg: number;
-      };
-      baseline_rsi: number;
-      rsi_variation_percent: number;
-      fatigue_status: {
-        status: string;
-        status_pt: string;
-        status_en: string;
-        color: string;
-      };
-      z_score_height: number;
-      history: Array<{
-        date: string;
-        rsi: number;
-        jump_height_cm: number;
-        peak_power_w: number;
-      }>;
-    };
-    sl_cmj?: {
-      right: { date: string; jump_height_cm: number; rsi: number; peak_power_w: number };
-      left: { date: string; jump_height_cm: number; rsi: number; peak_power_w: number };
-    };
-    dj?: {
-      latest: {
-        date: string;
-        box_height_cm: number;
-        jump_height_cm: number;
-        contact_time_ms: number;
-        rsi: number;
-        rsi_modified: number;
-      };
-      history: Array<{ date: string; rsi: number; box_height_cm: number }>;
-    };
-  };
-  asymmetry?: {
-    rsi: { asymmetry_percent: number; dominant_leg: string; red_flag: boolean };
-    jump_height: { asymmetry_percent: number; dominant_leg: string; red_flag: boolean };
-    red_flag: boolean;
-    interpretation: string;
-  };
-  fatigue_analysis?: {
-    status: string;
-    status_label: string;
-    color: string;
-    rsi_variation_percent: number;
-    baseline_rsi: number;
-    current_rsi: number;
-    interpretation: string;
-  };
-  power_velocity_insights?: {
-    peak_power_w: number;
-    peak_velocity_ms: number;
-    relative_power_wkg: number;
-    power_vs_average_percent: number;
-    velocity_vs_average_percent: number;
-    profile: {
-      type: string;
-      label: string;
-      recommendation: string;
-      color: string;
-    };
-  };
-  z_score?: {
-    jump_height: number;
-    interpretation: string;
-  };
-  ai_feedback?: string;
-  recommendations: string[];
-}
+const PROTOCOLS: ProtocolOption[] = [
+  { id: 'cmj', label: 'CMJ', labelPt: 'CMJ', icon: 'trending-up' },
+  { id: 'sl_cmj_left', label: 'SL-CMJ L', labelPt: 'SL-CMJ E', icon: 'footsteps' },
+  { id: 'sl_cmj_right', label: 'SL-CMJ R', labelPt: 'SL-CMJ D', icon: 'footsteps' },
+  { id: 'dj', label: 'DJ', labelPt: 'DJ', icon: 'arrow-down' },
+];
 
-// RSI Gauge Component
-const RSIGauge = ({ rsi, classification, locale }: { rsi: number; classification: string; locale: string }) => {
-  const chartWidth = Math.min(screenWidth - 64, 300);
-  const chartHeight = 120;
-  
-  const getClassificationColor = (cls: string) => {
-    switch (cls) {
-      case 'excellent': return '#22c55e';
-      case 'very_good': return '#10b981';
-      case 'good': return '#84cc16';
-      case 'average': return '#f59e0b';
-      case 'below_average': return '#f97316';
-      case 'poor': return '#ef4444';
-      default: return colors.text.secondary;
-    }
+// ---- Animated Number Component ----
+const AnimatedNumber = ({ value, decimals = 1, suffix = '', style }: { value: number; decimals?: number; suffix?: string; style?: any }) => {
+  const [display, setDisplay] = useState('0');
+  const animRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (value === 0 || isNaN(value)) { setDisplay(value.toFixed(decimals)); return; }
+    let start = 0;
+    const duration = 800;
+    const startTime = Date.now();
+    const animate = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay((value * eased).toFixed(decimals));
+      if (progress < 1) animRef.current = requestAnimationFrame(animate);
+    };
+    animRef.current = requestAnimationFrame(animate);
+    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); };
+  }, [value, decimals]);
+
+  return <Text style={style}>{display}{suffix}</Text>;
+};
+
+// ---- RSI Gauge Component (Modernized) ----
+const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; classification: string; protocol: string; locale: string }) => {
+  const chartW = Math.min(screenWidth - 48, 320);
+  const chartH = 160;
+  const cx = chartW / 2;
+  const cy = 110;
+  const radius = 90;
+  const startAngle = Math.PI;
+  const endAngle = 0;
+
+  const isDj = protocol === 'dj';
+  const metricLabel = isDj ? 'RSI' : 'RSImod';
+  const maxVal = isDj ? 3.5 : 1.5;
+
+  const getColor = (cls: string) => {
+    const map: Record<string, string> = {
+      excellent: '#22c55e', very_good: '#10b981', good: '#84cc16',
+      average: '#f59e0b', below_average: '#f97316', poor: '#ef4444',
+    };
+    return map[cls] || '#8b5cf6';
   };
-  
-  const getClassificationLabel = (cls: string) => {
+
+  const getLabel = (cls: string) => {
     const labels: Record<string, { pt: string; en: string }> = {
       excellent: { pt: 'Excelente', en: 'Excellent' },
       very_good: { pt: 'Muito Bom', en: 'Very Good' },
       good: { pt: 'Bom', en: 'Good' },
-      average: { pt: 'Médio', en: 'Average' },
-      below_average: { pt: 'Abaixo da Média', en: 'Below Average' },
+      average: { pt: 'Medio', en: 'Average' },
+      below_average: { pt: 'Abaixo da Media', en: 'Below Average' },
       poor: { pt: 'Fraco', en: 'Poor' },
     };
     return labels[cls]?.[locale === 'pt' ? 'pt' : 'en'] || cls;
   };
-  
-  // RSI scale: 0 to 3.5
-  const maxRSI = 3.5;
-  const normalizedRSI = Math.min(rsi / maxRSI, 1);
-  const color = getClassificationColor(classification);
-  
+
+  const normalized = Math.min(Math.max(rsi / maxVal, 0), 1);
+  const color = getColor(classification);
+
+  // Arc path helpers
+  const arcPoint = (angle: number, r: number) => ({
+    x: cx + r * Math.cos(angle),
+    y: cy - r * Math.sin(angle),
+  });
+
+  const bgStart = arcPoint(startAngle, radius);
+  const bgEnd = arcPoint(endAngle, radius);
+  const bgPath = `M ${bgStart.x} ${bgStart.y} A ${radius} ${radius} 0 0 1 ${bgEnd.x} ${bgEnd.y}`;
+
+  const valAngle = startAngle - normalized * Math.PI;
+  const valEnd = arcPoint(valAngle, radius);
+  const largeArc = normalized > 0.5 ? 1 : 0;
+  const valPath = `M ${bgStart.x} ${bgStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${valEnd.x} ${valEnd.y}`;
+
+  // Tick marks
+  const ticks = isDj ? [0.5, 1.0, 1.5, 2.0, 2.5, 3.0] : [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
+
   return (
-    <View style={styles.gaugeContainer}>
-      <Text style={styles.gaugeTitle}>RSI</Text>
-      <Svg width={chartWidth} height={chartHeight}>
+    <View style={s.gaugeCard} data-testid="rsi-gauge">
+      <Text style={s.gaugeLabel}>{metricLabel}</Text>
+      <Svg width={chartW} height={chartH}>
+        <Defs>
+          <SvgLinearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#ef4444" />
+            <Stop offset="0.35" stopColor="#f59e0b" />
+            <Stop offset="0.65" stopColor="#84cc16" />
+            <Stop offset="1" stopColor="#22c55e" />
+          </SvgLinearGradient>
+        </Defs>
         {/* Background arc */}
-        <Path
-          d={`M 30 90 A 110 110 0 0 1 ${chartWidth - 30} 90`}
-          stroke="rgba(255,255,255,0.1)"
-          strokeWidth="20"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Value arc */}
-        <Path
-          d={`M 30 90 A 110 110 0 0 1 ${30 + (chartWidth - 60) * normalizedRSI} ${90 - Math.sin(Math.PI * normalizedRSI) * 60}`}
-          stroke={color}
-          strokeWidth="20"
-          fill="none"
-          strokeLinecap="round"
-        />
-        {/* Reference markers */}
-        {[1.0, 1.5, 2.0, 2.5, 2.8].map((ref, i) => {
-          const pos = ref / maxRSI;
-          const x = 30 + (chartWidth - 60) * pos;
-          const y = 90 - Math.sin(Math.PI * pos) * 60;
+        <Path d={bgPath} stroke="rgba(255,255,255,0.08)" strokeWidth="22" fill="none" strokeLinecap="round" />
+        {/* Color arc */}
+        <Path d={bgPath} stroke="url(#gaugeGrad)" strokeWidth="22" fill="none" strokeLinecap="round" opacity={0.25} />
+        {/* Value arc with glow */}
+        {normalized > 0.01 && (
+          <>
+            <Path d={valPath} stroke={color} strokeWidth="24" fill="none" strokeLinecap="round" opacity={0.3} />
+            <Path d={valPath} stroke={color} strokeWidth="18" fill="none" strokeLinecap="round" />
+          </>
+        )}
+        {/* Tick marks */}
+        {ticks.map((tick, i) => {
+          const tNorm = tick / maxVal;
+          const tAngle = startAngle - tNorm * Math.PI;
+          const inner = arcPoint(tAngle, radius - 16);
+          const outer = arcPoint(tAngle, radius + 16);
           return (
             <G key={i}>
-              <Circle cx={x} cy={y} r="3" fill="rgba(255,255,255,0.3)" />
-              <SvgText x={x} y={y - 10} textAnchor="middle" fill={colors.text.tertiary} fontSize="8">
-                {ref}
-              </SvgText>
+              <Line x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y} stroke="rgba(255,255,255,0.15)" strokeWidth="1" />
+              <SvgText x={arcPoint(tAngle, radius + 26).x} y={arcPoint(tAngle, radius + 26).y} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="9">{tick}</SvgText>
             </G>
           );
         })}
-        {/* Center value */}
-        <SvgText x={chartWidth / 2} y={75} textAnchor="middle" fill={color} fontSize="32" fontWeight="bold">
-          {rsi.toFixed(2)}
-        </SvgText>
-        <SvgText x={chartWidth / 2} y={100} textAnchor="middle" fill={color} fontSize="12" fontWeight="600">
-          {getClassificationLabel(classification)}
-        </SvgText>
+        {/* Needle */}
+        {(() => {
+          const needleAngle = startAngle - normalized * Math.PI;
+          const tip = arcPoint(needleAngle, radius - 30);
+          return <Line x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke={color} strokeWidth="3" strokeLinecap="round" />;
+        })()}
+        <Circle cx={cx} cy={cy} r="6" fill={color} />
+        <Circle cx={cx} cy={cy} r="3" fill="#0a0e1a" />
+        {/* Value text */}
+        <SvgText x={cx} y={cy - 25} textAnchor="middle" fill={color} fontSize="36" fontWeight="bold">{rsi.toFixed(2)}</SvgText>
+        <SvgText x={cx} y={cy - 8} textAnchor="middle" fill={color} fontSize="13" fontWeight="600">{getLabel(classification)}</SvgText>
       </Svg>
     </View>
   );
 };
 
-// Helper function to calculate fatigue status from DJ RSI history
-const calculateDjFatigue = (history: Array<{date: string; rsi: number; box_height_cm: number}>, locale: string): JumpAnalysis['fatigue_analysis'] | null => {
-  if (!history || history.length < 2) return null;
-  
-  // Calculate baseline RSI from first 5 entries (or all if less than 5)
-  const baselineEntries = history.slice(0, Math.min(5, history.length));
-  const baselineRsi = baselineEntries.reduce((sum, h) => sum + h.rsi, 0) / baselineEntries.length;
-  
-  // Current RSI is the latest entry (first in array, sorted by date desc)
-  const currentRsi = history[0]?.rsi || 0;
-  
-  // Calculate variation
-  const rsiVariation = baselineRsi > 0 ? ((currentRsi - baselineRsi) / baselineRsi * 100) : 0;
-  
-  // Determine status based on variation
-  let status = 'green';
-  let statusLabel = locale === 'pt' ? 'SNC Recuperado' : 'CNS Recovered';
-  let color = '#10b981';
-  let interpretation = locale === 'pt' 
-    ? 'Sistema nervoso central recuperado. Treino normal permitido.'
-    : 'Central nervous system recovered. Normal training permitted.';
-  
-  if (rsiVariation <= -13) {
-    status = 'red';
-    statusLabel = locale === 'pt' ? 'Alto Risco de Fadiga' : 'High Fatigue Risk';
-    color = '#ef4444';
-    interpretation = locale === 'pt'
-      ? '⚠️ Fadiga significativa do SNC. Alto risco de lesão. Reduzir carga ou individualizar treino.'
-      : '⚠️ Significant CNS fatigue. High injury risk. Reduce load or individualize training.';
-  } else if (rsiVariation <= -6) {
-    status = 'yellow';
-    statusLabel = locale === 'pt' ? 'Monitorar Fadiga' : 'Monitor Fatigue';
-    color = '#f59e0b';
-    interpretation = locale === 'pt'
-      ? 'Possível fadiga do SNC detectada. Monitorar volume de sprints e exercícios de alta velocidade.'
-      : 'Possible CNS fatigue detected. Monitor sprint volume and high-speed exercises.';
-  }
-  
-  return {
-    status,
-    status_label: statusLabel,
-    color,
-    rsi_variation_percent: rsiVariation,
-    baseline_rsi: baselineRsi,
-    current_rsi: currentRsi,
-    interpretation,
-  };
-};
-
-// Fatigue Status Card
-const FatigueStatusCard = ({ fatigue, locale }: { fatigue: JumpAnalysis['fatigue_analysis']; locale: string }) => {
-  if (!fatigue) return null;
-  
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'green': return 'checkmark-circle';
-      case 'yellow': return 'alert-circle';
-      case 'red': return 'warning';
-      default: return 'help-circle';
-    }
-  };
-  
-  return (
-    <View style={[styles.fatigueCard, { borderColor: fatigue.color }]}>
-      <View style={styles.fatigueHeader}>
-        <Ionicons name={getStatusIcon(fatigue.status) as any} size={28} color={fatigue.color} />
-        <View style={styles.fatigueHeaderText}>
-          <Text style={styles.fatigueTitle}>
-            {locale === 'pt' ? 'Índice de Fadiga (SNC)' : 'Fatigue Index (CNS)'}
-          </Text>
-          <Text style={[styles.fatigueStatus, { color: fatigue.color }]}>
-            {fatigue.status_label}
-          </Text>
-        </View>
-        <View style={[styles.variationBadge, { backgroundColor: fatigue.color + '20' }]}>
-          <Text style={[styles.variationText, { color: fatigue.color }]}>
-            {Math.abs(fatigue.rsi_variation_percent).toFixed(1)}%
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.fatigueMetrics}>
-        <View style={styles.fatigueMetric}>
-          <Text style={styles.fatigueMetricLabel}>
-            {locale === 'pt' ? 'RSI Baseline' : 'Baseline RSI'}
-          </Text>
-          <Text style={styles.fatigueMetricValue}>{fatigue.baseline_rsi.toFixed(2)}</Text>
-        </View>
-        <View style={styles.fatigueMetricDivider} />
-        <View style={styles.fatigueMetric}>
-          <Text style={styles.fatigueMetricLabel}>
-            {locale === 'pt' ? 'RSI Atual' : 'Current RSI'}
-          </Text>
-          <Text style={[styles.fatigueMetricValue, { color: fatigue.color }]}>
-            {fatigue.current_rsi.toFixed(2)}
-          </Text>
-        </View>
-      </View>
-      
-      <Text style={styles.fatigueInterpretation}>{fatigue.interpretation}</Text>
-      
-      {/* Reference Scale */}
-      <View style={styles.fatigueScale}>
-        <View style={[styles.fatigueScaleItem, { backgroundColor: '#10b98120' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#10b981' }]}>0 a 5%</Text>
-          <Text style={styles.fatigueScaleText}>Normal</Text>
-        </View>
-        <View style={[styles.fatigueScaleItem, { backgroundColor: '#f59e0b20' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#f59e0b' }]}>6 a 12%</Text>
-          <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Monitorar' : 'Monitor'}</Text>
-        </View>
-        <View style={[styles.fatigueScaleItem, { backgroundColor: '#ef444420' }]}>
-          <Text style={[styles.fatigueScaleLabel, { color: '#ef4444' }]}>&gt;13%</Text>
-          <Text style={styles.fatigueScaleText}>{locale === 'pt' ? 'Alto Risco' : 'High Risk'}</Text>
-        </View>
-      </View>
-    </View>
-  );
-};
-
-// Asymmetry Card with Visual Bar Chart
-const AsymmetryCard = ({ asymmetry, slCmjData, locale }: { asymmetry: JumpAnalysis['asymmetry']; slCmjData?: JumpAnalysis['protocols']['sl_cmj']; locale: string }) => {
-  if (!asymmetry) return null;
-  
-  const getDominantLegLabel = (leg: string) => {
-    if (leg === 'right') return locale === 'pt' ? 'Direita' : 'Right';
-    if (leg === 'left') return locale === 'pt' ? 'Esquerda' : 'Left';
-    return locale === 'pt' ? 'Igual' : 'Equal';
-  };
-  
-  // Calculate bar widths based on actual values
-  const getRsiBarWidths = () => {
-    if (!slCmjData) return { right: 50, left: 50 };
-    const rightRsi = slCmjData.right?.rsi || 0;
-    const leftRsi = slCmjData.left?.rsi || 0;
-    const maxRsi = Math.max(rightRsi, leftRsi);
-    if (maxRsi === 0) return { right: 50, left: 50 };
-    return {
-      right: (rightRsi / maxRsi) * 100,
-      left: (leftRsi / maxRsi) * 100
-    };
-  };
-  
-  const getHeightBarWidths = () => {
-    if (!slCmjData) return { right: 50, left: 50 };
-    const rightHeight = slCmjData.right?.jump_height_cm || 0;
-    const leftHeight = slCmjData.left?.jump_height_cm || 0;
-    const maxHeight = Math.max(rightHeight, leftHeight);
-    if (maxHeight === 0) return { right: 50, left: 50 };
-    return {
-      right: (rightHeight / maxHeight) * 100,
-      left: (leftHeight / maxHeight) * 100
-    };
-  };
-  
-  const getTakeoffTimeBarWidths = () => {
-    if (!slCmjData) return { right: 50, left: 50 };
-    const rightTTT = slCmjData.right?.time_to_takeoff_ms || 0;
-    const leftTTT = slCmjData.left?.time_to_takeoff_ms || 0;
-    const maxTTT = Math.max(rightTTT, leftTTT);
-    if (maxTTT === 0) return { right: 50, left: 50 };
-    return {
-      right: (rightTTT / maxTTT) * 100,
-      left: (leftTTT / maxTTT) * 100
-    };
-  };
-  
-  const rsiWidths = getRsiBarWidths();
-  const heightWidths = getHeightBarWidths();
-  const tttWidths = getTakeoffTimeBarWidths();
-  
-  return (
-    <View style={[styles.asymmetryCard, asymmetry.red_flag && styles.asymmetryCardRedFlag]}>
-      <View style={styles.asymmetryHeader}>
-        <Ionicons 
-          name={asymmetry.red_flag ? 'flag' : 'swap-horizontal'} 
-          size={24} 
-          color={asymmetry.red_flag ? '#ef4444' : colors.accent.primary} 
-        />
-        <Text style={styles.asymmetryTitle}>
-          {locale === 'pt' ? 'Assimetria de Membros' : 'Limb Asymmetry'}
-        </Text>
-        {asymmetry.red_flag && (
-          <View style={styles.redFlagBadge}>
-            <Text style={styles.redFlagText}>RED FLAG</Text>
-          </View>
-        )}
-      </View>
-      
-      {/* RSImod Comparison Bars */}
-      <View style={styles.asymmetryBarSection}>
-        <Text style={styles.asymmetryMetricTitle}>RSImod</Text>
-        <View style={styles.asymmetryComparisonRow}>
-          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
-          <View style={styles.asymmetryBarContainer}>
-            <View style={[styles.asymmetryBarFill, { 
-              width: `${rsiWidths.right}%`,
-              backgroundColor: asymmetry.rsi.dominant_leg === 'right' ? '#22c55e' : '#60a5fa'
-            }]} />
-          </View>
-          <Text style={styles.asymmetryValueText}>{slCmjData?.right?.rsi?.toFixed(2) || '-'}</Text>
-        </View>
-        <View style={styles.asymmetryComparisonRow}>
-          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
-          <View style={styles.asymmetryBarContainer}>
-            <View style={[styles.asymmetryBarFill, { 
-              width: `${rsiWidths.left}%`,
-              backgroundColor: asymmetry.rsi.dominant_leg === 'left' ? '#22c55e' : '#60a5fa'
-            }]} />
-          </View>
-          <Text style={styles.asymmetryValueText}>{slCmjData?.left?.rsi?.toFixed(2) || '-'}</Text>
-        </View>
-        <Text style={[styles.asymmetryDiffText, asymmetry.rsi.red_flag && { color: '#ef4444' }]}>
-          Δ {asymmetry.rsi.asymmetry_percent.toFixed(1)}%
-        </Text>
-      </View>
-      
-      {/* Jump Height Comparison Bars */}
-      <View style={styles.asymmetryBarSection}>
-        <Text style={styles.asymmetryMetricTitle}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
-        <View style={styles.asymmetryComparisonRow}>
-          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
-          <View style={styles.asymmetryBarContainer}>
-            <View style={[styles.asymmetryBarFill, { 
-              width: `${heightWidths.right}%`,
-              backgroundColor: asymmetry.jump_height.dominant_leg === 'right' ? '#f59e0b' : '#a78bfa'
-            }]} />
-          </View>
-          <Text style={styles.asymmetryValueText}>{slCmjData?.right?.jump_height_cm?.toFixed(1) || '-'}</Text>
-        </View>
-        <View style={styles.asymmetryComparisonRow}>
-          <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
-          <View style={styles.asymmetryBarContainer}>
-            <View style={[styles.asymmetryBarFill, { 
-              width: `${heightWidths.left}%`,
-              backgroundColor: asymmetry.jump_height.dominant_leg === 'left' ? '#f59e0b' : '#a78bfa'
-            }]} />
-          </View>
-          <Text style={styles.asymmetryValueText}>{slCmjData?.left?.jump_height_cm?.toFixed(1) || '-'}</Text>
-        </View>
-        <Text style={[styles.asymmetryDiffText, asymmetry.jump_height.red_flag && { color: '#ef4444' }]}>
-          Δ {asymmetry.jump_height.asymmetry_percent.toFixed(1)}%
-        </Text>
-      </View>
-      
-      {/* Takeoff Time Comparison Bars */}
-      {slCmjData?.right?.time_to_takeoff_ms && slCmjData?.left?.time_to_takeoff_ms && (
-        <View style={styles.asymmetryBarSection}>
-          <Text style={styles.asymmetryMetricTitle}>
-            {locale === 'pt' ? 'Tempo Decolagem (ms)' : 'Takeoff Time (ms)'}
-          </Text>
-          <View style={styles.asymmetryComparisonRow}>
-            <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Dir' : 'R'}</Text>
-            <View style={styles.asymmetryBarContainer}>
-              <View style={[styles.asymmetryBarFill, { 
-                width: `${tttWidths.right}%`,
-                backgroundColor: '#a78bfa'
-              }]} />
-            </View>
-            <Text style={styles.asymmetryValueText}>{slCmjData.right.time_to_takeoff_ms.toFixed(0)}</Text>
-          </View>
-          <View style={styles.asymmetryComparisonRow}>
-            <Text style={styles.asymmetryLegText}>{locale === 'pt' ? 'Esq' : 'L'}</Text>
-            <View style={styles.asymmetryBarContainer}>
-              <View style={[styles.asymmetryBarFill, { 
-                width: `${tttWidths.left}%`,
-                backgroundColor: '#818cf8'
-              }]} />
-            </View>
-            <Text style={styles.asymmetryValueText}>{slCmjData.left.time_to_takeoff_ms.toFixed(0)}</Text>
-          </View>
-        </View>
-      )}
-      
-      <Text style={styles.asymmetryInterpretation}>{asymmetry.interpretation}</Text>
-      
-      <View style={styles.asymmetryThreshold}>
-        <Ionicons name="information-circle" size={14} color={colors.text.tertiary} />
-        <Text style={styles.asymmetryThresholdText}>
-          {locale === 'pt' 
-            ? 'Diferença >10% é considerada RED FLAG para risco de lesão'
-            : 'Difference >10% is considered RED FLAG for injury risk'}
-        </Text>
-      </View>
-    </View>
-  );
-};
-
-// Power-Velocity Profile Card with Visual Chart
-const PowerVelocityCard = ({ data, locale }: { data: JumpAnalysis['power_velocity_insights']; locale: string }) => {
+// ---- Fatigue Index Card ----
+const FatigueIndexCard = ({ data, locale }: { data: any; locale: string }) => {
   if (!data) return null;
-  
-  // Calculate position on the quadrant chart (0-100 scale)
-  // Center is at 50,50. Values are offset by their deviation from average
-  const chartWidth = screenWidth - 80;
-  const chartHeight = 150;
-  
-  // Normalize values to 0-100 range for chart positioning
-  const normalizedVelocity = Math.min(Math.max((data.velocity_vs_average_percent + 50) / 100 * 100, 5), 95);
-  const normalizedPower = Math.min(Math.max((data.power_vs_average_percent + 50) / 100 * 100, 5), 95);
-  
-  // Point position
-  const pointX = 40 + (normalizedVelocity / 100) * (chartWidth - 60);
-  const pointY = chartHeight - 20 - (normalizedPower / 100) * (chartHeight - 40);
-  
+
+  const getIcon = (cls: string) => {
+    if (cls === 'above_baseline') return 'arrow-up-circle';
+    if (cls === 'normal') return 'checkmark-circle';
+    if (cls === 'mild') return 'alert-circle';
+    return 'warning';
+  };
+
+  const scaleItems = [
+    { label: '< 0%', text: locale === 'pt' ? 'Acima' : 'Above', color: '#22c55e' },
+    { label: '0-5%', text: 'Normal', color: '#86efac' },
+    { label: '5-10%', text: locale === 'pt' ? 'Leve' : 'Mild', color: '#fbbf24' },
+    { label: '10-15%', text: locale === 'pt' ? 'Moderada' : 'Moderate', color: '#f97316' },
+    { label: '15-20%', text: locale === 'pt' ? 'Alta' : 'High', color: '#f87171' },
+    { label: '> 20%', text: locale === 'pt' ? 'Severa' : 'Severe', color: '#ef4444' },
+  ];
+
   return (
-    <View style={styles.pvCard}>
-      <View style={styles.pvHeader}>
-        <Ionicons name="flash" size={24} color="#f59e0b" />
-        <Text style={styles.pvTitle}>
-          {locale === 'pt' ? 'Perfil Potência-Velocidade' : 'Power-Velocity Profile'}
+    <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: data.color }]} data-testid="fatigue-index-card">
+      <View style={s.cardHeader}>
+        <Ionicons name={getIcon(data.classification) as any} size={24} color={data.color} />
+        <View style={{ flex: 1, marginLeft: 10 }}>
+          <Text style={s.cardHeaderLabel}>Fatigue Index ({data.metric_label})</Text>
+          <Text style={[s.cardHeaderValue, { color: data.color }]}>{data.label}</Text>
+        </View>
+        <View style={[s.badge, { backgroundColor: data.color + '20' }]}>
+          <Text style={[s.badgeText, { color: data.color }]}>{Math.abs(data.value).toFixed(1)}%</Text>
+        </View>
+      </View>
+
+      <View style={s.fatigueMetricsRow}>
+        <View style={s.fatigueMetricBox}>
+          <Text style={s.fatigueMetricLabel}>Baseline</Text>
+          <Text style={s.fatigueMetricVal}>{data.baseline.toFixed(2)}</Text>
+        </View>
+        <View style={[s.fatigueMetricDivider]} />
+        <View style={s.fatigueMetricBox}>
+          <Text style={s.fatigueMetricLabel}>{locale === 'pt' ? 'Atual' : 'Current'}</Text>
+          <Text style={[s.fatigueMetricVal, { color: data.color }]}>{data.current.toFixed(2)}</Text>
+        </View>
+      </View>
+
+      <View style={s.fatigueScaleRow}>
+        {scaleItems.map((item, i) => (
+          <View key={i} style={[s.fatigueScaleItem, { backgroundColor: item.color + '15' }]}>
+            <Text style={[s.fatigueScaleVal, { color: item.color }]}>{item.label}</Text>
+            <Text style={s.fatigueScaleText}>{item.text}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// ---- Power-Velocity Quadrant ----
+const PowerVelocityCard = ({ data, locale }: { data: any; locale: string }) => {
+  if (!data) return null;
+  const cW = screenWidth - 64;
+  const cH = 150;
+  const pad = { l: 40, r: 20, t: 10, b: 20 };
+  const iW = cW - pad.l - pad.r;
+  const iH = cH - pad.t - pad.b;
+
+  const nV = Math.min(Math.max((data.velocity_vs_average_percent + 50) / 100, 0.05), 0.95);
+  const nP = Math.min(Math.max((data.power_vs_average_percent + 50) / 100, 0.05), 0.95);
+  const px = pad.l + nV * iW;
+  const py = pad.t + iH - nP * iH;
+
+  return (
+    <View style={s.card} data-testid="power-velocity-card">
+      <View style={s.cardHeader}>
+        <Ionicons name="flash" size={20} color="#f59e0b" />
+        <Text style={[s.cardHeaderLabel, { marginLeft: 8 }]}>
+          {locale === 'pt' ? 'Perfil Potencia-Velocidade' : 'Power-Velocity Profile'}
         </Text>
       </View>
-      
-      {/* Visual Quadrant Chart */}
-      <View style={styles.pvChartContainer}>
-        <Svg width={chartWidth} height={chartHeight}>
-          {/* Background quadrants */}
-          <Rect x="40" y="10" width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(239, 68, 68, 0.15)" />
-          <Rect x={40 + (chartWidth - 60) / 2} y="10" width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(34, 197, 94, 0.15)" />
-          <Rect x="40" y={10 + (chartHeight - 30) / 2} width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(156, 163, 175, 0.15)" />
-          <Rect x={40 + (chartWidth - 60) / 2} y={10 + (chartHeight - 30) / 2} width={(chartWidth - 60) / 2} height={(chartHeight - 30) / 2} fill="rgba(251, 191, 36, 0.15)" />
-          
-          {/* Center lines */}
-          <Line x1={40 + (chartWidth - 60) / 2} y1="10" x2={40 + (chartWidth - 60) / 2} y2={chartHeight - 20} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
-          <Line x1="40" y1={10 + (chartHeight - 30) / 2} x2={chartWidth - 20} y2={10 + (chartHeight - 30) / 2} stroke="rgba(255,255,255,0.3)" strokeWidth="1" strokeDasharray="4,4" />
-          
-          {/* Quadrant labels */}
-          <SvgText x={40 + (chartWidth - 60) / 4} y="35" fill="#ef4444" fontSize="9" textAnchor="middle" fontWeight="600">
-            {locale === 'pt' ? 'Força' : 'Strength'}
-          </SvgText>
-          <SvgText x={40 + 3 * (chartWidth - 60) / 4} y="35" fill="#22c55e" fontSize="9" textAnchor="middle" fontWeight="600">
-            {locale === 'pt' ? 'Equilibrado' : 'Balanced'}
-          </SvgText>
-          <SvgText x={40 + (chartWidth - 60) / 4} y={chartHeight - 35} fill="#9ca3af" fontSize="9" textAnchor="middle" fontWeight="600">
-            {locale === 'pt' ? 'Desenvolver' : 'Develop'}
-          </SvgText>
-          <SvgText x={40 + 3 * (chartWidth - 60) / 4} y={chartHeight - 35} fill="#fbbf24" fontSize="9" textAnchor="middle" fontWeight="600">
-            {locale === 'pt' ? 'Velocidade' : 'Speed'}
-          </SvgText>
-          
-          {/* Axis labels */}
-          <SvgText x="15" y={(chartHeight - 10) / 2} fill={colors.text.tertiary} fontSize="8" transform={`rotate(-90, 15, ${(chartHeight - 10) / 2})`} textAnchor="middle">
-            {locale === 'pt' ? 'Potência' : 'Power'}
-          </SvgText>
-          <SvgText x={chartWidth / 2} y={chartHeight - 5} fill={colors.text.tertiary} fontSize="8" textAnchor="middle">
-            {locale === 'pt' ? 'Velocidade' : 'Velocity'}
-          </SvgText>
-          
-          {/* Athlete point */}
-          <Circle cx={pointX} cy={pointY} r="14" fill={data.profile.color} opacity={0.3} />
-          <Circle cx={pointX} cy={pointY} r="10" fill={data.profile.color} />
-          <SvgText x={pointX} y={pointY - 20} fill={colors.text.primary} fontSize="9" textAnchor="middle" fontWeight="bold">
-            {locale === 'pt' ? 'Atleta' : 'Athlete'}
-          </SvgText>
+      <View style={{ alignItems: 'center' }}>
+        <Svg width={cW} height={cH}>
+          <Rect x={pad.l} y={pad.t} width={iW / 2} height={iH / 2} fill="rgba(239,68,68,0.12)" />
+          <Rect x={pad.l + iW / 2} y={pad.t} width={iW / 2} height={iH / 2} fill="rgba(34,197,94,0.12)" />
+          <Rect x={pad.l} y={pad.t + iH / 2} width={iW / 2} height={iH / 2} fill="rgba(156,163,175,0.12)" />
+          <Rect x={pad.l + iW / 2} y={pad.t + iH / 2} width={iW / 2} height={iH / 2} fill="rgba(251,191,36,0.12)" />
+          <Line x1={pad.l + iW / 2} y1={pad.t} x2={pad.l + iW / 2} y2={pad.t + iH} stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="4,4" />
+          <Line x1={pad.l} y1={pad.t + iH / 2} x2={pad.l + iW} y2={pad.t + iH / 2} stroke="rgba(255,255,255,0.2)" strokeWidth="1" strokeDasharray="4,4" />
+          <SvgText x={pad.l + iW / 4} y={pad.t + 20} fill="rgba(239,68,68,0.7)" fontSize="8" textAnchor="middle">{locale === 'pt' ? 'Forca' : 'Strength'}</SvgText>
+          <SvgText x={pad.l + 3 * iW / 4} y={pad.t + 20} fill="rgba(34,197,94,0.7)" fontSize="8" textAnchor="middle">{locale === 'pt' ? 'Equilibrado' : 'Balanced'}</SvgText>
+          <SvgText x={pad.l + iW / 4} y={pad.t + iH - 8} fill="rgba(156,163,175,0.7)" fontSize="8" textAnchor="middle">{locale === 'pt' ? 'Desenvolver' : 'Develop'}</SvgText>
+          <SvgText x={pad.l + 3 * iW / 4} y={pad.t + iH - 8} fill="rgba(251,191,36,0.7)" fontSize="8" textAnchor="middle">{locale === 'pt' ? 'Velocidade' : 'Speed'}</SvgText>
+          {/* Glow */}
+          <Circle cx={px} cy={py} r="16" fill={data.profile.color} opacity={0.2} />
+          <Circle cx={px} cy={py} r="10" fill={data.profile.color} opacity={0.8} />
+          <Circle cx={px} cy={py} r="4" fill="#fff" opacity={0.9} />
         </Svg>
       </View>
-      
-      <View style={styles.pvMetrics}>
-        <View style={styles.pvMetric}>
-          <Text style={styles.pvMetricValue}>{data.peak_power_w.toFixed(0)}</Text>
-          <Text style={styles.pvMetricLabel}>
-            {locale === 'pt' ? 'Potência (W)' : 'Power (W)'}
-          </Text>
-          <Text style={[styles.pvMetricDiff, { color: data.power_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
-            {data.power_vs_average_percent >= 0 ? '+' : ''}{data.power_vs_average_percent.toFixed(0)}%
-          </Text>
+      <View style={s.pvMetricsRow}>
+        <View style={s.pvMetricItem}>
+          <AnimatedNumber value={data.peak_power_w} decimals={0} suffix=" W" style={s.pvMetricVal} />
+          <Text style={s.pvMetricLabel}>{locale === 'pt' ? 'Potencia' : 'Power'}</Text>
         </View>
-        <View style={styles.pvMetric}>
-          <Text style={styles.pvMetricValue}>{data.peak_velocity_ms.toFixed(2)}</Text>
-          <Text style={styles.pvMetricLabel}>
-            {locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}
-          </Text>
-          <Text style={[styles.pvMetricDiff, { color: data.velocity_vs_average_percent >= 0 ? '#22c55e' : '#ef4444' }]}>
-            {data.velocity_vs_average_percent >= 0 ? '+' : ''}{data.velocity_vs_average_percent.toFixed(0)}%
-          </Text>
+        <View style={s.pvMetricItem}>
+          <AnimatedNumber value={data.peak_velocity_ms} decimals={2} suffix=" m/s" style={s.pvMetricVal} />
+          <Text style={s.pvMetricLabel}>{locale === 'pt' ? 'Velocidade' : 'Velocity'}</Text>
         </View>
-        <View style={styles.pvMetric}>
-          <Text style={styles.pvMetricValue}>{data.relative_power_wkg.toFixed(1)}</Text>
-          <Text style={styles.pvMetricLabel}>W/kg</Text>
+        <View style={s.pvMetricItem}>
+          <AnimatedNumber value={data.relative_power_wkg} decimals={1} suffix="" style={s.pvMetricVal} />
+          <Text style={s.pvMetricLabel}>W/kg</Text>
         </View>
       </View>
-      
-      <View style={[styles.pvProfile, { backgroundColor: data.profile.color + '20', borderColor: data.profile.color }]}>
-        <Text style={[styles.pvProfileLabel, { color: data.profile.color }]}>{data.profile.label}</Text>
-        <Text style={styles.pvProfileRec}>{data.profile.recommendation}</Text>
+      <View style={[s.profileTag, { backgroundColor: data.profile.color + '20', borderColor: data.profile.color }]}>
+        <Text style={[s.profileTagLabel, { color: data.profile.color }]}>{data.profile.label}</Text>
+        <Text style={s.profileTagRec}>{data.profile.recommendation}</Text>
       </View>
     </View>
   );
 };
 
-// Z-Score Card
-const ZScoreCard = ({ data, locale }: { data: JumpAnalysis['z_score']; locale: string }) => {
-  if (!data) return null;
-  
-  const getZScoreColor = (z: number) => {
-    if (z >= 1.5) return '#22c55e';
-    if (z >= 0.5) return '#10b981';
-    if (z >= -0.5) return '#f59e0b';
-    if (z >= -1.5) return '#f97316';
-    return '#ef4444';
-  };
-  
-  const color = getZScoreColor(data.jump_height);
-  
-  return (
-    <View style={styles.zScoreCard}>
-      <View style={styles.zScoreHeader}>
-        <Ionicons name="stats-chart" size={20} color={colors.accent.primary} />
-        <Text style={styles.zScoreTitle}>Z-Score ({locale === 'pt' ? 'vs Média Histórica' : 'vs Historical Average'})</Text>
-      </View>
-      
-      <View style={styles.zScoreContent}>
-        <Text style={[styles.zScoreValue, { color }]}>
-          {data.jump_height > 0 ? '+' : ''}{data.jump_height.toFixed(2)}
-        </Text>
-        <Text style={styles.zScoreInterpretation}>{data.interpretation}</Text>
-      </View>
-      
-      <View style={styles.zScoreScale}>
-        <View style={[styles.zScaleItem, { backgroundColor: '#ef4444' }]} />
-        <View style={[styles.zScaleItem, { backgroundColor: '#f97316' }]} />
-        <View style={[styles.zScaleItem, { backgroundColor: '#f59e0b' }]} />
-        <View style={[styles.zScaleItem, { backgroundColor: '#10b981' }]} />
-        <View style={[styles.zScaleItem, { backgroundColor: '#22c55e' }]} />
-      </View>
-      <View style={styles.zScoreLabels}>
-        <Text style={styles.zScoreLabel}>-2</Text>
-        <Text style={styles.zScoreLabel}>-1</Text>
-        <Text style={styles.zScoreLabel}>0</Text>
-        <Text style={styles.zScoreLabel}>+1</Text>
-        <Text style={styles.zScoreLabel}>+2</Text>
-      </View>
-    </View>
-  );
-};
-
-// RSI History Chart
-const RSIHistoryChart = ({ history, locale }: { history: Array<{ date: string; rsi: number }>; locale: string }) => {
+// ---- RSI Evolution Chart (with glow + depth) ----
+const RSIEvolutionChart = ({ history, protocol, locale }: { history: any[]; protocol: string; locale: string }) => {
   if (!history || history.length < 2) return null;
+
+  const reversed = [...history].reverse();
+  const chartW = Math.min(screenWidth - 48, 400);
+  const chartH = 170;
+  const pad = { t: 20, r: 20, b: 35, l: 45 };
+  const iW = chartW - pad.l - pad.r;
+  const iH = chartH - pad.t - pad.b;
+
+  const rsiVals = reversed.map(h => h.rsi);
+  const maxR = Math.max(...rsiVals) * 1.15;
+  const minR = Math.min(...rsiVals) * 0.85;
+  const range = maxR - minR || 1;
+
+  const getX = (i: number) => pad.l + (i / (reversed.length - 1)) * iW;
+  const getY = (v: number) => pad.t + iH - ((v - minR) / range) * iH;
+
+  const points = reversed.map((h, i) => `${getX(i)},${getY(h.rsi)}`).join(' ');
   
-  const chartWidth = Math.min(screenWidth - 64, 400);
-  const chartHeight = 150;
-  const padding = { top: 20, right: 20, bottom: 30, left: 40 };
-  const innerWidth = chartWidth - padding.left - padding.right;
-  const innerHeight = chartHeight - padding.top - padding.bottom;
-  
-  const rsiValues = history.map(h => h.rsi);
-  const maxRSI = Math.max(...rsiValues) * 1.1;
-  const minRSI = Math.min(...rsiValues) * 0.9;
-  
-  const getX = (index: number) => padding.left + (index / (history.length - 1)) * innerWidth;
-  const getY = (rsi: number) => padding.top + innerHeight - ((rsi - minRSI) / (maxRSI - minRSI)) * innerHeight;
-  
-  const linePath = history.map((h, i) => `${getX(i)},${getY(h.rsi)}`).join(' ');
-  
+  // Area fill path
+  const areaPath = `M ${getX(0)},${getY(reversed[0].rsi)} ` +
+    reversed.map((h, i) => `L ${getX(i)},${getY(h.rsi)}`).join(' ') +
+    ` L ${getX(reversed.length - 1)},${pad.t + iH} L ${getX(0)},${pad.t + iH} Z`;
+
+  const isDj = protocol === 'dj';
+  const metricLabel = isDj ? 'RSI' : 'RSImod';
+
   return (
-    <View style={styles.historyChart}>
-      <Text style={styles.historyChartTitle}>
-        {locale === 'pt' ? 'Evolução do RSI' : 'RSI Evolution'}
-      </Text>
-      <Svg width={chartWidth} height={chartHeight}>
-        {/* Grid lines */}
-        {[0, 0.5, 1].map((ratio, i) => (
+    <View style={s.card} data-testid="rsi-evolution-chart">
+      <Text style={s.cardTitle}>{locale === 'pt' ? `Evolucao ${metricLabel}` : `${metricLabel} Evolution`}</Text>
+      <Svg width={chartW} height={chartH}>
+        <Defs>
+          <SvgLinearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={colors.accent.primary} stopOpacity="0.3" />
+            <Stop offset="1" stopColor={colors.accent.primary} stopOpacity="0.02" />
+          </SvgLinearGradient>
+          <SvgLinearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#a78bfa" />
+            <Stop offset="1" stopColor="#6366f1" />
+          </SvgLinearGradient>
+        </Defs>
+        {/* Grid */}
+        {[0, 0.25, 0.5, 0.75, 1].map((r, i) => (
           <G key={i}>
-            <Line
-              x1={padding.left}
-              y1={padding.top + innerHeight * ratio}
-              x2={chartWidth - padding.right}
-              y2={padding.top + innerHeight * ratio}
-              stroke={colors.border.default}
-              strokeWidth="1"
-              strokeDasharray="4 4"
-            />
-            <SvgText
-              x={padding.left - 5}
-              y={padding.top + innerHeight * ratio + 4}
-              textAnchor="end"
-              fill={colors.text.tertiary}
-              fontSize="9"
-            >
-              {(minRSI + (maxRSI - minRSI) * (1 - ratio)).toFixed(1)}
+            <Line x1={pad.l} y1={pad.t + iH * r} x2={pad.l + iW} y2={pad.t + iH * r} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+            <SvgText x={pad.l - 6} y={pad.t + iH * r + 4} textAnchor="end" fill="rgba(255,255,255,0.35)" fontSize="9">
+              {(minR + range * (1 - r)).toFixed(2)}
             </SvgText>
           </G>
         ))}
-        
-        {/* Line */}
-        <Polyline
-          points={linePath}
-          fill="none"
-          stroke={colors.accent.primary}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        
-        {/* Data points */}
-        {history.map((h, i) => (
-          <Circle
-            key={i}
-            cx={getX(i)}
-            cy={getY(h.rsi)}
-            r={i === 0 ? 6 : 4}
-            fill={i === 0 ? colors.accent.primary : 'rgba(99, 102, 241, 0.6)'}
-            stroke="#ffffff"
-            strokeWidth={i === 0 ? 2 : 1}
-          />
-        ))}
-        
+        {/* Area fill */}
+        <Path d={areaPath} fill="url(#areaFill)" />
+        {/* Glow line */}
+        <Polyline points={points} fill="none" stroke={colors.accent.primary} strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" opacity={0.3} />
+        {/* Main line */}
+        <Polyline points={points} fill="none" stroke="url(#lineGrad)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Points */}
+        {reversed.map((h, i) => {
+          const isLast = i === reversed.length - 1;
+          return (
+            <G key={i}>
+              {isLast && <Circle cx={getX(i)} cy={getY(h.rsi)} r="8" fill={colors.accent.primary} opacity={0.25} />}
+              <Circle cx={getX(i)} cy={getY(h.rsi)} r={isLast ? 5 : 3} fill={isLast ? colors.accent.primary : 'rgba(139,92,246,0.6)'} stroke={isLast ? '#fff' : 'transparent'} strokeWidth={isLast ? 2 : 0} />
+            </G>
+          );
+        })}
         {/* Date labels */}
-        {[0, Math.floor(history.length / 2), history.length - 1].map((idx) => (
-          <SvgText
-            key={idx}
-            x={getX(idx)}
-            y={chartHeight - 8}
-            textAnchor="middle"
-            fill={colors.text.tertiary}
-            fontSize="8"
-          >
-            {history[idx].date.substring(5)}
-          </SvgText>
-        ))}
+        {(() => {
+          const indices = reversed.length <= 4
+            ? reversed.map((_, i) => i)
+            : [0, Math.floor(reversed.length / 2), reversed.length - 1];
+          return indices.map(idx => (
+            <SvgText key={idx} x={getX(idx)} y={chartH - 8} textAnchor="middle" fill="rgba(255,255,255,0.4)" fontSize="8">
+              {reversed[idx]?.date?.substring(5) || ''}
+            </SvgText>
+          ));
+        })()}
       </Svg>
     </View>
   );
 };
 
-/**
- * JumpAssessment - Avaliação de saltos CMJ, DJ, SL-CMJ
- * 
- * FEATURE PREMIUM - Requer trial ou assinatura ativa
- */
+// ---- Z-Score Card ----
+const ZScoreCard = ({ data, locale }: { data: any; locale: string }) => {
+  if (!data) return null;
+  const zColor = data.jump_height >= 1.5 ? '#22c55e' : data.jump_height >= 0.5 ? '#10b981' : data.jump_height >= -0.5 ? '#f59e0b' : data.jump_height >= -1.5 ? '#f97316' : '#ef4444';
+  return (
+    <View style={s.card} data-testid="z-score-card">
+      <View style={s.cardHeader}>
+        <Ionicons name="stats-chart" size={18} color={colors.accent.primary} />
+        <Text style={[s.cardHeaderLabel, { marginLeft: 8 }]}>Z-Score ({locale === 'pt' ? 'vs Media Historica' : 'vs Historical Avg'})</Text>
+      </View>
+      <View style={{ alignItems: 'center', marginVertical: 8 }}>
+        <Text style={[{ fontSize: 36, fontWeight: 'bold' as const }, { color: zColor }]}>{data.jump_height > 0 ? '+' : ''}{data.jump_height.toFixed(2)}</Text>
+        <Text style={{ fontSize: 12, color: colors.text.secondary, textAlign: 'center', marginTop: 4 }}>{data.interpretation}</Text>
+      </View>
+      <View style={{ flexDirection: 'row', height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 8 }}>
+        {['#ef4444', '#f97316', '#f59e0b', '#10b981', '#22c55e'].map((c, i) => (
+          <View key={i} style={{ flex: 1, backgroundColor: c }} />
+        ))}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+        {['-2', '-1', '0', '+1', '+2'].map(l => (
+          <Text key={l} style={{ fontSize: 9, color: colors.text.tertiary }}>{l}</Text>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+// ==== MAIN COMPONENT ====
 export default function JumpAssessment() {
   const { locale } = useLanguage();
-  
-  const featureName = locale === 'pt' ? 'Avaliação de Saltos' : 'Jump Assessment';
-  
+  const featureName = locale === 'pt' ? 'Avaliacao de Saltos' : 'Jump Assessment';
   return (
     <PremiumGate featureName={featureName}>
       <JumpAssessmentContent />
@@ -755,1096 +421,428 @@ function JumpAssessmentContent() {
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
   const insets = useSafeAreaInsets();
-  
+
   // State
-  const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [selectedProtocol, setSelectedProtocol] = useState<JumpProtocol>('cmj');
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Manual entry fields
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [flightTime, setFlightTime] = useState('');
   const [contactTime, setContactTime] = useState('');
   const [jumpHeight, setJumpHeight] = useState('');
   const [boxHeight, setBoxHeight] = useState('');
+  const [timeToTakeoff, setTimeToTakeoff] = useState('');
   const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  // Fetch protocols
-  const { data: protocols } = useQuery<Record<string, JumpProtocolInfo>>({
-    queryKey: ['jump-protocols', locale],
+
+  // Fetch protocol-specific analysis
+  const { data: analysis, isLoading, refetch } = useQuery({
+    queryKey: ['jump-protocol-analysis', id, selectedProtocol, selectedDate],
     queryFn: async () => {
-      const res = await api.get(`/jump/protocols?lang=${locale}`);
+      const params = new URLSearchParams({ protocol: selectedProtocol, lang: locale });
+      if (selectedDate) params.append('date', selectedDate);
+      const res = await api.get(`/jump/protocol-analysis/${id}?${params.toString()}`);
       return res.data;
     },
+    staleTime: 0,
+    refetchOnMount: 'always' as const,
   });
-  
-  // Fetch analysis
-  const { data: analysis, isLoading: analysisLoading, refetch: refetchAnalysis } = useQuery<JumpAnalysis>({
-    queryKey: ['jump-analysis', id, locale],
-    queryFn: async () => {
-      const res = await api.get(`/jump/analysis/${id}?lang=${locale}`);
-      return res.data;
-    },
-    retry: false,
-    staleTime: 0, // Always fetch fresh data to ensure dynamic updates
-    refetchOnMount: 'always', // Refetch when component mounts
-  });
-  
-  // Refetch analysis data when screen gains focus (e.g. returning from Jump Camera)
-  // This ensures charts and metrics always show the latest data
-  useFocusEffect(
-    useCallback(() => {
-      refetchAnalysis();
-    }, [refetchAnalysis])
-  );
-  
-  // Submit mutation
+
+  // Refetch on screen focus
+  useFocusEffect(useCallback(() => { refetch(); }, [refetch]));
+
+  // When protocol changes, reset date selection
+  useEffect(() => { setSelectedDate(null); }, [selectedProtocol]);
+
+  // Submit manual assessment
   const submitMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await api.post('/jump/assessment', data);
+    mutationFn: async (payload: any) => {
+      const res = await api.post('/jump/assessment', payload);
       return res.data;
     },
     onSuccess: (data) => {
-      // Invalidate all jump-related queries to ensure charts update dynamically
+      queryClient.invalidateQueries({ queryKey: ['jump-protocol-analysis'] });
       queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
       queryClient.invalidateQueries({ queryKey: ['jump-assessments'] });
-      queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['assessments'] });
-      
-      // Force refetch the analysis data
-      refetchAnalysis();
-      
+      refetch();
       Alert.alert(
-        locale === 'pt' ? 'Avaliação Salva!' : 'Assessment Saved!',
-        locale === 'pt' 
-          ? `RSI: ${data.calculations.rsi}\nPico Potência: ${data.calculations.peak_power_w}W\nPico Velocidade: ${data.calculations.peak_velocity_ms} m/s`
-          : `RSI: ${data.calculations.rsi}\nPeak Power: ${data.calculations.peak_power_w}W\nPeak Velocity: ${data.calculations.peak_velocity_ms} m/s`,
+        locale === 'pt' ? 'Avaliacao Salva!' : 'Assessment Saved!',
+        `RSI: ${data.calculations.rsi}\n${locale === 'pt' ? 'Potencia' : 'Power'}: ${data.calculations.peak_power_w}W`,
         [{ text: 'OK' }]
       );
-      
-      // Reset form
-      setFlightTime('');
-      setContactTime('');
-      setJumpHeight('');
-      setBoxHeight('');
-      setNotes('');
+      setFlightTime(''); setContactTime(''); setJumpHeight(''); setBoxHeight(''); setTimeToTakeoff(''); setNotes('');
+      setShowManualEntry(false);
     },
     onError: (error: any) => {
-      Alert.alert(
-        locale === 'pt' ? 'Erro' : 'Error',
-        error.response?.data?.detail || (locale === 'pt' ? 'Erro ao salvar avaliação' : 'Error saving assessment')
-      );
+      Alert.alert(locale === 'pt' ? 'Erro' : 'Error', error.response?.data?.detail || 'Error');
     },
   });
-  
+
   const handleSubmit = () => {
-    if (!flightTime || !contactTime) {
-      Alert.alert(
-        locale === 'pt' ? 'Dados Incompletos' : 'Incomplete Data',
-        locale === 'pt' 
-          ? 'Preencha o Tempo de Voo e Tempo de Contato'
-          : 'Fill in Flight Time and Contact Time'
-      );
+    if (!flightTime || (!contactTime && selectedProtocol === 'dj')) {
+      Alert.alert(locale === 'pt' ? 'Dados Incompletos' : 'Incomplete Data', locale === 'pt' ? 'Preencha os campos obrigatorios' : 'Fill required fields');
       return;
     }
-    
     if (selectedProtocol === 'dj' && !boxHeight) {
-      Alert.alert(
-        locale === 'pt' ? 'Altura da Caixa' : 'Box Height',
-        locale === 'pt' 
-          ? 'Para Drop Jump, informe a altura da caixa'
-          : 'For Drop Jump, enter the box height'
-      );
+      Alert.alert(locale === 'pt' ? 'Altura da Caixa' : 'Box Height', locale === 'pt' ? 'Informe a altura da caixa' : 'Enter box height');
       return;
     }
-    
     submitMutation.mutate({
       athlete_id: id,
       date,
       protocol: selectedProtocol,
       flight_time_ms: parseFloat(flightTime.replace(',', '.')),
-      contact_time_ms: parseFloat(contactTime.replace(',', '.')),
+      contact_time_ms: contactTime ? parseFloat(contactTime.replace(',', '.')) : 0,
       jump_height_cm: jumpHeight ? parseFloat(jumpHeight.replace(',', '.')) : null,
       box_height_cm: boxHeight ? parseFloat(boxHeight.replace(',', '.')) : null,
+      time_to_takeoff_ms: timeToTakeoff ? parseFloat(timeToTakeoff.replace(',', '.')) : null,
       notes: notes || null,
     });
   };
-  
-  const t = {
-    title: locale === 'pt' ? 'Avaliação de Salto' : 'Jump Assessment',
-    selectProtocol: locale === 'pt' ? 'Selecionar Protocolo' : 'Select Protocol',
-    date: locale === 'pt' ? 'Data' : 'Date',
-    flightTime: locale === 'pt' ? 'Tempo de Voo (ms)' : 'Flight Time (ms)',
-    contactTime: locale === 'pt' ? 'Tempo de Contato (ms)' : 'Contact Time (ms)',
-    jumpHeight: locale === 'pt' ? 'Altura do Salto (cm)' : 'Jump Height (cm)',
-    jumpHeightOptional: locale === 'pt' ? 'Opcional - calculado automaticamente' : 'Optional - auto-calculated',
-    boxHeight: locale === 'pt' ? 'Altura da Caixa (cm)' : 'Box Height (cm)',
-    notes: locale === 'pt' ? 'Observações' : 'Notes',
-    save: locale === 'pt' ? 'Salvar Avaliação' : 'Save Assessment',
-    noData: locale === 'pt' ? 'Nenhuma avaliação de salto registrada' : 'No jump assessment recorded',
-    addFirst: locale === 'pt' ? 'Adicione a primeira avaliação acima' : 'Add the first assessment above',
-    analysis: locale === 'pt' ? 'Análise Completa' : 'Complete Analysis',
-    recommendations: locale === 'pt' ? 'Recomendações' : 'Recommendations',
-    aiInsights: locale === 'pt' ? 'Insights de IA' : 'AI Insights',
-  };
-  
-  const currentProtocol = protocols?.[selectedProtocol];
-  
+
+  const metrics = analysis?.metrics;
+  const hasData = analysis?.has_data;
+
   return (
-    <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 12 }]} showsVerticalScrollIndicator={false}>
+    <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={s.container}>
+      <ScrollView contentContainerStyle={[s.scrollContent, { paddingTop: insets.top + 8 }]} showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            onPress={() => router.back()} 
-            style={styles.backButton} 
-            data-testid="back-button"
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-          >
+        <View style={s.header}>
+          <TouchableOpacity onPress={() => router.back()} style={s.backBtn} data-testid="back-button" hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
-          <Text style={styles.title}>{t.title}</Text>
+          <Text style={s.title}>{locale === 'pt' ? 'Avaliacao de Salto' : 'Jump Assessment'}</Text>
           <View style={{ width: 40 }} />
         </View>
-        
-        {/* Protocol Selector */}
-        <TouchableOpacity 
-          style={styles.protocolSelector}
-          onPress={() => setShowProtocolModal(true)}
-          data-testid="protocol-selector"
-        >
-          <View style={styles.protocolSelectorContent}>
-            <View style={styles.protocolIcon}>
-              <Ionicons name={(currentProtocol?.icon || 'trending-up') as any} size={24} color="#ffffff" />
-            </View>
-            <View>
-              <Text style={styles.protocolName}>{currentProtocol?.name || 'CMJ'}</Text>
-              <Text style={styles.protocolFullName}>{currentProtocol?.full_name}</Text>
-            </View>
-          </View>
-          <Ionicons name="chevron-down" size={24} color={colors.text.secondary} />
-        </TouchableOpacity>
-        
-        {/* Input Form */}
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>
-            {locale === 'pt' ? 'Dados do Salto' : 'Jump Data'}
-          </Text>
-          
-          {/* Date */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.date}</Text>
-            <TextInput
-              style={styles.input}
-              value={date}
-              onChangeText={setDate}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={colors.text.tertiary}
-            />
-          </View>
-          
-          {/* Flight Time & Contact Time */}
-          <View style={styles.row}>
-            <View style={[styles.inputGroup, { flex: 1 }]}>
-              <Text style={styles.label}>{t.flightTime}</Text>
-              <TextInput
-                style={styles.input}
-                value={flightTime}
-                onChangeText={setFlightTime}
-                placeholder="450"
-                placeholderTextColor={colors.text.tertiary}
-                keyboardType="decimal-pad"
-                data-testid="flight-time-input"
-              />
-            </View>
-            <View style={[styles.inputGroup, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.label}>{t.contactTime}</Text>
-              <TextInput
-                style={styles.input}
-                value={contactTime}
-                onChangeText={setContactTime}
-                placeholder="250"
-                placeholderTextColor={colors.text.tertiary}
-                keyboardType="decimal-pad"
-                data-testid="contact-time-input"
-              />
-            </View>
-          </View>
-          
-          {/* Jump Height (optional) */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.jumpHeight}</Text>
-            <TextInput
-              style={styles.input}
-              value={jumpHeight}
-              onChangeText={setJumpHeight}
-              placeholder={t.jumpHeightOptional}
-              placeholderTextColor={colors.text.tertiary}
-              keyboardType="decimal-pad"
-            />
-          </View>
-          
-          {/* Box Height (for DJ only) */}
-          {selectedProtocol === 'dj' && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>{t.boxHeight}</Text>
-              <TextInput
-                style={styles.input}
-                value={boxHeight}
-                onChangeText={setBoxHeight}
-                placeholder="40"
-                placeholderTextColor={colors.text.tertiary}
-                keyboardType="decimal-pad"
-                data-testid="box-height-input"
-              />
-            </View>
-          )}
-          
-          {/* Notes */}
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t.notes}</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={notes}
-              onChangeText={setNotes}
-              placeholder={locale === 'pt' ? 'Observações opcionais...' : 'Optional notes...'}
-              placeholderTextColor={colors.text.tertiary}
-              multiline
-              numberOfLines={2}
-            />
-          </View>
-          
-          {/* Submit Button */}
-          <TouchableOpacity
-            style={[styles.submitButton, submitMutation.isPending && styles.submitButtonDisabled]}
-            onPress={handleSubmit}
-            disabled={submitMutation.isPending}
-            data-testid="submit-button"
-          >
-            <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.submitButtonGradient}>
-              {submitMutation.isPending ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <>
-                  <Ionicons name="save" size={20} color="#ffffff" />
-                  <Text style={styles.submitButtonText}>{t.save}</Text>
-                </>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+
+        {/* Protocol Selector Tabs */}
+        <View style={s.protocolTabs} data-testid="protocol-tabs">
+          {PROTOCOLS.map(p => {
+            const active = selectedProtocol === p.id;
+            return (
+              <TouchableOpacity
+                key={p.id}
+                style={[s.protocolTab, active && s.protocolTabActive]}
+                onPress={() => setSelectedProtocol(p.id)}
+                data-testid={`protocol-tab-${p.id}`}
+              >
+                <Ionicons name={p.icon as any} size={16} color={active ? '#fff' : colors.text.tertiary} />
+                <Text style={[s.protocolTabText, active && s.protocolTabTextActive]}>
+                  {locale === 'pt' ? p.labelPt : p.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-        
+
+        {/* Date Selector */}
+        {analysis?.available_dates && analysis.available_dates.length > 0 && (
+          <View style={s.dateSection} data-testid="date-selector">
+            <Text style={s.dateSectionLabel}>{locale === 'pt' ? 'Data da Avaliacao' : 'Assessment Date'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.dateScroll}>
+              {analysis.available_dates.map((d: string) => {
+                const isActive = d === (analysis.selected_date || analysis.available_dates[0]);
+                const displayDate = (() => {
+                  try {
+                    const [y, m, day] = d.split('-');
+                    return `${day}/${m}`;
+                  } catch { return d; }
+                })();
+                return (
+                  <TouchableOpacity
+                    key={d}
+                    style={[s.dateChip, isActive && s.dateChipActive]}
+                    onPress={() => setSelectedDate(d)}
+                    data-testid={`date-chip-${d}`}
+                  >
+                    <Text style={[s.dateChipText, isActive && s.dateChipTextActive]}>{displayDate}</Text>
+                    {isActive && <View style={s.dateChipDot} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Jump Camera Button */}
         <TouchableOpacity
-          style={styles.jumpCameraButton}
+          style={s.cameraButton}
           onPress={() => router.push(`/athlete/${id}/jump-camera`)}
           data-testid="jump-camera-btn"
         >
-          <LinearGradient colors={['#10b981', '#059669']} style={styles.jumpCameraButtonGradient}>
-            <Ionicons name="camera" size={24} color="#ffffff" />
-            <View style={styles.jumpCameraTextContainer}>
-              <Text style={styles.jumpCameraTitle}>
-                {locale === 'pt' ? 'Jump Camera' : 'Jump Camera'}
-              </Text>
-              <Text style={styles.jumpCameraSubtitle}>
-                {locale === 'pt' ? 'Captura automática via visão computacional' : 'Automatic capture via computer vision'}
-              </Text>
+          <LinearGradient colors={['#10b981', '#059669']} style={s.cameraButtonGrad}>
+            <Ionicons name="camera" size={22} color="#fff" />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={s.cameraTitle}>Jump Camera</Text>
+              <Text style={s.cameraSub}>{locale === 'pt' ? 'Captura automatica via visao computacional' : 'Automatic capture via computer vision'}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={24} color="#ffffff" />
+            <Ionicons name="chevron-forward" size={22} color="#fff" />
           </LinearGradient>
         </TouchableOpacity>
-        
-        {/* Analysis Section */}
-        {analysisLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.accent.primary} />
-          </View>
-        ) : (analysis?.protocols?.cmj || analysis?.protocols?.dj) ? (
-          <View style={styles.analysisSection}>
-            {/* Determine which protocol data to use */}
-            {(() => {
-              const hasCmj = analysis?.protocols?.cmj?.latest;
-              const hasDj = analysis?.protocols?.dj?.latest;
-              const activeProtocol = hasCmj ? 'cmj' : 'dj';
-              const protocolData = hasCmj ? analysis.protocols.cmj : analysis.protocols.dj;
-              const latestData = hasCmj ? analysis.protocols.cmj?.latest : analysis.protocols.dj?.latest;
-              const historyData = hasCmj ? analysis.protocols.cmj?.history : analysis.protocols.dj?.history;
-              
-              if (!latestData) return null;
-              
-              return (
-                <>
-                  <Text style={styles.sectionTitle}>
-                    <Ionicons name="analytics" size={18} color={colors.accent.primary} /> {t.analysis} ({activeProtocol === 'dj' ? 'Drop Jump' : 'CMJ'})
-                  </Text>
-                  
-                  {/* RSI Gauge */}
-                  <RSIGauge 
-                    rsi={latestData.rsi} 
-                    classification={latestData.rsi_classification || 'average'}
-                    locale={locale}
-                  />
-                  
-                  {/* Summary Cards */}
-                  <View style={styles.summaryGrid}>
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.summaryValue}>{latestData.jump_height_cm?.toFixed(1) || '-'}</Text>
-                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
-                    </View>
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.summaryValue}>{latestData.peak_power_w?.toFixed(0) || '-'}</Text>
-                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Potência (W)' : 'Power (W)'}</Text>
-                    </View>
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.summaryValue}>{latestData.peak_velocity_ms?.toFixed(2) || '-'}</Text>
-                      <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}</Text>
-                    </View>
-                    <View style={styles.summaryCard}>
-                      <Text style={styles.summaryValue}>{latestData.relative_power_wkg?.toFixed(1) || '-'}</Text>
-                      <Text style={styles.summaryLabel}>W/kg</Text>
-                    </View>
-                    {/* DJ-specific: Box Height */}
-                    {activeProtocol === 'dj' && latestData.box_height_cm && (
-                      <View style={styles.summaryCard}>
-                        <Text style={styles.summaryValue}>{latestData.box_height_cm}</Text>
-                        <Text style={styles.summaryLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  {/* Fatigue Status - Use backend data for CMJ, calculate locally for DJ */}
-                  <FatigueStatusCard 
-                    fatigue={
-                      analysis.fatigue_analysis || 
-                      (activeProtocol === 'dj' && analysis.protocols.dj?.history 
-                        ? calculateDjFatigue(analysis.protocols.dj.history, locale)
-                        : null)
-                    } 
-                    locale={locale} 
-                  />
-                  
-                  {/* Asymmetry */}
-                  <AsymmetryCard asymmetry={analysis.asymmetry} slCmjData={analysis.protocols.sl_cmj} locale={locale} />
-                  
-                  {/* Power-Velocity Profile */}
-                  <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />
-                  
-                  {/* Z-Score */}
-                  <ZScoreCard data={analysis.z_score} locale={locale} />
-                  
-                  {/* RSI History Chart */}
-                  {historyData && historyData.length > 0 && (
-                    <RSIHistoryChart history={historyData} locale={locale} />
-                  )}
-                  
-                  {/* AI Insights */}
-                  {analysis.ai_feedback && (
-                    <View style={styles.aiInsightsCard}>
-                      <View style={styles.aiInsightsHeader}>
-                        <Ionicons name="sparkles" size={20} color={colors.accent.primary} />
-                        <Text style={styles.aiInsightsTitle}>{t.aiInsights}</Text>
-                      </View>
-                      <Text style={styles.aiInsightsText}>{analysis.ai_feedback}</Text>
-                    </View>
-                  )}
-                  
-                  {/* Recommendations */}
-                  {analysis.recommendations && analysis.recommendations.length > 0 && (
-                    <View style={styles.recommendationsCard}>
-                      <Text style={styles.recommendationsTitle}>{t.recommendations}</Text>
-                      {analysis.recommendations.map((rec, i) => (
-                        <View key={i} style={styles.recommendationItem}>
-                          <Text style={styles.recommendationText}>{rec}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </>
-              );
-            })()}
-          </View>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
-            <Text style={styles.emptyText}>{t.noData}</Text>
-            <Text style={styles.emptySubtext}>{t.addFirst}</Text>
+
+        {/* Manual Entry Toggle */}
+        <TouchableOpacity
+          style={s.manualToggle}
+          onPress={() => setShowManualEntry(!showManualEntry)}
+          data-testid="manual-entry-toggle"
+        >
+          <Ionicons name={showManualEntry ? 'chevron-up' : 'create-outline'} size={18} color={colors.text.secondary} />
+          <Text style={s.manualToggleText}>{locale === 'pt' ? 'Avaliacao Manual' : 'Manual Assessment'}</Text>
+        </TouchableOpacity>
+
+        {/* Manual Entry Form (hidden by default) */}
+        {showManualEntry && (
+          <View style={s.formCard}>
+            <View style={s.row}>
+              <View style={[s.inputGroup, { flex: 1 }]}>
+                <Text style={s.inputLabel}>{locale === 'pt' ? 'Tempo de Voo (ms)' : 'Flight Time (ms)'}</Text>
+                <TextInput style={s.input} value={flightTime} onChangeText={setFlightTime} placeholder="372" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" data-testid="flight-time-input" />
+              </View>
+              <View style={[s.inputGroup, { flex: 1, marginLeft: 10 }]}>
+                <Text style={s.inputLabel}>{selectedProtocol === 'dj' ? (locale === 'pt' ? 'Tempo Contato (ms)' : 'Contact Time (ms)') : (locale === 'pt' ? 'Time-to-Takeoff (ms)' : 'Time-to-Takeoff (ms)')}</Text>
+                <TextInput
+                  style={s.input}
+                  value={selectedProtocol === 'dj' ? contactTime : timeToTakeoff}
+                  onChangeText={selectedProtocol === 'dj' ? setContactTime : setTimeToTakeoff}
+                  placeholder={selectedProtocol === 'dj' ? '250' : '600'}
+                  placeholderTextColor={colors.text.tertiary}
+                  keyboardType="decimal-pad"
+                  data-testid="contact-time-input"
+                />
+              </View>
+            </View>
+            <View style={s.row}>
+              <View style={[s.inputGroup, { flex: 1 }]}>
+                <Text style={s.inputLabel}>{locale === 'pt' ? 'Altura (cm) - Opcional' : 'Height (cm) - Optional'}</Text>
+                <TextInput style={s.input} value={jumpHeight} onChangeText={setJumpHeight} placeholder="auto" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" />
+              </View>
+              {selectedProtocol === 'dj' && (
+                <View style={[s.inputGroup, { flex: 1, marginLeft: 10 }]}>
+                  <Text style={s.inputLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
+                  <TextInput style={s.input} value={boxHeight} onChangeText={setBoxHeight} placeholder="40" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" data-testid="box-height-input" />
+                </View>
+              )}
+            </View>
+            <View style={s.inputGroup}>
+              <Text style={s.inputLabel}>{locale === 'pt' ? 'Data' : 'Date'}</Text>
+              <TextInput style={s.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.tertiary} />
+            </View>
+            <TouchableOpacity
+              style={[s.submitBtn, submitMutation.isPending && { opacity: 0.5 }]}
+              onPress={handleSubmit}
+              disabled={submitMutation.isPending}
+              data-testid="submit-button"
+            >
+              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={s.submitBtnGrad}>
+                {submitMutation.isPending ? <ActivityIndicator color="#fff" /> : (
+                  <>
+                    <Ionicons name="save" size={18} color="#fff" />
+                    <Text style={s.submitBtnText}>{locale === 'pt' ? 'Salvar' : 'Save'}</Text>
+                  </>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         )}
-        
+
+        {/* Loading */}
+        {isLoading && (
+          <View style={s.loadingBox}>
+            <ActivityIndicator size="large" color={colors.accent.primary} />
+          </View>
+        )}
+
+        {/* Analysis Section */}
+        {!isLoading && hasData && metrics && (
+          <View style={s.analysisSection}>
+            {/* RSI Gauge */}
+            <RSIGauge
+              rsi={metrics.rsi || 0}
+              classification={metrics.rsi_classification || 'poor'}
+              protocol={selectedProtocol}
+              locale={locale}
+            />
+
+            {/* Performance Metrics Grid */}
+            <View style={s.metricsGrid} data-testid="performance-metrics">
+              <View style={s.metricCard}>
+                <AnimatedNumber value={metrics.jump_height_cm || 0} decimals={1} style={s.metricVal} />
+                <Text style={s.metricLabel}>{locale === 'pt' ? 'Altura (cm)' : 'Height (cm)'}</Text>
+              </View>
+              <View style={s.metricCard}>
+                <AnimatedNumber value={metrics.peak_power_w || 0} decimals={0} style={s.metricVal} />
+                <Text style={s.metricLabel}>{locale === 'pt' ? 'Potencia (W)' : 'Power (W)'}</Text>
+              </View>
+              <View style={s.metricCard}>
+                <AnimatedNumber value={metrics.peak_velocity_ms || 0} decimals={2} style={s.metricVal} />
+                <Text style={s.metricLabel}>{locale === 'pt' ? 'Velocidade (m/s)' : 'Velocity (m/s)'}</Text>
+              </View>
+              <View style={s.metricCard}>
+                <AnimatedNumber value={metrics.relative_power_wkg || 0} decimals={1} style={s.metricVal} />
+                <Text style={s.metricLabel}>W/kg</Text>
+              </View>
+              {selectedProtocol === 'dj' && metrics.box_height_cm && (
+                <View style={s.metricCard}>
+                  <AnimatedNumber value={metrics.box_height_cm} decimals={0} style={s.metricVal} />
+                  <Text style={s.metricLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Fatigue Index */}
+            <FatigueIndexCard data={analysis.fatigue_index} locale={locale} />
+
+            {/* Power-Velocity */}
+            <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />
+
+            {/* Z-Score */}
+            <ZScoreCard data={analysis.z_score} locale={locale} />
+
+            {/* RSI Evolution */}
+            <RSIEvolutionChart history={analysis.history} protocol={selectedProtocol} locale={locale} />
+
+            {/* Recommendations */}
+            {analysis.recommendations && analysis.recommendations.length > 0 && (
+              <View style={s.card} data-testid="recommendations-card">
+                <Text style={s.cardTitle}>{locale === 'pt' ? 'Recomendacoes' : 'Recommendations'}</Text>
+                {analysis.recommendations.map((rec: string, i: number) => (
+                  <Text key={i} style={s.recText}>{rec}</Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* Empty State */}
+        {!isLoading && !hasData && (
+          <View style={s.emptyState}>
+            <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
+            <Text style={s.emptyTitle}>{locale === 'pt' ? 'Nenhuma avaliacao neste protocolo' : 'No assessments for this protocol'}</Text>
+            <Text style={s.emptySub}>{locale === 'pt' ? 'Use a Jump Camera ou adicione manualmente' : 'Use Jump Camera or add manually'}</Text>
+          </View>
+        )}
+
         <View style={{ height: 40 }} />
       </ScrollView>
-      
-      {/* Protocol Selection Modal */}
-      <Modal
-        visible={showProtocolModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowProtocolModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t.selectProtocol}</Text>
-              <TouchableOpacity onPress={() => setShowProtocolModal(false)}>
-                <Ionicons name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView>
-              {protocols && Object.values(protocols).map((protocol) => (
-                <TouchableOpacity
-                  key={protocol.id}
-                  style={[styles.modalOption, selectedProtocol === protocol.id && styles.modalOptionActive]}
-                  onPress={() => {
-                    setSelectedProtocol(protocol.id as JumpProtocol);
-                    setShowProtocolModal(false);
-                  }}
-                  data-testid={`protocol-${protocol.id}`}
-                >
-                  <View style={styles.modalOptionIcon}>
-                    <Ionicons name={protocol.icon as any} size={24} color={selectedProtocol === protocol.id ? '#ffffff' : colors.text.secondary} />
-                  </View>
-                  <View style={styles.modalOptionText}>
-                    <Text style={styles.modalOptionName}>{protocol.name}</Text>
-                    <Text style={styles.modalOptionDesc}>{protocol.description}</Text>
-                  </View>
-                  {selectedProtocol === protocol.id && (
-                    <Ionicons name="checkmark-circle" size={24} color={colors.accent.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </LinearGradient>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+// ==== STYLES ====
+const s = StyleSheet.create({
+  container: { flex: 1 },
+  scrollContent: { padding: 16, paddingBottom: 32 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  backBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
+
+  // Protocol Tabs
+  protocolTabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  protocolTab: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    paddingVertical: 10, borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: colors.text.primary,
-  },
-  protocolSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 2,
-    borderColor: colors.accent.primary,
-  },
-  protocolSelectorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  protocolIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: colors.accent.primary,
-    justifyContent: 'center',
+  protocolTabActive: { backgroundColor: colors.accent.primary, borderColor: colors.accent.primary },
+  protocolTabText: { fontSize: 12, fontWeight: '600', color: colors.text.tertiary },
+  protocolTabTextActive: { color: '#fff' },
+
+  // Date Selector
+  dateSection: { marginBottom: 14 },
+  dateSectionLabel: { fontSize: 11, fontWeight: '500', color: colors.text.tertiary, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 },
+  dateScroll: { flexDirection: 'row' },
+  dateChip: {
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginRight: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
   },
-  protocolName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+  dateChipActive: { backgroundColor: colors.accent.primary + '20', borderColor: colors.accent.primary },
+  dateChipText: { fontSize: 13, fontWeight: '600', color: colors.text.tertiary },
+  dateChipTextActive: { color: colors.accent.primary },
+  dateChipDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent.primary, marginTop: 3 },
+
+  // Camera Button
+  cameraButton: { borderRadius: 14, overflow: 'hidden', marginBottom: 10 },
+  cameraButtonGrad: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
+  cameraTitle: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  cameraSub: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 1 },
+
+  // Manual Toggle
+  manualToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 10, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  protocolFullName: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  formCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  formTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 16,
-  },
-  inputGroup: {
-    marginBottom: 12,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: colors.text.secondary,
-    marginBottom: 6,
-  },
+  manualToggleText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
+
+  // Form
+  formCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 14 },
+  row: { flexDirection: 'row' },
+  inputGroup: { marginBottom: 10 },
+  inputLabel: { fontSize: 11, fontWeight: '500', color: colors.text.secondary, marginBottom: 4 },
   input: {
-    backgroundColor: colors.dark.secondary,
-    borderRadius: 10,
-    padding: 14,
-    color: colors.text.primary,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  textArea: {
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  submitButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginTop: 8,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  jumpCameraButton: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-  },
-  jumpCameraButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  jumpCameraTextContainer: {
-    flex: 1,
-  },
-  jumpCameraTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  jumpCameraSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.8)',
-    marginTop: 2,
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  analysisSection: {
-    gap: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: 8,
-  },
-  gaugeContainer: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
-  },
-  gaugeTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  summaryCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 14,
-    alignItems: 'center',
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  summaryLabel: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    marginTop: 4,
-  },
-  fatigueCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-  },
-  fatigueHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 16,
-  },
-  fatigueHeaderText: {
-    flex: 1,
-  },
-  fatigueTitle: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  fatigueStatus: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  variationBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
-  variationText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  fatigueMetrics: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  fatigueMetric: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  fatigueMetricLabel: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-  },
-  fatigueMetricValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  fatigueMetricDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: colors.border.default,
-  },
-  fatigueInterpretation: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    lineHeight: 18,
-    marginBottom: 12,
-  },
-  fatigueScale: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  fatigueScaleItem: {
-    flex: 1,
-    padding: 8,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  fatigueScaleLabel: {
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  fatigueScaleText: {
-    fontSize: 9,
-    color: colors.text.secondary,
-  },
-  asymmetryCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-  },
-  asymmetryCardRedFlag: {
-    borderWidth: 2,
-    borderColor: '#ef4444',
-  },
-  asymmetryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  asymmetryTitle: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  redFlagBadge: {
-    backgroundColor: '#ef4444',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  redFlagText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  asymmetryBars: {
-    gap: 12,
-    marginBottom: 12,
-  },
-  asymmetryBarSection: {
-    marginBottom: 16,
-  },
-  asymmetryMetricTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  asymmetryComparisonRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  asymmetryLegText: {
-    width: 30,
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.text.tertiary,
-  },
-  asymmetryBarContainer: {
-    flex: 1,
-    height: 24,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  asymmetryBarFill: {
-    height: '100%',
-    borderRadius: 6,
-  },
-  asymmetryValueText: {
-    width: 45,
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text.primary,
-    textAlign: 'right',
-  },
-  asymmetryDiffText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.accent.primary,
-    textAlign: 'right',
-    marginTop: 4,
-  },
-  asymmetryBarLabel: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-    marginBottom: 4,
-  },
-  asymmetryBarWrapper: {
-    height: 20,
-    flexDirection: 'row',
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  asymmetryBar: {
-    height: '100%',
-  },
-  asymmetryIndicator: {
-    position: 'absolute',
-    top: 0,
-    width: 3,
-    height: '100%',
-    backgroundColor: '#ffffff',
-  },
-  asymmetryLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  asymmetryLegLabel: {
-    fontSize: 9,
-    color: colors.text.tertiary,
-  },
-  asymmetryPercent: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  asymmetryInterpretation: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  asymmetryThreshold: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  asymmetryThresholdText: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-  },
-  pvCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-  },
-  pvHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-  },
-  pvTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  pvChartContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  pvMetrics: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  pvMetric: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  pvMetricValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  pvMetricLabel: {
-    fontSize: 10,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-  },
-  pvMetricDiff: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  pvProfile: {
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-  },
-  pvProfileLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  pvProfileRec: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
-  zScoreCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-  },
-  zScoreHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  zScoreTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  zScoreContent: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  zScoreValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-  },
-  zScoreInterpretation: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  zScoreScale: {
-    flexDirection: 'row',
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 4,
-  },
-  zScaleItem: {
-    flex: 1,
-  },
-  zScoreLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  zScoreLabel: {
-    fontSize: 9,
-    color: colors.text.tertiary,
-  },
-  historyChart: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-  },
-  historyChartTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 12,
-  },
-  aiInsightsCard: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.2)',
-  },
-  aiInsightsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  aiInsightsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.accent.primary,
-  },
-  aiInsightsText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-  recommendationsCard: {
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-    padding: 16,
-  },
-  recommendationsTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 12,
-  },
-  recommendationItem: {
-    marginBottom: 8,
-  },
-  recommendationText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: colors.dark.card,
-    borderRadius: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 12,
-  },
-  emptySubtext: {
-    fontSize: 12,
-    color: colors.text.tertiary,
-    marginTop: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.dark.secondary,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-  },
-  modalOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 8,
-    backgroundColor: colors.dark.card,
-    gap: 12,
-  },
-  modalOptionActive: {
-    borderColor: colors.accent.primary,
-    borderWidth: 2,
-  },
-  modalOptionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: colors.dark.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOptionText: {
-    flex: 1,
-  },
-  modalOptionName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-  },
-  modalOptionDesc: {
-    fontSize: 12,
-    color: colors.text.secondary,
-  },
+    backgroundColor: colors.dark.secondary, borderRadius: 8, padding: 12,
+    color: colors.text.primary, fontSize: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  submitBtn: { borderRadius: 10, overflow: 'hidden', marginTop: 4 },
+  submitBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14 },
+  submitBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  // Loading
+  loadingBox: { padding: 40, alignItems: 'center' },
+
+  // Analysis Section
+  analysisSection: { gap: 14 },
+
+  // Cards
+  card: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  cardHeaderLabel: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  cardHeaderValue: { fontSize: 16, fontWeight: 'bold' },
+  cardTitle: { fontSize: 14, fontWeight: '600', color: colors.text.primary, marginBottom: 10 },
+
+  // Badge
+  badge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16 },
+  badgeText: { fontSize: 14, fontWeight: 'bold' },
+
+  // Gauge
+  gaugeCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, alignItems: 'center' },
+  gaugeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 },
+
+  // Fatigue metrics
+  fatigueMetricsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  fatigueMetricBox: { flex: 1, alignItems: 'center' },
+  fatigueMetricLabel: { fontSize: 10, color: colors.text.tertiary },
+  fatigueMetricVal: { fontSize: 20, fontWeight: 'bold', color: colors.text.primary },
+  fatigueMetricDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.1)' },
+  fatigueScaleRow: { flexDirection: 'row', gap: 4 },
+  fatigueScaleItem: { flex: 1, padding: 4, borderRadius: 6, alignItems: 'center' },
+  fatigueScaleVal: { fontSize: 8, fontWeight: 'bold' },
+  fatigueScaleText: { fontSize: 7, color: colors.text.secondary },
+
+  // Performance Metrics Grid
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metricCard: { flex: 1, minWidth: '45%', backgroundColor: colors.dark.card, borderRadius: 12, padding: 14, alignItems: 'center' },
+  metricVal: { fontSize: 22, fontWeight: 'bold', color: colors.text.primary },
+  metricLabel: { fontSize: 10, color: colors.text.secondary, marginTop: 4 },
+
+  // PV
+  pvMetricsRow: { flexDirection: 'row', marginBottom: 12 },
+  pvMetricItem: { flex: 1, alignItems: 'center' },
+  pvMetricVal: { fontSize: 18, fontWeight: 'bold', color: colors.text.primary },
+  pvMetricLabel: { fontSize: 10, color: colors.text.tertiary },
+  profileTag: { borderRadius: 10, padding: 10, borderWidth: 1 },
+  profileTagLabel: { fontSize: 13, fontWeight: 'bold', marginBottom: 2 },
+  profileTagRec: { fontSize: 11, color: colors.text.secondary },
+
+  // Recommendations
+  recText: { fontSize: 13, color: colors.text.secondary, lineHeight: 20, marginBottom: 8 },
+
+  // Empty State
+  emptyState: { alignItems: 'center', paddingVertical: 40, backgroundColor: colors.dark.card, borderRadius: 14 },
+  emptyTitle: { fontSize: 14, color: colors.text.secondary, marginTop: 12 },
+  emptySub: { fontSize: 12, color: colors.text.tertiary, marginTop: 4 },
 });

@@ -12,7 +12,8 @@ const envUrl = process.env.EXPO_PUBLIC_BACKEND_URL;
 const isValidEnvUrl = envUrl && (
   envUrl.includes('localhost') || 
   envUrl.includes('127.0.0.1') ||
-  envUrl === RAILWAY_PRODUCTION_URL
+  envUrl === RAILWAY_PRODUCTION_URL ||
+  envUrl.includes('preview.emergentagent.com')
 );
 
 const API_URL = isValidEnvUrl ? envUrl : RAILWAY_PRODUCTION_URL;

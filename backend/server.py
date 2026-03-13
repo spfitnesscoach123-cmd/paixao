@@ -5823,6 +5823,214 @@ def generate_jump_recommendations(analysis: dict, lang: str) -> List[str]:
     
     return recommendations
 
+@api_router.get("/jump/protocol-analysis/{athlete_id}")
+async def get_jump_protocol_analysis(
+    athlete_id: str,
+    protocol: str = "cmj",
+    date: Optional[str] = None,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Protocol-specific jump analysis with scientific Fatigue Index.
+    Each protocol is analyzed independently — no cross-protocol mixing.
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+
+    body_mass_kg = athlete.get("weight") or 70
+
+    # Fetch all assessments for this protocol only
+    all_assessments = await db.jump_assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "protocol": protocol
+    }).sort("date", -1).to_list(200)
+
+    # Available dates (unique, sorted desc)
+    available_dates = sorted(
+        list({a.get("date") for a in all_assessments if a.get("date")}),
+        reverse=True
+    )
+
+    if not all_assessments:
+        return {
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name"),
+            "body_mass_kg": body_mass_kg,
+            "protocol": protocol,
+            "available_dates": [],
+            "selected_date": None,
+            "metrics": None,
+            "fatigue_index": None,
+            "history": [],
+            "power_velocity_insights": None,
+            "z_score": None,
+            "recommendations": [],
+            "has_data": False
+        }
+
+    # Select assessment by date or default to latest
+    selected = None
+    if date:
+        selected = next((a for a in all_assessments if a.get("date") == date), None)
+    if not selected:
+        selected = all_assessments[0]
+
+    selected_date = selected.get("date")
+
+    # Determine which metric to use for classification and fatigue
+    # CMJ/SL-CMJ → RSImod, DJ → RSI classic
+    use_rsi_mod = protocol in ("cmj", "sl_cmj_left", "sl_cmj_right")
+    metric_key = "rsi" if not use_rsi_mod else "rsi"  # both stored as "rsi" in DB
+    metric_label = "RSImod" if use_rsi_mod else "RSI"
+
+    current_metric_value = selected.get("rsi", 0)
+
+    # Build metrics object
+    metrics = {
+        "jump_height_cm": selected.get("jump_height_cm"),
+        "flight_time_ms": selected.get("flight_time_ms"),
+        "contact_time_ms": selected.get("contact_time_ms"),
+        "time_to_takeoff_ms": selected.get("time_to_takeoff_ms"),
+        "rsi": selected.get("rsi"),
+        "rsi_modified": selected.get("rsi_modified"),
+        "rsi_classification": selected.get("rsi_classification", classify_rsi(current_metric_value)),
+        "peak_power_w": selected.get("peak_power_w"),
+        "peak_velocity_ms": selected.get("peak_velocity_ms"),
+        "relative_power_wkg": selected.get("relative_power_wkg"),
+        "box_height_cm": selected.get("box_height_cm"),
+    }
+
+    # === SCIENTIFIC FATIGUE INDEX ===
+    # Baseline = average of top 3 best metric values in last 90 days
+    from datetime import timedelta
+    cutoff_date_str = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+    recent_assessments = [
+        a for a in all_assessments
+        if a.get("date", "") >= cutoff_date_str and a.get("rsi", 0) > 0
+    ]
+    
+    metric_values = [a.get("rsi", 0) for a in recent_assessments if a.get("rsi", 0) > 0]
+    
+    fatigue_index = None
+    if metric_values:
+        # Top 3 best values (or all if < 3)
+        sorted_values = sorted(metric_values, reverse=True)
+        top_n = sorted_values[:3] if len(sorted_values) >= 3 else sorted_values
+        baseline = sum(top_n) / len(top_n)
+        
+        if baseline > 0:
+            fi_value = ((baseline - current_metric_value) / baseline) * 100
+            fi_value = round(fi_value, 1)
+            
+            # Classification per spec
+            if fi_value < 0:
+                fi_class = "above_baseline"
+                fi_label = "Performance Acima do Baseline" if lang == "pt" else "Performance Above Baseline"
+                fi_color = "#22c55e"
+            elif fi_value <= 5:
+                fi_class = "normal"
+                fi_label = "Variação Normal" if lang == "pt" else "Normal Variation"
+                fi_color = "#86efac"
+            elif fi_value <= 10:
+                fi_class = "mild"
+                fi_label = "Fadiga Leve" if lang == "pt" else "Mild Fatigue"
+                fi_color = "#fbbf24"
+            elif fi_value <= 15:
+                fi_class = "moderate"
+                fi_label = "Fadiga Moderada" if lang == "pt" else "Moderate Fatigue"
+                fi_color = "#f97316"
+            elif fi_value <= 20:
+                fi_class = "high"
+                fi_label = "Fadiga Alta" if lang == "pt" else "High Fatigue"
+                fi_color = "#f87171"
+            else:
+                fi_class = "severe"
+                fi_label = "Fadiga Severa" if lang == "pt" else "Severe Fatigue"
+                fi_color = "#ef4444"
+            
+            fatigue_index = {
+                "value": fi_value,
+                "baseline": round(baseline, 2),
+                "current": round(current_metric_value, 2),
+                "metric_label": metric_label,
+                "classification": fi_class,
+                "label": fi_label,
+                "color": fi_color,
+            }
+
+    # History for evolution chart
+    history = [
+        {
+            "date": a.get("date"),
+            "rsi": a.get("rsi"),
+            "jump_height_cm": a.get("jump_height_cm"),
+            "peak_power_w": a.get("peak_power_w"),
+        }
+        for a in all_assessments[:20]
+    ]
+
+    # Z-Score
+    historical_heights = [a.get("jump_height_cm", 0) for a in all_assessments if a.get("jump_height_cm", 0) > 0]
+    z_score_val = calculate_z_score(selected.get("jump_height_cm", 0), historical_heights)
+    z_score = {
+        "jump_height": z_score_val,
+        "interpretation": get_z_score_interpretation(z_score_val, lang)
+    } if len(historical_heights) >= 2 else None
+
+    # Power-Velocity Insights
+    peak_power = selected.get("peak_power_w", 0)
+    peak_velocity = selected.get("peak_velocity_ms", 0)
+    relative_power = selected.get("relative_power_wkg", 0)
+    avg_power = 3000
+    avg_velocity = 2.8
+    power_vs_avg = ((peak_power - avg_power) / avg_power * 100) if avg_power > 0 else 0
+    velocity_vs_avg = ((peak_velocity - avg_velocity) / avg_velocity * 100) if avg_velocity > 0 else 0
+
+    power_velocity_insights = {
+        "peak_power_w": peak_power,
+        "peak_velocity_ms": peak_velocity,
+        "relative_power_wkg": relative_power,
+        "power_vs_average_percent": round(power_vs_avg, 1),
+        "velocity_vs_average_percent": round(velocity_vs_avg, 1),
+        "profile": get_power_velocity_profile(power_vs_avg, velocity_vs_avg, lang)
+    } if peak_power > 0 else None
+
+    # Recommendations - alias data under "cmj" key so generate_jump_recommendations works
+    rec_analysis = {
+        "protocols": {"cmj": {"latest": metrics}},
+        "fatigue_analysis": {
+            "status": "red" if fatigue_index and fatigue_index["classification"] in ("severe", "high") else
+                     "yellow" if fatigue_index and fatigue_index["classification"] in ("moderate", "mild") else "green",
+            "status_label": fatigue_index["label"] if fatigue_index else "",
+        } if fatigue_index else None,
+        "power_velocity_insights": power_velocity_insights,
+        "z_score": z_score,
+    }
+    recommendations = generate_jump_recommendations(rec_analysis, lang)
+
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "body_mass_kg": body_mass_kg,
+        "protocol": protocol,
+        "available_dates": available_dates,
+        "selected_date": selected_date,
+        "metrics": metrics,
+        "fatigue_index": fatigue_index,
+        "history": history,
+        "power_velocity_insights": power_velocity_insights,
+        "z_score": z_score,
+        "recommendations": recommendations,
+        "has_data": True
+    }
+
+
 @api_router.delete("/jump/assessment/{assessment_id}")
 async def delete_jump_assessment(
     assessment_id: str,
