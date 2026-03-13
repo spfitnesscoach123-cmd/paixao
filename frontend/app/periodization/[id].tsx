@@ -705,8 +705,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   tableHeaderCell: {
-    minWidth: 120,
-    flex: 1,
+    width: 120,
+    maxWidth: 120,
     paddingVertical: 12,
     paddingHorizontal: 12,
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
@@ -733,8 +733,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     textAlign: 'center',
   },
   tableNameCell: {
-    minWidth: 120,
-    flex: 1,
+    width: 120,
+    maxWidth: 120,
     paddingVertical: 12,
     paddingHorizontal: 12,
     justifyContent: 'center',
