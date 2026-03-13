@@ -8440,6 +8440,626 @@ async def get_team_dashboard(
         alerts=alerts[:10]
     )
 
+
+# ============= DASHBOARD OVERVIEW (VISÃO GERAL DA EQUIPE) =============
+
+@api_router.get("/dashboard/overview")
+async def get_dashboard_overview(
+    lang: str = "pt",
+    athlete_id: Optional[str] = None,
+    position: Optional[str] = None,
+    date_range: str = "28d",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Advanced team performance intelligence dashboard.
+    Aggregation & visualization layer over existing metrics.
+    
+    Modes:
+    - TEAM: athlete_id=None, position=None → team averages
+    - POSITION: athlete_id=None, position=<pos> → position group
+    - ATHLETE: athlete_id=<id> → individual longitudinal
+    
+    ACWR always uses total_distance.
+    """
+    user_id = current_user["_id"]
+    
+    # Parse date range
+    date_range_map = {"7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_map.get(date_range, 28)
+    
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    filter_start = today - timedelta(days=filter_days)
+    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    ninety_days_ago_str = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+    seven_days_ago = today - timedelta(days=7)
+    twentyeight_days_ago = today - timedelta(days=28)
+    
+    # Load all athletes
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(200)
+    if not athletes:
+        return {"mode": "team", "athletes": [], "layers": {}}
+    
+    athlete_map = {str(a["_id"]): a for a in athletes}
+    all_athlete_ids = list(athlete_map.keys())
+    
+    # Determine mode and target athletes
+    mode = "team"
+    target_ids = all_athlete_ids
+    
+    if athlete_id and athlete_id != "all":
+        mode = "athlete"
+        target_ids = [athlete_id]
+    elif position and position != "all":
+        mode = "position"
+        target_ids = [aid for aid, a in athlete_map.items() if a.get("position", "") == position]
+    
+    # ============ BULK DATA LOAD (same as team dashboard) ============
+    all_gps = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": ninety_days_ago_str}
+    }).to_list(10000)
+    
+    all_wellness = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(2000)
+    
+    all_jumps = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_vbt = await db.vbt_data.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_body_comp = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    # ============ INDEX BY ATHLETE ============
+    gps_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_gps:
+        aid = r.get("athlete_id")
+        if aid:
+            gps_by_athlete.setdefault(aid, []).append(r)
+    for aid in gps_by_athlete:
+        gps_by_athlete[aid].sort(key=lambda x: x.get("date", ""))
+    
+    wellness_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_wellness:
+        aid = r.get("athlete_id")
+        if aid:
+            wellness_by_athlete.setdefault(aid, []).append(r)
+    
+    jump_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_jumps:
+        aid = r.get("athlete_id")
+        if aid:
+            jump_by_athlete.setdefault(aid, []).append(r)
+    
+    vbt_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_vbt:
+        aid = r.get("athlete_id")
+        if aid:
+            vbt_by_athlete.setdefault(aid, []).append(r)
+    
+    body_comp_by_athlete: Dict[str, dict] = {}
+    for r in all_body_comp:
+        aid = r.get("athlete_id")
+        if aid and aid not in body_comp_by_athlete:
+            body_comp_by_athlete[aid] = r
+    
+    # ============ GPS DEDUP HELPER ============
+    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+    
+    def build_daily_gps(gps_records):
+        """Build daily aggregated GPS from records, deduped by session/period."""
+        daily = {}
+        grouped = {}
+        for r in gps_records:
+            d = r.get("date", "")
+            sname = r.get("session_name") or "default"
+            grouped.setdefault(d, {}).setdefault(sname, []).append(r)
+        
+        for date_str, sessions_map in grouped.items():
+            day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
+                   "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
+            for sname, records in sessions_map.items():
+                session_total = None
+                period_recs = []
+                for r in records:
+                    pname = (r.get("period_name") or "").lower()
+                    is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                    is_per = any(kw in pname for kw in _GPS_PERIOD_KW)
+                    if is_sess and not is_per:
+                        if session_total is None:
+                            session_total = r
+                    else:
+                        period_recs.append(r)
+                source = [session_total] if session_total else (period_recs if period_recs else records)
+                for r in source:
+                    day["total_distance"] += r.get("total_distance", 0) or 0
+                    day["high_intensity_distance"] += r.get("high_intensity_distance", 0) or 0
+                    day["high_speed_running"] += r.get("high_speed_running", 0) or 0
+                    day["sprint_distance"] += r.get("sprint_distance", 0) or 0
+                    day["number_of_sprints"] += r.get("number_of_sprints", 0) or 0
+                    acc = r.get("number_of_accelerations", 0) or 0
+                    dec = r.get("number_of_decelerations", 0) or 0
+                    day["acc_dec"] += acc + dec
+            daily[date_str] = day
+        return daily
+    
+    def calc_acwr(daily_gps, ref_date=None):
+        """Calculate ACWR using total_distance. Always 7d acute / 28d chronic."""
+        ref = ref_date or today
+        acute = sum(daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(7))
+        chronic = sum(daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(28))
+        chronic_avg = chronic / 4 if chronic > 0 else 0
+        return round(acute / chronic_avg, 2) if chronic_avg > 0 else None
+    
+    def calc_monotony_strain(daily_gps, days=7, ref_date=None):
+        """Calculate monotony and strain from total_distance over N days."""
+        ref = ref_date or today
+        loads = [daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(days)]
+        if len(loads) < 2:
+            return None, None
+        mean_l = sum(loads) / len(loads)
+        if mean_l <= 0:
+            return None, None
+        var = sum((x - mean_l)**2 for x in loads) / len(loads)
+        std = var ** 0.5
+        if std <= 0:
+            return None, None
+        monotony = round(mean_l / std, 2)
+        strain = round(sum(loads) * monotony, 0)
+        return monotony, strain
+    
+    def get_wellness_score(w):
+        """Extract or compute wellness score from a wellness record."""
+        ws = w.get("wellness_score")
+        if ws and ws > 0:
+            return ws
+        f = w.get("fatigue", 5); s = w.get("stress", 5); m = w.get("mood", 5)
+        sq = w.get("sleep_quality", 5); ms = w.get("muscle_soreness", 5); h = w.get("hydration", 5)
+        calc = (10-f)*0.20 + (10-s)*0.15 + m*0.15 + sq*0.20 + (10-ms)*0.15 + h*0.15
+        return round(calc, 2) if calc > 0 else None
+    
+    def calc_lmpi(acwr_val, wellness_val, rsimod_val, vbt_fatigue_pct, monotony_val):
+        """
+        LMPI = composite score 0-100.
+        ACWR→30%, Wellness→25%, RSImod→20%, VBT Fatigue→15%, Monotony→10%
+        """
+        score = 0.0
+        # ACWR component: optimal=1.0-1.3→100, <0.8→50, >1.5→20
+        if acwr_val is not None:
+            if 0.8 <= acwr_val <= 1.3:
+                acwr_score = 100
+            elif acwr_val < 0.8:
+                acwr_score = max(20, acwr_val / 0.8 * 80)
+            elif acwr_val <= 1.5:
+                acwr_score = max(30, 100 - (acwr_val - 1.3) / 0.2 * 70)
+            else:
+                acwr_score = max(10, 100 - (acwr_val - 1.0) * 60)
+            score += acwr_score * 0.30
+        
+        # Wellness: 0-10 scale → 0-100
+        if wellness_val is not None and wellness_val > 0:
+            score += min(100, wellness_val * 10) * 0.25
+        
+        # RSImod: typical range 0.2-0.6 → 0-100
+        if rsimod_val is not None and rsimod_val > 0:
+            rsi_score = min(100, (rsimod_val / 0.5) * 100)
+            score += rsi_score * 0.20
+        
+        # VBT Fatigue: velocity loss % (0=good, 20+=bad) → inverted
+        if vbt_fatigue_pct is not None:
+            vbt_score = max(0, 100 - vbt_fatigue_pct * 5)
+            score += vbt_score * 0.15
+        else:
+            score += 50 * 0.15  # neutral if no data
+        
+        # Monotony: <1.5=good, >2=bad
+        if monotony_val is not None:
+            if monotony_val <= 1.5:
+                mono_score = 100
+            elif monotony_val <= 2.0:
+                mono_score = 60
+            else:
+                mono_score = max(10, 100 - (monotony_val - 1.5) * 60)
+            score += mono_score * 0.10
+        else:
+            score += 50 * 0.10
+        
+        return round(min(100, max(0, score)), 1)
+    
+    # ============ PER-ATHLETE CALCULATIONS ============
+    athlete_results = []
+    
+    for aid in target_ids:
+        if aid not in athlete_map:
+            continue
+        a = athlete_map[aid]
+        name = a.get("name", "")
+        pos = a.get("position", "")
+        
+        # GPS daily
+        gps_recs = gps_by_athlete.get(aid, [])
+        daily_gps = build_daily_gps(gps_recs)
+        
+        # ACWR (always total_distance)
+        acwr = calc_acwr(daily_gps)
+        monotony, strain = calc_monotony_strain(daily_gps)
+        
+        # Acute/Chronic raw
+        acute_load = sum(daily_gps.get((today - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(7))
+        chronic_load = sum(daily_gps.get((today - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(28))
+        
+        # Daily load timeline (for charts)
+        daily_timeline = []
+        for i in range(filter_days):
+            d = (today - timedelta(days=filter_days - 1 - i)).strftime("%Y-%m-%d")
+            day_data = daily_gps.get(d, {})
+            daily_timeline.append({
+                "date": d,
+                "total_distance": day_data.get("total_distance", 0),
+                "hid": day_data.get("high_intensity_distance", 0),
+                "hsr": day_data.get("high_speed_running", 0),
+                "sprint": day_data.get("sprint_distance", 0),
+                "sprints_count": day_data.get("number_of_sprints", 0),
+                "acc_dec": day_data.get("acc_dec", 0)
+            })
+        
+        # Weekly heatmap (last 4 weeks, day-of-week)
+        weekly_heatmap = []
+        for w in range(4):
+            week_data = []
+            for dow in range(7):  # Mon=0 to Sun=6
+                d = today - timedelta(days=(3-w)*7 + (6 - dow))
+                d_str = d.strftime("%Y-%m-%d")
+                dist = daily_gps.get(d_str, {}).get("total_distance", 0)
+                week_data.append({"date": d_str, "dow": dow, "value": dist})
+            weekly_heatmap.append({"week": w, "days": week_data})
+        
+        # ACWR timeline (rolling)
+        acwr_timeline = []
+        for i in range(min(filter_days, 60)):
+            ref = today - timedelta(days=filter_days - 1 - i)
+            a_val = calc_acwr(daily_gps, ref)
+            if a_val is not None:
+                acwr_timeline.append({"date": ref.strftime("%Y-%m-%d"), "acwr": a_val})
+        
+        # Velocity zones distribution (aggregate over period)
+        vz_total = {"hid": 0, "hsr": 0, "sprint": 0, "other": 0}
+        for d_str, day_data in daily_gps.items():
+            if d_str >= filter_start_str:
+                vz_total["hid"] += day_data.get("high_intensity_distance", 0)
+                vz_total["hsr"] += day_data.get("high_speed_running", 0)
+                vz_total["sprint"] += day_data.get("sprint_distance", 0)
+                td = day_data.get("total_distance", 0)
+                other = td - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"]
+        total_dist_period = sum(daily_gps.get(d, {}).get("total_distance", 0) 
+                               for d in [((today - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(filter_days)])
+        vz_other = max(0, total_dist_period - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"])
+        velocity_zones = {
+            "low_intensity": round(vz_other),
+            "hid_z3": round(vz_total["hid"]),
+            "hsr_z4": round(vz_total["hsr"]),
+            "sprint_z5": round(vz_total["sprint"])
+        }
+        
+        # Wellness
+        w_recs = wellness_by_athlete.get(aid, [])
+        latest_wellness = None
+        wellness_score = None
+        wellness_details = {}
+        wellness_timeline = []
+        
+        if w_recs:
+            latest_w = w_recs[0]
+            latest_wellness = latest_w.get("date")
+            wellness_score = get_wellness_score(latest_w)
+            wellness_details = {
+                "sleep": latest_w.get("sleep_quality", 5),
+                "fatigue": latest_w.get("fatigue", 5),
+                "stress": latest_w.get("stress", 5),
+                "soreness": latest_w.get("muscle_soreness", 5),
+                "mood": latest_w.get("mood", 5)
+            }
+            # Wellness timeline
+            for w in w_recs[:filter_days]:
+                ws = get_wellness_score(w)
+                if ws:
+                    wellness_timeline.append({
+                        "date": w.get("date"),
+                        "score": ws,
+                        "sleep": w.get("sleep_quality", 5),
+                        "fatigue": w.get("fatigue", 5),
+                        "stress": w.get("stress", 5),
+                        "soreness": w.get("muscle_soreness", 5),
+                        "mood": w.get("mood", 5)
+                    })
+        
+        # Jump data — CMJ (primary neuromuscular), SL-CMJ (asymmetry), DJ (complementary)
+        j_recs = jump_by_athlete.get(aid, [])
+        cmj_recs = [j for j in j_recs if j.get("protocol") == "cmj"]
+        sl_right_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_right"]
+        sl_left_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_left"]
+        dj_recs = [j for j in j_recs if j.get("protocol") == "dj"]
+        rsimod = None
+        rsimod_timeline = []
+        jump_metrics = {}
+        asymmetry = None
+        
+        if cmj_recs:
+            latest_j = cmj_recs[0]
+            rsimod = latest_j.get("rsi") or latest_j.get("rsi_modified")
+            jump_metrics = {
+                "jump_height_cm": latest_j.get("jump_height_cm"),
+                "flight_time_ms": latest_j.get("flight_time_ms"),
+                "contraction_time_ms": latest_j.get("contraction_time_ms") or latest_j.get("time_to_takeoff_ms"),
+                "rsimod": rsimod,
+                "peak_power_w": latest_j.get("peak_power_w")
+            }
+            # CMJ fatigue index (baseline from best 3 in last 60 days)
+            recent_rsi = [j.get("rsi") or j.get("rsi_modified") or 0 for j in cmj_recs[:20] if (j.get("rsi") or j.get("rsi_modified"))]
+            if len(recent_rsi) >= 3:
+                baseline_rsi = sum(sorted(recent_rsi, reverse=True)[:3]) / 3
+                fatigue_index = round(((rsimod - baseline_rsi) / baseline_rsi) * 100, 1) if baseline_rsi > 0 and rsimod else None
+            else:
+                fatigue_index = None
+                baseline_rsi = recent_rsi[0] if recent_rsi else None
+            jump_metrics["fatigue_index"] = fatigue_index
+            jump_metrics["baseline_rsi"] = round(baseline_rsi, 3) if baseline_rsi else None
+            
+            for j in cmj_recs[:20]:
+                r = j.get("rsi") or j.get("rsi_modified")
+                if r:
+                    rsimod_timeline.append({"date": j.get("date"), "rsimod": r, 
+                                           "height": j.get("jump_height_cm")})
+        
+        # SL-CMJ asymmetry
+        if sl_right_recs and sl_left_recs:
+            r_height = sl_right_recs[0].get("jump_height_cm", 0)
+            l_height = sl_left_recs[0].get("jump_height_cm", 0)
+            r_rsi = sl_right_recs[0].get("rsi") or sl_right_recs[0].get("rsi_modified") or 0
+            l_rsi = sl_left_recs[0].get("rsi") or sl_left_recs[0].get("rsi_modified") or 0
+            max_h = max(r_height, l_height)
+            max_r = max(r_rsi, l_rsi)
+            asymmetry = {
+                "height_pct": round(abs(r_height - l_height) / max_h * 100, 1) if max_h > 0 else 0,
+                "rsi_pct": round(abs(r_rsi - l_rsi) / max_r * 100, 1) if max_r > 0 else 0,
+                "dominant": "right" if r_height >= l_height else "left",
+                "right_height": r_height, "left_height": l_height,
+                "right_rsi": round(r_rsi, 3), "left_rsi": round(l_rsi, 3),
+                "risk_flag": abs(r_height - l_height) / max_h * 100 > 10 if max_h > 0 else False
+            }
+        
+        # VBT data — grouped by exercise, never mixed
+        v_recs = vbt_by_athlete.get(aid, [])
+        vbt_fatigue_pct = None
+        vbt_metrics = {}
+        vbt_by_exercise = {}
+        
+        if v_recs:
+            # Group by exercise
+            for vr in v_recs:
+                ex = vr.get("exercise", "unknown")
+                vbt_by_exercise.setdefault(ex, []).append(vr)
+            
+            # For each exercise, get latest metrics
+            vbt_exercises_summary = {}
+            for ex, ex_recs in vbt_by_exercise.items():
+                latest_v = ex_recs[0]
+                sets = latest_v.get("sets", [])
+                velocities = [s.get("mean_velocity", 0) for s in sets if s.get("mean_velocity")]
+                ex_fatigue = None
+                if len(velocities) >= 2 and velocities[0] > 0:
+                    ex_fatigue = round((1 - velocities[-1] / velocities[0]) * 100, 1)
+                vbt_exercises_summary[ex] = {
+                    "mean_velocity": round(sum(velocities)/len(velocities), 3) if velocities else None,
+                    "peak_velocity": round(max(velocities), 3) if velocities else None,
+                    "fatigue_pct": ex_fatigue,
+                    "date": latest_v.get("date"),
+                    "sessions": len(ex_recs)
+                }
+            
+            # Overall VBT fatigue: use the exercise with most recent data
+            latest_v = v_recs[0]
+            sets = latest_v.get("sets", [])
+            if sets:
+                velocities = [s.get("mean_velocity", 0) for s in sets if s.get("mean_velocity")]
+                if len(velocities) >= 2 and velocities[0] > 0:
+                    vbt_fatigue_pct = round((1 - velocities[-1] / velocities[0]) * 100, 1)
+            
+            vbt_metrics = {
+                "latest_exercise": v_recs[0].get("exercise"),
+                "fatigue_pct": vbt_fatigue_pct,
+                "exercises": vbt_exercises_summary
+            }
+        
+        # Body composition
+        bc = body_comp_by_athlete.get(aid)
+        body_comp = {}
+        if bc:
+            body_comp = {
+                "weight": bc.get("weight_kg"),
+                "body_fat_pct": bc.get("body_fat_percentage"),
+                "lean_mass_kg": bc.get("lean_mass_kg")
+            }
+        
+        # LMPI
+        lmpi = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
+        
+        # Risk classification
+        risk_level = "unknown"
+        if acwr is not None:
+            if acwr < 0.8: risk_level = "low"
+            elif acwr <= 1.3: risk_level = "optimal"
+            elif acwr <= 1.5: risk_level = "moderate"
+            else: risk_level = "high"
+        
+        # Risk score (composite)
+        risk_score = 100 - lmpi  # inverse of performance
+        
+        athlete_results.append({
+            "id": aid,
+            "name": name,
+            "position": pos,
+            "acwr": acwr,
+            "acute_load": round(acute_load),
+            "chronic_load": round(chronic_load),
+            "monotony": monotony,
+            "strain": strain,
+            "wellness_score": wellness_score,
+            "wellness_details": wellness_details,
+            "wellness_timeline": wellness_timeline,
+            "rsimod": rsimod,
+            "rsimod_timeline": rsimod_timeline,
+            "jump_metrics": jump_metrics,
+            "asymmetry": asymmetry,
+            "vbt_metrics": vbt_metrics,
+            "vbt_fatigue_pct": vbt_fatigue_pct,
+            "body_comp": body_comp,
+            "lmpi": lmpi,
+            "risk_level": risk_level,
+            "risk_score": round(risk_score, 1),
+            "daily_timeline": daily_timeline,
+            "acwr_timeline": acwr_timeline,
+            "velocity_zones": velocity_zones,
+            "weekly_heatmap": weekly_heatmap
+        })
+    
+    # ============ AGGREGATION ============
+    n = len(athlete_results)
+    
+    def safe_avg(vals):
+        filtered = [v for v in vals if v is not None]
+        return round(sum(filtered) / len(filtered), 2) if filtered else None
+    
+    team_acwr = safe_avg([a["acwr"] for a in athlete_results])
+    team_wellness = safe_avg([a["wellness_score"] for a in athlete_results])
+    team_rsimod = safe_avg([a["rsimod"] for a in athlete_results])
+    team_monotony = safe_avg([a["monotony"] for a in athlete_results])
+    team_strain = safe_avg([a["strain"] for a in athlete_results])
+    team_lmpi = safe_avg([a["lmpi"] for a in athlete_results])
+    team_acute = safe_avg([a["acute_load"] for a in athlete_results])
+    team_chronic = safe_avg([a["chronic_load"] for a in athlete_results])
+    
+    # Aggregated daily timeline (team/position average)
+    agg_timeline = []
+    if mode != "athlete" and n > 0:
+        for day_idx in range(filter_days):
+            d = (today - timedelta(days=filter_days - 1 - day_idx)).strftime("%Y-%m-%d")
+            day_vals = [a["daily_timeline"][day_idx] if day_idx < len(a["daily_timeline"]) else {} for a in athlete_results]
+            agg_timeline.append({
+                "date": d,
+                "total_distance": round(safe_avg([dv.get("total_distance", 0) for dv in day_vals]) or 0),
+                "hid": round(safe_avg([dv.get("hid", 0) for dv in day_vals]) or 0),
+                "hsr": round(safe_avg([dv.get("hsr", 0) for dv in day_vals]) or 0),
+                "sprint": round(safe_avg([dv.get("sprint", 0) for dv in day_vals]) or 0),
+            })
+    
+    # Risk distribution
+    risk_dist = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
+    for a in athlete_results:
+        risk_dist[a.get("risk_level", "unknown")] += 1
+    
+    # Available count (athletes with data in period)
+    available = sum(1 for a in athlete_results if a["acwr"] is not None or a["wellness_score"] is not None)
+    unavailable = n - available
+    
+    # Positions list
+    positions = sorted(set(a.get("position", "") for a in athletes if a.get("position")))
+    
+    # ============ GENERATE INSIGHTS ============
+    insights = {}
+    
+    # Smart Summary insight
+    ss_parts = []
+    if team_acwr is not None:
+        if team_acwr > 1.5:
+            ss_parts.append("ACWR elevado indica sobrecarga aguda. Risco aumentado de lesão." if lang == "pt" else "High ACWR indicates acute overload. Increased injury risk.")
+        elif team_acwr < 0.8:
+            ss_parts.append("ACWR baixo sugere sub-treinamento. Considerar aumento progressivo." if lang == "pt" else "Low ACWR suggests undertraining. Consider progressive increase.")
+        else:
+            ss_parts.append("ACWR na zona ótima (0.8-1.3)." if lang == "pt" else "ACWR in optimal zone (0.8-1.3).")
+    if team_wellness is not None and team_wellness < 5:
+        ss_parts.append("Wellness abaixo de 5/10 indica fadiga geral significativa." if lang == "pt" else "Wellness below 5/10 indicates significant general fatigue.")
+    if team_rsimod is not None and team_monotony is not None and team_monotony > 2.0:
+        ss_parts.append("Monotonia alta (>2.0) combinada com dados neuromusculares requer atenção." if lang == "pt" else "High monotony (>2.0) combined with neuromuscular data requires attention.")
+    insights["smart_summary"] = " ".join(ss_parts) if ss_parts else ("Dados insuficientes para gerar insight." if lang == "pt" else "Insufficient data for insight.")
+    
+    # Load Intelligence insight
+    li_parts = []
+    if team_acwr is not None:
+        if team_monotony and team_monotony > 2.0:
+            li_parts.append("Monotonia elevada detectada. Variar estímulos de treino para reduzir risco." if lang == "pt" else "High monotony detected. Vary training stimuli to reduce risk.")
+        if team_strain and team_strain > 5000:
+            li_parts.append("Strain semanal alto. Monitorar recuperação individual." if lang == "pt" else "High weekly strain. Monitor individual recovery.")
+    insights["load_intelligence"] = " ".join(li_parts) if li_parts else ("Carga dentro dos parâmetros esperados." if lang == "pt" else "Load within expected parameters.")
+    
+    # Team Status insight
+    low_wellness = [a for a in athlete_results if a["wellness_score"] and a["wellness_score"] < 5]
+    if low_wellness:
+        names = ", ".join([a["name"].split()[0] for a in low_wellness[:3]])
+        insights["team_status"] = f"Atletas com baixa prontidão: {names}. Considerar ajuste de volume." if lang == "pt" else f"Athletes with low readiness: {names}. Consider volume adjustment."
+    else:
+        insights["team_status"] = "Equipe com boa prontidão geral." if lang == "pt" else "Team with good overall readiness."
+    
+    # Neuromuscular insight
+    nm_parts = []
+    low_rsi = [a for a in athlete_results if a["rsimod"] and a["rsimod"] < 0.3]
+    if low_rsi:
+        nm_parts.append(f"{len(low_rsi)} atleta(s) com RSImod baixo (<0.30)." if lang == "pt" else f"{len(low_rsi)} athlete(s) with low RSImod (<0.30).")
+    high_vbt_fatigue = [a for a in athlete_results if a["vbt_fatigue_pct"] and a["vbt_fatigue_pct"] > 15]
+    if high_vbt_fatigue:
+        nm_parts.append("Perda de velocidade >15% no VBT sugere fadiga neuromuscular periférica." if lang == "pt" else "Velocity loss >15% in VBT suggests peripheral neuromuscular fatigue.")
+    insights["neuromuscular"] = " ".join(nm_parts) if nm_parts else ("Status neuromuscular estável." if lang == "pt" else "Stable neuromuscular status.")
+    
+    # Risk Intelligence insight
+    high_risk = [a for a in athlete_results if a["risk_level"] == "high"]
+    if high_risk:
+        names = ", ".join([a["name"].split()[0] for a in high_risk[:3]])
+        insights["risk_intelligence"] = f"Atletas em alto risco: {names}. ACWR + wellness combinados indicam necessidade de intervenção imediata." if lang == "pt" else f"High risk athletes: {names}. Combined ACWR + wellness indicate need for immediate intervention."
+    else:
+        insights["risk_intelligence"] = "Nenhum atleta em zona de alto risco atualmente." if lang == "pt" else "No athletes currently in high risk zone."
+    
+    # Build response
+    response = {
+        "mode": mode,
+        "filter": {
+            "athlete_id": athlete_id,
+            "position": position,
+            "date_range": date_range,
+            "filter_days": filter_days
+        },
+        "positions": positions,
+        "summary": {
+            "total_athletes": n,
+            "available": available,
+            "unavailable": unavailable,
+            "team_acwr": team_acwr,
+            "team_wellness": team_wellness,
+            "team_rsimod": team_rsimod,
+            "team_monotony": team_monotony,
+            "team_strain": team_strain,
+            "team_lmpi": team_lmpi,
+            "team_acute_load": team_acute,
+            "team_chronic_load": team_chronic,
+            "risk_distribution": risk_dist
+        },
+        "athletes": athlete_results,
+        "aggregated_timeline": agg_timeline,
+        "insights": insights,
+        "last_update": datetime.utcnow().isoformat()
+    }
+    
+    return response
+
+
+
 # ============= SUBSCRIPTION ENDPOINTS =============
 
 # ============= WEARABLE IMPORT ENDPOINTS =============

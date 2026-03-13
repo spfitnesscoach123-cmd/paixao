@@ -424,6 +424,32 @@ export default function TeamDashboard() {
           contentContainerStyle={styles.scrollContent}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
+          {/* CSV IMPORT BUTTON */}
+          <TouchableOpacity
+            style={styles.csvImportButton}
+            onPress={() => router.push('/upload-catapult')}
+            activeOpacity={0.8}
+            data-testid="csv-import-button"
+          >
+            <LinearGradient
+              colors={colors.gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.csvImportGradient}
+            >
+              <Ionicons name="cloud-upload" size={24} color="#ffffff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.csvImportTitle}>
+                  {locale === 'pt' ? 'Importar Dados CSV Catapult' : 'Import CSV Catapult Data'}
+                </Text>
+                <Text style={styles.csvImportSubtitle}>
+                  {locale === 'pt' ? 'GPS, Sprint, Aceleração' : 'GPS, Sprint, Acceleration'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+            </LinearGradient>
+          </TouchableOpacity>
+
           {/* FILTERS ROW */}
           <View style={styles.filtersRow}>
             {/* Metric Selector */}
@@ -1014,6 +1040,27 @@ const createStyles = (colors: any) => StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
+  },
+  csvImportButton: {
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  csvImportGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  csvImportTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  csvImportSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
   },
   alertsSection: {
     marginBottom: 16,
