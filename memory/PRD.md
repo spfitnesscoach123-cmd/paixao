@@ -138,6 +138,13 @@ Page used only the last global assessment, causing cross-protocol overwriting (C
 - Readiness color thresholds: ≥80 green, ≥60 cyan, ≥40 amber, <40 red
 
 ## CHANGELOG
+### Mar 13, 2026 — Addendum: Page Reorganization, Asymmetry & Date Field
+- **REMOVED**: Jump charts from Assessments tab (rendering disabled, code preserved)
+- **ADDED**: Full Jump Protocol Analysis section to Scientific Analysis tab (protocol tabs, date selector, RSI gauge, Fatigue Index, asymmetry, evolution chart, recommendations)
+- **ADDED**: SL-CMJ Asymmetry card with bilateral comparison bars, red flag detection (>10%), dominant leg indicator
+- **ADDED**: Assessment Date field to Jump Camera configuration (YYYY-MM-DD input, defaults to today)
+- **BACKEND**: Asymmetry data returned in /api/jump/protocol-analysis endpoint for SL-CMJ protocols (null for CMJ/DJ)
+
 ### Mar 13, 2026 — Jump Assessment Page Refactor
 - **NEW**: Protocol-specific analysis endpoint `/api/jump/protocol-analysis/{athlete_id}`
 - **NEW**: Protocol selector tabs (CMJ, SL-CMJ L, SL-CMJ R, DJ)
