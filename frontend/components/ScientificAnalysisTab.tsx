@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline } from 'react-native-svg';
+import Svg, { Line, Circle, Rect, G, Text as SvgText, Polyline, Defs, LinearGradient as SvgLinGrad, Stop, Path } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -464,6 +464,221 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
   );
 };
 
+// ===== JUMP PROTOCOL SECTION (Scientific Analysis Hub) =====
+const PROTO_OPTS = [
+  { id: 'cmj', label: 'CMJ' },
+  { id: 'sl_cmj_left', label: 'SL-CMJ E' },
+  { id: 'sl_cmj_right', label: 'SL-CMJ D' },
+  { id: 'dj', label: 'DJ' },
+];
+
+const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale: string }) => {
+  const [proto, setProto] = useState('cmj');
+  const [selDate, setSelDate] = useState<string | null>(null);
+
+  const { data: pData, isLoading: pLoading } = useQuery({
+    queryKey: ['jump-proto-sci', athleteId, proto, selDate],
+    queryFn: async () => {
+      const params = new URLSearchParams({ protocol: proto, lang: locale });
+      if (selDate) params.append('date', selDate);
+      const res = await api.get(`/jump/protocol-analysis/${athleteId}?${params}`);
+      return res.data;
+    },
+    staleTime: 30000,
+  });
+
+  const m = pData?.metrics;
+  const fi = pData?.fatigue_index;
+  const asym = pData?.asymmetry;
+  const hist = pData?.history;
+  const isDj = proto === 'dj';
+  const metricLabel = isDj ? 'RSI' : 'RSImod';
+
+  const rsiColor = (cls: string) => {
+    const map: Record<string, string> = { excellent: '#22c55e', very_good: '#10b981', good: '#84cc16', average: '#f59e0b', below_average: '#f97316', poor: '#ef4444' };
+    return map[cls] || '#8b5cf6';
+  };
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
+          <Ionicons name="arrow-up" size={22} color="#f59e0b" />
+        </View>
+        <View>
+          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Avaliacao de Salto' : 'Jump Assessment'}</Text>
+          <Text style={styles.cardSubtitle}>{locale === 'pt' ? 'Analise por Protocolo' : 'Protocol Analysis'}</Text>
+        </View>
+      </View>
+
+      {/* Protocol tabs */}
+      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+        {PROTO_OPTS.map(p => (
+          <TouchableOpacity
+            key={p.id}
+            onPress={() => { setProto(p.id); setSelDate(null); }}
+            style={{
+              flex: 1, paddingVertical: 6, borderRadius: 8, alignItems: 'center',
+              backgroundColor: proto === p.id ? colors.accent.primary : 'rgba(255,255,255,0.05)',
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '600', color: proto === p.id ? '#fff' : colors.text.tertiary }}>{p.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Date chips */}
+      {pData?.available_dates?.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
+          {pData.available_dates.map((d: string) => {
+            const isAct = d === (pData.selected_date || pData.available_dates[0]);
+            return (
+              <TouchableOpacity key={d} onPress={() => setSelDate(d)} style={{
+                paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, marginRight: 6,
+                backgroundColor: isAct ? colors.accent.primary + '20' : 'rgba(255,255,255,0.05)',
+                borderWidth: 1, borderColor: isAct ? colors.accent.primary : 'transparent',
+              }}>
+                <Text style={{ fontSize: 11, color: isAct ? colors.accent.primary : colors.text.tertiary }}>{d.substring(5).replace('-', '/')}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      )}
+
+      {pLoading && <ActivityIndicator size="small" color={colors.accent.primary} style={{ padding: 16 }} />}
+
+      {!pLoading && !pData?.has_data && (
+        <Text style={{ textAlign: 'center', color: colors.text.tertiary, fontSize: 12, padding: 16 }}>
+          {locale === 'pt' ? 'Sem dados neste protocolo' : 'No data for this protocol'}
+        </Text>
+      )}
+
+      {!pLoading && m && (
+        <>
+          {/* RSI Value + Classification */}
+          <View style={{ alignItems: 'center', marginBottom: 10, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10 }}>
+            <Text style={{ fontSize: 10, color: colors.text.tertiary, textTransform: 'uppercase' as const, letterSpacing: 1 }}>{metricLabel}</Text>
+            <Text style={{ fontSize: 36, fontWeight: 'bold', color: rsiColor(m.rsi_classification) }}>{(m.rsi || 0).toFixed(2)}</Text>
+            <Text style={{ fontSize: 12, color: rsiColor(m.rsi_classification), fontWeight: '600' }}>
+              {m.rsi_classification?.replace(/_/g, ' ').toUpperCase()}
+            </Text>
+          </View>
+
+          {/* Metrics Grid */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+            {[
+              { v: m.jump_height_cm, l: locale === 'pt' ? 'Altura (cm)' : 'Height (cm)' },
+              { v: m.peak_power_w, l: locale === 'pt' ? 'Potencia (W)' : 'Power (W)', d: 0 },
+              { v: m.peak_velocity_ms, l: locale === 'pt' ? 'Velocidade' : 'Velocity', s: ' m/s' },
+              { v: m.relative_power_wkg, l: 'W/kg' },
+            ].filter(x => x.v).map((x, i) => (
+              <View key={i} style={{ flex: 1, minWidth: '45%', padding: 8, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 8, alignItems: 'center' }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.text.primary }}>
+                  {(x.v as number).toFixed(x.d !== undefined ? x.d : 1)}{x.s || ''}
+                </Text>
+                <Text style={{ fontSize: 9, color: colors.text.tertiary }}>{x.l}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Fatigue Index */}
+          {fi && (
+            <View style={{ padding: 10, borderRadius: 8, backgroundColor: fi.color + '10', borderLeftWidth: 3, borderLeftColor: fi.color, marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: 10, color: colors.text.tertiary }}>Fatigue Index ({fi.metric_label})</Text>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: fi.color }}>{fi.label}</Text>
+                </View>
+                <Text style={{ fontSize: 22, fontWeight: 'bold', color: fi.color }}>{Math.abs(fi.value).toFixed(1)}%</Text>
+              </View>
+              <View style={{ flexDirection: 'row', marginTop: 6, gap: 12 }}>
+                <Text style={{ fontSize: 10, color: colors.text.secondary }}>Baseline: {fi.baseline.toFixed(2)}</Text>
+                <Text style={{ fontSize: 10, color: fi.color }}>{locale === 'pt' ? 'Atual' : 'Current'}: {fi.current.toFixed(2)}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Asymmetry (SL-CMJ) */}
+          {asym && (proto === 'sl_cmj_left' || proto === 'sl_cmj_right') && (
+            <View style={{ padding: 10, borderRadius: 8, backgroundColor: asym.red_flag ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', borderLeftWidth: 3, borderLeftColor: asym.red_flag ? '#ef4444' : '#22c55e', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>
+                  {locale === 'pt' ? 'Assimetria SL-CMJ' : 'SL-CMJ Asymmetry'}
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: asym.red_flag ? '#ef4444' : '#22c55e' }}>{asym.rsi_asymmetry_percent.toFixed(1)}%</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                <Text style={{ fontSize: 10, color: colors.text.secondary }}>{locale === 'pt' ? 'Esq' : 'L'}: {asym.left_rsi}</Text>
+                <Text style={{ fontSize: 10, color: colors.text.secondary }}>{locale === 'pt' ? 'Dir' : 'R'}: {asym.right_rsi}</Text>
+              </View>
+              {asym.red_flag && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                  <Ionicons name="warning" size={12} color="#ef4444" />
+                  <Text style={{ fontSize: 10, color: '#ef4444' }}>Red Flag {'>'} 10%</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* RSI Evolution mini chart */}
+          {hist && hist.length >= 2 && (() => {
+            const rev = [...hist].reverse();
+            const cW = screenWidth - 64;
+            const cH = 120;
+            const pad = { t: 10, r: 10, b: 20, l: 35 };
+            const iW = cW - pad.l - pad.r;
+            const iH = cH - pad.t - pad.b;
+            const vals = rev.map((h: any) => h.rsi as number);
+            const mx = Math.max(...vals) * 1.1;
+            const mn = Math.min(...vals) * 0.9;
+            const rng = mx - mn || 1;
+            const gX = (i: number) => pad.l + (i / (rev.length - 1)) * iW;
+            const gY = (v: number) => pad.t + iH - ((v - mn) / rng) * iH;
+            const pts = rev.map((h: any, i: number) => `${gX(i)},${gY(h.rsi)}`).join(' ');
+            const areaP = `M ${gX(0)},${gY(rev[0].rsi)} ` + rev.map((h: any, i: number) => `L ${gX(i)},${gY(h.rsi)}`).join(' ') + ` L ${gX(rev.length - 1)},${pad.t + iH} L ${gX(0)},${pad.t + iH} Z`;
+            return (
+              <View style={{ marginTop: 4 }}>
+                <Text style={{ fontSize: 10, color: colors.text.tertiary, marginBottom: 4 }}>
+                  {locale === 'pt' ? `Evolucao ${metricLabel}` : `${metricLabel} Evolution`}
+                </Text>
+                <Svg width={cW} height={cH}>
+                  <Defs>
+                    <SvgLinGrad id="sciAreaFill" x1="0" y1="0" x2="0" y2="1">
+                      <Stop offset="0" stopColor={colors.accent.primary} stopOpacity="0.2" />
+                      <Stop offset="1" stopColor={colors.accent.primary} stopOpacity="0.01" />
+                    </SvgLinGrad>
+                  </Defs>
+                  {[0, 0.5, 1].map((r, i) => (
+                    <G key={i}>
+                      <Line x1={pad.l} y1={pad.t + iH * r} x2={pad.l + iW} y2={pad.t + iH * r} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+                      <SvgText x={pad.l - 4} y={pad.t + iH * r + 3} textAnchor="end" fill="rgba(255,255,255,0.3)" fontSize="8">{(mn + rng * (1 - r)).toFixed(2)}</SvgText>
+                    </G>
+                  ))}
+                  <Path d={areaP} fill="url(#sciAreaFill)" />
+                  <Polyline points={pts} fill="none" stroke={colors.accent.primary} strokeWidth="4" opacity={0.25} strokeLinecap="round" strokeLinejoin="round" />
+                  <Polyline points={pts} fill="none" stroke={colors.accent.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  {rev.map((h: any, i: number) => (
+                    <Circle key={i} cx={gX(i)} cy={gY(h.rsi)} r={i === rev.length - 1 ? 4 : 2} fill={i === rev.length - 1 ? colors.accent.primary : 'rgba(139,92,246,0.5)'} />
+                  ))}
+                </Svg>
+              </View>
+            );
+          })()}
+
+          {/* Recommendations */}
+          {pData.recommendations?.length > 0 && (
+            <View style={{ marginTop: 8 }}>
+              {pData.recommendations.map((r: string, i: number) => (
+                <Text key={i} style={{ fontSize: 11, color: colors.text.secondary, lineHeight: 16, marginBottom: 4 }}>{r}</Text>
+              ))}
+            </View>
+          )}
+        </>
+      )}
+    </View>
+  );
+};
+
 // ===== MAIN COMPONENT =====
 
 export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ athleteId }) => {
@@ -745,66 +960,9 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
         </View>
       )}
 
-      {/* Jump Assessment Section */}
+      {/* Jump Assessment Section - Protocol Analysis Hub */}
       {analysis.jump_analysis && (
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(245, 158, 11, 0.2)' }]}>
-              <Ionicons name="arrow-up" size={22} color="#f59e0b" />
-            </View>
-            <View>
-              <Text style={styles.cardTitle}>
-                {locale === 'pt' ? 'Avaliação de Salto' : 'Jump Assessment'}
-              </Text>
-              <Text style={styles.cardSubtitle}>
-                RSI, CMJ, {locale === 'pt' ? 'Índice de Fadiga' : 'Fatigue Index'}
-              </Text>
-            </View>
-          </View>
-          
-          {/* Jump metrics */}
-          <View style={styles.jumpMetrics}>
-            <View style={styles.jumpMetricItem}>
-              <Text style={styles.jumpMetricValue}>{analysis.jump_analysis.latest?.rsi?.toFixed(2) || '-'}</Text>
-              <Text style={styles.jumpMetricLabel}>RSI</Text>
-            </View>
-            <View style={styles.jumpMetricItem}>
-              <Text style={styles.jumpMetricValue}>{analysis.jump_analysis.latest?.jump_height_cm?.toFixed(1) || '-'}</Text>
-              <Text style={styles.jumpMetricLabel}>cm</Text>
-            </View>
-            <View style={styles.jumpMetricItem}>
-              <Text style={styles.jumpMetricValue}>{analysis.jump_analysis.latest?.peak_power_w?.toFixed(0) || '-'}</Text>
-              <Text style={styles.jumpMetricLabel}>W</Text>
-            </View>
-            <View style={styles.jumpMetricItem}>
-              <Text style={[
-                styles.jumpMetricValue, 
-                { color: analysis.jump_analysis.latest?.fatigue_status === 'red' ? '#ef4444' : 
-                         analysis.jump_analysis.latest?.fatigue_status === 'yellow' ? '#f59e0b' : '#10b981' }
-              ]}>
-                {analysis.jump_analysis.historical?.z_score?.toFixed(2) || '-'}
-              </Text>
-              <Text style={styles.jumpMetricLabel}>Z-Score</Text>
-            </View>
-          </View>
-          
-          {/* RSI Evolution */}
-          {analysis.jump_analysis.history && analysis.jump_analysis.history.length > 1 && (
-            <RSIEvolutionChart data={analysis.jump_analysis.history} locale={locale} />
-          )}
-          
-          {/* Fatigue Alert */}
-          {analysis.jump_analysis.fatigue_alert && (
-            <View style={styles.fatigueAlert}>
-              <Ionicons name="warning" size={18} color="#ef4444" />
-              <Text style={styles.fatigueAlertText}>
-                {locale === 'pt' 
-                  ? `RSI ${analysis.jump_analysis.historical?.rsi_variation_percent?.toFixed(1)}% abaixo do baseline - Fadiga neuromuscular detectada`
-                  : `RSI ${analysis.jump_analysis.historical?.rsi_variation_percent?.toFixed(1)}% below baseline - Neuromuscular fatigue detected`}
-              </Text>
-            </View>
-          )}
-        </View>
+        <JumpProtocolSection athleteId={athleteId} locale={locale} />
       )}
 
       {/* VBT Section */}

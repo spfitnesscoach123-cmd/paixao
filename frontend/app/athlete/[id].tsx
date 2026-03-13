@@ -656,10 +656,10 @@ export default function AthleteDetails() {
               </TouchableOpacity>
             </View>
 
-            {/* Jump Assessment Section (replaced Strength Analysis) */}
-            <View style={styles.strengthAnalysisSection}>
+            {/* Jump charts moved to Scientific Analysis tab — rendering disabled here */}
+            {/* <View style={styles.strengthAnalysisSection}>
               <JumpAnalysisCharts athleteId={id} />
-            </View>
+            </View> */}
 
             {/* Body Composition Section */}
             {bodyCompositionData && bodyCompositionData.length > 0 && (

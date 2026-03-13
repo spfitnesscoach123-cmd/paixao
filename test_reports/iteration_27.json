@@ -1,0 +1,102 @@
+{
+  "summary": "Jump Protocol Analysis Asymmetry Feature Testing Complete - All 19 backend tests passed (100%). Verified: 1) SL-CMJ protocols return asymmetry object with rsi_asymmetry_percent, left_rsi, right_rsi, dominant_leg, red_flag fields, 2) CMJ and DJ protocols correctly return asymmetry as null, 3) Protocol isolation working correctly, 4) Fatigue Index uses RSImod for CMJ/SL-CMJ and RSI for DJ, 5) Date filtering returns different metrics, 6) Asymmetry formula |right-left|/max(right,left)*100 verified, 7) POST /api/jump/assessment still works.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/test_reports/pytest/pytest_jump_asymmetry.xml",
+    "/app/backend/tests/test_jump_asymmetry.py"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "VERIFIED: /app/backend/server.py lines 6004-6046 - SL-CMJ asymmetry calculation correctly implemented",
+    "VERIFIED: Asymmetry formula: |right-left|/max(right,left)*100 correctly calculates rsi_asymmetry_percent",
+    "VERIFIED: red_flag = true when asymmetry > 10% (line 6044)",
+    "VERIFIED: dominant_leg correctly identifies 'right' or 'left' based on RSI comparison (line 6043)",
+    "VERIFIED: For non-SL-CMJ protocols (cmj, dj), asymmetry is correctly null (lines 6004-6006 condition)",
+    "VERIFIED: Fatigue Index metric_label is 'RSImod' for CMJ/SL-CMJ and 'RSI' for DJ (lines 5888-5890)"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_jump_asymmetry.py - Created comprehensive asymmetry feature test file"
+  ],
+  "success_rate": {
+    "backend": "100% (19/19 tests passed)",
+    "frontend": "N/A - Backend only testing as requested"
+  },
+  "test_credentials": {
+    "email": "contato@loadmanagerpro.com.br",
+    "password": "#UAE2026",
+    "athlete_id": "69a6ca6a85668876432f090a"
+  },
+  "seed_data_creation": "Created SL-CMJ Left and Right assessments for asymmetry testing",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Jump Protocol Analysis asymmetry feature fully tested. Key findings: SL-CMJ protocols return asymmetry object with rsi_asymmetry_percent=11.8%, dominant_leg='right', red_flag=true (>10%). CMJ/DJ protocols correctly return asymmetry=null. Fatigue Index uses RSImod for CMJ (61.5% severe) and RSI for DJ (14.1% moderate). All APIs working correctly.",
+  "mocked_api": {
+    "has_mocked_apis": false,
+    "mocked_apis_list": []
+  },
+  "tests_executed": {
+    "backend_api_tests": {
+      "total": 19,
+      "passed": 19,
+      "failed": 0,
+      "tests": [
+        "test_01_sl_cmj_left_returns_asymmetry_object - PASSED (asymmetry object with all required fields)",
+        "test_02_sl_cmj_right_returns_asymmetry_object - PASSED",
+        "test_03_cmj_returns_asymmetry_null - PASSED (asymmetry=null for CMJ)",
+        "test_04_dj_returns_asymmetry_null - PASSED (asymmetry=null for DJ)",
+        "test_05_asymmetry_formula_calculation - PASSED (formula verified)",
+        "test_06_red_flag_threshold - PASSED (red_flag=true when >10%)",
+        "test_07_cmj_only_returns_cmj_data - PASSED",
+        "test_08_dj_only_returns_dj_data - PASSED",
+        "test_09_protocols_have_independent_dates - PASSED",
+        "test_10_cmj_uses_rsimod_label - PASSED (metric_label=RSImod)",
+        "test_11_sl_cmj_uses_rsimod_label - PASSED (metric_label=RSImod)",
+        "test_12_dj_uses_rsi_label - PASSED (metric_label=RSI)",
+        "test_13_date_filter_changes_selected_date - PASSED",
+        "test_14_date_filter_returns_different_metrics - PASSED",
+        "test_15_post_assessment_still_works - PASSED",
+        "test_16_post_sl_cmj_assessment - PASSED",
+        "test_17_response_includes_asymmetry_field - PASSED",
+        "test_18_full_asymmetry_structure_for_sl_cmj - PASSED",
+        "test_19_second_athlete_protocol_analysis - PASSED"
+      ]
+    },
+    "manual_verifications": [
+      "SL-CMJ Left asymmetry: rsi_asymmetry_percent=11.8%, dominant_leg='right', red_flag=true",
+      "CMJ asymmetry: null (correct)",
+      "DJ asymmetry: null (correct)",
+      "CMJ Fatigue Index: metric_label='RSImod', value=61.5%, classification='severe'",
+      "DJ Fatigue Index: metric_label='RSI', value=14.1%, classification='moderate'"
+    ]
+  },
+  "verified_features": {
+    "asymmetry_for_sl_cmj": "VERIFIED - Returns object with rsi_asymmetry_percent, left_rsi, right_rsi, dominant_leg, red_flag",
+    "asymmetry_null_for_non_sl_cmj": "VERIFIED - CMJ and DJ return asymmetry=null",
+    "asymmetry_formula": "VERIFIED - |right-left|/max(right,left)*100",
+    "red_flag_threshold": "VERIFIED - red_flag=true when asymmetry > 10%",
+    "protocol_isolation": "VERIFIED - Each protocol returns only its own data",
+    "fatigue_index_metric_labels": "VERIFIED - RSImod for CMJ/SL-CMJ, RSI for DJ",
+    "date_filtering": "VERIFIED - Different dates return different metrics",
+    "post_assessment_endpoint": "VERIFIED - POST /api/jump/assessment still works"
+  },
+  "asymmetry_sample_data": {
+    "protocol": "sl_cmj_left",
+    "rsi_asymmetry_percent": 11.8,
+    "height_asymmetry_percent": 9.7,
+    "left_rsi": 0.3,
+    "right_rsi": 0.34,
+    "left_height": 17.7,
+    "right_height": 19.6,
+    "dominant_leg": "right",
+    "red_flag": true,
+    "contra_date": "2026-03-13"
+  }
+}

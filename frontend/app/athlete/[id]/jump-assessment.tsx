@@ -230,6 +230,68 @@ const FatigueIndexCard = ({ data, locale }: { data: any; locale: string }) => {
   );
 };
 
+// ---- SL-CMJ Asymmetry Card ----
+const AsymmetryCard = ({ data, locale }: { data: any; locale: string }) => {
+  if (!data) return null;
+
+  const isRedFlag = data.red_flag;
+  const barColor = isRedFlag ? '#ef4444' : data.rsi_asymmetry_percent > 8 ? '#f59e0b' : '#22c55e';
+  const statusText = isRedFlag
+    ? (locale === 'pt' ? 'Assimetria Significativa' : 'Significant Asymmetry')
+    : data.rsi_asymmetry_percent > 8
+      ? (locale === 'pt' ? 'Monitorar' : 'Monitor')
+      : (locale === 'pt' ? 'Aceitavel' : 'Acceptable');
+
+  const renderBar = (label: string, left: number, right: number, unit: string) => {
+    const max = Math.max(left, right) || 1;
+    return (
+      <View style={{ marginBottom: 10 }}>
+        <Text style={{ fontSize: 10, color: colors.text.tertiary, marginBottom: 4 }}>{label}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={{ fontSize: 11, color: colors.text.secondary, width: 42, textAlign: 'right' }}>{locale === 'pt' ? 'Esq' : 'L'} {left.toFixed(unit === 'cm' ? 1 : 2)}</Text>
+          <View style={{ flex: 1, height: 16, flexDirection: 'row', borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' }}>
+            <View style={{ width: `${(left / max) * 50}%`, backgroundColor: '#6366f1', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }} />
+            <View style={{ flex: 1 }} />
+            <View style={{ width: `${(right / max) * 50}%`, backgroundColor: '#8b5cf6', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
+          </View>
+          <Text style={{ fontSize: 11, color: colors.text.secondary, width: 42 }}>{right.toFixed(unit === 'cm' ? 1 : 2)} {locale === 'pt' ? 'Dir' : 'R'}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <View style={[s.card, { borderLeftWidth: 3, borderLeftColor: barColor }]} data-testid="asymmetry-card">
+      <View style={s.cardHeader}>
+        <Ionicons name="swap-horizontal" size={20} color={barColor} />
+        <View style={{ flex: 1, marginLeft: 8 }}>
+          <Text style={s.cardHeaderLabel}>{locale === 'pt' ? 'Assimetria SL-CMJ' : 'SL-CMJ Asymmetry'}</Text>
+        </View>
+        <View style={[s.badge, { backgroundColor: barColor + '20' }]}>
+          <Text style={[s.badgeText, { color: barColor }]}>{data.rsi_asymmetry_percent.toFixed(1)}%</Text>
+        </View>
+      </View>
+
+      <View style={{ alignItems: 'center', marginBottom: 12 }}>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: barColor }}>{statusText}</Text>
+        {isRedFlag && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+            <Ionicons name="warning" size={14} color="#ef4444" />
+            <Text style={{ fontSize: 11, color: '#ef4444' }}>{locale === 'pt' ? 'Red Flag > 10%' : 'Red Flag > 10%'}</Text>
+          </View>
+        )}
+      </View>
+
+      {renderBar('RSImod', data.left_rsi, data.right_rsi, 'rsi')}
+      {renderBar(locale === 'pt' ? 'Altura (cm)' : 'Height (cm)', data.left_height, data.right_height, 'cm')}
+
+      <Text style={{ fontSize: 10, color: colors.text.tertiary, textAlign: 'center', marginTop: 4 }}>
+        {locale === 'pt' ? `Perna dominante: ${data.dominant_leg === 'right' ? 'Direita' : 'Esquerda'}` : `Dominant leg: ${data.dominant_leg}`}
+      </Text>
+    </View>
+  );
+};
+
 // ---- Power-Velocity Quadrant ----
 const PowerVelocityCard = ({ data, locale }: { data: any; locale: string }) => {
   if (!data) return null;
@@ -693,6 +755,11 @@ function JumpAssessmentContent() {
 
             {/* Fatigue Index */}
             <FatigueIndexCard data={analysis.fatigue_index} locale={locale} />
+
+            {/* SL-CMJ Asymmetry (only for SL-CMJ protocols) */}
+            {(selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
+              <AsymmetryCard data={analysis.asymmetry} locale={locale} />
+            )}
 
             {/* Power-Velocity */}
             <PowerVelocityCard data={analysis.power_velocity_insights} locale={locale} />

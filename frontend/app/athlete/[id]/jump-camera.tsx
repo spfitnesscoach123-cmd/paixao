@@ -147,6 +147,7 @@ function JumpCameraContent() {
   const [boxHeight, setBoxHeight] = useState('40');
   const [athleteHeight, setAthleteHeight] = useState('175');
   const [showProtocolModal, setShowProtocolModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
@@ -452,6 +453,7 @@ function JumpCameraContent() {
     
     const isSlCmj = selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right';
     const today = format(new Date(), 'yyyy-MM-dd');
+    const assessmentDate = selectedDate || today;
     
     // SL-CMJ: Save BOTH legs as separate assessments
     if (isSlCmj && jumpCamera.slCmjLeg1 && jumpCamera.slCmjLeg2) {
@@ -462,7 +464,7 @@ function JumpCameraContent() {
         const [res1, res2] = await Promise.all([
           api.post('/jump/assessment', {
             athlete_id: athleteId,
-            date: today,
+            date: assessmentDate,
             protocol: leg1Protocol,
             flight_time_ms: jumpCamera.slCmjLeg1.metrics.flightTimeMs,
             contact_time_ms: 0,
@@ -472,7 +474,7 @@ function JumpCameraContent() {
           }),
           api.post('/jump/assessment', {
             athlete_id: athleteId,
-            date: today,
+            date: assessmentDate,
             protocol: leg2Protocol,
             flight_time_ms: jumpCamera.slCmjLeg2.metrics.flightTimeMs,
             contact_time_ms: 0,
@@ -508,7 +510,7 @@ function JumpCameraContent() {
     // CMJ or DJ: Save single assessment with time_to_takeoff_ms
     submitMutation.mutate({
       athlete_id: athleteId,
-      date: today,
+      date: assessmentDate,
       protocol: selectedProtocol,
       flight_time_ms: jumpCamera.metrics.flightTimeMs,
       contact_time_ms: jumpCamera.metrics.contactTimeMs,
@@ -517,7 +519,7 @@ function JumpCameraContent() {
       time_to_takeoff_ms: jumpCamera.metrics.eccentricDurationMs || null,
       notes: `data_source: camera`,
     });
-  }, [athleteId, selectedProtocol, boxHeight, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
+  }, [athleteId, selectedProtocol, selectedDate, boxHeight, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
 
   // ============================================================
   // handleStartCamera - Initiates the progressive initialization
@@ -767,6 +769,24 @@ function JumpCameraContent() {
                 placeholderTextColor={colors.text.tertiary}
                 data-testid="athlete-height-input"
               />
+            </View>
+            
+            {/* Assessment Date */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>
+                {locale === 'pt' ? 'Data da Avaliacao' : 'Assessment Date'}
+              </Text>
+              <TextInput
+                style={styles.input}
+                value={selectedDate}
+                onChangeText={setSelectedDate}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.text.tertiary}
+                data-testid="assessment-date-input"
+              />
+              <Text style={{ fontSize: 10, color: colors.text.tertiary, marginTop: 2 }}>
+                {locale === 'pt' ? 'Formato: AAAA-MM-DD (padrao: hoje)' : 'Format: YYYY-MM-DD (default: today)'}
+              </Text>
             </View>
           </View>
           

@@ -6001,6 +6001,50 @@ async def get_jump_protocol_analysis(
         "profile": get_power_velocity_profile(power_vs_avg, velocity_vs_avg, lang)
     } if peak_power > 0 else None
 
+    # SL-CMJ Asymmetry: fetch contralateral leg for comparison
+    asymmetry = None
+    if protocol in ("sl_cmj_left", "sl_cmj_right"):
+        contra_protocol = "sl_cmj_right" if protocol == "sl_cmj_left" else "sl_cmj_left"
+        contra_assessment = await db.jump_assessments.find_one(
+            {"athlete_id": athlete_id, "coach_id": current_user["_id"], "protocol": contra_protocol, "date": selected_date},
+            {"_id": 0}
+        )
+        if not contra_assessment:
+            # Try latest from contralateral
+            contra_assessment = await db.jump_assessments.find_one(
+                {"athlete_id": athlete_id, "coach_id": current_user["_id"], "protocol": contra_protocol},
+                {"_id": 0},
+                sort=[("date", -1)]
+            )
+        if contra_assessment:
+            current_rsi = current_metric_value
+            contra_rsi = contra_assessment.get("rsi", 0)
+            current_height = selected.get("jump_height_cm", 0)
+            contra_height = contra_assessment.get("jump_height_cm", 0)
+            
+            max_rsi = max(current_rsi, contra_rsi) if max(current_rsi, contra_rsi) > 0 else 1
+            max_height = max(current_height, contra_height) if max(current_height, contra_height) > 0 else 1
+            
+            rsi_asym = abs(current_rsi - contra_rsi) / max_rsi * 100
+            height_asym = abs(current_height - contra_height) / max_height * 100
+            
+            left_rsi = current_rsi if "left" in protocol else contra_rsi
+            right_rsi = contra_rsi if "left" in protocol else current_rsi
+            left_height = current_height if "left" in protocol else contra_height
+            right_height = contra_height if "left" in protocol else current_height
+            
+            asymmetry = {
+                "rsi_asymmetry_percent": round(rsi_asym, 1),
+                "height_asymmetry_percent": round(height_asym, 1),
+                "left_rsi": round(left_rsi, 2),
+                "right_rsi": round(right_rsi, 2),
+                "left_height": round(left_height, 1),
+                "right_height": round(right_height, 1),
+                "dominant_leg": "right" if right_rsi > left_rsi else "left",
+                "red_flag": rsi_asym > 10,
+                "contra_date": contra_assessment.get("date"),
+            }
+
     # Recommendations - alias data under "cmj" key so generate_jump_recommendations works
     rec_analysis = {
         "protocols": {"cmj": {"latest": metrics}},
@@ -6026,6 +6070,7 @@ async def get_jump_protocol_analysis(
         "history": history,
         "power_velocity_insights": power_velocity_insights,
         "z_score": z_score,
+        "asymmetry": asymmetry,
         "recommendations": recommendations,
         "has_data": True
     }
