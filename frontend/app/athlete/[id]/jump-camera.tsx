@@ -155,9 +155,12 @@ function JumpCameraContent() {
   // Frame counter for logging
   const frameCountRef = useRef(0);
   
+  // Map selected protocol to internal camera protocol
+  const cameraProtocol = selectedProtocol === 'sl_cmj' ? 'sl_cmj_left' : selectedProtocol;
+  
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
-    protocol: selectedProtocol,
+    protocol: cameraProtocol as any,
     athleteId: athleteId || '',
     boxHeightCm: parseFloat(boxHeight) || 40,
     athleteHeightCm: parseFloat(athleteHeight) || 175,
@@ -451,7 +454,7 @@ function JumpCameraContent() {
   const handleSaveAssessment = useCallback(async () => {
     if (!jumpCamera.metrics) return;
     
-    const isSlCmj = selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right';
+    const isSlCmj = selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right';
     const today = format(new Date(), 'yyyy-MM-dd');
     const assessmentDate = selectedDate || today;
     
@@ -836,7 +839,7 @@ function JumpCameraContent() {
                 </TouchableOpacity>
               </View>
               <ScrollView>
-                {(Object.keys(JUMP_PROTOCOL_INFO) as JumpProtocol[]).map((protocol) => {
+                {(['cmj', 'sl_cmj', 'dj'] as JumpProtocol[]).map((protocol) => {
                   const info = JUMP_PROTOCOL_INFO[protocol];
                   return (
                     <TouchableOpacity
@@ -1145,7 +1148,7 @@ function JumpCameraContent() {
                   </Text>
                 )}
                 {/* SL-CMJ jump number indicator */}
-                {(selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
+                {(selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
                   <Text style={styles.activeLegText}>
                     Jump {jumpCamera.slCmjJumpNumber}/2
                   </Text>

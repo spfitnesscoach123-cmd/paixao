@@ -68,6 +68,10 @@ export default function AthleteDetails() {
     end: null,
     activeKey: 'all'
   });
+  
+  // GPS Activity Delete mode state
+  const [deleteMode, setDeleteMode] = useState(false);
+  const [selectedForDelete, setSelectedForDelete] = useState<string[]>([]);
 
   const { data: athlete, isLoading: athleteLoading } = useQuery({
     queryKey: ['athlete', id],
@@ -262,6 +266,49 @@ export default function AthleteDetails() {
     );
   };
 
+  // GPS Activity Delete
+  const toggleDeleteSelection = (sessionId: string) => {
+    setSelectedForDelete(prev => 
+      prev.includes(sessionId) ? prev.filter(id => id !== sessionId) : [...prev, sessionId]
+    );
+  };
+
+  const deleteActivitiesMutation = useMutation({
+    mutationFn: async (sessionIds: string[]) => {
+      await api.post('/gps-data/delete-activities', { session_ids: sessionIds });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['gps', id] });
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['analysis'] });
+      queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
+      setDeleteMode(false);
+      setSelectedForDelete([]);
+      Alert.alert(locale === 'pt' ? 'Sucesso' : 'Success', locale === 'pt' ? 'Atividades excluídas com sucesso' : 'Activities deleted successfully');
+    },
+    onError: () => {
+      Alert.alert(locale === 'pt' ? 'Erro' : 'Error', locale === 'pt' ? 'Não foi possível excluir as atividades' : 'Failed to delete activities');
+    },
+  });
+
+  const handleDeleteActivities = () => {
+    if (selectedForDelete.length === 0) return;
+    Alert.alert(
+      locale === 'pt' ? 'Confirmar Exclusão' : 'Confirm Deletion',
+      locale === 'pt' 
+        ? `Tem certeza que deseja excluir ${selectedForDelete.length} atividade(s)?\nEsta ação não pode ser desfeita.`
+        : `Are you sure you want to delete ${selectedForDelete.length} activity(ies)?\nThis action cannot be undone.`,
+      [
+        { text: locale === 'pt' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+        {
+          text: locale === 'pt' ? 'Confirmar Exclusão' : 'Confirm Delete',
+          style: 'destructive',
+          onPress: () => deleteActivitiesMutation.mutate(selectedForDelete),
+        },
+      ]
+    );
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([
@@ -345,15 +392,6 @@ export default function AthleteDetails() {
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.chartsButton}
-              onPress={() => router.push(`/athlete/${id}/charts`)}
-            >
-              <Ionicons name="bar-chart" size={20} color={colors.accent.primary} />
-              <Text style={styles.chartsButtonText}>{t('athletes.viewCharts')}</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.accent.primary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
               style={styles.deleteButton}
               onPress={handleDelete}
             >
@@ -370,18 +408,43 @@ export default function AthleteDetails() {
               <TouchableOpacity
                 style={styles.actionButton}
                 onPress={() => router.push(`/athlete/${id}/add-gps`)}
+                data-testid="manual-gps-entry-btn"
               >
                 <Ionicons name="add-circle" size={24} color="#2563eb" />
                 <Text style={styles.actionButtonText}>{t('gps.manualEntry')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.actionButton}
-                onPress={() => router.push(`/athlete/${id}/upload-gps`)}
+                style={[styles.actionButton, deleteMode && { borderColor: colors.status.error, backgroundColor: 'rgba(239,68,68,0.1)' }]}
+                onPress={() => {
+                  if (deleteMode) {
+                    setDeleteMode(false);
+                    setSelectedForDelete([]);
+                  } else {
+                    setDeleteMode(true);
+                  }
+                }}
+                data-testid="delete-activities-toggle-btn"
               >
-                <Ionicons name="cloud-upload" size={24} color="#2563eb" />
-                <Text style={styles.actionButtonText}>{t('gps.uploadCSV')}</Text>
+                <Ionicons name={deleteMode ? 'close-circle' : 'trash-outline'} size={24} color={deleteMode ? colors.status.error : '#2563eb'} />
+                <Text style={[styles.actionButtonText, deleteMode && { color: colors.status.error }]}>
+                  {deleteMode ? (locale === 'pt' ? 'Cancelar' : 'Cancel') : (locale === 'pt' ? 'Excluir Atividades' : 'Delete Activities')}
+                </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Delete Selected Button */}
+            {deleteMode && selectedForDelete.length > 0 && (
+              <TouchableOpacity
+                style={styles.deleteSelectedButton}
+                onPress={handleDeleteActivities}
+                data-testid="delete-selected-btn"
+              >
+                <Ionicons name="trash" size={20} color="#ffffff" />
+                <Text style={styles.deleteSelectedText}>
+                  {locale === 'pt' ? `Excluir Selecionadas (${selectedForDelete.length})` : `Delete Selected (${selectedForDelete.length})`}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* GPS Date Filter */}
             <GPSDateFilter 
@@ -410,15 +473,27 @@ export default function AthleteDetails() {
               groupedSessions.map((session) => {
                 const isExpanded = expandedSessions.includes(session.session_id);
                 const hasPeriods = session.periods.length > 1;
+                const isSelectedForDel = selectedForDelete.includes(session.session_id);
                 
                 return (
-                  <View key={session.session_id} style={styles.sessionCard}>
+                  <View key={session.session_id} style={[styles.sessionCard, isSelectedForDel && { borderColor: colors.status.error }]}>
                     {/* Session Header - Clickable to expand */}
                     <TouchableOpacity 
                       style={styles.sessionHeader}
-                      onPress={() => hasPeriods && toggleSessionExpand(session.session_id)}
-                      activeOpacity={hasPeriods ? 0.7 : 1}
+                      onPress={() => {
+                        if (deleteMode) {
+                          toggleDeleteSelection(session.session_id);
+                        } else if (hasPeriods) {
+                          toggleSessionExpand(session.session_id);
+                        }
+                      }}
+                      activeOpacity={hasPeriods || deleteMode ? 0.7 : 1}
                     >
+                      {deleteMode && (
+                        <View style={[styles.checkbox, isSelectedForDel && styles.checkboxChecked]} data-testid={`checkbox-${session.session_id}`}>
+                          {isSelectedForDel && <Ionicons name="checkmark" size={16} color="#ffffff" />}
+                        </View>
+                      )}
                       <View style={styles.sessionHeaderLeft}>
                         <View style={styles.sessionIconBox}>
                           <Ionicons name="calendar" size={20} color={colors.accent.primary} />
@@ -963,25 +1038,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.status.error,
   },
-  chartsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.dark.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: colors.accent.primary,
-  },
-  chartsButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.accent.primary,
-    marginLeft: 8,
-    marginRight: 8,
-    flex: 1,
-  },
   deleteButtonText: {
     fontSize: 16,
     fontWeight: '600',
@@ -1413,5 +1469,35 @@ const styles = StyleSheet.create({
   },
   classifierButtonTextActive: {
     color: '#ffffff',
+  },
+  // Delete mode styles
+  deleteSelectedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.status.error,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    gap: 8,
+  },
+  deleteSelectedText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  checkboxChecked: {
+    backgroundColor: colors.status.error,
+    borderColor: colors.status.error,
   },
 });

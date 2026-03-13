@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import Svg, { Path, Circle, G, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
+import Svg, { Path, G, Text as SvgText, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -11,23 +11,39 @@ interface QTRGaugeProps {
 
 export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
   const { t } = useLanguage();
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const [displayScore, setDisplayScore] = React.useState(0);
   
   // Clamp score between 0 and 100
   const clampedScore = Math.max(0, Math.min(100, score));
   
+  // Animate on mount or score change
+  useEffect(() => {
+    animatedValue.setValue(0);
+    const listener = animatedValue.addListener(({ value }) => {
+      setDisplayScore(Math.round(value));
+    });
+    Animated.timing(animatedValue, {
+      toValue: clampedScore,
+      duration: 600,
+      useNativeDriver: false,
+    }).start();
+    return () => animatedValue.removeListener(listener);
+  }, [clampedScore]);
+  
   // Get classification and color based on score
-  const getClassification = () => {
-    if (clampedScore <= 30) return { label: t('wellness.qtrBad') || 'Ruim', color: '#ef4444' };
-    if (clampedScore <= 60) return { label: t('wellness.qtrRegular') || 'Regular', color: '#f59e0b' };
-    if (clampedScore <= 85) return { label: t('wellness.qtrGood') || 'Bom', color: '#10b981' };
+  const getClassification = (s: number) => {
+    if (s <= 30) return { label: t('wellness.qtrBad') || 'Ruim', color: '#ef4444' };
+    if (s <= 60) return { label: t('wellness.qtrRegular') || 'Regular', color: '#f59e0b' };
+    if (s <= 85) return { label: t('wellness.qtrGood') || 'Bom', color: '#10b981' };
     return { label: t('wellness.qtrExcellent') || 'Excelente', color: '#22c55e' };
   };
 
-  const classification = getClassification();
+  const classification = getClassification(displayScore);
   
-  // Gauge dimensions - adjusted for better fit
+  // Gauge dimensions
   const strokeWidth = 14;
-  const radius = (size - strokeWidth) / 2 - 10; // Reduced radius slightly
+  const radius = (size - strokeWidth) / 2 - 10;
   const centerX = size / 2;
   const centerY = size / 2;
   
@@ -36,10 +52,8 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
   const endAngle = 405;
   const sweepAngle = 270;
   
-  // Convert angle to radians
   const toRadians = (angle: number) => (angle - 90) * Math.PI / 180;
   
-  // Calculate arc path
   const polarToCartesian = (angle: number) => {
     const rad = toRadians(angle);
     return {
@@ -48,38 +62,26 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
     };
   };
   
-  // Progress arc path (based on score)
-  const progressAngle = startAngle + (sweepAngle * clampedScore / 100);
+  // Progress arc path (based on animated display score)
+  const progressAngle = startAngle + (sweepAngle * displayScore / 100);
   
-  // Create arc path
   const describeArc = (start: number, end: number) => {
     const startPoint = polarToCartesian(start);
     const endPoint = polarToCartesian(end);
     const largeArcFlag = (end - start) > 180 ? 1 : 0;
-    
     return [
       'M', startPoint.x, startPoint.y,
       'A', radius, radius, 0, largeArcFlag, 1, endPoint.x, endPoint.y
     ].join(' ');
   };
 
-  // Needle calculations
-  const needleAngle = startAngle + (sweepAngle * clampedScore / 100);
-  const needleLength = radius - 20;
-  const needleEnd = {
-    x: centerX + needleLength * Math.cos(toRadians(needleAngle)),
-    y: centerY + needleLength * Math.sin(toRadians(needleAngle)),
-  };
-
-  // Color gradient based on score
-  const getGradientColor = () => {
-    if (clampedScore <= 30) return '#ef4444';
-    if (clampedScore <= 60) return '#f59e0b';
-    if (clampedScore <= 85) return '#10b981';
+  const getGradientColor = (s: number) => {
+    if (s <= 30) return '#ef4444';
+    if (s <= 60) return '#f59e0b';
+    if (s <= 85) return '#10b981';
     return '#22c55e';
   };
 
-  // Container height to fit gauge properly
   const containerHeight = size * 0.85;
 
   return (
@@ -134,28 +136,16 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
             strokeLinecap="round"
           />
           
-          {/* Progress Arc */}
-          {clampedScore > 0 && (
+          {/* Animated Progress Arc */}
+          {displayScore > 0 && (
             <Path
               d={describeArc(startAngle, progressAngle)}
               fill="none"
-              stroke={getGradientColor()}
+              stroke={getGradientColor(displayScore)}
               strokeWidth={strokeWidth + 2}
               strokeLinecap="round"
             />
           )}
-          
-          {/* Needle */}
-          <G>
-            <Circle cx={centerX} cy={centerY} r={8} fill={classification.color} />
-            <Path
-              d={`M ${centerX} ${centerY} L ${needleEnd.x} ${needleEnd.y}`}
-              stroke={classification.color}
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-            <Circle cx={needleEnd.x} cy={needleEnd.y} r={4} fill={classification.color} />
-          </G>
           
           {/* Zone Labels */}
           <SvgText
@@ -184,7 +174,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
       {/* Score Display */}
       <View style={[styles.scoreContainer, { bottom: containerHeight * 0.12 }]}>
         <Text style={[styles.scoreValue, { color: classification.color }]}>
-          {Math.round(clampedScore)}
+          {displayScore}
         </Text>
         <Text style={[styles.scoreLabel, { color: classification.color }]}>
           {classification.label}
@@ -193,7 +183,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
       
       {/* QTR Label */}
       <Text style={styles.qtrLabel}>QTR</Text>
-      <Text style={[styles.qtrSubLabel, { bottom: 0 }]}>{t('wellness.qtrTitle') || 'Qualidade Total de Recuperação'}</Text>
+      <Text style={[styles.qtrSubLabel, { bottom: 0 }]}>{t('wellness.qtrTitle') || 'Qualidade Total de Recuperacao'}</Text>
     </View>
   );
 };

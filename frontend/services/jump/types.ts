@@ -8,7 +8,7 @@
 /**
  * Jump protocols supported
  */
-export type JumpProtocol = 'cmj' | 'sl_cmj_right' | 'sl_cmj_left' | 'dj';
+export type JumpProtocol = 'cmj' | 'sl_cmj' | 'sl_cmj_right' | 'sl_cmj_left' | 'dj';
 
 /**
  * Active leg for single-leg jumps
@@ -208,6 +208,15 @@ export const JUMP_PROTOCOL_INFO: Record<JumpProtocol, {
     description: 'Standard jump with arm swing and knee bend',
     descriptionPt: 'Salto padrao com movimento de bracos e flexao de joelhos',
     icon: 'trending-up',
+    requiresBoxHeight: false,
+    requiresLegSelection: false,
+  },
+  sl_cmj: {
+    name: 'Single Leg CMJ',
+    namePt: 'CMJ Unipodal',
+    description: 'Single leg jump - both legs captured automatically',
+    descriptionPt: 'Salto unipodal - ambas pernas capturadas automaticamente',
+    icon: 'accessibility',
     requiresBoxHeight: false,
     requiresLegSelection: false,
   },

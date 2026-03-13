@@ -467,8 +467,7 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 // ===== JUMP PROTOCOL SECTION (Scientific Analysis Hub) =====
 const PROTO_OPTS = [
   { id: 'cmj', label: 'CMJ' },
-  { id: 'sl_cmj_left', label: 'SL-CMJ E' },
-  { id: 'sl_cmj_right', label: 'SL-CMJ D' },
+  { id: 'sl_cmj', label: 'SL-CMJ' },
   { id: 'dj', label: 'DJ' },
 ];
 
@@ -479,7 +478,9 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
   const { data: pData, isLoading: pLoading } = useQuery({
     queryKey: ['jump-proto-sci', athleteId, proto, selDate],
     queryFn: async () => {
-      const params = new URLSearchParams({ protocol: proto, lang: locale });
+      // Map sl_cmj to sl_cmj_left for API call (backend returns both legs data)
+      const apiProto = proto === 'sl_cmj' ? 'sl_cmj_left' : proto;
+      const params = new URLSearchParams({ protocol: apiProto, lang: locale });
       if (selDate) params.append('date', selDate);
       const res = await api.get(`/jump/protocol-analysis/${athleteId}?${params}`);
       return res.data;
@@ -599,7 +600,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
           )}
 
           {/* Asymmetry (SL-CMJ) */}
-          {asym && (proto === 'sl_cmj_left' || proto === 'sl_cmj_right') && (
+          {asym && proto === 'sl_cmj' && (
             <View style={{ padding: 10, borderRadius: 8, backgroundColor: asym.red_flag ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', borderLeftWidth: 3, borderLeftColor: asym.red_flag ? '#ef4444' : '#22c55e', marginBottom: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>

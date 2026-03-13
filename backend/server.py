@@ -1216,6 +1216,43 @@ async def get_athlete_gps_data(
         record["_id"] = str(record["_id"])
     return [GPSData(**record) for record in gps_records]
 
+class GPSDeleteRequest(BaseModel):
+    session_ids: List[str]
+
+@api_router.post("/gps-data/delete-activities")
+async def delete_gps_activities(
+    data: GPSDeleteRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete GPS activities by session_ids. Removes all period records for each session."""
+    if not data.session_ids or len(data.session_ids) == 0:
+        raise HTTPException(status_code=400, detail="No session_ids provided")
+    
+    total_deleted = 0
+    for session_id in data.session_ids:
+        # Delete all GPS records matching this session_id and coach
+        result = await db.gps_data.delete_many({
+            "session_id": session_id,
+            "coach_id": current_user["_id"]
+        })
+        total_deleted += result.deleted_count
+        
+        # If session_id starts with "legacy_", it means it was grouped by date
+        # Try deleting by date match as well
+        if session_id.startswith("legacy_"):
+            date_str = session_id.replace("legacy_", "")
+            result2 = await db.gps_data.delete_many({
+                "date": date_str,
+                "coach_id": current_user["_id"],
+                "session_id": {"$exists": False}
+            })
+            total_deleted += result2.deleted_count
+    
+    if total_deleted == 0:
+        raise HTTPException(status_code=404, detail="No activities found to delete")
+    
+    return {"message": f"Deleted {total_deleted} records", "deleted_count": total_deleted}
+
 @api_router.get("/gps-data/athlete/{athlete_id}/sessions")
 async def get_athlete_sessions(
     athlete_id: str,
@@ -6065,6 +6102,7 @@ async def get_jump_protocol_analysis(
         "protocol": protocol,
         "available_dates": available_dates,
         "selected_date": selected_date,
+        "selected_assessment_id": str(selected.get("_id", "")) if selected.get("_id") else None,
         "metrics": metrics,
         "fatigue_index": fatigue_index,
         "history": history,
@@ -6426,10 +6464,23 @@ async def get_scientific_analysis(
     injury_risk_factors = []
     
     # 1. GPS Data Summary (últimos 30 dias)
+    # Only count SESSION periods to avoid counting sub-periods as separate activities
     try:
-        gps_data = await db.gps_data.find({
+        gps_data_raw = await db.gps_data.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).limit(30).to_list(30)
+        }).sort("date", -1).to_list(500)
+        
+        # Filter: only include records where period is "SESSION" or there's no multi-period structure
+        _SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+        
+        def _is_session_record(record):
+            pname = (record.get("period_name") or "").lower()
+            session_id = record.get("session_id")
+            if not pname or not session_id:
+                return True  # Legacy records without period_name count as sessions
+            return any(kw in pname for kw in _SESSION_KW)
+        
+        gps_data = [g for g in gps_data_raw if _is_session_record(g)][:30]
         
         if gps_data:
             total_distance = sum(g.get("total_distance", 0) for g in gps_data)

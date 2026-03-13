@@ -26,7 +26,7 @@ import { format } from 'date-fns';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-type JumpProtocol = 'cmj' | 'sl_cmj_right' | 'sl_cmj_left' | 'dj';
+type JumpProtocol = 'cmj' | 'sl_cmj' | 'dj';
 
 interface ProtocolOption {
   id: JumpProtocol;
@@ -37,8 +37,7 @@ interface ProtocolOption {
 
 const PROTOCOLS: ProtocolOption[] = [
   { id: 'cmj', label: 'CMJ', labelPt: 'CMJ', icon: 'trending-up' },
-  { id: 'sl_cmj_left', label: 'SL-CMJ L', labelPt: 'SL-CMJ E', icon: 'footsteps' },
-  { id: 'sl_cmj_right', label: 'SL-CMJ R', labelPt: 'SL-CMJ D', icon: 'footsteps' },
+  { id: 'sl_cmj', label: 'SL-CMJ', labelPt: 'SL-CMJ', icon: 'footsteps' },
   { id: 'dj', label: 'DJ', labelPt: 'DJ', icon: 'arrow-down' },
 ];
 
@@ -490,6 +489,9 @@ function JumpAssessmentContent() {
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
+  // The actual backend protocol to query (for SL-CMJ, we query sl_cmj_left to get asymmetry data)
+  const backendProtocol = selectedProtocol === 'sl_cmj' ? 'sl_cmj_left' : selectedProtocol;
+
   // Manual entry fields
   const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [flightTime, setFlightTime] = useState('');
@@ -501,9 +503,9 @@ function JumpAssessmentContent() {
 
   // Fetch protocol-specific analysis
   const { data: analysis, isLoading, refetch } = useQuery({
-    queryKey: ['jump-protocol-analysis', id, selectedProtocol, selectedDate],
+    queryKey: ['jump-protocol-analysis', id, backendProtocol, selectedDate],
     queryFn: async () => {
-      const params = new URLSearchParams({ protocol: selectedProtocol, lang: locale });
+      const params = new URLSearchParams({ protocol: backendProtocol, lang: locale });
       if (selectedDate) params.append('date', selectedDate);
       const res = await api.get(`/jump/protocol-analysis/${id}?${params.toString()}`);
       return res.data;
@@ -551,10 +553,12 @@ function JumpAssessmentContent() {
       Alert.alert(locale === 'pt' ? 'Altura da Caixa' : 'Box Height', locale === 'pt' ? 'Informe a altura da caixa' : 'Enter box height');
       return;
     }
+    // For SL-CMJ, submit for both legs with the same data
+    const submitProtocol = backendProtocol;
     submitMutation.mutate({
       athlete_id: id,
       date,
-      protocol: selectedProtocol,
+      protocol: submitProtocol,
       flight_time_ms: parseFloat(flightTime.replace(',', '.')),
       contact_time_ms: contactTime ? parseFloat(contactTime.replace(',', '.')) : 0,
       jump_height_cm: jumpHeight ? parseFloat(jumpHeight.replace(',', '.')) : null,
@@ -599,33 +603,93 @@ function JumpAssessmentContent() {
           })}
         </View>
 
-        {/* Date Selector */}
+        {/* Date Selector - Collapsible dropdown */}
         {analysis?.available_dates && analysis.available_dates.length > 0 && (
-          <View style={s.dateSection} data-testid="date-selector">
-            <Text style={s.dateSectionLabel}>{locale === 'pt' ? 'Data da Avaliacao' : 'Assessment Date'}</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.dateScroll}>
-              {analysis.available_dates.map((d: string) => {
-                const isActive = d === (analysis.selected_date || analysis.available_dates[0]);
-                const displayDate = (() => {
-                  try {
-                    const [y, m, day] = d.split('-');
-                    return `${day}/${m}`;
-                  } catch { return d; }
-                })();
-                return (
-                  <TouchableOpacity
-                    key={d}
-                    style={[s.dateChip, isActive && s.dateChipActive]}
-                    onPress={() => setSelectedDate(d)}
-                    data-testid={`date-chip-${d}`}
-                  >
-                    <Text style={[s.dateChipText, isActive && s.dateChipTextActive]}>{displayDate}</Text>
-                    {isActive && <View style={s.dateChipDot} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+          <View data-testid="date-selector">
+            <TouchableOpacity
+              style={s.dateDropdownToggle}
+              onPress={() => setShowDatePicker(!showDatePicker)}
+              data-testid="date-dropdown-toggle"
+            >
+              <Ionicons name="calendar-outline" size={16} color={colors.accent.primary} />
+              <Text style={s.dateDropdownLabel}>
+                {locale === 'pt' ? 'Data da Avaliacao' : 'Assessment Date'}
+              </Text>
+              <View style={s.dateDropdownValue}>
+                <Text style={s.dateDropdownValueText}>
+                  {(() => {
+                    const d = analysis.selected_date || analysis.available_dates[0];
+                    try {
+                      const [y, m, day] = d.split('-');
+                      return `${day}/${m}/${y}`;
+                    } catch { return d; }
+                  })()}
+                </Text>
+              </View>
+              <Ionicons name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+            
+            {showDatePicker && (
+              <View style={s.dateDropdownList}>
+                {analysis.available_dates.map((d: string) => {
+                  const isActive = d === (analysis.selected_date || analysis.available_dates[0]);
+                  const displayDate = (() => {
+                    try {
+                      const [y, m, day] = d.split('-');
+                      return `${day}/${m}/${y}`;
+                    } catch { return d; }
+                  })();
+                  return (
+                    <TouchableOpacity
+                      key={d}
+                      style={[s.dateDropdownItem, isActive && s.dateDropdownItemActive]}
+                      onPress={() => { setSelectedDate(d); setShowDatePicker(false); }}
+                      data-testid={`date-item-${d}`}
+                    >
+                      <Text style={[s.dateDropdownItemText, isActive && s.dateDropdownItemTextActive]}>{displayDate}</Text>
+                      {isActive && <Ionicons name="checkmark" size={16} color={colors.accent.primary} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
           </View>
+        )}
+
+        {/* Delete Assessment Button */}
+        {analysis?.has_data && analysis?.selected_assessment_id && (
+          <TouchableOpacity
+            style={s.deleteAssessmentBtn}
+            onPress={() => {
+              Alert.alert(
+                locale === 'pt' ? 'Confirmar Exclusao' : 'Confirm Deletion',
+                locale === 'pt' ? 'Tem certeza que deseja excluir esta avaliacao?' : 'Are you sure you want to delete this assessment?',
+                [
+                  { text: locale === 'pt' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+                  {
+                    text: locale === 'pt' ? 'Confirmar Exclusao' : 'Confirm Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                      try {
+                        await api.delete(`/jump/assessment/${analysis.selected_assessment_id}`);
+                        queryClient.invalidateQueries({ queryKey: ['jump-protocol-analysis'] });
+                        queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
+                        setSelectedDate(null);
+                        refetch();
+                        Alert.alert(locale === 'pt' ? 'Sucesso' : 'Success', locale === 'pt' ? 'Avaliacao excluida' : 'Assessment deleted');
+                      } catch {
+                        Alert.alert(locale === 'pt' ? 'Erro' : 'Error', locale === 'pt' ? 'Nao foi possivel excluir' : 'Failed to delete');
+                      }
+                    },
+                  },
+                ]
+              );
+            }}
+            data-testid="delete-assessment-btn"
+          >
+            <Ionicons name="trash-outline" size={16} color={colors.status.error} />
+            <Text style={s.deleteAssessmentText}>{locale === 'pt' ? 'Excluir Avaliacao' : 'Delete Assessment'}</Text>
+          </TouchableOpacity>
         )}
 
         {/* Jump Camera Button */}
@@ -756,8 +820,8 @@ function JumpAssessmentContent() {
             {/* Fatigue Index */}
             <FatigueIndexCard data={analysis.fatigue_index} locale={locale} />
 
-            {/* SL-CMJ Asymmetry (only for SL-CMJ protocols) */}
-            {(selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
+            {/* SL-CMJ Asymmetry (only for SL-CMJ protocol) */}
+            {selectedProtocol === 'sl_cmj' && (
               <AsymmetryCard data={analysis.asymmetry} locale={locale} />
             )}
 
@@ -829,6 +893,41 @@ const s = StyleSheet.create({
   dateChipText: { fontSize: 13, fontWeight: '600', color: colors.text.tertiary },
   dateChipTextActive: { color: colors.accent.primary },
   dateChipDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: colors.accent.primary, marginTop: 3 },
+
+  // Date Dropdown
+  dateDropdownToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 12, paddingHorizontal: 14,
+    backgroundColor: colors.dark.card, borderRadius: 12, marginBottom: 4,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  dateDropdownLabel: { fontSize: 12, color: colors.text.secondary, fontWeight: '500' },
+  dateDropdownValue: {
+    flex: 1, alignItems: 'flex-end',
+  },
+  dateDropdownValueText: { fontSize: 14, fontWeight: '700', color: colors.accent.primary },
+  dateDropdownList: {
+    backgroundColor: colors.dark.card, borderRadius: 12, marginBottom: 14,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+    maxHeight: 250,
+  },
+  dateDropdownItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, paddingHorizontal: 16,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  dateDropdownItemActive: { backgroundColor: 'rgba(139,92,246,0.1)' },
+  dateDropdownItemText: { fontSize: 14, color: colors.text.secondary },
+  dateDropdownItemTextActive: { color: colors.accent.primary, fontWeight: '600' },
+
+  // Delete Assessment
+  deleteAssessmentBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, paddingHorizontal: 14,
+    backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10, marginBottom: 12,
+    borderWidth: 1, borderColor: 'rgba(239,68,68,0.3)',
+  },
+  deleteAssessmentText: { fontSize: 13, fontWeight: '600', color: colors.status.error },
 
   // Camera Button
   cameraButton: { borderRadius: 14, overflow: 'hidden', marginBottom: 10 },
