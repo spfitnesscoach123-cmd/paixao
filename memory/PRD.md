@@ -7,163 +7,81 @@ A comprehensive athlete load management platform for coaches, featuring VBT (Vel
 - Coach authentication with JWT
 - Athlete CRUD management
 - VBT Camera with barbell tracking (MediaPipe pose detection)
-- Jump Assessment (manual entry + camera-based)
+- Jump Assessment (manual entry + camera-based) with protocol-specific architecture (CMJ/DJ/SL-CMJ)
 - Wellness forms with shareable tokens
 - Team dashboard with risk indicators
-- GPS data import
+- GPS/Catapult data import (CSV)
 - Rolling Load Engine (backend)
 - RevenueCat subscription management
+- Scientific Analysis tab (Análise Científica)
+- Periodization planning
+- **Dashboard Visão Geral da Equipe (Advanced Intelligence Dashboard)** — NEW
 
-## Jump Camera Pipeline
+## Dashboard Visão Geral da Equipe (data.tsx)
 
 ### Architecture
-```
-services/jump/
-  types.ts          - Type definitions (JumpMetrics, JumpEvents, LiveMetrics, etc.)
-  jumpDetector.ts   - Core detection algorithms (calibration, takeoff/landing, metrics)
-  useJumpCamera.ts  - React hook (state machine, frame processing, SL-CMJ dual jump)
-  index.ts          - Public exports
+- Backend: `GET /api/dashboard/overview` — aggregation & visualization layer over existing metrics
+- Frontend: `app/(tabs)/data.tsx` — complete rebuild with 5 layers
+- Does NOT recalculate ACWR/Monotony/Strain — reuses existing calculations
+- LMPI (LoadManager Performance Indicator) is the only new composite metric (0-100 scale)
 
-app/athlete/[id]/jump-camera.tsx - Full UI (protocol selection, camera, results)
-app/athlete/[id]/jump-assessment.tsx - Analysis dashboard with charts
-```
+### 3 Automatic Modes
+- **TEAM MODE**: athlete=all → team averages, all athletes in charts
+- **POSITION MODE**: position selected → position group averages
+- **ATHLETE MODE**: 1 athlete → individual longitudinal analysis
 
-### Supported Protocols
-- **CMJ** - RSImod = jumpHeight(m) / timeToTakeoff(s). contactTime = 0.
-- **DJ** - RSI = jumpHeight(m) / contactTime(s). Classic reactive strength.
-- **SL-CMJ Left/Right** - Two-jump sequence, bilateral comparison, asymmetry detection.
+### 5 Layers
+1. **Load Intelligence**: Acute/Chronic Load gauges, Total Distance timeline, ACWR scatter, Velocity Zones donut, Weekly Heatmap, Load Ranking table
+2. **Smart Summary**: LMPI Gauge, Performance Profile radar, ACWR vs Wellness quadrant, Availability donut, High Risk table
+3. **Team Status**: Readiness gauge, Wellness bars (Sleep/Fatigue/Stress/Soreness/Mood), Cumulative Load, Availability, Low Readiness table
+4. **Neuromuscular Status**: Neuro Score gauge, RSImod longitudinal/comparison, CMJ Radar, VBT Fatigue by exercise
+5. **Risk Intelligence**: Risk Score gauge, ACWR vs Wellness quadrant, RSImod vs ACWR scatter, SL-CMJ Asymmetry alerts, Full Risk Panel table
 
-### Key Metrics
-- Flight Time (ms)
-- Contact Time (ms) - **DJ only**
-- Jump Height (cm) - h = (g * t^2) / 8
-- Time to Takeoff (ms) - CMJ/SL-CMJ: eccentric + concentric phase
-- Eccentric Duration (ms) - CMJ countermovement phase
-- RSImod - jumpHeight / timeToTakeoff (CMJ/SL-CMJ)
-- RSI classic - jumpHeight / contactTime (DJ)
-- Takeoff Velocity (m/s)
-- Bilateral asymmetry (%) - SL-CMJ with red flag >10%
+### Filters
+- Athlete (dropdown, all or specific)
+- Date Range (7d/14d/28d/90d)
+- Position (dropdown, from athlete profiles)
 
-### SL-CMJ Save Pipeline
-- When user saves SL-CMJ, BOTH legs saved via Promise.all (two separate API calls)
-- Each leg: sl_cmj_left or sl_cmj_right protocol with time_to_takeoff_ms
-- Analysis endpoint returns R/L data with rsi_modified and time_to_takeoff_ms
-- AsymmetryCard shows: RSImod R/L, Jump Height R/L, Takeoff Time R/L
+### LMPI Formula
+ACWR→30% + Wellness→25% + RSImod→20% + VBT Fatigue→15% + Monotony→10%
 
-### Bug Fix History
-- **Pipeline break** (Feb 2026): useEffect transition required metrics (now transitions on phase='review')
-- **RSImod formula** (Mar 2026): CMJ was using contactTime. Fixed to use timeToTakeoff.
-- **SL-CMJ persistence** (Mar 2026): Only leg2 was saved. Fixed to save BOTH legs.
-- **Chart refresh** (Mar 2026): useFocusEffect added for refetch on screen focus.
-- **Backend weight null** (Feb 2026): `athlete.get('weight') or 70` fix.
+### Rules
+- ACWR always uses Total Distance
+- CMJ protocol is primary for neuromuscular monitoring
+- VBT data grouped by exercise, never mixed
+- SL-CMJ used for asymmetry risk indicators
+- Last valid assessment per athlete for team comparisons
 
-### Backend Schema
-```python
-class JumpAssessmentCreate(BaseModel):
-    athlete_id: str
-    date: str
-    protocol: JumpProtocol  # cmj, sl_cmj_left, sl_cmj_right, dj
-    flight_time_ms: float
-    contact_time_ms: float  # DJ only, 0 for CMJ/SL-CMJ
-    jump_height_cm: Optional[float]
-    box_height_cm: Optional[float]  # DJ only
-    time_to_takeoff_ms: Optional[float]  # CMJ/SL-CMJ: eccentric+concentric
-    notes: Optional[str]
-```
+## Key API Endpoints
+- `GET /api/dashboard/overview` — Advanced dashboard data (filters: athlete_id, position, date_range, lang)
+- `GET /api/team-dashboard` — Team operational dashboard
+- `GET /api/jump/analysis/{athlete_id}` — Jump analysis by protocol
+- `POST /api/jump/assessment` — Save jump assessment
+- `POST /api/gps-data` — GPS data import
+- `GET /api/athletes` — List athletes
 
-### Safety Isolation
-- Jump Camera and VBT Camera share ZERO imports
-- No shared camera config or MediaPipe initialization modified
+## Tech Stack
+- Frontend: React Native (Expo), TypeScript, react-native-svg, react-native-gifted-charts
+- Backend: FastAPI, Motor (MongoDB async), JWT auth
+- Database: MongoDB
+- Charts: Custom SVG (Gauge, Radar, Quadrant, Heatmap, Line, Donut, Bar)
 
-## Versioning System
-- Source of truth: `frontend/package.json` -> version 1.0.83
-- Auto-sync: `frontend/scripts/sync-version.js`
+## Status
+### Completed
+- All 5 layers of Dashboard Visão Geral
+- CSV Import button moved to Team Dashboard
+- Backend aggregation endpoint with 3 modes
+- Global filters with instant reactivity
+- Layer transitions with fade animation
+- Insights per layer
+- All backend tests pass (20/20)
+- All frontend tests pass (8/8)
 
-## Deployment Fix (Mar 2026)
-### Root Cause
-EAS iOS build failed because `eslint-import-resolver-typescript@3.10.1` pulled in `unrs-resolver@1.11.1` which has 57 platform-specific native binaries as optional dependencies. Yarn v1 on the EAS macOS builder hit a 500 error downloading `@unrs/resolver-binding-linux-arm-musleabihf`, causing the entire `yarn install` to fail — which cascaded into `@types/jest` appearing "not installed".
-### Fix
-Added `"resolutions": { "eslint-import-resolver-typescript": "3.6.3" }` in package.json. Version 3.6.3 uses `enhanced-resolve` (pure JS) instead of `unrs-resolver` (native binaries), eliminating all 57 platform-specific packages from yarn.lock.
-
-## Periodization Page Visual Fixes (Mar 2026)
-### Changes Applied
-1. **Table alignment**: Metric column headers and values changed from `textAlign: 'right'` to `'center'`. "Atleta" column remains left-aligned.
-2. **Non-functional buttons removed**: `daysOverview` static badges (D.O, MD-5, etc.) removed from rendering. No code deleted — only JSX block replaced.
-3. **Functional day selector moved above table**: Interactive day buttons (with onPress) relocated from below to above the table in `renderTableView`.
-4. **Zero logic changes**: Only `textAlign` style properties and JSX ordering modified.
-
-## Backlog
-- P1: PDF generation crash in "Analise Cientifica"
-- P1: Refactor dashboards to use Rolling Load Engine API
-- P2: Internationalization
-- P2: UI for merging duplicate athlete profiles
-- P3: Remove ios_backup_before_removal/
-- P3: Extract RiskDonut component
-- P3: ESLint config for TypeScript
-
-## Jump Assessment Page Refactor (Mar 2026)
-### Problem
-Page used only the last global assessment, causing cross-protocol overwriting (CMJ overwrites DJ, etc.). No per-protocol filtering or date selection.
-
-### Architecture Changes
-1. **New API endpoint**: `GET /api/jump/protocol-analysis/{athlete_id}?protocol=cmj&date=YYYY-MM-DD`
-   - Returns protocol-isolated data with available_dates, metrics, fatigue_index, history, power_velocity, z_score, recommendations
-   - Each assessment individually persisted and never overwritten
-2. **Protocol selector tabs**: CMJ, SL-CMJ L, SL-CMJ R, DJ — horizontal tab bar
-3. **Date selector chips**: Horizontal scrollable chips showing available dates per protocol
-4. **Scientific Fatigue Index**: `FI% = ((Baseline - Current) / Baseline) * 100`
-   - Baseline = avg of top 3 best RSI values in last 90 days
-   - Bands: <0% above_baseline, 0-5% normal, 5-10% mild, 10-15% moderate, 15-20% high, >20% severe
-5. **Protocol-specific classification**: CMJ/SL-CMJ uses RSImod, DJ uses RSI classic
-6. **Manual entry hidden by default** — toggle button reveals form
-7. **Modernized UX**: Gauge with gradient arc + needle, glow effects on charts, area fill, animated numbers
-
-### Files Modified
-- `/app/backend/server.py` — Added `get_jump_protocol_analysis` endpoint
-- `/app/frontend/app/athlete/[id]/jump-assessment.tsx` — Complete page rewrite
-- `/app/frontend/services/api.ts` — Added preview URL support
-
-### CRITICAL: Jump Camera NOT modified
-- No changes to jump-camera.tsx, jumpDetector.ts, useJumpCamera.ts, MediaPipe, or any biomechanical formulas
-
-## Team Dashboard Metrics Audit (Mar 2026)
-### Changes Applied
-1. **FADIGA → READINESS**: Athlete cards and stats now display "Readiness" (0-100%) from wellness `readiness_score * 10` instead of fatigue. Fatigue code preserved (not deleted).
-2. **GPS Period Dedup**: Dashboard now uses only "Session" records when aggregating GPS data. Prevents double-counting when Session + 1st Half + 2nd Half exist for same date/session.
-3. **Monotony/Strain Audit**: Confirmed already using `acwr_metric` selector correctly. No code changes needed.
-
-### Key Implementation Details
-- Backend: `TeamDashboardAthlete.readiness_score` (0-100%), `TeamDashboardStats.team_avg_readiness`
-- GPS dedup uses keywords: session/total/full vs half/1st/2nd/period
-- Readiness color thresholds: ≥80 green, ≥60 cyan, ≥40 amber, <40 red
-
-## CHANGELOG
-### Mar 13, 2026 — Addendum: Page Reorganization, Asymmetry & Date Field
-- **REMOVED**: Jump charts from Assessments tab (rendering disabled, code preserved)
-- **ADDED**: Full Jump Protocol Analysis section to Scientific Analysis tab (protocol tabs, date selector, RSI gauge, Fatigue Index, asymmetry, evolution chart, recommendations)
-- **ADDED**: SL-CMJ Asymmetry card with bilateral comparison bars, red flag detection (>10%), dominant leg indicator
-- **ADDED**: Assessment Date field to Jump Camera configuration (YYYY-MM-DD input, defaults to today)
-- **BACKEND**: Asymmetry data returned in /api/jump/protocol-analysis endpoint for SL-CMJ protocols (null for CMJ/DJ)
-
-### Mar 13, 2026 — Jump Assessment Page Refactor
-- **NEW**: Protocol-specific analysis endpoint `/api/jump/protocol-analysis/{athlete_id}`
-- **NEW**: Protocol selector tabs (CMJ, SL-CMJ L, SL-CMJ R, DJ)
-- **NEW**: Date selector chips with available dates per protocol
-- **NEW**: Scientific Fatigue Index (%) with 6-band classification
-- **NEW**: Modernized RSI gauge with gradient arc, needle, and glow effects
-- **NEW**: RSI Evolution chart with area fill and glow layer
-- **NEW**: Animated number transitions on data load
-- **FIX**: Assessments no longer overwritten between protocols
-- **FIX**: Manual entry form hidden by default (camera-first approach)
-- **UNCHANGED**: Jump Camera, MediaPipe, detection pipeline, biomechanical formulas
-
-
-## Credentials
-- Coach (PRO): contato@loadmanagerpro.com.br / #UAE2026
-- App Review Token: APPS26
-### Mar 12, 2026 — Team Dashboard & Periodization & iOS Fixes
-- Replaced Fadiga with Readiness metric on team dashboard
-- Fixed GPS data double-counting (Session period dedup)
-- Periodization page UI: column alignment, button repositioning
-- iOS deployment: pinned eslint-import-resolver-typescript to 3.6.3
-- iOS versioning: synced to 1.0.84
+### Pending/Backlog
+- (P2) PDF Generation fix in Análise Científica
+- (P2) Frontend dashboards migration to Rolling Load Engine API
+- (P3) ESLint TypeScript configuration
+- Internationalization completion
+- Duplicate athlete merge UI
+- Remove ios_backup directory
+- Extract RiskDonut component from team.tsx
