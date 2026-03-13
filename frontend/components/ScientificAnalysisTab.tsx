@@ -5,10 +5,10 @@ import {
   StyleSheet, 
   ScrollView, 
   TouchableOpacity, 
-  ActivityIndicator,
   Dimensions,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ACWREvolutionChart } from './ACWREvolutionChart';
+import { FadeInView, ChartEntryView, SkeletonDashboard, AnimatedMetric } from './animations';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -546,7 +547,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
         </ScrollView>
       )}
 
-      {pLoading && <ActivityIndicator size="small" color={colors.accent.primary} style={{ padding: 16 }} />}
+      {pLoading && <SkeletonDashboard />}
 
       {!pLoading && !pData?.has_data && (
         <Text style={{ textAlign: 'center', color: colors.text.tertiary, fontSize: 12, padding: 16 }}>
@@ -820,10 +821,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
-        <Text style={styles.loadingText}>
-          {locale === 'pt' ? 'Gerando análise científica...' : 'Generating scientific analysis...'}
-        </Text>
+        <SkeletonDashboard />
       </View>
     );
   }

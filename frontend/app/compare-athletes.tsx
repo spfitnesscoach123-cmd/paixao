@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
+import { FadeInView, SkeletonDashboard, AnimatedMetric } from '../components/animations';
 import { Athlete, GPSData } from '../types';
 import { colors } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';

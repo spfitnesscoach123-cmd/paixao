@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  Dimensions, ActivityIndicator, Animated, Modal, Pressable
+  Dimensions, Animated, Modal, Pressable
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import Svg, { Circle, G, Text as SvgText, Rect, Line, Path, Defs, LinearGradient
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { AnimatedMetric, SkeletonDashboard, FadeInView, ChartEntryView, AnimatedCard } from '../../components/animations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 64;
@@ -452,31 +453,41 @@ export default function DataScreen() {
     return (
       <View>
         {/* Acute vs Chronic Gauges */}
+        <FadeInView delay={0}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load'}</Text>
+          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Cronica' : 'Acute vs Chronic Load'}</Text>
+          <ChartEntryView delay={100} duration={700}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
             <GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={110} />
             <GaugeChart value={chronicLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Chronic 28d" color={COLORS.blue} size={110} />
             <GaugeChart value={acwr || 0} max={2} label="ACWR" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
           </View>
+          </ChartEntryView>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony</Text><Text style={styles.metricPillValue}>{monotony?.toFixed(1) || '--'}</Text></View>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain</Text><Text style={styles.metricPillValue}>{strain ? Math.round(strain).toLocaleString() : '--'}</Text></View>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony</Text><AnimatedMetric value={monotony || 0} style={styles.metricPillValue} decimals={1} /></View>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain</Text><AnimatedMetric value={strain || 0} style={styles.metricPillValue} /></View>
           </View>
         </View>
+        </FadeInView>
         
         {/* Load Timeline */}
+        <FadeInView delay={120}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Distância Total (Timeline)' : 'Total Distance (Timeline)'}</Text>
+          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Distancia Total (Timeline)' : 'Total Distance (Timeline)'}</Text>
+          <ChartEntryView delay={200} duration={600}>
           <View style={{ marginTop: 8 }}>
             <LineChart lines={[{ data: distances, color: COLORS.cyan }]} labels={dateLabels} showArea height={140} />
           </View>
+          </ChartEntryView>
         </View>
+        </FadeInView>
         
         {/* ACWR Timeline (athlete mode) */}
         {mode === 'athlete' && acwrTimeline.length > 0 && (
+          <FadeInView delay={200}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>ACWR Timeline</Text>
+            <ChartEntryView delay={100} duration={600}>
             <View style={{ marginTop: 8 }}>
               <LineChart 
                 lines={[
@@ -488,20 +499,28 @@ export default function DataScreen() {
                 height={140}
               />
             </View>
+            </ChartEntryView>
           </View>
+          </FadeInView>
         )}
         
         {/* Scatter - Team/Position mode */}
         {mode !== 'athlete' && scatterPoints.length > 0 && (
+          <FadeInView delay={250}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>ACWR vs {locale === 'pt' ? 'Carga' : 'Load'}</Text>
+            <ChartEntryView delay={100} duration={500}>
             <QuadrantChart points={scatterPoints} xLabel="ACWR" yLabel={locale === 'pt' ? 'Carga Aguda (m)' : 'Acute Load (m)'} xMid={1.3} height={180} />
+            </ChartEntryView>
           </View>
+          </FadeInView>
         )}
         
         {/* Velocity Zones */}
+        <FadeInView delay={300}>
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{locale === 'pt' ? 'Zonas de Velocidade' : 'Velocity Zones'}</Text>
+          <ChartEntryView delay={100} duration={500}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
             <DonutChart 
               segments={[
@@ -521,16 +540,22 @@ export default function DataScreen() {
               <HorizontalBar value={vz.sprint_z5} max={vzTotal || 1} label="Sprint Z5" color={COLORS.red} />
             </View>
           </View>
+          </ChartEntryView>
         </View>
+        </FadeInView>
         
         {/* Weekly Heatmap */}
         {heatmap.length > 0 && (
+          <FadeInView delay={400}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{locale === 'pt' ? 'Heatmap Semanal' : 'Weekly Heatmap'}</Text>
+            <ChartEntryView delay={100} duration={600}>
             <View style={{ marginTop: 8 }}>
               <WeeklyHeatmap data={heatmap} />
             </View>
+            </ChartEntryView>
           </View>
+          </FadeInView>
         )}
         
         {/* Load Ranking Table */}
@@ -1033,11 +1058,15 @@ export default function DataScreen() {
   // ============ RENDER ============
   if (isLoading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
-        <Text style={{ color: colors.text.secondary, marginTop: 12, fontSize: 13 }}>
-          {locale === 'pt' ? 'Carregando dados...' : 'Loading data...'}
-        </Text>
+      <View style={styles.container}>
+        <LinearGradient colors={[colors.dark.secondary, colors.dark.primary]} style={styles.gradient}>
+          <View style={styles.header}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>{locale === 'pt' ? 'Visao Geral' : 'Overview'}</Text>
+            </View>
+          </View>
+          <SkeletonDashboard />
+        </LinearGradient>
       </View>
     );
   }

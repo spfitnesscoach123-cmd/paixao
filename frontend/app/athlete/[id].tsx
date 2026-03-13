@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  ActivityIndicator,
   RefreshControl,
   Alert,
 } from 'react-native';
@@ -20,6 +19,7 @@ import { format, parseISO, isWithinInterval } from 'date-fns';
 import { ScientificAnalysisTab } from '../../components/ScientificAnalysisTab';
 import { GPSDateFilter } from '../../components/GPSDateFilter';
 import { WellnessCharts } from '../../components/WellnessCharts';
+import { AnimatedMetric, AnimatedCard, SkeletonProfile, SkeletonList, SkeletonCard, FadeInView, ChartEntryView } from '../../components/animations';
 import { JumpAnalysisCharts } from '../../components/JumpAnalysisCharts';
 import { BodyCompositionCharts } from '../../components/BodyCompositionCharts';
 import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
@@ -337,7 +337,7 @@ export default function AthleteDetails() {
   if (athleteLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
+        <SkeletonProfile />
       </View>
     );
   }
@@ -468,7 +468,7 @@ export default function AthleteDetails() {
             )}
 
             {gpsLoading ? (
-              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
+              <SkeletonList count={3} />
             ) : groupedSessions.length > 0 ? (
               groupedSessions.map((session) => {
                 const isExpanded = expandedSessions.includes(session.session_id);
@@ -639,7 +639,7 @@ export default function AthleteDetails() {
             )}
 
             {wellnessLoading ? (
-              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
+              <SkeletonList count={3} />
             ) : wellnessData && wellnessData.length > 0 ? (
               <>
                 <Text style={styles.sectionTitle}>{t('wellness.history') || 'Histórico'}</Text>
@@ -753,7 +753,7 @@ export default function AthleteDetails() {
             <Text style={styles.sectionTitle}>{t('assessments.history') || 'Histórico de Avaliações'}</Text>
             
             {assessmentsLoading ? (
-              <ActivityIndicator size="large" color={colors.accent.primary} style={{ marginTop: 32 }} />
+              <SkeletonList count={3} />
             ) : assessments && assessments.length > 0 ? (
               assessments.map((item, index) => (
                 <View key={item.id || `assessment-${index}`} style={styles.dataCard}>

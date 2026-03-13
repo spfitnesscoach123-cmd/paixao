@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
   RefreshControl,
   Modal,
   Pressable,
@@ -20,6 +19,7 @@ import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
+import { AnimatedMetric, AnimatedCard, SkeletonDashboard, FadeInView, ChartEntryView } from '../../components/animations';
 
 // ACWR Metric options
 const ACWR_METRICS = [
@@ -336,7 +336,7 @@ export default function TeamDashboard() {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
+        <SkeletonDashboard />
       </View>
     );
   }
@@ -646,58 +646,60 @@ export default function TeamDashboard() {
           )}
 
           {/* Stats Cards */}
+          <FadeInView delay={100}>
           <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(34, 211, 238, 0.15)', 'rgba(34, 211, 238, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="speedometer" size={24} color="#22d3ee" />
-                <Text style={styles.statValue}>{data.stats.team_avg_acwr}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'ACWR Médio' : 'Avg ACWR'}</Text>
+                <AnimatedMetric value={parseFloat(data.stats.team_avg_acwr) || 0} style={styles.statValue} decimals={2} />
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'ACWR Medio' : 'Avg ACWR'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
             
-            <View style={styles.statCard}>
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(16, 185, 129, 0.15)', 'rgba(16, 185, 129, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="fitness" size={24} color="#10b981" />
-                <Text style={styles.statValue}>{data.stats.team_avg_wellness}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Wellness Médio' : 'Avg Wellness'}</Text>
+                <AnimatedMetric value={parseFloat(data.stats.team_avg_wellness) || 0} style={styles.statValue} decimals={0} />
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Wellness Medio' : 'Avg Wellness'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
             
-            <View style={styles.statCard}>
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(16, 185, 129, 0.15)', 'rgba(34, 211, 238, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="pulse" size={24} color="#10b981" />
-                <Text style={styles.statValue}>{data.stats.team_avg_readiness != null ? `${data.stats.team_avg_readiness}%` : '-'}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Readiness Médio' : 'Avg Readiness'}</Text>
+                <AnimatedMetric value={data.stats.team_avg_readiness || 0} style={styles.statValue} suffix="%" />
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Readiness Medio' : 'Avg Readiness'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
             
-            {/* Strength/Power Card - shows team average power */}
-            <View style={styles.statCard}>
+            {/* Strength/Power Card */}
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(99, 102, 241, 0.15)', 'rgba(99, 102, 241, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="barbell" size={24} color="#6366f1" />
-                <Text style={styles.statValue}>{data.stats.team_avg_power ? `${data.stats.team_avg_power}` : '-'}W</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Potência Média' : 'Avg Power'}</Text>
+                <AnimatedMetric value={data.stats.team_avg_power || 0} style={styles.statValue} suffix="W" />
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Potencia Media' : 'Avg Power'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
             
-            {/* Body Composition Card - shows team average body fat */}
-            <View style={styles.statCard}>
+            {/* Body Composition Card */}
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(236, 72, 153, 0.15)', 'rgba(236, 72, 153, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="body" size={24} color="#ec4899" />
-                <Text style={styles.statValue}>{data.stats.team_avg_body_fat ? `${data.stats.team_avg_body_fat.toFixed(1)}%` : '-'}</Text>
+                <AnimatedMetric value={data.stats.team_avg_body_fat || 0} style={styles.statValue} decimals={1} suffix="%" />
                 <Text style={styles.statLabel}>{locale === 'pt' ? '% Gordura' : 'Body Fat %'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
             
-            {/* HSR Card - High Speed Running average */}
-            <View style={styles.statCard}>
+            {/* HSR Card */}
+            <AnimatedCard style={styles.statCard}>
               <LinearGradient colors={['rgba(139, 92, 246, 0.15)', 'rgba(139, 92, 246, 0.05)']} style={styles.statCardGradient}>
                 <Ionicons name="flash" size={24} color="#8b5cf6" />
-                <Text style={styles.statValue}>{data.stats.team_avg_hid ? `${Math.round(data.stats.team_avg_hid)}m` : '-'}</Text>
-                <Text style={styles.statLabel}>{locale === 'pt' ? 'Média HSR' : 'Avg HSR'}</Text>
+                <AnimatedMetric value={data.stats.team_avg_hid ? Math.round(data.stats.team_avg_hid) : 0} style={styles.statValue} suffix="m" />
+                <Text style={styles.statLabel}>{locale === 'pt' ? 'Media HSR' : 'Avg HSR'}</Text>
               </LinearGradient>
-            </View>
+            </AnimatedCard>
           </View>
+          </FadeInView>
           
           {/* ACWR Legend */}
           <View style={styles.acwrLegendCard}>

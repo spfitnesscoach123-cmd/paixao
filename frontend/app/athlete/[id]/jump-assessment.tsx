@@ -6,7 +6,6 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  ActivityIndicator,
   Alert,
   Dimensions,
   Animated,
@@ -16,6 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { FadeInView, ChartEntryView, SkeletonDashboard, AnimatedMetric } from '../../../components/animations';
 import Svg, { Line, Circle, Rect, G, Text as SvgText, Path, Polyline, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/core';
 import api from '../../../services/api';
@@ -775,13 +775,12 @@ function JumpAssessmentContent() {
 
         {/* Loading */}
         {isLoading && (
-          <View style={s.loadingBox}>
-            <ActivityIndicator size="large" color={colors.accent.primary} />
-          </View>
+          <SkeletonDashboard />
         )}
 
         {/* Analysis Section */}
         {!isLoading && hasData && metrics && (
+          <FadeInView delay={100}>
           <View style={s.analysisSection}>
             {/* RSI Gauge */}
             <RSIGauge
@@ -844,6 +843,7 @@ function JumpAssessmentContent() {
               </View>
             )}
           </View>
+          </FadeInView>
         )}
 
         {/* Empty State */}

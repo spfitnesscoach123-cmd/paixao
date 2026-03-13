@@ -4,6 +4,7 @@ import Svg, { Line, Circle, Polyline, Rect, G, Text as SvgText } from 'react-nat
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { QTRGauge } from './QTRGauge';
+import { FadeInView, ChartEntryView, AnimatedMetric } from './animations';
 
 interface WellnessData {
   date: string;
@@ -126,6 +127,7 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
   return (
     <View style={styles.container}>
       {/* QTR Gauge */}
+      <FadeInView delay={0}>
       <View style={styles.qtrSection}>
         <QTRGauge score={qtrScore} size={220} />
         
@@ -149,11 +151,15 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
           </View>
         </View>
       </View>
+      </FadeInView>
 
       {/* Parameter Correlation Chart */}
+      <FadeInView delay={200}>
       <View style={styles.chartSection}>
-        <Text style={styles.chartTitle}>{t('wellness.parameterEvolution') || 'Evolução dos Parâmetros'}</Text>
-        <Text style={styles.chartSubtitle}>{t('wellness.last14days') || 'Últimos 14 dias'}</Text>
+        <Text style={styles.chartTitle}>{t('wellness.parameterEvolution') || 'Evolucao dos Parametros'}</Text>
+        <Text style={styles.chartSubtitle}>{t('wellness.last14days') || 'Ultimos 14 dias'}</Text>
+        
+        <ChartEntryView delay={300} duration={600}>
         
         <Svg width={chartWidth} height={chartHeight}>
           {/* Grid lines */}
@@ -206,6 +212,7 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
             ))
           ))}
         </Svg>
+        </ChartEntryView>
         
         {/* Legend */}
         <View style={styles.legend}>
@@ -217,6 +224,7 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
           ))}
         </View>
       </View>
+      </FadeInView>
 
       {/* Summary Stats */}
       <View style={styles.summarySection}>

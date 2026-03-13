@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
+import { FadeInView, SkeletonDashboard, AnimatedMetric } from '../../components/animations';
 import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../services/api';
 import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
@@ -369,9 +370,7 @@ export default function PeriodizationScreen() {
         </View>
 
         {weeksLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.accent.primary} />
-          </View>
+          <SkeletonDashboard />
         ) : weeks && weeks.length > 0 ? (
           weeks.map((week: PeriodizationWeek) => renderWeekCard(week))
         ) : (
@@ -417,9 +416,7 @@ export default function PeriodizationScreen() {
 
             <ScrollView style={styles.activityList}>
               {sessionsLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.accent.primary} />
-                </View>
+                <SkeletonDashboard />
               ) : gpsSessions && gpsSessions.length > 0 ? (
                 gpsSessions.map((session: any) => (
                   <View key={session.session_id} style={styles.sessionCard}>

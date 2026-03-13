@@ -5,7 +5,6 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   RefreshControl,
   Image,
 } from 'react-native';
@@ -18,6 +17,7 @@ import api from '../../services/api';
 import { Athlete } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { AnimatedCard, SkeletonList, FadeInView } from '../../components/animations';
 
 export default function AthletesScreen() {
   const router = useRouter();
@@ -52,11 +52,10 @@ export default function AthletesScreen() {
     return age;
   };
 
-  const renderAthleteCard = ({ item }: { item: Athlete }) => (
-    <TouchableOpacity
+  const renderAthleteCard = ({ item, index }: { item: Athlete; index?: number }) => (
+    <AnimatedCard
       style={styles.athleteCard}
       onPress={() => router.push(`/athlete/${item.id || item._id}`)}
-      activeOpacity={0.8}
     >
       <LinearGradient
         colors={colors.gradients.card}
@@ -108,7 +107,7 @@ export default function AthletesScreen() {
           <Ionicons name="chevron-forward" size={24} color={colors.accent.primary} />
         </View>
       </LinearGradient>
-    </TouchableOpacity>
+    </AnimatedCard>
   );
 
   const styles = createStyles(colors);
@@ -116,7 +115,7 @@ export default function AthletesScreen() {
   if (isLoading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={colors.accent.primary} />
+        <SkeletonList count={6} />
       </View>
     );
   }
