@@ -101,6 +101,31 @@ Added `"resolutions": { "eslint-import-resolver-typescript": "3.6.3" }` in packa
 - P3: Extract RiskDonut component
 - P3: ESLint config for TypeScript
 
+## Jump Assessment Page Refactor (Mar 2026)
+### Problem
+Page used only the last global assessment, causing cross-protocol overwriting (CMJ overwrites DJ, etc.). No per-protocol filtering or date selection.
+
+### Architecture Changes
+1. **New API endpoint**: `GET /api/jump/protocol-analysis/{athlete_id}?protocol=cmj&date=YYYY-MM-DD`
+   - Returns protocol-isolated data with available_dates, metrics, fatigue_index, history, power_velocity, z_score, recommendations
+   - Each assessment individually persisted and never overwritten
+2. **Protocol selector tabs**: CMJ, SL-CMJ L, SL-CMJ R, DJ — horizontal tab bar
+3. **Date selector chips**: Horizontal scrollable chips showing available dates per protocol
+4. **Scientific Fatigue Index**: `FI% = ((Baseline - Current) / Baseline) * 100`
+   - Baseline = avg of top 3 best RSI values in last 90 days
+   - Bands: <0% above_baseline, 0-5% normal, 5-10% mild, 10-15% moderate, 15-20% high, >20% severe
+5. **Protocol-specific classification**: CMJ/SL-CMJ uses RSImod, DJ uses RSI classic
+6. **Manual entry hidden by default** — toggle button reveals form
+7. **Modernized UX**: Gauge with gradient arc + needle, glow effects on charts, area fill, animated numbers
+
+### Files Modified
+- `/app/backend/server.py` — Added `get_jump_protocol_analysis` endpoint
+- `/app/frontend/app/athlete/[id]/jump-assessment.tsx` — Complete page rewrite
+- `/app/frontend/services/api.ts` — Added preview URL support
+
+### CRITICAL: Jump Camera NOT modified
+- No changes to jump-camera.tsx, jumpDetector.ts, useJumpCamera.ts, MediaPipe, or any biomechanical formulas
+
 ## Team Dashboard Metrics Audit (Mar 2026)
 ### Changes Applied
 1. **FADIGA → READINESS**: Athlete cards and stats now display "Readiness" (0-100%) from wellness `readiness_score * 10` instead of fatigue. Fatigue code preserved (not deleted).
@@ -112,6 +137,26 @@ Added `"resolutions": { "eslint-import-resolver-typescript": "3.6.3" }` in packa
 - GPS dedup uses keywords: session/total/full vs half/1st/2nd/period
 - Readiness color thresholds: ≥80 green, ≥60 cyan, ≥40 amber, <40 red
 
+## CHANGELOG
+### Mar 13, 2026 — Jump Assessment Page Refactor
+- **NEW**: Protocol-specific analysis endpoint `/api/jump/protocol-analysis/{athlete_id}`
+- **NEW**: Protocol selector tabs (CMJ, SL-CMJ L, SL-CMJ R, DJ)
+- **NEW**: Date selector chips with available dates per protocol
+- **NEW**: Scientific Fatigue Index (%) with 6-band classification
+- **NEW**: Modernized RSI gauge with gradient arc, needle, and glow effects
+- **NEW**: RSI Evolution chart with area fill and glow layer
+- **NEW**: Animated number transitions on data load
+- **FIX**: Assessments no longer overwritten between protocols
+- **FIX**: Manual entry form hidden by default (camera-first approach)
+- **UNCHANGED**: Jump Camera, MediaPipe, detection pipeline, biomechanical formulas
+
+
 ## Credentials
 - Coach (PRO): contato@loadmanagerpro.com.br / #UAE2026
 - App Review Token: APPS26
+### Mar 12, 2026 — Team Dashboard & Periodization & iOS Fixes
+- Replaced Fadiga with Readiness metric on team dashboard
+- Fixed GPS data double-counting (Session period dedup)
+- Periodization page UI: column alignment, button repositioning
+- iOS deployment: pinned eslint-import-resolver-typescript to 3.6.3
+- iOS versioning: synced to 1.0.84
