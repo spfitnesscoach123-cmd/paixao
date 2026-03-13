@@ -15,7 +15,10 @@ A comprehensive athlete load management platform for coaches, featuring VBT (Vel
 - RevenueCat subscription management
 - Scientific Analysis tab (Análise Científica)
 - Periodization planning
-- **Dashboard Visão Geral da Equipe (Advanced Intelligence Dashboard)** — NEW
+- **Dashboard Visão Geral da Equipe (Advanced Intelligence Dashboard)**
+- **GPS Activity Deletion with selection mode**
+- **Jump Assessment deletion with confirmation**
+- **Animated Wellness QTR Gauge (no needle)**
 
 ## Dashboard Visão Geral da Equipe (data.tsx)
 
@@ -33,31 +36,22 @@ A comprehensive athlete load management platform for coaches, featuring VBT (Vel
 ### 5 Layers
 1. **Load Intelligence**: Acute/Chronic Load gauges, Total Distance timeline, ACWR scatter, Velocity Zones donut, Weekly Heatmap, Load Ranking table
 2. **Smart Summary**: LMPI Gauge, Performance Profile radar, ACWR vs Wellness quadrant, Availability donut, High Risk table
-3. **Team Status**: Readiness gauge, Wellness bars (Sleep/Fatigue/Stress/Soreness/Mood), Cumulative Load, Availability, Low Readiness table
+3. **Team Status**: Readiness gauge, Wellness bars, Cumulative Load, Availability, Low Readiness table
 4. **Neuromuscular Status**: Neuro Score gauge, RSImod longitudinal/comparison, CMJ Radar, VBT Fatigue by exercise
 5. **Risk Intelligence**: Risk Score gauge, ACWR vs Wellness quadrant, RSImod vs ACWR scatter, SL-CMJ Asymmetry alerts, Full Risk Panel table
 
-### Filters
-- Athlete (dropdown, all or specific)
-- Date Range (7d/14d/28d/90d)
-- Position (dropdown, from athlete profiles)
-
 ### LMPI Formula
 ACWR→30% + Wellness→25% + RSImod→20% + VBT Fatigue→15% + Monotony→10%
-
-### Rules
-- ACWR always uses Total Distance
-- CMJ protocol is primary for neuromuscular monitoring
-- VBT data grouped by exercise, never mixed
-- SL-CMJ used for asymmetry risk indicators
-- Last valid assessment per athlete for team comparisons
 
 ## Key API Endpoints
 - `GET /api/dashboard/overview` — Advanced dashboard data (filters: athlete_id, position, date_range, lang)
 - `GET /api/team-dashboard` — Team operational dashboard
 - `GET /api/jump/analysis/{athlete_id}` — Jump analysis by protocol
 - `POST /api/jump/assessment` — Save jump assessment
+- `DELETE /api/jump/assessment/{id}` — Delete jump assessment
 - `POST /api/gps-data` — GPS data import
+- `POST /api/gps-data/delete-activities` — Delete GPS activities by session_ids
+- `GET /api/gps-data/athlete/{id}/sessions` — Get athlete GPS sessions
 - `GET /api/athletes` — List athletes
 
 ## Tech Stack
@@ -67,18 +61,25 @@ ACWR→30% + Wellness→25% + RSImod→20% + VBT Fatigue→15% + Monotony→10%
 - Charts: Custom SVG (Gauge, Radar, Quadrant, Heatmap, Line, Donut, Bar)
 
 ## Status
-### Completed
+### Completed (Mar 2026 - System Cleanup & UX)
+- Removed "View Detailed Charts" button from Athlete Profile
+- Removed "Upload CSV" button from GPS Data tab
+- Added GPS Activity Deletion with selection mode, checkboxes, confirmation modal
+- Fixed Scientific Analysis activity counting (only SESSION periods)
+- Improved Wellness QTR Gauge: animated progress, no needle
+- Improved Jump Test Date Display: collapsible dropdown selector
+- Added Jump Assessment deletion with confirmation modal
+- Merged SL-CMJ (D) and SL-CMJ (E) into single "SL-CMJ" protocol across all pages
+- Fixed NoneType errors in GPS sessions endpoint
+
+### Previously Completed
 - All 5 layers of Dashboard Visão Geral
 - CSV Import button moved to Team Dashboard
 - Backend aggregation endpoint with 3 modes
 - Global filters with instant reactivity
-- Layer transitions with fade animation
-- Insights per layer
-- All backend tests pass (20/20)
-- All frontend tests pass (8/8)
 
 ### Pending/Backlog
-- (P2) PDF Generation fix in Análise Científica
+- (P2) PDF Generation fix in Análise Científica (recurring issue)
 - (P2) Frontend dashboards migration to Rolling Load Engine API
 - (P3) ESLint TypeScript configuration
 - Internationalization completion

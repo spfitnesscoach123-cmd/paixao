@@ -1298,7 +1298,7 @@ async def get_athlete_sessions(
                 "max_deceleration": 0,
             }
         
-        period_name = record.get("period_name") or record.get("notes", "").replace("Período: ", "") or "Full Session"
+        period_name = record.get("period_name") or (record.get("notes") or "").replace("Período: ", "") or "Full Session"
         sessions[session_key]["periods"].append({
             "period_name": period_name,
             "total_distance": record.get("total_distance", 0),
@@ -1332,12 +1332,12 @@ async def get_athlete_sessions(
             sessions[session_key]["totals"]["number_of_decelerations"] = record.get("number_of_decelerations", 0)
         
         # Track max values
-        if record.get("max_speed", 0) > sessions[session_key]["max_speed"]:
-            sessions[session_key]["max_speed"] = record.get("max_speed", 0)
-        if record.get("max_acceleration", 0) > sessions[session_key]["max_acceleration"]:
-            sessions[session_key]["max_acceleration"] = record.get("max_acceleration", 0)
-        if record.get("max_deceleration", 0) > sessions[session_key]["max_deceleration"]:
-            sessions[session_key]["max_deceleration"] = record.get("max_deceleration", 0)
+        if (record.get("max_speed") or 0) > sessions[session_key]["max_speed"]:
+            sessions[session_key]["max_speed"] = record.get("max_speed") or 0
+        if (record.get("max_acceleration") or 0) > sessions[session_key]["max_acceleration"]:
+            sessions[session_key]["max_acceleration"] = record.get("max_acceleration") or 0
+        if (record.get("max_deceleration") or 0) > sessions[session_key]["max_deceleration"]:
+            sessions[session_key]["max_deceleration"] = record.get("max_deceleration") or 0
     
     return list(sessions.values())
 
