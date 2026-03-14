@@ -51,8 +51,8 @@ Sports performance management app for coaches to track athletes' GPS data, welln
 - Frontend: Native share sheet instead of new tab
 
 ## Pending Issues
+- P0: ACWR no Dashboard Overview usa Coupled ACWR (cálculo inline) em vez do EWMA (RollingLoadEngine) — auditoria completa em `/app/memory/AUDIT_REPORT_ACWR_OVERVIEW_vs_TEAM.md`
 - P1: PDF generation crash in "Análise Científica" (recurring >3 times)
-- P2: Frontend dashboards not using RollingLoadEngine consistently
 - P3: ESLint configuration for TypeScript
 
 ## Backlog
