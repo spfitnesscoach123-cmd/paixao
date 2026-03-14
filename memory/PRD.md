@@ -26,6 +26,16 @@ Sports performance management app for coaches to track athletes' GPS data, welln
 
 ## Recent Changes
 
+### 2026-03-14: ACWR Alignment + PDF Export Fix
+- Dashboard Overview now uses EWMA ACWR from athlete_load_metrics (same source as Team Dashboard)
+- Removed inline calc_acwr() Coupled ACWR calculation
+- ACWR, acute_load, chronic_load, monotony, strain now from RollingLoadEngine
+- ACWR timeline uses historical EWMA records
+- PDF export (GET /api/report/dashboard-overview) rewritten: maps data from actual response keys (summary, athletes, aggregated_timeline) instead of non-existent layered keys
+- Fixed NoneType format errors in PDF risk panel
+- All values now match between UI and PDF export
+- Files changed: backend/server.py
+
 ### 2026-03-14: Dashboard Overview - New Date Filter Options
 - Added "Hoje/Today" and "Ontem/Yesterday" to the global date range selector
 - Frontend: Updated DATE_RANGES array in data.tsx with new options at the top
