@@ -1,59 +1,51 @@
-# PRD — Load Manager Pro
+# Load Manager Pro - PRD
 
-## Problema Original
-Aplicacao de gestao de carga atletica com dashboards, perfil de atleta, import CSV GPS, wellness, readiness, VBT, jumps, analise cientifica e PDF.
+## Original Problem Statement
+Aplicativo de monitoramento de carga esportiva com React Native (frontend) + FastAPI (backend) + MongoDB.
 
-## Credenciais
-- **Coach**: `contato@loadmanagerpro.com.br` / `#UAE2026`
+## Bug Crítico P0 - Dashboard Visão Geral: Dados Desatualizados
+**Status: CORRIGIDO (2026-03-14)**
+
+### Causa Raiz
+A função `get_dashboard_overview` em `server.py` computava métricas de carga (ACWR, LMPI, RSI, monotony, strain, acute/chronic load) **independentemente** da existência de GPS data para cada atleta. O `get_team_dashboard` gateava essas computações dentro de `if gps_data:`. Isso causava divergência: após deletar GPS activities, o Team Dashboard zerava tudo, mas o Overview continuava mostrando valores de wellness, RSI e LMPI.
+
+### Correção Aplicada
+1. Adicionado flag `has_gps_data` por atleta
+2. ACWR/monotony/strain/acute/chronic só computados quando `has_gps_data=True`
+3. LMPI = None quando `has_gps_data=False`
+4. Team summary averages (team_acwr, team_rsimod, team_lmpi, etc.) filtrados por atletas com GPS data
+5. Wellness/readiness mantidos para todos atletas (dados válidos independentes de GPS)
+
+### Validação
+- Testado com curl: delete GPS → ambos dashboards zeram métricas de carga ✓
+- Testado: add GPS → ambos dashboards mostram dados consistentes ✓
+- Testado: recalculate-all após delete → métricas permanecem null ✓
+- **NÃO validado em produção Railway** — requer deploy pelo usuário
+
+## Pendentes
+
+### P1
+- PDF generation crash em "Análise Científica"
+- Verificação de features anteriores pelo usuário
+
+### P2
+- Refatorar dashboards para usar Rolling Load Engine consistentemente
+- RSI discrepância entre dashboards (Overview usa latest CMJ RSI, Team usa agregação diferente)
+
+### P3/Backlog
+- Internacionalização de ScientificAnalysisTab.tsx e Avaliações
+- ESLint config para TypeScript
+- UI para merge de perfis duplicados
+- Remover diretório ios_backup_before_removal/
 
 ## Arquitetura
-- Frontend: Expo (React Native Web) porta 3000 / TestFlight (iOS)
-- Backend: FastAPI porta 8001
-- Producao: `https://paixao-production.up.railway.app`
-- Preview: `https://dashboard-sync-fix-3.preview.emergentagent.com`
-- iOS aponta Railway via `RAILWAY_PRODUCTION_URL` em `services/api.ts`
+- Backend: FastAPI (`/app/backend/server.py`) - 12K+ lines
+- Frontend: React Native/Expo (`/app/frontend/`)
+- DB: MongoDB (football_training)
+- Deploy produção: Railway
 
-## Fonte Unica de Verdade
-- `athlete_load_metrics` (EWMA/RollingLoadEngine com dedup) → Acute/Chronic/ACWR/Monotony/Strain
-- `gps_data` com dedup Session/Period → Timeline, Heatmap, Velocity Zones
-- Demais colecoes (wellness, jump_assessments, body_compositions, vbt_data) → live-queried
-
-## Recalculo Automatico
-| Operacao | Recalcula athlete_load_metrics? |
-|----------|-------------------------------|
-| CREATE GPS | SIM (update_athlete_metrics) |
-| DELETE GPS | SIM (clean stale + recalculate_from_date) |
-| UPDATE activity-type GPS | SIM (recalculate_from_date) |
-| DELETE Athlete | SIM (cascade delete 7 colecoes) |
-| CREATE/DELETE wellness/jumps/bodycomp/VBT | N/A (live-queried) |
-
-## Frontend Tab Refetch (useFocusEffect)
-- data.tsx (Overview): useFocusEffect → refetch() ao ganhar foco
-- team.tsx (Team Dashboard): useFocusEffect → refetch() ao ganhar foco
-- Garante que tabs nunca mostram dados stale apos navegacao
-
-## Correcoes Mar 2026
-- [x] Dedup GPS no aggregate_gps_for_date
-- [x] Recalculo automatico CREATE/DELETE/UPDATE GPS
-- [x] Cascade delete de atleta (7 colecoes)
-- [x] Gauge Prontidao usa readiness_score real
-- [x] Codigo morto removido
-- [x] useFocusEffect em Overview e Team Dashboard (fix stale data)
-- [x] Delete GPS Phase 3: clean stale metrics from affected date forward
-- [x] Recalculo global Railway (28 atletas, Khosaif corrigido 22130→11125)
-
-## Backlog
-### P1
-- PDF crash em Analise Cientifica (recorrente >3x)
-- Refatorar dashboards para Rolling Load Engine centralizado
-### P2
-- Internacionalizacao ScientificAnalysisTab e Avaliacoes
-- ESLint config TypeScript
-### P3
-- UI merge perfis duplicados
-- Remover frontend/ios_backup_before_removal/
-
-## Arquivos Chave
-- backend/server.py, backend/load_engine/rolling_load_engine.py
-- frontend/app/(tabs)/data.tsx, frontend/app/(tabs)/team.tsx
-- frontend/app/_layout.tsx, frontend/services/api.ts
+## Endpoints Chave
+- GET /api/dashboard/overview — Dashboard Visão Geral
+- GET /api/dashboard/team — Team Dashboard
+- POST /api/gps-data/delete-activities — Deletar atividades GPS
+- POST /api/load-metrics/recalculate-all — Recalcular métricas
