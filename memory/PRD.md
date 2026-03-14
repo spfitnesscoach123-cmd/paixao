@@ -10,7 +10,7 @@ Aplicacao de gestao de carga atletica com dashboards, perfil de atleta, import C
 - Frontend: Expo (React Native Web) porta 3000 / TestFlight (iOS)
 - Backend: FastAPI porta 8001
 - Producao: `https://paixao-production.up.railway.app`
-- Preview: `https://load-metrics-unify.preview.emergentagent.com`
+- Preview: `https://dashboard-sync-fix-3.preview.emergentagent.com`
 - iOS aponta Railway via `RAILWAY_PRODUCTION_URL` em `services/api.ts`
 
 ## Fonte Unica de Verdade
