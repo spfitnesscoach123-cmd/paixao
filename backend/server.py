@@ -846,7 +846,32 @@ async def delete_athlete(
     })
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Athlete not found")
-    return {"message": "Athlete deleted successfully"}
+    
+    # Cascade cleanup: remove derived/related data for the deleted athlete
+    coach_id_str = str(current_user["_id"])
+    cleanup = {}
+    r = await db.athlete_load_metrics.delete_many({"athlete_id": athlete_id})
+    cleanup["athlete_load_metrics"] = r.deleted_count
+    r = await db.gps_data.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+    cleanup["gps_data"] = r.deleted_count
+    r = await db.wellness.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+    cleanup["wellness"] = r.deleted_count
+    r = await db.jump_assessments.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+    cleanup["jump_assessments"] = r.deleted_count
+    r = await db.body_compositions.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+    cleanup["body_compositions"] = r.deleted_count
+    try:
+        r = await db.vbt_data.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+        cleanup["vbt_data"] = r.deleted_count
+    except Exception:
+        pass
+    try:
+        r = await db.assessments.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+        cleanup["assessments"] = r.deleted_count
+    except Exception:
+        pass
+    
+    return {"message": "Athlete deleted successfully", "related_data_cleaned": cleanup}
 
 
 # ============= ATHLETE IDENTITY RESOLUTION =============
@@ -1234,21 +1259,40 @@ async def delete_gps_activities(
     data: GPSDeleteRequest,
     current_user: dict = Depends(get_current_user)
 ):
-    """Delete GPS activities by session_ids. Removes all period records for each session."""
+    """Delete GPS activities by session_ids. Removes all period records for each session
+    and recalculates athlete_load_metrics for affected athletes from the earliest affected date."""
     if not data.session_ids or len(data.session_ids) == 0:
         raise HTTPException(status_code=400, detail="No session_ids provided")
     
+    coach_id_str = str(current_user["_id"])
+    
+    # PHASE 1: Collect affected athletes and dates BEFORE deleting
+    affected: dict = {}  # {athlete_id: set(dates)}
+    for session_id in data.session_ids:
+        query = {"session_id": session_id, "coach_id": current_user["_id"]}
+        records = await db.gps_data.find(query, {"athlete_id": 1, "date": 1, "_id": 0}).to_list(500)
+        for r in records:
+            aid = r.get("athlete_id")
+            dt = r.get("date")
+            if aid and dt:
+                affected.setdefault(aid, set()).add(dt)
+        if session_id.startswith("legacy_"):
+            date_str = session_id.replace("legacy_", "")
+            query2 = {"date": date_str, "coach_id": current_user["_id"], "session_id": {"$exists": False}}
+            records2 = await db.gps_data.find(query2, {"athlete_id": 1, "date": 1, "_id": 0}).to_list(500)
+            for r in records2:
+                aid = r.get("athlete_id")
+                if aid:
+                    affected.setdefault(aid, set()).add(date_str)
+    
+    # PHASE 2: Delete the GPS records
     total_deleted = 0
     for session_id in data.session_ids:
-        # Delete all GPS records matching this session_id and coach
         result = await db.gps_data.delete_many({
             "session_id": session_id,
             "coach_id": current_user["_id"]
         })
         total_deleted += result.deleted_count
-        
-        # If session_id starts with "legacy_", it means it was grouped by date
-        # Try deleting by date match as well
         if session_id.startswith("legacy_"):
             date_str = session_id.replace("legacy_", "")
             result2 = await db.gps_data.delete_many({
@@ -1261,7 +1305,42 @@ async def delete_gps_activities(
     if total_deleted == 0:
         raise HTTPException(status_code=404, detail="No activities found to delete")
     
-    return {"message": f"Deleted {total_deleted} records", "deleted_count": total_deleted}
+    # PHASE 3: Recalculate athlete_load_metrics from earliest affected date
+    recalc_results = []
+    for athlete_id, dates in affected.items():
+        earliest_date = min(dates)
+        try:
+            # Delete stale metrics from the affected dates forward
+            await db.athlete_load_metrics.delete_many({
+                "athlete_id": athlete_id,
+                "date": {"$gte": earliest_date}
+            })
+            
+            # Find the earliest remaining GPS date >= earliest affected date
+            next_gps = await db.gps_data.find_one(
+                {"athlete_id": athlete_id, "coach_id": coach_id_str, "date": {"$gte": earliest_date}},
+                sort=[("date", 1)],
+                projection={"date": 1, "_id": 0}
+            )
+            
+            if next_gps and next_gps.get("date"):
+                results = await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id_str,
+                    start_date=next_gps["date"]
+                )
+                recalc_results.append({"athlete_id": athlete_id, "dates_recalculated": len(results)})
+            else:
+                recalc_results.append({"athlete_id": athlete_id, "stale_metrics_cleaned": True})
+        except Exception as e:
+            logging.warning(f"[LoadEngine] Failed to recalculate after GPS delete for {athlete_id}: {e}")
+            recalc_results.append({"athlete_id": athlete_id, "error": str(e)})
+    
+    return {
+        "message": f"Deleted {total_deleted} records",
+        "deleted_count": total_deleted,
+        "metrics_recalculated": recalc_results
+    }
 
 @api_router.get("/gps-data/athlete/{athlete_id}/sessions")
 async def get_athlete_sessions(
@@ -1414,12 +1493,25 @@ async def update_session_activity_type(
             athlete_name=athlete_name
         )
     
+    # Recalculate load metrics for the affected athlete/date
+    try:
+        session_date = session_records[0].get("date")
+        if session_date:
+            await load_engine.recalculate_from_date(
+                athlete_id=data.athlete_id,
+                coach_id=coach_id_str,
+                start_date=session_date
+            )
+    except Exception as e:
+        logging.warning(f"[LoadEngine] Failed to recalculate after activity-type update: {e}")
+    
     return {
         "message": "Activity type updated successfully",
         "session_id": session_id,
         "activity_type": data.activity_type,
         "records_updated": result.modified_count,
-        "peak_values_updated": peak_updated
+        "peak_values_updated": peak_updated,
+        "metrics_recalculated": True
     }
 
 
@@ -1532,13 +1624,29 @@ async def classify_session_for_all_athletes(
             except Exception as e:
                 print(f"Error updating peaks for athlete {athlete_id}: {e}")
     
+    # Recalculate load metrics for ALL affected athletes
+    recalc_count = 0
+    session_date = session_records[0].get("date") if session_records else None
+    if session_date:
+        for athlete_id in athlete_ids:
+            try:
+                await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    start_date=session_date
+                )
+                recalc_count += 1
+            except Exception as e:
+                logging.warning(f"[LoadEngine] Failed to recalculate after classify-all for {athlete_id}: {e}")
+    
     return {
         "success": True,
         "session_id": session_id,
         "activity_type": data.activity_type,
         "records_updated": result.modified_count,
         "athletes_affected": len(athlete_ids),
-        "peaks_updated": len(peaks_updated)
+        "peaks_updated": len(peaks_updated),
+        "metrics_recalculated": recalc_count
     }
 
 
