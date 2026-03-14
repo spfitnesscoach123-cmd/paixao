@@ -161,12 +161,16 @@ class RollingLoadEngine:
             "hsr": 0.0,
             "sprint_distance": 0.0,
             "acc_dec_load": 0.0,
+            "high_intensity_distance": 0.0,
+            "number_of_sprints": 0.0,
         }
         
         for record in gps_records:
             totals["distance"] += float(record.get("total_distance", 0) or 0)
             totals["hsr"] += float(record.get("high_speed_running", 0) or 0)
             totals["sprint_distance"] += float(record.get("sprint_distance", 0) or 0)
+            totals["high_intensity_distance"] += float(record.get("high_intensity_distance", 0) or 0)
+            totals["number_of_sprints"] += float(record.get("number_of_sprints", 0) or 0)
             
             # ACC + DEC load
             acc = float(record.get("number_of_accelerations", 0) or 0)
@@ -310,6 +314,12 @@ class RollingLoadEngine:
             acc_dec_values = self.calculate_metric_values(
                 "acc_dec_load", loads.get("acc_dec_load", 0), previous, is_first_day
             )
+            hid_values = self.calculate_metric_values(
+                "high_intensity_distance", loads.get("high_intensity_distance", 0), previous, is_first_day
+            )
+            sprints_count_values = self.calculate_metric_values(
+                "number_of_sprints", loads.get("number_of_sprints", 0), previous, is_first_day
+            )
             
             # Calculate weekly metrics (using distance as primary)
             weekly = await self.calculate_weekly_metrics(
@@ -324,7 +334,9 @@ class RollingLoadEngine:
                 ("distance", distance_values),
                 ("hsr", hsr_values),
                 ("sprint_distance", sprint_values),
-                ("acc_dec_load", acc_dec_values)
+                ("acc_dec_load", acc_dec_values),
+                ("high_intensity_distance", hid_values),
+                ("number_of_sprints", sprints_count_values),
             ]:
                 has_spike, status = self.spike_detector.detect_spike_from_acwr(values.acwr)
                 if has_spike:
@@ -341,6 +353,8 @@ class RollingLoadEngine:
                 hsr=hsr_values,
                 sprint_distance=sprint_values,
                 acc_dec_load=acc_dec_values,
+                high_intensity_distance=hid_values,
+                number_of_sprints=sprints_count_values,
                 monotony=weekly["monotony"],
                 strain=weekly["strain"],
                 weekly_load=weekly["weekly_load"],
@@ -496,6 +510,38 @@ class RollingLoadEngine:
         """
         result = await self.collection.delete_many({"athlete_id": athlete_id})
         return result.deleted_count
+
+    async def populate_all_athletes(self):
+        """
+        Populate EWMA metrics for all athletes with GPS data.
+        Runs recalculate_from_date for each athlete from their earliest GPS date.
+        """
+        athletes = await self.db.athletes.find({}).to_list(1000)
+        total = len(athletes)
+        populated = 0
+
+        for athlete in athletes:
+            athlete_id = str(athlete["_id"])
+            coach_id = str(athlete.get("coach_id", ""))
+
+            earliest = await self.db.gps_data.find_one(
+                {"athlete_id": athlete_id},
+                sort=[("date", 1)],
+                projection={"date": 1, "_id": 0}
+            )
+
+            if earliest and earliest.get("date"):
+                try:
+                    await self.recalculate_from_date(
+                        athlete_id=athlete_id,
+                        coach_id=coach_id,
+                        start_date=earliest["date"]
+                    )
+                    populated += 1
+                except Exception as e:
+                    logger.error(f"[LoadEngine] Failed to populate {athlete_id}: {e}")
+
+        logger.info(f"[LoadEngine] Population complete: {populated}/{total} athletes processed")
 
 
 # Factory function

@@ -34,7 +34,9 @@ TRACKED_METRICS = [
     "distance",
     "hsr",  # High Speed Running
     "sprint_distance",
-    "acc_dec_load"
+    "acc_dec_load",
+    "high_intensity_distance",
+    "number_of_sprints",
 ]
 
 
@@ -81,6 +83,8 @@ class DailyMetrics(BaseModel):
     hsr: MetricValues = Field(default_factory=MetricValues)
     sprint_distance: MetricValues = Field(default_factory=MetricValues)
     acc_dec_load: MetricValues = Field(default_factory=MetricValues)
+    high_intensity_distance: MetricValues = Field(default_factory=MetricValues)
+    number_of_sprints: MetricValues = Field(default_factory=MetricValues)
 
 
 class WeeklyMetrics(BaseModel):
@@ -103,6 +107,8 @@ class AthleteLoadMetrics(BaseModel):
     hsr: MetricValues = Field(default_factory=MetricValues)
     sprint_distance: MetricValues = Field(default_factory=MetricValues)
     acc_dec_load: MetricValues = Field(default_factory=MetricValues)
+    high_intensity_distance: MetricValues = Field(default_factory=MetricValues)
+    number_of_sprints: MetricValues = Field(default_factory=MetricValues)
     
     # Weekly aggregates (based on primary metric - distance)
     monotony: float = 0.0

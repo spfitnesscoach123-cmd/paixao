@@ -74,6 +74,16 @@ db = client[os.environ['DB_NAME']]
 # Initialize Rolling Load Engine
 load_engine = create_load_engine(db)
 
+# Mapping: dashboard acwr_metric parameter → load_engine field name
+ACWR_METRIC_TO_ENGINE_FIELD = {
+    "total_distance": "distance",
+    "high_intensity_distance": "high_intensity_distance",
+    "high_speed_running": "hsr",
+    "sprint_distance": "sprint_distance",
+    "number_of_sprints": "number_of_sprints",
+    "acc_dec": "acc_dec_load",
+}
+
 # JWT Configuration
 SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
 ALGORITHM = "HS256"
@@ -7997,6 +8007,21 @@ async def get_team_dashboard(
         "coach_id": user_id
     }).sort("date", -1).to_list(200)
     
+    # Query 6: EWMA load metrics (latest per athlete from load_engine)
+    all_load_metrics = await db.athlete_load_metrics.find(
+        {"coach_id": user_id}
+    ).sort("date", -1).to_list(5000)
+    
+    # Index load metrics by athlete_id (keep only latest per athlete)
+    load_metrics_by_athlete: Dict[str, dict] = {}
+    for m in all_load_metrics:
+        aid = m.get("athlete_id")
+        if aid and aid not in load_metrics_by_athlete:
+            load_metrics_by_athlete[aid] = m
+    
+    # Map the acwr_metric parameter to load_engine field name
+    load_engine_field = ACWR_METRIC_TO_ENGINE_FIELD.get(acwr_metric, "distance")
+    
     # ============================================================
     # BUILD INDEXED DATA STRUCTURES FOR O(1) LOOKUPS
     # ============================================================
@@ -8198,41 +8223,32 @@ async def get_team_dashboard(
             sessions_7d = len(unique_sessions_7d)
             total_distance += distance_7d
             
-            # ACWR CALCULATION (logic unchanged)
-            acute_load = 0.0
-            for i in range(7):
-                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-                day_data = gps_data_by_date.get(date_str, {})
-                acute_load += day_data.get(acwr_metric, 0) or 0
-            
-            chronic_load = 0.0
-            for i in range(28):
-                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
-                day_data = gps_data_by_date.get(date_str, {})
-                chronic_load += day_data.get(acwr_metric, 0) or 0
-            
-            chronic_weekly_avg = chronic_load / 4 if chronic_load > 0 else 0
-            
-            if chronic_weekly_avg > 0:
-                acwr = round(acute_load / chronic_weekly_avg, 2)
-                total_acwr += acwr
-                acwr_count += 1
-                
-                if acwr < 0.8:
-                    risk_level = "low"
-                elif acwr <= 1.3:
-                    risk_level = "optimal"
-                elif acwr <= 1.5:
-                    risk_level = "moderate"
+            # ACWR from EWMA (load_engine) — replaces inline Coupled ACWR
+            athlete_ewma = load_metrics_by_athlete.get(athlete_id)
+            if athlete_ewma:
+                ewma_metric_data = athlete_ewma.get(load_engine_field, {})
+                if isinstance(ewma_metric_data, dict) and ewma_metric_data.get("acwr") is not None:
+                    acwr = ewma_metric_data["acwr"]
+                    total_acwr += acwr
+                    acwr_count += 1
+                    
+                    if acwr < 0.8:
+                        risk_level = "low"
+                    elif acwr <= 1.3:
+                        risk_level = "optimal"
+                    elif acwr <= 1.5:
+                        risk_level = "moderate"
+                    else:
+                        risk_level = "high"
+                    
+                    risk_distribution[risk_level] += 1
+                    
+                    if risk_level == "high":
+                        position_summary[position]["high_risk_count"] += 1
+                        alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
+                        alerts.append(alert_msg)
                 else:
-                    risk_level = "high"
-                
-                risk_distribution[risk_level] += 1
-                
-                if risk_level == "high":
-                    position_summary[position]["high_risk_count"] += 1
-                    alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
-                    alerts.append(alert_msg)
+                    risk_distribution["unknown"] += 1
             else:
                 risk_distribution["unknown"] += 1
             
@@ -11748,6 +11764,20 @@ async def startup_event():
     
     asyncio.create_task(process_pending_deletions_job())
     logging.info("[DeletionScheduler] Started automatic pending deletions scheduler (runs every 1 hour)")
+    
+    # Populate EWMA load metrics if collection is empty
+    async def _populate_ewma():
+        try:
+            count = await db.athlete_load_metrics.count_documents({})
+            if count == 0:
+                logging.info("[LoadEngine] athlete_load_metrics empty — populating EWMA metrics...")
+                await load_engine.ensure_indexes()
+                await load_engine.populate_all_athletes()
+            else:
+                logging.info(f"[LoadEngine] athlete_load_metrics already has {count} documents")
+        except Exception as e:
+            logging.error(f"[LoadEngine] Population failed: {e}")
+    asyncio.create_task(_populate_ewma())
 
 
 @app.on_event("shutdown")
