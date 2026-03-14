@@ -1,27 +1,24 @@
 # PRD — Load Manager Pro
 
 ## Problema Original
-Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dashboard, Dashboard Overview), perfil de atleta, importacao CSV de dados GPS, wellness, readiness, VBT, jumps, analise cientifica e exportacao PDF.
+Aplicacao de gestao de carga atletica com dashboards, perfil de atleta, import CSV GPS, wellness, readiness, VBT, jumps, analise cientifica e PDF.
 
-## Usuarios
-- **Coach/Preparador Fisico**: Monitora metricas de carga, wellness e readiness de atletas
-- **Credenciais de teste**: `contato@loadmanagerpro.com.br` / `#UAE2026`
+## Credenciais
+- **Coach**: `contato@loadmanagerpro.com.br` / `#UAE2026`
 
 ## Arquitetura
-- **Frontend**: Expo (React Native Web) porta 3000 / TestFlight (iOS)
-- **Backend**: FastAPI porta 8001
-- **Producao (Railway)**: `https://paixao-production.up.railway.app`
-- **Preview (Emergent)**: `https://load-metrics-unify.preview.emergentagent.com`
-- **Banco**: MongoDB via `MONGO_URL`
-- **App iOS**: Aponta para Railway via `RAILWAY_PRODUCTION_URL` em `services/api.ts`
+- Frontend: Expo (React Native Web) porta 3000 / TestFlight (iOS)
+- Backend: FastAPI porta 8001
+- Producao: `https://paixao-production.up.railway.app`
+- Preview: `https://load-metrics-unify.preview.emergentagent.com`
+- iOS aponta Railway via `RAILWAY_PRODUCTION_URL` em `services/api.ts`
 
 ## Fonte Unica de Verdade
-- `athlete_load_metrics` (EWMA via RollingLoadEngine com dedup) → Acute/Chronic/ACWR/Monotony/Strain
-- `gps_data` com dedup Session/Period → Total Distance diario, timeline, heatmap
-- `wellness` → wellness_score (0-10), readiness_score (0-10, exibido como 0-100%)
-- Demais colecoes (jump_assessments, body_compositions, vbt_data, assessments) → queries ao vivo
+- `athlete_load_metrics` (EWMA/RollingLoadEngine com dedup) → Acute/Chronic/ACWR/Monotony/Strain
+- `gps_data` com dedup Session/Period → Timeline, Heatmap, Velocity Zones
+- Demais colecoes (wellness, jump_assessments, body_compositions, vbt_data) → live-queried
 
-## Recalculo Automatico (Mar 2026)
+## Recalculo Automatico
 | Operacao | Recalcula athlete_load_metrics? |
 |----------|-------------------------------|
 | CREATE GPS | SIM (update_athlete_metrics) |
@@ -30,44 +27,33 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 | DELETE Athlete | SIM (cascade delete 7 colecoes) |
 | CREATE/DELETE wellness/jumps/bodycomp/VBT | N/A (live-queried) |
 
-## Funcionalidades Implementadas
-### Core
-- Auth JWT + RevenueCat, CRUD atletas, Import CSV GPS
-- Rolling Load Engine (EWMA) com dedup GPS + recalculo automatico em create/update/delete
-- Dashboard Overview (Load Intelligence, Team Status, Jump, VBT, Body Comp)
-- Team Dashboard com tabela de atletas
-- Perfil individual do atleta (botoes)
-- Filtros globais: 7d, 14d, 28d, 90d, Hoje, Ontem
-- Exportacao PDF Dashboard Overview
-- Analise Cientifica, Wellness form/tracking
-- Cascade delete de atletas (7 colecoes)
+## Frontend Tab Refetch (useFocusEffect)
+- data.tsx (Overview): useFocusEffect → refetch() ao ganhar foco
+- team.tsx (Team Dashboard): useFocusEffect → refetch() ao ganhar foco
+- Garante que tabs nunca mostram dados stale apos navegacao
 
-### Correcoes Mar 2026
-- [x] Dedup GPS no aggregate_gps_for_date (Session/Period keywords)
-- [x] Recalculo automatico no DELETE GPS (3 fases: collect → delete → clean+recalc)
-- [x] Recalculo automatico no UPDATE activity-type GPS
+## Correcoes Mar 2026
+- [x] Dedup GPS no aggregate_gps_for_date
+- [x] Recalculo automatico CREATE/DELETE/UPDATE GPS
 - [x] Cascade delete de atleta (7 colecoes)
 - [x] Gauge Prontidao usa readiness_score real
-- [x] Codigo morto removido (calc_acwr, calc_monotony_strain)
-- [x] Recalculo global executado em Railway (28 atletas)
-- [x] Khosaif acute corrigido: 22130 → 11125
+- [x] Codigo morto removido
+- [x] useFocusEffect em Overview e Team Dashboard (fix stale data)
+- [x] Delete GPS Phase 3: clean stale metrics from affected date forward
+- [x] Recalculo global Railway (28 atletas, Khosaif corrigido 22130→11125)
 
 ## Backlog
 ### P1
 - PDF crash em Analise Cientifica (recorrente >3x)
 - Refatorar dashboards para Rolling Load Engine centralizado
-
 ### P2
 - Internacionalizacao ScientificAnalysisTab e Avaliacoes
 - ESLint config TypeScript
-
 ### P3
 - UI merge perfis duplicados
 - Remover frontend/ios_backup_before_removal/
 
 ## Arquivos Chave
-- `backend/server.py` — Endpoints
-- `backend/load_engine/rolling_load_engine.py` — EWMA, dedup, recalculo
-- `frontend/services/api.ts` — Config API URL
-- `frontend/app/(tabs)/data.tsx` — Dashboard Overview
-- `frontend/app/(tabs)/team.tsx` — Team Dashboard
+- backend/server.py, backend/load_engine/rolling_load_engine.py
+- frontend/app/(tabs)/data.tsx, frontend/app/(tabs)/team.tsx
+- frontend/app/_layout.tsx, frontend/services/api.ts
