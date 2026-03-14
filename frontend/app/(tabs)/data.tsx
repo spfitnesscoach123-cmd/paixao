@@ -10,6 +10,7 @@ import Svg, { Circle, G, Text as SvgText, Rect, Line, Path, Defs, LinearGradient
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../../services/api';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AnimatedMetric, SkeletonDashboard, FadeInView, ChartEntryView, AnimatedCard } from '../../components/animations';
@@ -380,6 +381,13 @@ export default function DataScreen() {
       return res.data;
     },
   });
+
+  // Refetch data when tab gains focus (critical for React Native tabs that stay mounted)
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
   
   // Athletes list for filter (separate query)
   const { data: athletesList } = useQuery({

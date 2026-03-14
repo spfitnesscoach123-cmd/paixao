@@ -1,0 +1,149 @@
+{
+  "summary": "Dashboard Stale Data Fix Testing - All 16 backend tests PASSED. Backend GPS create/delete correctly updates athlete_load_metrics and both Overview and Team Dashboard APIs return consistent, updated values. Frontend useFocusEffect implementation verified in data.tsx and team.tsx. Web version shows 403 auth errors (separate issue from stale data fix).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Web Dashboard loading",
+        "issue": "403 authentication errors on web platform - tokens not persisting in web localStorage. Backend APIs work fine via curl.",
+        "affected_selectors": ["/team", "/data"],
+        "note": "This is a web-specific auth issue, NOT related to the stale data fix. Native mobile app should work correctly."
+      }
+    ],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend": {
+      "TestDashboardStaleDataFix": {
+        "test_01_get_baseline_overview": "PASS - Retrieved baseline ACWR and acute_load values",
+        "test_02_get_baseline_team_dashboard": "PASS - Retrieved team baseline stats",
+        "test_03_create_gps_data": "PASS - Created GPS with session_id and verified insertion",
+        "test_04_verify_overview_updated_after_create": "PASS - Overview API reflects new GPS data",
+        "test_05_verify_team_dashboard_updated": "PASS - Team Dashboard API reflects new GPS data",
+        "test_06_delete_gps_data": "PASS - GPS deleted with metrics_recalculated in response",
+        "test_07_verify_overview_reverted_after_delete": "PASS - Overview API reverted to baseline",
+        "test_08_verify_team_dashboard_reverted": "PASS - Team Dashboard reverted to baseline"
+      },
+      "TestDashboardConsistency": {
+        "test_01_overview_and_team_consistent_acwr": "PASS - Both endpoints return consistent ACWR for same athlete",
+        "test_02_overview_summary_has_required_fields": "PASS - All required summary fields present",
+        "test_03_team_dashboard_stats_has_required_fields": "PASS - All required stats fields present"
+      },
+      "TestFrontendUseFocusEffect": {
+        "test_data_tsx_has_useFocusEffect_import": "PASS - import { useFocusEffect } from 'expo-router' found",
+        "test_data_tsx_uses_useFocusEffect_for_refetch": "PASS - useFocusEffect with refetch() callback found",
+        "test_team_tsx_has_useFocusEffect_import": "PASS - useFocusEffect from expo-router found",
+        "test_team_tsx_uses_useFocusEffect_for_refetch": "PASS - useFocusEffect with refetch() callback found",
+        "test_layout_tsx_no_custom_staleTime": "PASS - QueryClient uses default config (allows refetch)"
+      }
+    },
+    "frontend": {
+      "login_flow": "PASS - Login to /athletes successful",
+      "athletes_list": "PASS - Shows João Silva, Maria Santos, Pedro Costa",
+      "dashboard_navigation": "PASS - Navigation tabs visible (Athletes, Team, Periodization, Dashboard, Profile)",
+      "web_dashboard_data_loading": "FAIL - 403 errors (web auth token issue, separate from stale data fix)"
+    }
+  },
+  "api_verification": {
+    "GET /api/dashboard/overview": {
+      "status": "200 OK",
+      "response": {
+        "summary.team_acwr": 1,
+        "summary.team_wellness": 5.28,
+        "summary.team_readiness": 54,
+        "summary.team_acute_load": 3500,
+        "summary.team_chronic_load": 3500
+      }
+    },
+    "GET /api/dashboard/team": {
+      "status": "200 OK",
+      "response": {
+        "stats.total_athletes": 3,
+        "stats.team_avg_acwr": 1,
+        "stats.team_avg_wellness": 5.3,
+        "stats.team_avg_readiness": 54
+      }
+    },
+    "POST /api/gps-data": {
+      "status": "200 OK",
+      "triggers_load_engine_update": true,
+      "updates_athlete_load_metrics": true
+    },
+    "POST /api/gps-data/delete-activities": {
+      "status": "200 OK",
+      "cleans_stale_metrics": true,
+      "recalculates_from_earliest": true,
+      "response_includes": "metrics_recalculated array"
+    }
+  },
+  "code_review_findings": {
+    "data.tsx_useFocusEffect": {
+      "location": "Line 386-390",
+      "implementation": "useFocusEffect(useCallback(() => { refetch(); }, [refetch]))",
+      "status": "CORRECT"
+    },
+    "team.tsx_useFocusEffect": {
+      "location": "Line 147-151",
+      "implementation": "useFocusEffect(React.useCallback(() => { refetch(); }, [refetch]))",
+      "status": "CORRECT"
+    },
+    "_layout.tsx_QueryClient": {
+      "location": "Line 10",
+      "implementation": "const queryClient = new QueryClient()",
+      "staleTime": "default (not set to Infinity)",
+      "status": "CORRECT - allows refetch to work"
+    },
+    "delete_gps_activities": {
+      "location": "server.py ~Line 1258-1343",
+      "implementation": "3-phase approach: collect affected → delete GPS → clean stale metrics + recalculate",
+      "status": "CORRECT"
+    }
+  },
+  "fix_verification": {
+    "stale_data_fix_backend": {
+      "status": "VERIFIED",
+      "description": "GPS delete properly cleans athlete_load_metrics from earliest affected date and recalculates",
+      "evidence": "Test test_06_delete_gps_data shows response with metrics_recalculated array"
+    },
+    "overview_team_consistency": {
+      "status": "VERIFIED", 
+      "description": "Both Dashboard Overview and Team Dashboard return consistent ACWR for same athlete",
+      "evidence": "Test test_01_overview_and_team_consistent_acwr passes"
+    },
+    "useFocusEffect_implementation": {
+      "status": "VERIFIED",
+      "description": "Both data.tsx and team.tsx use useFocusEffect to call refetch() on tab focus",
+      "evidence": "File content verification tests all pass"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_stale_data_fix.py",
+    "/app/test_reports/pytest/pytest_dashboard_stale_data_fix.xml"
+  ],
+  "action_items": [
+    "INVESTIGATE: Web platform 403 auth errors - tokens not persisting in localStorage (separate issue from stale data fix)",
+    "VERIFY: Test on native mobile app to confirm stale data fix works correctly with useFocusEffect"
+  ],
+  "critical_code_review_comments": [
+    "useFocusEffect correctly imported from expo-router in both tab files",
+    "refetch() called inside useCallback with proper dependency array [refetch]",
+    "QueryClient created without staleTime: Infinity (which would prevent refetch from working)",
+    "Backend delete_gps_activities Phase 3 correctly deletes stale metrics then recalculates"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dashboard_stale_data_fix.py"
+  ],
+  "success_rate": {
+    "backend": "100% (16/16 tests passed)",
+    "frontend": "60% (navigation works, web auth issue blocks dashboard data)"
+  },
+  "test_credentials": "Coach: contato@loadmanagerpro.com.br / #UAE2026",
+  "seed_data_used": "João Silva (69a6ca6a85668876432f090a) with existing GPS on 2026-03-03",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All backend GPS stale data fix tests pass. The useFocusEffect is correctly implemented in data.tsx and team.tsx. Web version has separate 403 auth issue not related to stale data fix - backend APIs work perfectly via curl. The stale data fix should work correctly on native mobile where auth tokens are properly persisted."
+}

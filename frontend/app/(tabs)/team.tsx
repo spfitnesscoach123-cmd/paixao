@@ -11,7 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, G, Text as SvgText, Rect, Line } from 'react-native-svg';
@@ -142,6 +142,13 @@ export default function TeamDashboard() {
       return response.data;
     },
   });
+
+  // Refetch data when tab gains focus (critical for React Native tabs that stay mounted)
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   // Get current metric label
   const getCurrentMetricLabel = () => {
