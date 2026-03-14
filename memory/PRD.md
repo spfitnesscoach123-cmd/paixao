@@ -34,11 +34,15 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 - Analise Cientifica com recomendacoes
 - Wellness form e tracking
 
-### Correcoes Recentes (Fev 2026)
+### Correcoes Recentes (Mar 2026)
 - [x] P1: Dedup GPS no `aggregate_gps_for_date()` — corrigido para nao somar Session + sub-periodos
-- [x] P2: Endpoint `POST /api/load-metrics/recalculate-all` para rebuild completo
-- [x] P3: Gauge "Prontidao" agora usa `readiness_score` real (nao wellness*10)
+- [x] P2: Endpoint `POST /api/load-metrics/recalculate-all` para rebuild completo — executado com sucesso
+- [x] P3: Gauge "Prontidao" agora usa `readiness_score` real (nao wellness*10) + exibe Wellness Medio abaixo
 - [x] P4: Codigo morto removido (calc_acwr, calc_monotony_strain inline no Overview)
+- [x] Alinhamento completo validado: Team Dashboard ACWR=1.0 = Overview ACWR=1.0, Readiness=54% em ambos
+- [x] Recalculo global executado e validado visualmente
+
+### Correcoes Anteriores (Fev 2026)
 - [x] Alinhamento ACWR entre Team Dashboard e Dashboard Overview (EWMA centralizado)
 - [x] Correcao PDF Export (valores zerados → dados corretos)
 - [x] Redesign menu do perfil do atleta (grid de botoes)
@@ -52,6 +56,7 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 ### P1 — Alto
 - PDF generation crash em "Analise Cientifica" (recorrente >3x)
 - Refatorar outros dashboards para usar Rolling Load Engine centralizado
+- Validar em producao (Railway) com dados reais do atleta Khosaif Abdallah apos deploy
 
 ### P2 — Medio
 - Internacionalizacao completa do ScientificAnalysisTab e pagina "Avaliacoes"
