@@ -9138,10 +9138,9 @@ async def get_dashboard_overview_pdf(
     layers: str = "load,summary,status,neuro,risk",
     current_user: dict = Depends(get_current_user)
 ):
-    """Generate HTML report for dashboard overview PDF export."""
+    """Generate HTML report for dashboard overview PDF export with inline SVG charts."""
     from fastapi.responses import HTMLResponse
     
-    # Get data from the existing overview endpoint
     overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
     
     is_pt = lang == "pt"
@@ -9155,7 +9154,93 @@ async def get_dashboard_overview_pdf(
     neuro_data = overview.get("neuromuscular", {})
     risk_data = overview.get("risk_intelligence", {})
     
-    # Build page sections
+    # ── SVG chart helpers ──
+    def make_line_chart_svg(values, dates_list, color, title, unit, w=500, h=140):
+        if not values or all(v == 0 for v in values):
+            return ""
+        pad = 50
+        max_v = max(values) * 1.1 or 1
+        iw, ih = w - pad * 2, h - 40
+        pts = []
+        for i, v in enumerate(values):
+            x = pad + (i / max(len(values) - 1, 1)) * iw
+            y = h - 20 - (v / max_v) * ih
+            pts.append((x, y, v))
+        polyline = " ".join(f"{x},{y}" for x, y, _ in pts)
+        circles = "".join(f'<circle cx="{x}" cy="{y}" r="3" fill="{color}"/>' for x, y, _ in pts)
+        grid = ""
+        for i in range(4):
+            gy = h - 20 - (i / 3) * ih
+            gv = (i / 3) * max_v
+            grid += f'<line x1="{pad}" y1="{gy}" x2="{w - pad}" y2="{gy}" stroke="#cbd5e1" stroke-dasharray="3"/>'
+            grid += f'<text x="{pad - 5}" y="{gy + 4}" text-anchor="end" fill="#64748b" font-size="9">{gv:,.0f}</text>'
+        dlabels = ""
+        step = max(1, len(dates_list) // 6)
+        for i in range(0, len(dates_list), step):
+            x = pad + (i / max(len(dates_list) - 1, 1)) * iw
+            dlabels += f'<text x="{x}" y="{h - 4}" text-anchor="middle" fill="#64748b" font-size="8">{dates_list[i]}</text>'
+        area_pts = f"{pts[0][0]},{h - 20} " + polyline + f" {pts[-1][0]},{h - 20}"
+        return f'''<div class="chart-container">
+            <div class="chart-title">{title} ({unit})</div>
+            <svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">
+                {grid}
+                <polygon points="{area_pts}" fill="{color}" opacity="0.08"/>
+                <polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="2"/>
+                {circles} {dlabels}
+            </svg></div>'''
+
+    def make_bar_chart_svg(values, labels, colors, title, w=500, h=140):
+        if not values or all(v == 0 for v in values):
+            return ""
+        pad_l, pad_r, pad_t, pad_b = 50, 20, 20, 30
+        iw = w - pad_l - pad_r
+        ih = h - pad_t - pad_b
+        max_v = max(values) * 1.1 or 1
+        n = len(values)
+        bw = min(40, iw / n * 0.6)
+        gap = iw / n
+        bars = ""
+        for i, (v, lbl, col) in enumerate(zip(values, labels, colors)):
+            x = pad_l + i * gap + (gap - bw) / 2
+            bh = (v / max_v) * ih
+            y = pad_t + ih - bh
+            bars += f'<rect x="{x}" y="{y}" width="{bw}" height="{bh}" rx="3" fill="{col}"/>'
+            bars += f'<text x="{x + bw / 2}" y="{y - 4}" text-anchor="middle" fill="#374151" font-size="9" font-weight="600">{v:,.0f}</text>'
+            bars += f'<text x="{x + bw / 2}" y="{h - 8}" text-anchor="middle" fill="#64748b" font-size="8">{lbl}</text>'
+        grid = ""
+        for i in range(4):
+            gy = pad_t + ih - (i / 3) * ih
+            gv = (i / 3) * max_v
+            grid += f'<line x1="{pad_l}" y1="{gy}" x2="{w - pad_r}" y2="{gy}" stroke="#e2e8f0" stroke-dasharray="3"/>'
+            grid += f'<text x="{pad_l - 5}" y="{gy + 3}" text-anchor="end" fill="#94a3b8" font-size="8">{gv:,.0f}</text>'
+        return f'''<div class="chart-container">
+            <div class="chart-title">{title}</div>
+            <svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">{grid}{bars}</svg></div>'''
+
+    def make_gauge_svg(value, label, w=120, h=120):
+        cx, cy, r = w / 2, h / 2 + 5, 45
+        circ = 2 * 3.14159 * r
+        half = circ / 2
+        pct = min(max(value / 2.0, 0), 1)
+        col = "#10b981" if 0.8 <= value <= 1.3 else "#f59e0b" if value < 0.8 else "#ef4444"
+        return f'''<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">
+            <circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#e2e8f0" stroke-width="8"
+                stroke-dasharray="{half} {circ}" stroke-dashoffset="0" transform="rotate(180 {cx} {cy})"/>
+            <circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{col}" stroke-width="8"
+                stroke-dasharray="{pct * half} {circ}" stroke-dashoffset="0" transform="rotate(180 {cx} {cy})" stroke-linecap="round"/>
+            <text x="{cx}" y="{cy + 2}" text-anchor="middle" fill="#1e293b" font-size="18" font-weight="800">{value:.2f}</text>
+            <text x="{cx}" y="{cy + 16}" text-anchor="middle" fill="#64748b" font-size="9">{label}</text></svg>'''
+
+    def make_horiz_bar(value, max_val, label, color, w=400, h=28):
+        pct = (value / max_val * 100) if max_val else 0
+        bw = max(2, pct / 100 * (w - 120))
+        return f'''<svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">
+            <text x="0" y="{h / 2 + 4}" fill="#374151" font-size="10">{label}</text>
+            <rect x="90" y="{h / 2 - 6}" width="{w - 170}" height="12" rx="6" fill="#f1f5f9"/>
+            <rect x="90" y="{h / 2 - 6}" width="{bw}" height="12" rx="6" fill="{color}"/>
+            <text x="{w - 5}" y="{h / 2 + 4}" text-anchor="end" fill="#374151" font-size="10" font-weight="600">{value:,.0f}m</text></svg>'''
+
+    # ── Build sections ──
     sections_html = ""
     
     if "load" in selected_layers:
@@ -9166,32 +9251,36 @@ async def get_dashboard_overview_pdf(
         strain_val = load_data.get("strain") or 0
         vz = load_data.get("velocity_zones", {})
         
-        # Distance timeline
         timeline = load_data.get("distance_timeline", [])
-        timeline_html = ""
+        timeline_chart = ""
         if timeline:
-            max_d = max((d.get("distance", 0) for d in timeline), default=1) or 1
-            bars = "".join([f'<div class="bar-wrap"><div class="bar" style="height:{max(4, d.get("distance",0)/max_d*100)}%;background:linear-gradient(to top,#0891b2,#22d3ee)"></div><span class="bar-label">{d.get("date","")[-5:]}</span></div>' for d in timeline[-14:]])
-            timeline_html = f'<div class="chart-title">{"Distancia Total" if is_pt else "Total Distance"}</div><div class="bar-chart">{bars}</div>'
+            tl_vals = [d.get("distance", 0) for d in timeline[-14:]]
+            tl_dates = [d.get("date", "")[-5:] for d in timeline[-14:]]
+            timeline_chart = make_line_chart_svg(tl_vals, tl_dates, "#0891b2", "Distancia Total" if is_pt else "Total Distance", "m")
+        
+        vz_vals = [vz.get("low_intensity", 0), vz.get("hid_z3", 0), vz.get("hsr_z4", 0), vz.get("sprint_z5", 0)]
+        vz_labels = ["Low Int", "HID Z3", "HSR Z4", "Sprint Z5"]
+        vz_colors = ["#3b82f6", "#06b6d4", "#eab308", "#ef4444"]
+        vz_total = sum(vz_vals) or 1
+        
+        vz_horiz = "".join([make_horiz_bar(v, vz_total, l, c) for v, l, c in zip(vz_vals, vz_labels, vz_colors)])
+        vz_bar_chart = make_bar_chart_svg(vz_vals, vz_labels, vz_colors, "Zonas de Velocidade" if is_pt else "Velocity Zones")
         
         acwr_color = "#10b981" if 0.8 <= acwr <= 1.3 else "#f59e0b" if acwr < 0.8 else "#ef4444"
         
-        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(34,211,238,0.15);color:#22d3ee">Load Intelligence</span></div>
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-cyan">Load Intelligence</span></div>
         <div class="metrics-row">
-            <div class="metric-card"><div class="metric-label">Acute 7d</div><div class="metric-value" style="color:#22d3ee">{acute:,.0f} m</div></div>
+            <div class="metric-card"><div class="metric-label">Acute 7d</div><div class="metric-value" style="color:#0891b2">{acute:,.0f} m</div></div>
             <div class="metric-card"><div class="metric-label">Chronic 28d</div><div class="metric-value" style="color:#3b82f6">{chronic:,.0f} m</div></div>
-            <div class="metric-card"><div class="metric-label">ACWR</div><div class="metric-value" style="color:{acwr_color}">{acwr:.2f}</div></div>
+            <div class="metric-card"><div class="metric-label">ACWR</div><div class="metric-value" style="color:{acwr_color}">{acwr:.2f}</div>
+                <div style="text-align:center;margin-top:4px">{make_gauge_svg(acwr, "ACWR")}</div></div>
             <div class="metric-card"><div class="metric-label">Monotony</div><div class="metric-value">{mono:.1f}</div></div>
             <div class="metric-card"><div class="metric-label">Strain</div><div class="metric-value">{strain_val:,.0f}</div></div>
         </div>
-        {timeline_html}
-        <div class="chart-title">{"Zonas de Velocidade" if is_pt else "Velocity Zones"}</div>
-        <div class="metrics-row">
-            <div class="metric-card"><div class="metric-label">Low Intensity</div><div class="metric-value" style="color:#3b82f6">{vz.get("low_intensity",0):,.0f}m</div></div>
-            <div class="metric-card"><div class="metric-label">HID Z3</div><div class="metric-value" style="color:#22d3ee">{vz.get("hid_z3",0):,.0f}m</div></div>
-            <div class="metric-card"><div class="metric-label">HSR Z4</div><div class="metric-value" style="color:#eab308">{vz.get("hsr_z4",0):,.0f}m</div></div>
-            <div class="metric-card"><div class="metric-label">Sprint Z5</div><div class="metric-value" style="color:#ef4444">{vz.get("sprint_z5",0):,.0f}m</div></div>
-        </div>
+        {timeline_chart}
+        {vz_bar_chart}
+        <div style="margin-top:8px">{vz_horiz}</div>
         </div>'''
     
     if "summary" in selected_layers:
@@ -9202,23 +9291,23 @@ async def get_dashboard_overview_pdf(
         
         lmpi_color = "#ef4444" if lmpi < 40 else "#f59e0b" if lmpi < 70 else "#10b981"
         
+        prof_vals = [profile.get("load", 0), profile.get("wellness", 0), profile.get("neuromuscular", 0), profile.get("power", 0)]
+        prof_labels = ["Load", "Wellness", "Neuro", "Power"]
+        prof_colors = ["#0891b2", "#10b981", "#8b5cf6", "#f59e0b"]
+        prof_chart = make_bar_chart_svg(prof_vals, prof_labels, prof_colors, "Performance Profile")
+        
         risk_table = ""
         if high_risk:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:#ef4444">{a.get("lmpi",0):.0f}</td><td>{a.get("acwr",0):.2f}</td></tr>' for a in high_risk[:10]])
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("lmpi",0):.0f}</td><td>{a.get("acwr",0):.2f}</td></tr>' for a in high_risk[:10]])
             risk_table = f'<div class="chart-title">{"Atletas Alto Risco" if is_pt else "High Risk Athletes"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>LMPI</th><th>ACWR</th></tr></thead><tbody>{rows}</tbody></table>'
         
-        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b">Smart Summary</span></div>
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-amber">Smart Summary</span></div>
         <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">LMPI Score</div><div class="metric-value" style="color:{lmpi_color};font-size:36px">{lmpi:.0f}</div><div class="metric-sub">/100</div></div>
+            <div class="metric-card big"><div class="metric-label">LMPI Score</div><div class="metric-value" style="color:{lmpi_color};font-size:32px">{lmpi:.0f}<span class="metric-sub">/100</span></div></div>
             <div class="metric-card"><div class="metric-label">{"Disponibilidade" if is_pt else "Availability"}</div><div class="metric-value" style="color:#10b981">{avail:.0f}%</div></div>
         </div>
-        <div class="chart-title">Performance Profile</div>
-        <div class="metrics-row">
-            <div class="metric-card"><div class="metric-label">Load</div><div class="metric-value">{profile.get("load",0):.0f}</div></div>
-            <div class="metric-card"><div class="metric-label">Wellness</div><div class="metric-value">{profile.get("wellness",0):.0f}</div></div>
-            <div class="metric-card"><div class="metric-label">Neuromuscular</div><div class="metric-value">{profile.get("neuromuscular",0):.0f}</div></div>
-            <div class="metric-card"><div class="metric-label">Power</div><div class="metric-value">{profile.get("power",0):.0f}</div></div>
-        </div>
+        {prof_chart}
         {risk_table}
         </div>'''
     
@@ -9229,19 +9318,22 @@ async def get_dashboard_overview_pdf(
         
         rd_color = "#ef4444" if readiness < 50 else "#f59e0b" if readiness < 75 else "#10b981"
         
+        w_vals = [wellness_avg.get("sleep", 0), wellness_avg.get("fatigue", 0), wellness_avg.get("soreness", 0), wellness_avg.get("stress", 0)]
+        w_labels = ["Sono" if is_pt else "Sleep", "Fadiga" if is_pt else "Fatigue", "Dor" if is_pt else "Soreness", "Estresse" if is_pt else "Stress"]
+        w_colors = ["#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+        w_chart = make_bar_chart_svg(w_vals, w_labels, w_colors, "Wellness Breakdown")
+        
         lrt = ""
         if low_ready:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:#ef4444">{a.get("readiness",0):.0f}%</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in low_ready[:10]])
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("readiness",0):.0f}%</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in low_ready[:10]])
             lrt = f'<div class="chart-title">{"Baixa Prontidao" if is_pt else "Low Readiness"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Readiness</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
         
-        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(16,185,129,0.15);color:#10b981">Team Status</span></div>
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-green">Team Status</span></div>
         <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">{"Prontidao" if is_pt else "Readiness"}</div><div class="metric-value" style="color:{rd_color};font-size:36px">{readiness:.0f}%</div></div>
-            <div class="metric-card"><div class="metric-label">{"Sono" if is_pt else "Sleep"}</div><div class="metric-value">{wellness_avg.get("sleep",0):.1f}</div></div>
-            <div class="metric-card"><div class="metric-label">{"Fadiga" if is_pt else "Fatigue"}</div><div class="metric-value">{wellness_avg.get("fatigue",0):.1f}</div></div>
-            <div class="metric-card"><div class="metric-label">{"Dor" if is_pt else "Soreness"}</div><div class="metric-value">{wellness_avg.get("soreness",0):.1f}</div></div>
-            <div class="metric-card"><div class="metric-label">{"Estresse" if is_pt else "Stress"}</div><div class="metric-value">{wellness_avg.get("stress",0):.1f}</div></div>
+            <div class="metric-card big"><div class="metric-label">{"Prontidao" if is_pt else "Readiness"}</div><div class="metric-value" style="color:{rd_color};font-size:32px">{readiness:.0f}%</div></div>
         </div>
+        {w_chart}
         {lrt}
         </div>'''
     
@@ -9251,13 +9343,21 @@ async def get_dashboard_overview_pdf(
         fatigue_idx = neuro_data.get("fatigue_index", 0)
         
         ns_color = "#ef4444" if neuro_score < 50 else "#f59e0b" if neuro_score < 75 else "#10b981"
+        fi_color = "#ef4444" if fatigue_idx < -10 else "#f59e0b" if fatigue_idx < -5 else "#10b981"
         
-        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(99,102,241,0.15);color:#6366f1">Neuromuscular Status</span></div>
+        n_vals = [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)]
+        n_labels = ["Neuro", "RSImod", "Fatigue"]
+        n_colors = [ns_color, "#8b5cf6", fi_color]
+        n_chart = make_bar_chart_svg(n_vals, n_labels, n_colors, "Neuromuscular Overview")
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-purple">Neuromuscular Status</span></div>
         <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">Neuro Score</div><div class="metric-value" style="color:{ns_color};font-size:36px">{neuro_score:.0f}</div></div>
+            <div class="metric-card big"><div class="metric-label">Neuro Score</div><div class="metric-value" style="color:{ns_color};font-size:32px">{neuro_score:.0f}</div></div>
             <div class="metric-card"><div class="metric-label">RSImod</div><div class="metric-value">{rsimod:.2f}</div></div>
-            <div class="metric-card"><div class="metric-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="metric-value" style="color:{"#ef4444" if fatigue_idx < -10 else "#f59e0b" if fatigue_idx < -5 else "#10b981"}">{fatigue_idx:.1f}%</div></div>
+            <div class="metric-card"><div class="metric-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="metric-value" style="color:{fi_color}">{fatigue_idx:.1f}%</div></div>
         </div>
+        {n_chart}
         </div>'''
     
     if "risk" in selected_layers:
@@ -9268,12 +9368,13 @@ async def get_dashboard_overview_pdf(
         
         panel_html = ""
         if risk_panel:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{rs_color}">{a.get("risk_score",0):.0f}</td><td>{a.get("acwr",0):.2f}</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in risk_panel[:15]])
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{"#10b981" if a.get("risk_score",0)<30 else "#f59e0b" if a.get("risk_score",0)<60 else "#ef4444"}">{a.get("risk_score",0):.0f}</td><td>{a.get("acwr",0):.2f}</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in risk_panel[:15]])
             panel_html = f'<div class="chart-title">{"Painel de Risco" if is_pt else "Risk Panel"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Risk</th><th>ACWR</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
         
-        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">Risk Intelligence</span></div>
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-red">Risk Intelligence</span></div>
         <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">{"Risco Geral" if is_pt else "Risk Score"}</div><div class="metric-value" style="color:{rs_color};font-size:36px">{risk_score:.0f}</div></div>
+            <div class="metric-card big"><div class="metric-label">{"Risco Geral" if is_pt else "Risk Score"}</div><div class="metric-value" style="color:{rs_color};font-size:32px">{risk_score:.0f}</div></div>
         </div>
         {panel_html}
         </div>'''
@@ -9286,42 +9387,77 @@ async def get_dashboard_overview_pdf(
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Team Dashboard Report</title>
+    <title>Dashboard Report</title>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; line-height: 1.5; }}
-        @media print {{ body {{ background: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }} }}
-        .page-break {{ page-break-before: always; padding-top: 12px; }}
-        .page-break:first-child {{ page-break-before: avoid; }}
-        .report-header {{ text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid rgba(139,92,246,0.3); }}
-        .report-title {{ font-size: 22px; font-weight: 800; color: #fff; letter-spacing: 2px; }}
-        .report-subtitle {{ font-size: 12px; color: #94a3b8; margin-top: 6px; }}
-        .section-header {{ margin-bottom: 16px; }}
-        .layer-badge {{ display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }}
-        .metrics-row {{ display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }}
-        .metric-card {{ flex: 1; min-width: 100px; background: rgba(21,28,50,0.8); border: 1px solid rgba(139,92,246,0.1); border-radius: 12px; padding: 14px; text-align: center; }}
-        .metric-card.big {{ min-width: 160px; }}
-        .metric-label {{ font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }}
-        .metric-value {{ font-size: 22px; font-weight: 800; color: #e2e8f0; }}
-        .metric-sub {{ font-size: 11px; color: #64748b; }}
-        .chart-title {{ font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 10px; margin-top: 16px; letter-spacing: 0.5px; }}
-        .bar-chart {{ display: flex; align-items: flex-end; gap: 4px; height: 100px; margin-bottom: 16px; padding: 4px 0; }}
-        .bar-wrap {{ flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }}
-        .bar {{ width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; min-height: 4px; }}
-        .bar-label {{ font-size: 8px; color: #64748b; margin-top: 4px; }}
-        .data-table {{ width: 100%; border-collapse: collapse; margin-bottom: 16px; }}
-        .data-table th {{ text-align: left; font-size: 10px; color: #64748b; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); text-transform: uppercase; letter-spacing: 0.5px; }}
-        .data-table td {{ font-size: 12px; color: #e2e8f0; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }}
-        .footer {{ text-align: center; color: #475569; font-size: 10px; margin-top: 30px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            padding: 24px;
+            line-height: 1.5;
+        }}
+        .container {{ max-width: 800px; margin: 0 auto; }}
+        .report-header {{
+            text-align: center; margin-bottom: 28px; padding-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }}
+        .report-title {{ font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 1.5px; }}
+        .report-subtitle {{ font-size: 11px; color: #64748b; margin-top: 4px; }}
+        .section {{
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; margin-bottom: 20px; page-break-inside: avoid;
+        }}
+        .section-header {{ margin-bottom: 14px; }}
+        .layer-badge {{
+            display: inline-block; padding: 5px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+        }}
+        .lb-cyan {{ background: #ecfeff; color: #0891b2; }}
+        .lb-amber {{ background: #fffbeb; color: #d97706; }}
+        .lb-green {{ background: #ecfdf5; color: #059669; }}
+        .lb-purple {{ background: #f5f3ff; color: #7c3aed; }}
+        .lb-red {{ background: #fef2f2; color: #dc2626; }}
+        .metrics-row {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }}
+        .metric-card {{
+            flex: 1; min-width: 90px; background: #ffffff; border: 1px solid #e2e8f0;
+            border-radius: 10px; padding: 12px; text-align: center;
+        }}
+        .metric-card.big {{ min-width: 140px; }}
+        .metric-label {{ font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }}
+        .metric-value {{ font-size: 20px; font-weight: 800; color: #1e293b; }}
+        .metric-sub {{ font-size: 10px; color: #94a3b8; font-weight: 400; }}
+        .chart-container {{ margin: 12px 0; }}
+        .chart-title {{ font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; margin-top: 12px; letter-spacing: 0.3px; }}
+        .data-table {{ width: 100%; border-collapse: collapse; margin-bottom: 14px; }}
+        .data-table th {{
+            text-align: left; font-size: 9px; color: #64748b; padding: 6px 10px;
+            border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px;
+        }}
+        .data-table td {{
+            font-size: 11px; color: #334155; padding: 6px 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }}
+        .data-table td.danger {{ color: #dc2626; font-weight: 600; }}
+        .footer {{
+            text-align: center; color: #94a3b8; font-size: 9px; margin-top: 24px;
+            padding-top: 10px; border-top: 1px solid #e2e8f0;
+        }}
+        @media print {{
+            body {{ background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            .section {{ break-inside: avoid; }}
+        }}
     </style>
 </head>
 <body>
+<div class="container">
     <div class="report-header">
-        <div class="report-title">TEAM DASHBOARD REPORT</div>
-        <div class="report-subtitle">Mode: {mode_label} | Period: {date_range} | Generated: {now}</div>
+        <div class="report-title">DASHBOARD REPORT</div>
+        <div class="report-subtitle">{mode_label} | {"Periodo" if is_pt else "Period"}: {date_range} | {now}</div>
     </div>
     {sections_html}
-    <div class="footer">Load Manager Pro - Dashboard Report - {now}</div>
+    <div class="footer">Load Manager Pro &mdash; {now}</div>
+</div>
 </body>
 </html>"""
     
