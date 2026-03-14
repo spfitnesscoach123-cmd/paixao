@@ -8,13 +8,15 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 - **Credenciais de teste**: `contato@loadmanagerpro.com.br` / `#UAE2026`
 
 ## Arquitetura
-- **Frontend**: Expo (React Native Web) na porta 3000
+- **Frontend**: Expo (React Native Web) na porta 3000 / TestFlight (iOS)
 - **Backend**: FastAPI na porta 8001
+- **Producao (Railway)**: `https://paixao-production.up.railway.app`
+- **Preview (Emergent)**: `https://load-metrics-unify.preview.emergentagent.com`
 - **Banco**: MongoDB via `MONGO_URL`
-- **URL publica**: `https://load-metrics-unify.preview.emergentagent.com`
+- **App iOS (TestFlight)**: Aponta para Railway via `RAILWAY_PRODUCTION_URL` hardcoded em `services/api.ts`
 
 ## Fonte Unica de Verdade para Metricas GPS
-- `athlete_load_metrics` (EWMA via RollingLoadEngine) → Acute Load, Chronic Load, ACWR, Monotony, Strain
+- `athlete_load_metrics` (EWMA via RollingLoadEngine com dedup) → Acute Load, Chronic Load, ACWR, Monotony, Strain
 - `gps_data` com dedup Session/Period → Total Distance diario, timeline, heatmap
 - `wellness` → wellness_score (0-10), readiness_score (0-10, exibido como 0-100%)
 - Team Dashboard = referencia de verdade para logica GPS
@@ -23,7 +25,7 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 
 ### Core
 - Autenticacao JWT + RevenueCat
-- CRUD de atletas
+- CRUD de atletas (28 atletas em producao)
 - Import CSV de dados GPS (catapult, statsports, etc.)
 - Rolling Load Engine (EWMA) com dedup GPS
 - Dashboard Overview com camadas: Load Intelligence, Team Status, Jump, VBT, Body Comp
@@ -34,44 +36,39 @@ Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dash
 - Analise Cientifica com recomendacoes
 - Wellness form e tracking
 
-### Correcoes Recentes (Mar 2026)
-- [x] P1: Dedup GPS no `aggregate_gps_for_date()` — corrigido para nao somar Session + sub-periodos
-- [x] P2: Endpoint `POST /api/load-metrics/recalculate-all` para rebuild completo — executado com sucesso
-- [x] P3: Gauge "Prontidao" agora usa `readiness_score` real (nao wellness*10) + exibe Wellness Medio abaixo
-- [x] P4: Codigo morto removido (calc_acwr, calc_monotony_strain inline no Overview)
-- [x] Alinhamento completo validado: Team Dashboard ACWR=1.0 = Overview ACWR=1.0, Readiness=54% em ambos
-- [x] Recalculo global executado e validado visualmente
+### Correcoes Mar 2026
+- [x] Dedup GPS no `aggregate_gps_for_date()` — deployado + recalculado em producao
+- [x] Endpoint `POST /api/load-metrics/recalculate-all` — criado e executado em Railway
+- [x] Gauge "Prontidao" usa `readiness_score` real + exibe Wellness Medio
+- [x] Codigo morto removido (calc_acwr, calc_monotony_strain)
+- [x] Recalculo global executado em Railway (28 atletas)
+- [x] KHOSAIF ABDALLAH: acute_load corrigido de 22130 → 11125 (alinhado com Team Dashboard)
+- [x] team_acwr alinhado: 0.94 em ambos os dashboards
+- [x] team_readiness alinhado: 72.3% em ambos os dashboards
 
-### Correcoes Anteriores (Fev 2026)
-- [x] Alinhamento ACWR entre Team Dashboard e Dashboard Overview (EWMA centralizado)
-- [x] Correcao PDF Export (valores zerados → dados corretos)
-- [x] Redesign menu do perfil do atleta (grid de botoes)
-- [x] Filtros "Hoje" e "Ontem" no Dashboard Overview
+### Correcoes Fev 2026
+- [x] Alinhamento ACWR (EWMA centralizado)
+- [x] Correcao PDF Export
+- [x] Redesign menu perfil atleta
+- [x] Filtros "Hoje"/"Ontem"
 
-## Backlog (Priorizado)
+## Backlog
 
-### P0 — Critico
-- Nenhum pendente
-
-### P1 — Alto
+### P1
 - PDF generation crash em "Analise Cientifica" (recorrente >3x)
-- Refatorar outros dashboards para usar Rolling Load Engine centralizado
-- Validar em producao (Railway) com dados reais do atleta Khosaif Abdallah apos deploy
+- Refatorar outros dashboards para Rolling Load Engine
 
-### P2 — Medio
-- Internacionalizacao completa do ScientificAnalysisTab e pagina "Avaliacoes"
-- Corrigir configuracao ESLint para TypeScript
+### P2
+- Internacionalizacao (ScientificAnalysisTab, Avaliacoes)
+- ESLint config TypeScript
 
-### P3 — Baixo
-- UI para merge de perfis duplicados de atletas
-- Remover diretorio backup `frontend/ios_backup_before_removal/`
+### P3
+- UI para merge perfis duplicados
+- Remover `frontend/ios_backup_before_removal/`
 
 ## Arquivos Chave
-- `backend/server.py` — Endpoints principais (12000+ linhas)
+- `backend/server.py` — Endpoints principais
 - `backend/load_engine/rolling_load_engine.py` — EWMA, ACWR, dedup GPS
+- `frontend/services/api.ts` — Config API URL (Railway hardcoded para producao)
 - `frontend/app/(tabs)/data.tsx` — Dashboard Overview
 - `frontend/app/(tabs)/team.tsx` — Team Dashboard
-- `frontend/app/athlete/[id].tsx` — Perfil do atleta
-
-## Colecoes MongoDB
-- `athletes`, `gps_data`, `athlete_load_metrics`, `wellness`, `jump_assessments`, `vbt_data`, `body_compositions`, `coaches`
