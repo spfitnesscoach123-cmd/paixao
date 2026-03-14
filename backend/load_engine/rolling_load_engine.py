@@ -133,6 +133,10 @@ class RollingLoadEngine:
         
         return await cursor.to_list(length=days)
     
+    # Session/period dedup keywords — same as Team Dashboard
+    _SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+    _PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+
     async def aggregate_gps_for_date(
         self,
         athlete_id: str,
@@ -140,13 +144,18 @@ class RollingLoadEngine:
         date: str
     ) -> Dict[str, float]:
         """
-        Aggregate GPS data for a specific date.
-        
+        Aggregate GPS data for a specific date WITH session/period dedup.
+
+        Uses the same dedup logic as the Team Dashboard:
+        - Group records by session_name
+        - For each session, prefer the 'Session' total row over sub-period rows
+        - Never sum Session + sub-periods together (avoids double-counting)
+
         Args:
             athlete_id: Athlete ID
             coach_id: Coach ID
             date: Date string (YYYY-MM-DD)
-            
+
         Returns:
             Dict with aggregated loads for each metric
         """
@@ -155,7 +164,7 @@ class RollingLoadEngine:
             "coach_id": coach_id,
             "date": date
         }).to_list(100)
-        
+
         totals = {
             "distance": 0.0,
             "hsr": 0.0,
@@ -164,19 +173,44 @@ class RollingLoadEngine:
             "high_intensity_distance": 0.0,
             "number_of_sprints": 0.0,
         }
-        
+
+        if not gps_records:
+            return totals
+
+        # Group records by session_name
+        grouped: Dict[str, list] = {}
         for record in gps_records:
-            totals["distance"] += float(record.get("total_distance", 0) or 0)
-            totals["hsr"] += float(record.get("high_speed_running", 0) or 0)
-            totals["sprint_distance"] += float(record.get("sprint_distance", 0) or 0)
-            totals["high_intensity_distance"] += float(record.get("high_intensity_distance", 0) or 0)
-            totals["number_of_sprints"] += float(record.get("number_of_sprints", 0) or 0)
-            
-            # ACC + DEC load
-            acc = float(record.get("number_of_accelerations", 0) or 0)
-            dec = float(record.get("number_of_decelerations", 0) or 0)
-            totals["acc_dec_load"] += acc + dec
-        
+            sname = record.get("session_name") or "default"
+            grouped.setdefault(sname, []).append(record)
+
+        # For each session, apply dedup logic
+        for sname, records in grouped.items():
+            session_total = None
+            period_recs = []
+
+            for r in records:
+                pname = (r.get("period_name") or "").lower()
+                is_sess = any(kw in pname for kw in self._SESSION_KW)
+                is_per = any(kw in pname for kw in self._PERIOD_KW)
+                if is_sess and not is_per:
+                    if session_total is None:
+                        session_total = r
+                else:
+                    period_recs.append(r)
+
+            # Choose source: session total > periods > all records
+            source = [session_total] if session_total else (period_recs if period_recs else records)
+
+            for r in source:
+                totals["distance"] += float(r.get("total_distance", 0) or 0)
+                totals["hsr"] += float(r.get("high_speed_running", 0) or 0)
+                totals["sprint_distance"] += float(r.get("sprint_distance", 0) or 0)
+                totals["high_intensity_distance"] += float(r.get("high_intensity_distance", 0) or 0)
+                totals["number_of_sprints"] += float(r.get("number_of_sprints", 0) or 0)
+                acc = float(r.get("number_of_accelerations", 0) or 0)
+                dec = float(r.get("number_of_decelerations", 0) or 0)
+                totals["acc_dec_load"] += acc + dec
+
         return totals
     
     def calculate_metric_values(

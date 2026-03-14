@@ -785,6 +785,7 @@ export default function DataScreen() {
   };
   
   const renderTeamStatus = () => {
+    const readiness = mode === 'athlete' ? athletes[0]?.readiness_score : summary.team_readiness;
     const wellness = mode === 'athlete' ? athletes[0]?.wellness_score : summary.team_wellness;
     const details = mode === 'athlete' ? athletes[0]?.wellness_details : null;
     const wellTimeline = mode === 'athlete' ? athletes[0]?.wellness_timeline : [];
@@ -822,8 +823,13 @@ export default function DataScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{locale === 'pt' ? 'Prontidão da Equipe' : 'Team Readiness'}</Text>
           <View style={{ alignItems: 'center', marginTop: 8 }}>
-            <GaugeChart value={wellness ? wellness * 10 : 0} max={100} label={locale === 'pt' ? 'Prontidão' : 'Readiness'} color={wellness && wellness > 6 ? COLORS.green : wellness && wellness > 4 ? COLORS.yellow : COLORS.red} size={140} />
+            <GaugeChart value={readiness || 0} max={100} label={locale === 'pt' ? 'Prontidão' : 'Readiness'} color={readiness && readiness > 60 ? COLORS.green : readiness && readiness > 40 ? COLORS.yellow : COLORS.red} size={140} />
           </View>
+          {wellness != null && (
+            <View style={{ alignItems: 'center', marginTop: 6 }}>
+              <Text style={{ color: '#94a3b8', fontSize: 11 }}>{locale === 'pt' ? 'Wellness Médio' : 'Avg Wellness'}: {wellness?.toFixed(1) || '--'}/10</Text>
+            </View>
+          )}
         </View>
         
         {/* Wellness Bars */}

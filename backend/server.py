@@ -4608,6 +4608,71 @@ async def recalculate_athlete_metrics(
     )
 
 
+@api_router.post("/load-metrics/recalculate-all")
+async def recalculate_all_load_metrics(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Force full recalculation of athlete_load_metrics for ALL athletes.
+    This rebuilds all EWMA, ACWR, monotony, strain values using corrected
+    GPS dedup logic. Should be called after fixing aggregate_gps_for_date.
+    """
+    user_id = current_user["_id"]
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(200)
+
+    if not athletes:
+        return {"success": False, "message": "No athletes found", "athletes_processed": 0}
+
+    results = []
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        coach_id = str(user_id)
+
+        # Delete existing metrics for this athlete
+        await db.athlete_load_metrics.delete_many({"athlete_id": athlete_id})
+
+        # Find earliest GPS date
+        earliest = await db.gps_data.find_one(
+            {"athlete_id": athlete_id, "coach_id": coach_id},
+            sort=[("date", 1)],
+            projection={"date": 1, "_id": 0}
+        )
+
+        if earliest and earliest.get("date"):
+            try:
+                recalc_results = await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    start_date=earliest["date"]
+                )
+                success_count = sum(1 for r in recalc_results if r.success)
+                results.append({
+                    "athlete_id": athlete_id,
+                    "name": athlete.get("name"),
+                    "dates_processed": len(recalc_results),
+                    "success_count": success_count
+                })
+            except Exception as e:
+                results.append({
+                    "athlete_id": athlete_id,
+                    "name": athlete.get("name"),
+                    "error": str(e)
+                })
+        else:
+            results.append({
+                "athlete_id": athlete_id,
+                "name": athlete.get("name"),
+                "dates_processed": 0,
+                "message": "No GPS data"
+            })
+
+    return {
+        "success": True,
+        "athletes_processed": len(results),
+        "details": results
+    }
+
+
 @api_router.get("/load-metrics/team/latest")
 async def get_team_load_metrics(
     current_user: dict = Depends(get_current_user)
@@ -8684,31 +8749,6 @@ async def get_dashboard_overview(
             daily[date_str] = day
         return daily
     
-    def calc_acwr(daily_gps, ref_date=None):
-        """Calculate ACWR using total_distance. Always 7d acute / 28d chronic."""
-        ref = ref_date or today
-        acute = sum(daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(7))
-        chronic = sum(daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(28))
-        chronic_avg = chronic / 4 if chronic > 0 else 0
-        return round(acute / chronic_avg, 2) if chronic_avg > 0 else None
-    
-    def calc_monotony_strain(daily_gps, days=7, ref_date=None):
-        """Calculate monotony and strain from total_distance over N days."""
-        ref = ref_date or today
-        loads = [daily_gps.get((ref - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(days)]
-        if len(loads) < 2:
-            return None, None
-        mean_l = sum(loads) / len(loads)
-        if mean_l <= 0:
-            return None, None
-        var = sum((x - mean_l)**2 for x in loads) / len(loads)
-        std = var ** 0.5
-        if std <= 0:
-            return None, None
-        monotony = round(mean_l / std, 2)
-        strain = round(sum(loads) * monotony, 0)
-        return monotony, strain
-    
     def get_wellness_score(w):
         """Extract or compute wellness score from a wellness record."""
         ws = w.get("wellness_score")
@@ -8856,10 +8896,11 @@ async def get_dashboard_overview(
             "sprint_z5": round(vz_total["sprint"])
         }
         
-        # Wellness
+        # Wellness + Readiness
         w_recs = wellness_by_athlete.get(aid, [])
         latest_wellness = None
         wellness_score = None
+        readiness_score = None
         wellness_details = {}
         wellness_timeline = []
         
@@ -8867,6 +8908,10 @@ async def get_dashboard_overview(
             latest_w = w_recs[0]
             latest_wellness = latest_w.get("date")
             wellness_score = get_wellness_score(latest_w)
+            # Extract real readiness_score (different formula from wellness)
+            raw_readiness = latest_w.get("readiness_score")
+            if raw_readiness is not None and raw_readiness > 0:
+                readiness_score = round(raw_readiness * 10, 1)  # 0-10 → 0-100%
             wellness_details = {
                 "sleep": latest_w.get("sleep_quality", 5),
                 "fatigue": latest_w.get("fatigue", 5),
@@ -9020,6 +9065,7 @@ async def get_dashboard_overview(
             "monotony": monotony,
             "strain": strain,
             "wellness_score": wellness_score,
+            "readiness_score": readiness_score,
             "wellness_details": wellness_details,
             "wellness_timeline": wellness_timeline,
             "rsimod": rsimod,
@@ -9047,6 +9093,7 @@ async def get_dashboard_overview(
     
     team_acwr = safe_avg([a["acwr"] for a in athlete_results])
     team_wellness = safe_avg([a["wellness_score"] for a in athlete_results])
+    team_readiness = safe_avg([a["readiness_score"] for a in athlete_results])
     team_rsimod = safe_avg([a["rsimod"] for a in athlete_results])
     team_monotony = safe_avg([a["monotony"] for a in athlete_results])
     team_strain = safe_avg([a["strain"] for a in athlete_results])
@@ -9149,6 +9196,7 @@ async def get_dashboard_overview(
             "unavailable": unavailable,
             "team_acwr": team_acwr,
             "team_wellness": team_wellness,
+            "team_readiness": team_readiness,
             "team_rsimod": team_rsimod,
             "team_monotony": team_monotony,
             "team_strain": team_strain,

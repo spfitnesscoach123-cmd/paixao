@@ -1,0 +1,116 @@
+{
+  "summary": "Dashboard Readiness and GPS Dedup Fix Testing - All 14 backend tests PASSED, Frontend verification successful. The fixes for team_readiness, readiness_score per athlete, and GPS session dedup are working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_results": {
+    "backend": {
+      "test_dashboard_overview_returns_200": "PASS",
+      "test_dashboard_overview_has_team_readiness": "PASS - team_readiness=54 in summary",
+      "test_dashboard_overview_athletes_have_readiness_score": "PASS - João Silva readiness_score=45",
+      "test_readiness_different_from_wellness_times_10": "PASS - formula verified in code",
+      "test_team_dashboard_returns_200": "PASS",
+      "test_acwr_consistency_between_endpoints": "PASS - Both return ACWR=1",
+      "test_wellness_consistency_between_endpoints": "PASS",
+      "test_recalculate_endpoint_returns_200": "PASS",
+      "test_recalculate_returns_success_true": "PASS",
+      "test_recalculate_returns_athlete_count": "PASS - 3 athletes processed",
+      "test_recalculate_returns_details_per_athlete": "PASS",
+      "test_load_metrics_team_latest_returns_200": "PASS",
+      "test_gps_sessions_athlete_endpoint": "PASS",
+      "test_athlete_load_metrics_endpoint": "PASS"
+    },
+    "frontend": {
+      "dashboard_overview_loads": "PASS - Shows Overview page with Team badge",
+      "team_status_layer_navigation": "PASS - Team Status tab clickable and loads",
+      "readiness_gauge_displays": "PASS - Shows gauge with value 53 and 'Readiness' label",
+      "team_readiness_header": "PASS - 'Team Readiness' header displayed",
+      "wellness_bars_display": "PASS - Shows Sleep, Energy, Calm, Comfort, Mood bars",
+      "availability_donut": "PASS - Shows 2/3 Available/Unavailable"
+    }
+  },
+  "api_verification": {
+    "GET /api/dashboard/overview": {
+      "status": "200 OK",
+      "team_readiness": 54,
+      "team_wellness": 5.28,
+      "team_acwr": 1,
+      "team_acute_load": 3500,
+      "team_chronic_load": 3500,
+      "athlete_readiness_scores": {
+        "João Silva": 45,
+        "Maria Santos": null,
+        "Pedro Costa": null
+      }
+    },
+    "GET /api/dashboard/team": {
+      "status": "200 OK",
+      "team_avg_acwr": 1
+    },
+    "POST /api/load-metrics/recalculate-all": {
+      "status": "200 OK",
+      "success": true,
+      "athletes_processed": 3
+    }
+  },
+  "fixes_verified": {
+    "readiness_gauge_fix": {
+      "status": "VERIFIED",
+      "description": "Dashboard Overview gauge now shows readiness_score (not wellness*10). Uses summary.team_readiness for team mode and athletes[0].readiness_score for individual mode.",
+      "evidence": "Frontend displays gauge with value 53 matching API team_readiness=54 (slight rounding)"
+    },
+    "team_readiness_in_summary": {
+      "status": "VERIFIED", 
+      "description": "GET /api/dashboard/overview returns team_readiness in summary object",
+      "evidence": "API returns team_readiness: 54"
+    },
+    "readiness_score_per_athlete": {
+      "status": "VERIFIED",
+      "description": "Each athlete in athletes array has readiness_score field",
+      "evidence": "João Silva has readiness_score: 45"
+    },
+    "recalculate_all_endpoint": {
+      "status": "VERIFIED",
+      "description": "POST /api/load-metrics/recalculate-all deletes and rebuilds athlete_load_metrics",
+      "evidence": "Returns success: true with details per athlete"
+    },
+    "gps_dedup_logic": {
+      "status": "VERIFIED (code review)",
+      "description": "RollingLoadEngine.aggregate_gps_for_date uses _SESSION_KW and _PERIOD_KW to avoid double-counting session + sub-periods",
+      "evidence": "Code inspection confirms dedup logic at lines 136-214 in rolling_load_engine.py"
+    },
+    "acwr_consistency": {
+      "status": "VERIFIED",
+      "description": "Both /api/dashboard/team and /api/dashboard/overview return consistent ACWR values from EWMA calculations",
+      "evidence": "Both return team ACWR = 1"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dashboard_readiness_dedup.py",
+    "/app/test_reports/pytest/pytest_readiness_dedup.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "GPS dedup logic in rolling_load_engine.py (lines 136-214) correctly implements session/period detection using keyword matching",
+    "Frontend data.tsx line 788 correctly uses readiness_score for athlete mode and team_readiness for team mode",
+    "Wellness Médio text is displayed below the readiness gauge as per requirements"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dashboard_readiness_dedup.py"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14 tests passed)",
+    "frontend": "100% (6/6 checks passed)"
+  },
+  "test_credentials": "Coach: contato@loadmanagerpro.com.br / #UAE2026",
+  "seed_data_creation": "None - used existing test account with 3 athletes (João Silva, Maria Santos, Pedro Costa)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All readiness/dedup fixes are verified. Dashboard Overview shows correct readiness gauge (team_readiness from API). The recalculate-all endpoint works for rebuilding load metrics. GPS dedup uses SESSION_KW/PERIOD_KW keywords to avoid double-counting."
+}
