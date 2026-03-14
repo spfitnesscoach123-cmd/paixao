@@ -9111,6 +9111,207 @@ async def get_dashboard_overview(
 
 
 
+# ============= DASHBOARD OVERVIEW PDF REPORT =============
+
+@api_router.get("/report/dashboard-overview")
+async def get_dashboard_overview_pdf(
+    lang: str = "pt",
+    athlete_id: Optional[str] = None,
+    position: Optional[str] = None,
+    date_range: str = "28d",
+    layers: str = "load,summary,status,neuro,risk",
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate HTML report for dashboard overview PDF export."""
+    from fastapi.responses import HTMLResponse
+    
+    # Get data from the existing overview endpoint
+    overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    
+    is_pt = lang == "pt"
+    selected_layers = set(layers.split(","))
+    mode = overview.get("mode", "team")
+    mode_label = {"team": "Equipe" if is_pt else "Team", "position": "Posicao" if is_pt else "Position", "athlete": "Atleta" if is_pt else "Athlete"}.get(mode, mode)
+    
+    load_data = overview.get("load_intelligence", {})
+    summary_data = overview.get("smart_summary", {})
+    status_data = overview.get("team_status", {})
+    neuro_data = overview.get("neuromuscular", {})
+    risk_data = overview.get("risk_intelligence", {})
+    
+    # Build page sections
+    sections_html = ""
+    
+    if "load" in selected_layers:
+        acwr = load_data.get("acwr") or 0
+        acute = load_data.get("acute_load") or 0
+        chronic = load_data.get("chronic_load") or 0
+        mono = load_data.get("monotony") or 0
+        strain_val = load_data.get("strain") or 0
+        vz = load_data.get("velocity_zones", {})
+        
+        # Distance timeline
+        timeline = load_data.get("distance_timeline", [])
+        timeline_html = ""
+        if timeline:
+            max_d = max((d.get("distance", 0) for d in timeline), default=1) or 1
+            bars = "".join([f'<div class="bar-wrap"><div class="bar" style="height:{max(4, d.get("distance",0)/max_d*100)}%;background:linear-gradient(to top,#0891b2,#22d3ee)"></div><span class="bar-label">{d.get("date","")[-5:]}</span></div>' for d in timeline[-14:]])
+            timeline_html = f'<div class="chart-title">{"Distancia Total" if is_pt else "Total Distance"}</div><div class="bar-chart">{bars}</div>'
+        
+        acwr_color = "#10b981" if 0.8 <= acwr <= 1.3 else "#f59e0b" if acwr < 0.8 else "#ef4444"
+        
+        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(34,211,238,0.15);color:#22d3ee">Load Intelligence</span></div>
+        <div class="metrics-row">
+            <div class="metric-card"><div class="metric-label">Acute 7d</div><div class="metric-value" style="color:#22d3ee">{acute:,.0f} m</div></div>
+            <div class="metric-card"><div class="metric-label">Chronic 28d</div><div class="metric-value" style="color:#3b82f6">{chronic:,.0f} m</div></div>
+            <div class="metric-card"><div class="metric-label">ACWR</div><div class="metric-value" style="color:{acwr_color}">{acwr:.2f}</div></div>
+            <div class="metric-card"><div class="metric-label">Monotony</div><div class="metric-value">{mono:.1f}</div></div>
+            <div class="metric-card"><div class="metric-label">Strain</div><div class="metric-value">{strain_val:,.0f}</div></div>
+        </div>
+        {timeline_html}
+        <div class="chart-title">{"Zonas de Velocidade" if is_pt else "Velocity Zones"}</div>
+        <div class="metrics-row">
+            <div class="metric-card"><div class="metric-label">Low Intensity</div><div class="metric-value" style="color:#3b82f6">{vz.get("low_intensity",0):,.0f}m</div></div>
+            <div class="metric-card"><div class="metric-label">HID Z3</div><div class="metric-value" style="color:#22d3ee">{vz.get("hid_z3",0):,.0f}m</div></div>
+            <div class="metric-card"><div class="metric-label">HSR Z4</div><div class="metric-value" style="color:#eab308">{vz.get("hsr_z4",0):,.0f}m</div></div>
+            <div class="metric-card"><div class="metric-label">Sprint Z5</div><div class="metric-value" style="color:#ef4444">{vz.get("sprint_z5",0):,.0f}m</div></div>
+        </div>
+        </div>'''
+    
+    if "summary" in selected_layers:
+        lmpi = summary_data.get("lmpi", {}).get("score", 0)
+        profile = summary_data.get("performance_profile", {})
+        avail = summary_data.get("availability", {}).get("available_pct", 0)
+        high_risk = summary_data.get("high_risk_athletes", [])
+        
+        lmpi_color = "#ef4444" if lmpi < 40 else "#f59e0b" if lmpi < 70 else "#10b981"
+        
+        risk_table = ""
+        if high_risk:
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:#ef4444">{a.get("lmpi",0):.0f}</td><td>{a.get("acwr",0):.2f}</td></tr>' for a in high_risk[:10]])
+            risk_table = f'<div class="chart-title">{"Atletas Alto Risco" if is_pt else "High Risk Athletes"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>LMPI</th><th>ACWR</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(245,158,11,0.15);color:#f59e0b">Smart Summary</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">LMPI Score</div><div class="metric-value" style="color:{lmpi_color};font-size:36px">{lmpi:.0f}</div><div class="metric-sub">/100</div></div>
+            <div class="metric-card"><div class="metric-label">{"Disponibilidade" if is_pt else "Availability"}</div><div class="metric-value" style="color:#10b981">{avail:.0f}%</div></div>
+        </div>
+        <div class="chart-title">Performance Profile</div>
+        <div class="metrics-row">
+            <div class="metric-card"><div class="metric-label">Load</div><div class="metric-value">{profile.get("load",0):.0f}</div></div>
+            <div class="metric-card"><div class="metric-label">Wellness</div><div class="metric-value">{profile.get("wellness",0):.0f}</div></div>
+            <div class="metric-card"><div class="metric-label">Neuromuscular</div><div class="metric-value">{profile.get("neuromuscular",0):.0f}</div></div>
+            <div class="metric-card"><div class="metric-label">Power</div><div class="metric-value">{profile.get("power",0):.0f}</div></div>
+        </div>
+        {risk_table}
+        </div>'''
+    
+    if "status" in selected_layers:
+        readiness = status_data.get("readiness", {}).get("score", 0)
+        wellness_avg = status_data.get("wellness_avg", {})
+        low_ready = status_data.get("low_readiness_athletes", [])
+        
+        rd_color = "#ef4444" if readiness < 50 else "#f59e0b" if readiness < 75 else "#10b981"
+        
+        lrt = ""
+        if low_ready:
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:#ef4444">{a.get("readiness",0):.0f}%</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in low_ready[:10]])
+            lrt = f'<div class="chart-title">{"Baixa Prontidao" if is_pt else "Low Readiness"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Readiness</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(16,185,129,0.15);color:#10b981">Team Status</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">{"Prontidao" if is_pt else "Readiness"}</div><div class="metric-value" style="color:{rd_color};font-size:36px">{readiness:.0f}%</div></div>
+            <div class="metric-card"><div class="metric-label">{"Sono" if is_pt else "Sleep"}</div><div class="metric-value">{wellness_avg.get("sleep",0):.1f}</div></div>
+            <div class="metric-card"><div class="metric-label">{"Fadiga" if is_pt else "Fatigue"}</div><div class="metric-value">{wellness_avg.get("fatigue",0):.1f}</div></div>
+            <div class="metric-card"><div class="metric-label">{"Dor" if is_pt else "Soreness"}</div><div class="metric-value">{wellness_avg.get("soreness",0):.1f}</div></div>
+            <div class="metric-card"><div class="metric-label">{"Estresse" if is_pt else "Stress"}</div><div class="metric-value">{wellness_avg.get("stress",0):.1f}</div></div>
+        </div>
+        {lrt}
+        </div>'''
+    
+    if "neuro" in selected_layers:
+        neuro_score = neuro_data.get("neuro_score", {}).get("score", 0)
+        rsimod = neuro_data.get("rsimod", {}).get("value", 0)
+        fatigue_idx = neuro_data.get("fatigue_index", 0)
+        
+        ns_color = "#ef4444" if neuro_score < 50 else "#f59e0b" if neuro_score < 75 else "#10b981"
+        
+        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(99,102,241,0.15);color:#6366f1">Neuromuscular Status</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">Neuro Score</div><div class="metric-value" style="color:{ns_color};font-size:36px">{neuro_score:.0f}</div></div>
+            <div class="metric-card"><div class="metric-label">RSImod</div><div class="metric-value">{rsimod:.2f}</div></div>
+            <div class="metric-card"><div class="metric-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="metric-value" style="color:{"#ef4444" if fatigue_idx < -10 else "#f59e0b" if fatigue_idx < -5 else "#10b981"}">{fatigue_idx:.1f}%</div></div>
+        </div>
+        </div>'''
+    
+    if "risk" in selected_layers:
+        risk_score = risk_data.get("risk_score", {}).get("score", 0)
+        risk_panel = risk_data.get("risk_panel", [])
+        
+        rs_color = "#10b981" if risk_score < 30 else "#f59e0b" if risk_score < 60 else "#ef4444"
+        
+        panel_html = ""
+        if risk_panel:
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{rs_color}">{a.get("risk_score",0):.0f}</td><td>{a.get("acwr",0):.2f}</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in risk_panel[:15]])
+            panel_html = f'<div class="chart-title">{"Painel de Risco" if is_pt else "Risk Panel"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Risk</th><th>ACWR</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="page-break"><div class="section-header"><span class="layer-badge" style="background:rgba(239,68,68,0.15);color:#ef4444">Risk Intelligence</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">{"Risco Geral" if is_pt else "Risk Score"}</div><div class="metric-value" style="color:{rs_color};font-size:36px">{risk_score:.0f}</div></div>
+        </div>
+        {panel_html}
+        </div>'''
+    
+    from datetime import datetime
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    html = f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Dashboard Report</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; line-height: 1.5; }}
+        @media print {{ body {{ background: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }} }}
+        .page-break {{ page-break-before: always; padding-top: 12px; }}
+        .page-break:first-child {{ page-break-before: avoid; }}
+        .report-header {{ text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid rgba(139,92,246,0.3); }}
+        .report-title {{ font-size: 22px; font-weight: 800; color: #fff; letter-spacing: 2px; }}
+        .report-subtitle {{ font-size: 12px; color: #94a3b8; margin-top: 6px; }}
+        .section-header {{ margin-bottom: 16px; }}
+        .layer-badge {{ display: inline-block; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 700; letter-spacing: 1px; }}
+        .metrics-row {{ display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }}
+        .metric-card {{ flex: 1; min-width: 100px; background: rgba(21,28,50,0.8); border: 1px solid rgba(139,92,246,0.1); border-radius: 12px; padding: 14px; text-align: center; }}
+        .metric-card.big {{ min-width: 160px; }}
+        .metric-label {{ font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }}
+        .metric-value {{ font-size: 22px; font-weight: 800; color: #e2e8f0; }}
+        .metric-sub {{ font-size: 11px; color: #64748b; }}
+        .chart-title {{ font-size: 13px; font-weight: 700; color: #94a3b8; margin-bottom: 10px; margin-top: 16px; letter-spacing: 0.5px; }}
+        .bar-chart {{ display: flex; align-items: flex-end; gap: 4px; height: 100px; margin-bottom: 16px; padding: 4px 0; }}
+        .bar-wrap {{ flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }}
+        .bar {{ width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; min-height: 4px; }}
+        .bar-label {{ font-size: 8px; color: #64748b; margin-top: 4px; }}
+        .data-table {{ width: 100%; border-collapse: collapse; margin-bottom: 16px; }}
+        .data-table th {{ text-align: left; font-size: 10px; color: #64748b; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); text-transform: uppercase; letter-spacing: 0.5px; }}
+        .data-table td {{ font-size: 12px; color: #e2e8f0; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); }}
+        .footer {{ text-align: center; color: #475569; font-size: 10px; margin-top: 30px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.06); }}
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="report-title">TEAM DASHBOARD REPORT</div>
+        <div class="report-subtitle">Mode: {mode_label} | Period: {date_range} | Generated: {now}</div>
+    </div>
+    {sections_html}
+    <div class="footer">Load Manager Pro - Dashboard Report - {now}</div>
+</body>
+</html>"""
+    
+    return HTMLResponse(content=html)
+
+
 # ============= SUBSCRIPTION ENDPOINTS =============
 
 # ============= WEARABLE IMPORT ENDPOINTS =============

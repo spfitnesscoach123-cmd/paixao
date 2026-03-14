@@ -1,12 +1,14 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  Dimensions, Animated, Modal, Pressable
+  Dimensions, Animated, Modal, Pressable, Platform, ActivityIndicator, Alert
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, G, Text as SvgText, Rect, Line, Path, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -347,6 +349,17 @@ export default function DataScreen() {
   // Fade animation
   const fadeAnim = useRef(new Animated.Value(1)).current;
   
+  // PDF Export state
+  const [pdfModalVisible, setPdfModalVisible] = useState(false);
+  const [pdfLayers, setPdfLayers] = useState<Record<string, boolean>>({
+    load: true, summary: true, status: true, neuro: true, risk: true,
+  });
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  
+  const togglePdfLayer = (key: string) => {
+    setPdfLayers(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+  
   const switchLayer = useCallback((key: string) => {
     Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }).start(() => {
       setActiveLayer(key);
@@ -384,6 +397,58 @@ export default function DataScreen() {
     await queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] });
     setRefreshing(false);
   };
+
+  // PDF Export handler
+  const handleExportPdf = useCallback(async () => {
+    if (!data || isGeneratingPdf) return;
+    
+    const selectedKeys = Object.entries(pdfLayers).filter(([_, v]) => v).map(([k]) => k);
+    if (selectedKeys.length === 0) {
+      Alert.alert('Error', 'Select at least one section');
+      return;
+    }
+    
+    setIsGeneratingPdf(true);
+    setPdfModalVisible(false);
+    
+    try {
+      const params = new URLSearchParams({ lang: locale, date_range: selectedDateRange });
+      if (selectedAthlete !== 'all') params.set('athlete_id', selectedAthlete);
+      if (selectedPosition !== 'all') params.set('position', selectedPosition);
+      params.set('layers', selectedKeys.join(','));
+      
+      const response = await api.get(`/report/dashboard-overview?${params.toString()}`, { responseType: 'text' });
+      const html = response.data;
+      
+      if (!html) throw new Error('Empty response');
+      
+      if (Platform.OS === 'web') {
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(html);
+          printWindow.document.close();
+          setTimeout(() => printWindow.print(), 500);
+        }
+      } else {
+        const { uri } = await Print.printToFileAsync({ html, base64: false });
+        if (uri) {
+          await Sharing.shareAsync(uri, {
+            UTI: '.pdf',
+            mimeType: 'application/pdf',
+            dialogTitle: 'Dashboard Report',
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('[PDF] Error:', error);
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Erro ao gerar PDF' : 'Failed to generate PDF'
+      );
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }, [data, pdfLayers, selectedAthlete, selectedDateRange, selectedPosition, locale, isGeneratingPdf]);
   
   const getModeBadge = () => {
     if (mode === 'athlete') return { label: locale === 'pt' ? 'Individual' : 'Individual', color: COLORS.purple };
@@ -1077,7 +1142,25 @@ export default function DataScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.headerTitle}>{locale === 'pt' ? 'Visão Geral' : 'Overview'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={styles.headerTitle}>{locale === 'pt' ? 'Visão Geral' : 'Overview'}</Text>
+              <TouchableOpacity
+                style={styles.pdfExportBtn}
+                onPress={() => setPdfModalVisible(true)}
+                disabled={isGeneratingPdf || !data}
+                activeOpacity={0.7}
+                data-testid="pdf-export-btn"
+              >
+                {isGeneratingPdf ? (
+                  <ActivityIndicator size="small" color="#dc2626" />
+                ) : (
+                  <>
+                    <Ionicons name="document-text-outline" size={16} color="#dc2626" />
+                    <Text style={{ color: '#dc2626', fontSize: 10, fontWeight: '600' }}>PDF</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <View style={[styles.modeBadge, { backgroundColor: modeBadge.color + '20', borderColor: modeBadge.color + '40' }]}>
                 <Text style={[styles.modeBadgeText, { color: modeBadge.color }]}>{modeBadge.label}</Text>
@@ -1147,6 +1230,53 @@ export default function DataScreen() {
       
       {/* ============ MODALS ============ */}
       
+      {/* PDF Export Modal */}
+      <Modal visible={pdfModalVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setPdfModalVisible(false)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>EXPORT DASHBOARD REPORT</Text>
+            <Text style={{ color: colors.text.tertiary, fontSize: 12, marginBottom: 16 }}>
+              Select which dashboard sections you want to include in the exported PDF.
+            </Text>
+            
+            {[
+              { key: 'load', label: 'Load Intelligence', icon: 'analytics' },
+              { key: 'summary', label: 'Smart Summary', icon: 'bulb' },
+              { key: 'status', label: 'Team Status', icon: 'people' },
+              { key: 'neuro', label: 'Neuromuscular', icon: 'body' },
+              { key: 'risk', label: 'Risk Intelligence', icon: 'shield-checkmark' },
+            ].map(item => (
+              <TouchableOpacity 
+                key={item.key} 
+                style={styles.pdfLayerRow}
+                onPress={() => togglePdfLayer(item.key)}
+                data-testid={`pdf-layer-${item.key}`}
+              >
+                <View style={[styles.pdfCheckbox, pdfLayers[item.key] && styles.pdfCheckboxChecked]}>
+                  {pdfLayers[item.key] && <Ionicons name="checkmark" size={14} color="#fff" />}
+                </View>
+                <Ionicons name={item.icon as any} size={18} color={pdfLayers[item.key] ? colors.accent.primary : colors.text.tertiary} />
+                <Text style={[styles.pdfLayerLabel, pdfLayers[item.key] && { color: colors.text.primary }]}>{item.label}</Text>
+              </TouchableOpacity>
+            ))}
+            
+            <View style={styles.pdfModalActions}>
+              <TouchableOpacity style={styles.pdfCancelBtn} onPress={() => setPdfModalVisible(false)}>
+                <Text style={{ color: colors.text.secondary, fontSize: 14, fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.pdfExportActionBtn} 
+                onPress={handleExportPdf}
+                data-testid="pdf-export-confirm"
+              >
+                <Ionicons name="document-text" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Export PDF</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Athlete Modal */}
       <Modal visible={athleteModalVisible} transparent animationType="fade">
         <Pressable style={styles.modalOverlay} onPress={() => setAthleteModalVisible(false)}>
@@ -1264,4 +1394,36 @@ const createStyles = (colors: any) => StyleSheet.create({
   modalOptionText: { fontSize: 14, color: colors.text.primary },
   modalOptionActive: { color: colors.accent.primary, fontWeight: '700' },
   modalOptionSubtext: { fontSize: 11, color: colors.text.tertiary, marginTop: 2 },
+  // PDF Export styles
+  pdfExportBtn: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(220, 38, 38, 0.12)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.25)',
+  },
+  pdfLayerRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 10,
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.04)',
+  },
+  pdfCheckbox: {
+    width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center' as const, justifyContent: 'center' as const,
+  },
+  pdfCheckboxChecked: {
+    backgroundColor: colors.accent.primary, borderColor: colors.accent.primary,
+  },
+  pdfLayerLabel: { fontSize: 14, color: colors.text.tertiary, fontWeight: '500' as const, flex: 1 },
+  pdfModalActions: { flexDirection: 'row' as const, justifyContent: 'flex-end' as const, gap: 10, marginTop: 20 },
+  pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
+  pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },
 });

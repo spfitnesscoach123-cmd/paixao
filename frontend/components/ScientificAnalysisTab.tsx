@@ -489,6 +489,8 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
     staleTime: 30000,
   });
 
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+
   const m = pData?.metrics;
   const fi = pData?.fatigue_index;
   const asym = pData?.asymmetry;
@@ -529,22 +531,67 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
         ))}
       </View>
 
-      {/* Date chips */}
+      {/* Date dropdown - same pattern as Jump Assessment page */}
       {pData?.available_dates?.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-          {pData.available_dates.map((d: string) => {
-            const isAct = d === (pData.selected_date || pData.available_dates[0]);
-            return (
-              <TouchableOpacity key={d} onPress={() => setSelDate(d)} style={{
-                paddingHorizontal: 12, paddingVertical: 5, borderRadius: 14, marginRight: 6,
-                backgroundColor: isAct ? colors.accent.primary + '20' : 'rgba(255,255,255,0.05)',
-                borderWidth: 1, borderColor: isAct ? colors.accent.primary : 'transparent',
-              }}>
-                <Text style={{ fontSize: 11, color: isAct ? colors.accent.primary : colors.text.tertiary }}>{d.substring(5).replace('-', '/')}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={{ marginBottom: 10 }}>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row', alignItems: 'center', gap: 8,
+              paddingVertical: 10, paddingHorizontal: 12,
+              backgroundColor: colors.dark.card, borderRadius: 10,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+            }}
+            onPress={() => setShowDateDropdown(!showDateDropdown)}
+            data-testid="sci-date-dropdown-toggle"
+          >
+            <Ionicons name="calendar-outline" size={14} color={colors.accent.primary} />
+            <Text style={{ fontSize: 11, color: colors.text.secondary, fontWeight: '500' }}>
+              {locale === 'pt' ? 'Data' : 'Date'}
+            </Text>
+            <View style={{ flex: 1, alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.accent.primary }}>
+                {(() => {
+                  const d = pData.selected_date || pData.available_dates[0];
+                  try { const [y, mm, dd] = d.split('-'); return `${dd}/${mm}/${y}`; } catch { return d; }
+                })()}
+              </Text>
+            </View>
+            <Ionicons name={showDateDropdown ? 'chevron-up' : 'chevron-down'} size={16} color={colors.text.secondary} />
+          </TouchableOpacity>
+          
+          {showDateDropdown && (
+            <View style={{
+              backgroundColor: colors.dark.card, borderRadius: 10, marginTop: 2,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', overflow: 'hidden',
+              maxHeight: 200,
+            }}>
+              <ScrollView nestedScrollEnabled>
+                {pData.available_dates.map((d: string) => {
+                  const isAct = d === (pData.selected_date || pData.available_dates[0]);
+                  const displayDate = (() => {
+                    try { const [y, mm, dd] = d.split('-'); return `${dd}/${mm}/${y}`; } catch { return d; }
+                  })();
+                  return (
+                    <TouchableOpacity 
+                      key={d} 
+                      onPress={() => { setSelDate(d); setShowDateDropdown(false); }}
+                      style={{
+                        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                        paddingVertical: 10, paddingHorizontal: 14,
+                        backgroundColor: isAct ? 'rgba(139,92,246,0.1)' : 'transparent',
+                        borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
+                      }}
+                      data-testid={`sci-date-item-${d}`}
+                    >
+                      <Text style={{ fontSize: 13, color: isAct ? colors.accent.primary : colors.text.secondary, fontWeight: isAct ? '600' : '400' }}>{displayDate}</Text>
+                      {isAct && <Ionicons name="checkmark" size={14} color={colors.accent.primary} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+        </View>
       )}
 
       {pLoading && <SkeletonDashboard />}
