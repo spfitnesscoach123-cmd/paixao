@@ -1,76 +1,72 @@
-# LoadManager Pro - PRD
+# PRD — Load Manager Pro
 
-## Original Problem Statement
-Sports performance management app for coaches to track athletes' GPS data, wellness, assessments, body composition, and scientific analysis. Built with React Native (Expo) + FastAPI + MongoDB.
+## Problema Original
+Aplicacao de gestao de carga atletica com dashboards de monitoramento (Team Dashboard, Dashboard Overview), perfil de atleta, importacao CSV de dados GPS, wellness, readiness, VBT, jumps, analise cientifica e exportacao PDF.
 
-## Core Features Implemented
-- Athlete CRUD with photo upload
-- GPS data tracking with session grouping and period selection
-- Wellness questionnaires with QTR gauge
-- Physical assessments (Strength/VBT, Body Composition)
-- Scientific Analysis with injury risk evaluation
-- Team Dashboard with ACWR metrics (EWMA-based)
-- Dashboard Overview with PDF export
-- Periodization planning
-- Compare athletes
-- Wellness token/link generation
-- Account management with deletion scheduling
-- RevenueCat subscription integration
-- Multi-language support (PT/EN)
+## Usuarios
+- **Coach/Preparador Fisico**: Monitora metricas de carga, wellness e readiness de atletas
+- **Credenciais de teste**: `contato@loadmanagerpro.com.br` / `#UAE2026`
 
-## Architecture
-- Frontend: React Native (Expo) with expo-router
-- Backend: FastAPI (Python) with MongoDB
-- Auth: JWT-based
-- Key collections: athletes, gps_data, wellness_questionnaires, physical_assessments, athlete_load_metrics, body_composition, comprehensive_analyses
+## Arquitetura
+- **Frontend**: Expo (React Native Web) na porta 3000
+- **Backend**: FastAPI na porta 8001
+- **Banco**: MongoDB via `MONGO_URL`
+- **URL publica**: `https://load-metrics-unify.preview.emergentagent.com`
 
-## Recent Changes
+## Fonte Unica de Verdade para Metricas GPS
+- `athlete_load_metrics` (EWMA via RollingLoadEngine) → Acute Load, Chronic Load, ACWR, Monotony, Strain
+- `gps_data` com dedup Session/Period → Total Distance diario, timeline, heatmap
+- `wellness` → wellness_score (0-10), readiness_score (0-10, exibido como 0-100%)
+- Team Dashboard = referencia de verdade para logica GPS
 
-### 2026-03-14: ACWR Alignment + PDF Export Fix
-- Dashboard Overview now uses EWMA ACWR from athlete_load_metrics (same source as Team Dashboard)
-- Removed inline calc_acwr() Coupled ACWR calculation
-- ACWR, acute_load, chronic_load, monotony, strain now from RollingLoadEngine
-- ACWR timeline uses historical EWMA records
-- PDF export (GET /api/report/dashboard-overview) rewritten: maps data from actual response keys (summary, athletes, aggregated_timeline) instead of non-existent layered keys
-- Fixed NoneType format errors in PDF risk panel
-- All values now match between UI and PDF export
-- Files changed: backend/server.py
+## Funcionalidades Implementadas
 
-### 2026-03-14: Dashboard Overview - New Date Filter Options
-- Added "Hoje/Today" and "Ontem/Yesterday" to the global date range selector
-- Frontend: Updated DATE_RANGES array in data.tsx with new options at the top
-- Backend: Added "today" (0 days) and "yesterday" (1 day) to date_range_map in /api/dashboard/overview
-- All layers (Load Intelligence, Smart Summary, Team Status, Neuromuscular, Risk Intelligence) respect the new filters
-- Order: Today > Yesterday > 7d > 14d > 28d > 90d
+### Core
+- Autenticacao JWT + RevenueCat
+- CRUD de atletas
+- Import CSV de dados GPS (catapult, statsports, etc.)
+- Rolling Load Engine (EWMA) com dedup GPS
+- Dashboard Overview com camadas: Load Intelligence, Team Status, Jump, VBT, Body Comp
+- Team Dashboard com tabela de atletas e metricas agregadas
+- Perfil individual do atleta com navegacao por botoes
+- Filtros globais de data: 7d, 14d, 28d, 90d, Hoje, Ontem
+- Exportacao PDF do Dashboard Overview
+- Analise Cientifica com recomendacoes
+- Wellness form e tracking
 
-### 2026-03-14: Athlete Profile Navigation Menu Redesign
-- Replaced horizontal tab bar with grid-style navigation buttons
-- 5 buttons (Info, GPS Data, Wellness, Assessments, Analysis) in 2-column grid
-- Active state: highlighted background, purple border, solid icon background
-- Inactive state: subtle translucent background, clearly clickable
-- No logic/route/content changes - purely visual
-- File changed: `/app/frontend/app/athlete/[id].tsx`
+### Correcoes Recentes (Fev 2026)
+- [x] P1: Dedup GPS no `aggregate_gps_for_date()` — corrigido para nao somar Session + sub-periodos
+- [x] P2: Endpoint `POST /api/load-metrics/recalculate-all` para rebuild completo
+- [x] P3: Gauge "Prontidao" agora usa `readiness_score` real (nao wellness*10)
+- [x] P4: Codigo morto removido (calc_acwr, calc_monotony_strain inline no Overview)
+- [x] Alinhamento ACWR entre Team Dashboard e Dashboard Overview (EWMA centralizado)
+- [x] Correcao PDF Export (valores zerados → dados corretos)
+- [x] Redesign menu do perfil do atleta (grid de botoes)
+- [x] Filtros "Hoje" e "Ontem" no Dashboard Overview
 
-### 2026-03-14 (Previous fork): ACWR Calculation Fix
-- Fixed incorrect ACWR showing 4.0 on Team Dashboard
-- Implemented RollingLoadEngine startup population of athlete_load_metrics collection
-- Refactored /api/dashboard/team endpoint
+## Backlog (Priorizado)
 
-### 2026-03-14 (Previous fork): Dashboard PDF Export Fixes
-- Backend: SVG charts embedded, print-friendly white CSS
-- Frontend: Native share sheet instead of new tab
+### P0 — Critico
+- Nenhum pendente
 
-## Pending Issues
-- P0: ACWR no Dashboard Overview usa Coupled ACWR (cálculo inline) em vez do EWMA (RollingLoadEngine) — auditoria completa em `/app/memory/AUDIT_REPORT_ACWR_OVERVIEW_vs_TEAM.md`
-- P1: PDF generation crash in "Análise Científica" (recurring >3 times)
-- P3: ESLint configuration for TypeScript
+### P1 — Alto
+- PDF generation crash em "Analise Cientifica" (recorrente >3x)
+- Refatorar outros dashboards para usar Rolling Load Engine centralizado
 
-## Backlog
-- Complete internationalization of ScientificAnalysisTab.tsx and "Avaliações" page
-- Build UI for merging duplicate athlete profiles
-- Remove backup directory frontend/ios_backup_before_removal/
-- Extract RiskDonut component from team.tsx
+### P2 — Medio
+- Internacionalizacao completa do ScientificAnalysisTab e pagina "Avaliacoes"
+- Corrigir configuracao ESLint para TypeScript
 
-## Credentials
-- Coach: contato@loadmanagerpro.com.br / #UAE2026
-- App Review Token: APPS26
+### P3 — Baixo
+- UI para merge de perfis duplicados de atletas
+- Remover diretorio backup `frontend/ios_backup_before_removal/`
+
+## Arquivos Chave
+- `backend/server.py` — Endpoints principais (12000+ linhas)
+- `backend/load_engine/rolling_load_engine.py` — EWMA, ACWR, dedup GPS
+- `frontend/app/(tabs)/data.tsx` — Dashboard Overview
+- `frontend/app/(tabs)/team.tsx` — Team Dashboard
+- `frontend/app/athlete/[id].tsx` — Perfil do atleta
+
+## Colecoes MongoDB
+- `athletes`, `gps_data`, `athlete_load_metrics`, `wellness`, `jump_assessments`, `vbt_data`, `body_compositions`, `coaches`
