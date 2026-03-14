@@ -8576,6 +8576,24 @@ async def get_dashboard_overview(
         "date": {"$gte": ninety_days_ago_str}
     }).to_list(10000)
     
+    # EWMA load metrics from RollingLoadEngine (same source as Team Dashboard)
+    all_load_metrics = await db.athlete_load_metrics.find(
+        {"coach_id": user_id}
+    ).sort("date", -1).to_list(5000)
+    
+    # Index: latest per athlete + full history per athlete
+    load_metrics_latest: dict = {}
+    load_metrics_history: dict = {}
+    for m in all_load_metrics:
+        aid = m.get("athlete_id")
+        if not aid:
+            continue
+        if aid not in load_metrics_latest:
+            load_metrics_latest[aid] = m
+        if aid not in load_metrics_history:
+            load_metrics_history[aid] = []
+        load_metrics_history[aid].append(m)
+    
     all_wellness = await db.wellness.find({
         "coach_id": user_id
     }).sort("date", -1).to_list(2000)
@@ -8763,13 +8781,25 @@ async def get_dashboard_overview(
         gps_recs = gps_by_athlete.get(aid, [])
         daily_gps = build_daily_gps(gps_recs)
         
-        # ACWR (always total_distance)
-        acwr = calc_acwr(daily_gps)
-        monotony, strain = calc_monotony_strain(daily_gps)
+        # ACWR from EWMA (athlete_load_metrics) — same source as Team Dashboard
+        athlete_ewma = load_metrics_latest.get(aid)
+        if athlete_ewma:
+            ewma_distance = athlete_ewma.get("distance", {})
+            if isinstance(ewma_distance, dict) and ewma_distance.get("acwr") is not None:
+                acwr = ewma_distance["acwr"]
+            else:
+                acwr = None
+            acute_load = ewma_distance.get("ewma_acute", 0) if isinstance(ewma_distance, dict) else 0
+            chronic_load = ewma_distance.get("ewma_chronic", 0) if isinstance(ewma_distance, dict) else 0
+        else:
+            acwr = None
+            acute_load = 0
+            chronic_load = 0
         
-        # Acute/Chronic raw
-        acute_load = sum(daily_gps.get((today - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(7))
-        chronic_load = sum(daily_gps.get((today - timedelta(days=i)).strftime("%Y-%m-%d"), {}).get("total_distance", 0) for i in range(28))
+        monotony_val = athlete_ewma.get("monotony", 0) if athlete_ewma else 0
+        strain_val = athlete_ewma.get("strain", 0) if athlete_ewma else 0
+        monotony = monotony_val
+        strain = strain_val
         
         # Daily load timeline (for charts)
         daily_timeline = []
@@ -8797,13 +8827,15 @@ async def get_dashboard_overview(
                 week_data.append({"date": d_str, "dow": dow, "value": dist})
             weekly_heatmap.append({"week": w, "days": week_data})
         
-        # ACWR timeline (rolling)
+        # ACWR timeline from EWMA history (athlete_load_metrics)
         acwr_timeline = []
-        for i in range(min(filter_days, 60)):
-            ref = today - timedelta(days=filter_days - 1 - i)
-            a_val = calc_acwr(daily_gps, ref)
-            if a_val is not None:
-                acwr_timeline.append({"date": ref.strftime("%Y-%m-%d"), "acwr": a_val})
+        history = load_metrics_history.get(aid, [])
+        for m in reversed(history):  # oldest first
+            m_date = m.get("date", "")
+            if filter_start_str <= m_date <= today_str:
+                dist = m.get("distance", {})
+                if isinstance(dist, dict) and dist.get("acwr") is not None:
+                    acwr_timeline.append({"date": m_date, "acwr": dist["acwr"]})
         
         # Velocity zones distribution (aggregate over period)
         vz_total = {"hid": 0, "hsr": 0, "sprint": 0, "other": 0}
