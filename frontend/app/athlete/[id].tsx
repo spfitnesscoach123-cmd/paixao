@@ -823,62 +823,36 @@ export default function AthleteDetails() {
         <Text style={styles.athleteName}>{athlete.name}</Text>
       </View>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'info' && styles.activeTab]}
-          onPress={() => setActiveTab('info')}
-        >
-          <Ionicons 
-            name="information-circle" 
-            size={20} 
-            color={activeTab === 'info' ? '#2563eb' : '#9ca3af'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'info' && styles.activeTabText]}>{t('athletes.info')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'gps' && styles.activeTab]}
-          onPress={() => setActiveTab('gps')}
-        >
-          <Ionicons 
-            name="location" 
-            size={20} 
-            color={activeTab === 'gps' ? '#2563eb' : '#9ca3af'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'gps' && styles.activeTabText]}>{t('gps.title')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'wellness' && styles.activeTab]}
-          onPress={() => setActiveTab('wellness')}
-        >
-          <Ionicons 
-            name="fitness" 
-            size={20} 
-            color={activeTab === 'wellness' ? '#2563eb' : '#9ca3af'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'wellness' && styles.activeTabText]}>{t('wellness.wellness')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'assessments' && styles.activeTab]}
-          onPress={() => setActiveTab('assessments')}
-        >
-          <Ionicons 
-            name="barbell" 
-            size={20} 
-            color={activeTab === 'assessments' ? '#2563eb' : '#9ca3af'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'assessments' && styles.activeTabText]}>{t('athletes.assessments')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'analysis' && styles.activeTab]}
-          onPress={() => setActiveTab('analysis')}
-        >
-          <Ionicons 
-            name="analytics" 
-            size={20} 
-            color={activeTab === 'analysis' ? '#2563eb' : '#9ca3af'} 
-          />
-          <Text style={[styles.tabText, activeTab === 'analysis' && styles.activeTabText]}>{t('analysis.title')}</Text>
-        </TouchableOpacity>
+      <View style={styles.navGrid}>
+        {([
+          { key: 'info' as TabType, icon: 'information-circle', label: t('athletes.info') },
+          { key: 'gps' as TabType, icon: 'location', label: t('gps.title') },
+          { key: 'wellness' as TabType, icon: 'fitness', label: t('wellness.wellness') },
+          { key: 'assessments' as TabType, icon: 'barbell', label: t('athletes.assessments') },
+          { key: 'analysis' as TabType, icon: 'analytics', label: t('analysis.title') },
+        ]).map((item) => {
+          const isActive = activeTab === item.key;
+          return (
+            <TouchableOpacity
+              key={item.key}
+              style={[styles.navButton, isActive && styles.navButtonActive]}
+              onPress={() => setActiveTab(item.key)}
+              activeOpacity={0.7}
+              data-testid={`nav-btn-${item.key}`}
+            >
+              <View style={[styles.navIconWrap, isActive && styles.navIconWrapActive]}>
+                <Ionicons
+                  name={item.icon as any}
+                  size={22}
+                  color={isActive ? '#ffffff' : colors.accent.primary}
+                />
+              </View>
+              <Text style={[styles.navButtonText, isActive && styles.navButtonTextActive]}>
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <ScrollView
@@ -970,31 +944,58 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginTop: 12,
   },
-  tabBar: {
+  navGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 10,
     backgroundColor: colors.dark.secondary,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 212, 255, 0.2)',
+    borderBottomColor: 'rgba(139, 92, 246, 0.15)',
   },
-  tab: {
-    flex: 1,
+  navButton: {
+    width: '47%' as any,
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    borderRadius: 12,
     paddingVertical: 12,
-    gap: 4,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.2)',
+    gap: 10,
   },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.accent.primary,
+  navButtonActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.22)',
+    borderColor: colors.accent.primary,
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  tabText: {
-    fontSize: 12,
-    color: colors.text.tertiary,
+  navIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  navIconWrapActive: {
+    backgroundColor: colors.accent.primary,
+  },
+  navButtonText: {
+    fontSize: 13,
     fontWeight: '600',
+    color: colors.text.secondary,
+    flexShrink: 1,
   },
-  activeTabText: {
-    color: colors.accent.primary,
+  navButtonTextActive: {
+    color: colors.text.primary,
+    fontWeight: '700',
   },
   content: {
     flex: 1,

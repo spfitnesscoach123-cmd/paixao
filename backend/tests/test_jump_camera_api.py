@@ -17,7 +17,7 @@ import random
 import string
 
 # Use the public backend URL for testing
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://ratio-fix-1.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://acwr-fix-audit.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

@@ -17,7 +17,7 @@ import requests
 import os
 import re
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://ratio-fix-1.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://acwr-fix-audit.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"
