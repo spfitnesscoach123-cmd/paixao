@@ -1,59 +1,53 @@
 <analysis>**original_problem_statement:**
-The user has provided a series of sequential tasks:
-1.  **ACWR Calculation Audit & Fix:** A high-priority technical audit to investigate why the ACWR (Acute:Chronic Workload Ratio) metric on the Team Dashboard was consistently and incorrectly displaying a value of 4.0. The user provided a detailed 7-step audit plan to determine why the correct EWMA (Exponentially Weighted Moving Average) calculation was not being used. Following the audit, the user provided a 4-step plan to implement the fix.
-2.  **PDF Export Fixes:** A request to fix three specific issues with the PDF export functionality on the main Dashboard Overview page:
-    *   Graphs were missing from the exported PDF.
-    *   The PDF was being generated with the app's dark theme background instead of a print-friendly white one.
-    *   The export button was incorrectly opening a new browser tab instead of triggering the device's native share menu, which was the standard behavior elsewhere in the app.
-3.  **System Cleanup & UX Improvements (from previous forks):** A list of 8 specific tasks to remove redundant UI elements, add delete functionality for GPS activities and jump assessments, and fix inconsistencies in data representation.
-4.  **UI/UX Audit & Modernization (from previous forks):** A comprehensive audit and subsequent implementation to transform the static UI into a Modern Live Sports Analytics Platform using advanced animations and modern UI patterns.
+The user initiated a series of sequential tasks to improve the application:
+1.  **Athlete Profile UI Redesign:** A purely visual request to replace an unclear, grey, list-style navigation menu on the individual athlete profile page with a grid of modern, interactive, and clearly clickable buttons.
+2.  **Dashboard Date Filter Enhancement:** A feature request to add two new, high-priority options, Hoje (Today) and Ontem (Yesterday), to the global date filter on the Dashboard Overview page to allow for more granular daily analysis.
+3.  **ACWR Inconsistency Audit:** A detailed, 9-step technical audit to investigate and document why the ACWR (Acute:Chronic Workload Ratio) metric was inconsistent between the Team Dashboard and the Dashboard Overview pages.
+4.  **ACWR Alignment Fix:** Following the audit's confirmation that the two pages used different calculation pipelines (correct EWMA on Team Dashboard vs. incorrect inline Coupled ACWR on Overview), the user requested a high-priority fix to align the Dashboard Overview with the correct, centralized  pipeline.
+5.  **PDF Export Bug Fix:** A bug report stating that after recent changes, the PDF export on the Dashboard Overview page was incorrectly rendering all numerical values as , even though the on-screen data was correct. The request was to fix the data fidelity in the exported PDF.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The agent has successfully completed two major tasks in this session.
-First, it performed a deep technical audit on the ACWR calculation, discovering that an outdated, incorrect inline calculation was being used on the Team Dashboard instead of the correct, existing EWMA-based . Following the user's plan, the agent refactored the backend to pre-calculate all EWMA metrics on startup and store them in a new  collection. The Team Dashboard endpoint was updated to consume this pre-calculated data, resolving the bug.
-
-Second, the agent fixed all three user-reported issues with the Dashboard Overview's PDF export. The backend endpoint was rewritten to generate and embed SVG charts within the report's HTML and apply print-friendly CSS. The frontend was corrected to use the proper method to trigger the device's native share/download functionality without opening a new tab.
-
-Both fixes were validated by the testing agent.
+The agent successfully addressed and completed all user requests for this session.
+1.  **Athlete Profile Menu:** The old text menu in  was replaced with a modern, visually distinct grid of interactive buttons.
+2.  **Date Filter:** The Dashboard Overview page () and its corresponding backend endpoint () were updated to include and process Today and Yesterday date filters.
+3.  **ACWR Audit & Fix:** A thorough audit was conducted, and a report () was created. The fix was then implemented by refactoring the  function in  to source all ACWR and related load metrics directly from the  collection, removing the incorrect inline calculation and ensuring consistency across the app.
+4.  **PDF Export Fix:** The agent diagnosed and fixed the zero values bug in the PDF export. The root cause was an incorrect data mapping in the  endpoint. The agent rewrote the data extraction logic to use the correct keys from the API response and added safeguards to handle potential  values, ensuring the PDF accurately reflects the on-screen data.
 
 **Last working item**:
--   Last item agent was working: Correcting the PDF export functionality on the Dashboard Overview page (missing graphs, dark background, incorrect button behavior).
+-   Last item agent was working: Fixing the Dashboard Overview PDF export, which was rendering all numerical values as '0'.
 -   Status: USER VERIFICATION PENDING
 -   Agent Testing Done: Y
--   Which testing method agent to use? NA
+-   Which testing method agent to use? The testing agent should be run again, but with a specific focus on the frontend of the Dashboard Overview page (). The previous run passed backend tests but flagged a potential UI issue where values might still render as . A screenshot of the overview page after selecting a date range with data would also be valuable.
 -   User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: User verification pending for the ACWR Calculation Fix. (P0)
--   **Issue 2**: User verification pending for the Dashboard PDF Export fixes. (P0)
--   **Issue 3**: User verification pending for the major UI Modernization. (P1)
--   **Issue 4**: User verification pending for all features from previous forks (New Dashboard, Periodization, Jump Page, Camera, etc.). (P1)
--   **Issue 5**: PDF Generation in Análise Científica causes the app to freeze or crash. (P2)
--   **Issue 6**: Frontend dashboards do not use the new Rolling Load Engine for consistency. (P2)
--   **Issue 7**: Incorrect ESLint configuration for TypeScript. (P3)
+-   **Issue 1**: Potential Frontend Rendering Bug on Dashboard Overview. (P0)
+-   **Issue 2**: User verification pending for the PDF export fix. (P0)
+-   **Issue 3**: User verification pending for the ACWR alignment fix. (P0)
+-   **Issue 4**: User verification pending for the new Today / Yesterday date filter feature. (P0)
+-   **Issue 5**: User verification pending for the redesigned Athlete Profile navigation menu. (P0)
+-   **Issue 6**: PDF Generation in Análise Científica causes the app to freeze or crash. (P1)
+-   **Issue 7**: User verification pending for numerous features from previous forks (original ACWR fix, UI Modernization, New Dashboard, Periodization, etc.). (P1)
+-   **Issue 8**: Frontend dashboards (beyond the ACWR metric) do not use the new Rolling Load Engine for consistency. (P2)
+-   **Issue 9**: Incorrect ESLint configuration for TypeScript. (P3)
 
 **Issues Detail**:
--   **Issue 1: User verification pending for the ACWR Calculation Fix**
-    -   **Attempted fixes**: The agent identified the root cause (outdated inline calculation) and implemented a robust fix by populating an  collection on startup with correct EWMA values and refactoring the  endpoint to use this data. The fix was verified by the testing agent.
-    -   **Next debug checklist**: Await user feedback.
-    -   **Why fix this issue and what will be achieved with the fix?**: This was a critical bug fix. The ACWR is a core metric for the application.
-    -   **Status**: USER VERIFICATION PENDING
+-   **Issue 1: Potential Frontend Rendering Bug on Dashboard Overview**
+    -   **Attempted fixes**: None directly. This issue was discovered by the testing agent during validation of the backend PDF fix. The API now correctly returns data, but the frontend might not be displaying it.
+    -   **Next debug checklist**:
+        1.  Inspect the component rendering logic in .
+        2.  Check how the state is updated after the API call for .
+        3.  Look for incorrect fallbacks (e.g., ) or state initialization issues that might cause the UI to show  before the data is fully processed.
+        4.  Verify that the data structure returned by the API matches what the frontend components expect.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical UI bug. Even if the backend and PDF are correct, the user cannot see the live data on the main dashboard, making the feature unusable.
+    -   **Status**: NOT STARTED
     -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Both
+    -   **Should Test frontend/backend/both after fix?**: Frontend
     -   **Blocked on other issue**: None
 
--   **Issue 2: User verification pending for the Dashboard PDF Export fixes**
-    -   **Attempted fixes**: The agent rewrote the backend endpoint () to include SVG charts and print-friendly CSS. The frontend () was updated to use an iframe-based method to trigger the native share sheet. The fix was verified by the testing agent.
-    -   **Next debug checklist**: Await user feedback.
-    -   **Why fix this issue and what will be achieved with the fix?**: This improves a key reporting feature, making it consistent and functional.
-    -   **Status**: USER VERIFICATION PENDING
-    -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: Both
-    -   **Blocked on other issue**: None
-
--   **Issue 5: PDF generation crash in Análise Científica**
+-   **Issue 6: PDF generation crash in Análise Científica**
     -   **Attempted fixes**: None in this session. This is a known recurring issue from previous forks.
     -   **Next debug checklist**:
         1.  Analyze the backend endpoint  in .
@@ -66,109 +60,106 @@ Both fixes were validated by the testing agent.
     -   **Blocked on other issue**: None
 
 **In progress Task List**:
--   None. All tasks undertaken in this session are complete pending user verification.
+-   None.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks**:
-    *   **(P0)** Present all completed work (ACWR fix, PDF export fix, and previously completed features) to the user for verification.
+    *   **(P0)** Present all completed work from this session (Athlete Menu, Date Filter, ACWR Fix, PDF Fix) to the user for verification.
+    *   **(P0)** Investigate and fix the potential frontend rendering bug on the Dashboard Overview where metrics might show as .
     *   **(P1)** Address the recurring crash during PDF generation in Análise Científica.
-    *   **(P2)** Refactor other frontend dashboards to use the backend's Rolling Load Engine API for consistency.
+    *   **(P2)** Refactor other frontend dashboards to use the backend's Rolling Load Engine API for consistency across all metrics.
 *   **Future Tasks**:
-    *   Fix the incorrect ESLint configuration for TypeScript.
     *   Complete the internationalization of  and the Avaliações page.
+    *   Fix the incorrect ESLint configuration for TypeScript.
     *   Build a UI for merging duplicate athlete profiles.
     *   Remove the backup directory .
 
 **Completed work in this session**
--   **ACWR Calculation Fix (DONE - Pending User Verification)**:
-    -   Performed a complete technical audit as per the user's specification.
-    -   Refactored  to add a startup task that populates the  collection using the .
-    -   Updated the  endpoint to use the pre-calculated EWMA data, fixing the bug that showed ACWR as 4.0.
--   **Dashboard PDF Export Fixes (DONE - Pending User Verification)**:
-    -   Rewrote the  endpoint in  to generate and embed SVG charts and use a white background.
-    -   Corrected the export button behavior in  to use the native share sheet instead of opening a new tab.
+-   **Athlete Profile Menu Redesign (DONE - Pending User Verification)**: Replaced the navigation list with a styled, interactive button grid in .
+-   **Dashboard Date Filter Enhancement (DONE - Pending User Verification)**: Added Today and Yesterday options to the filter in  and updated the backend API in .
+-   **ACWR Alignment Fix (DONE - Pending User Verification)**: Refactored  to make the Dashboard Overview consume the correct EWMA ACWR data from , aligning it with the Team Dashboard. The obsolete  function was removed.
+-   **Dashboard PDF Export Fix (DONE - Pending User Verification)**: Corrected the data mapping logic in the  endpoint in , ensuring the exported PDF contains the correct numerical values instead of zeros.
 
 **Earlier issues found/mentioned but not fixed**
--   **VBT Rep Counting & Regressions**: A known issue from previous sessions that was not part of this workstream.
+-   **Frontend Rendering on Dashboard Overview**: As noted by the testing agent, the UI in  may be incorrectly displaying  for metrics, even though the API is returning correct data.
 
 **Known issue recurrence from previous fork**
--   **PDF generation crash**: A persistent issue in the Análise Científica section.
+-   **PDF generation crash**: A persistent stability issue in the Análise Científica section.
     -   **Recurrence count**: >3
     -   **Status**: NOT STARTED
 
 **Code Architecture**
-populate_all_athletes
+
 
 **Key Technical Concepts**
--   **Backend Refactoring & Data Pipelines**: Replaced a flawed, real-time calculation with a robust, pre-computed data pipeline. A new startup task now populates a dedicated MongoDB collection () with EWMA metrics, which is then consumed by API endpoints.
--   **Backend-Driven PDF/HTML Generation**: Generating complex HTML reports on the backend, including dynamically created SVG charts embedded as strings, and applying print-specific CSS for a clean output.
--   **Frontend File Handling**: Implementing the correct web pattern (using a hidden iframe) to trigger a file download/share action from a blob without navigating away from the page or opening a new tab.
--   **Systematic Debugging**: Following a detailed, multi-step user-provided audit plan to accurately diagnose a complex issue before attempting a fix.
+-   **UI/UX Refactoring**: Replacing a standard  component with a custom, dynamically styled grid of  components in React Native for better visual hierarchy and user experience.
+-   **Data Pipeline Unification**: A critical architectural improvement. An incorrect, localized inline calculation () was deprecated and removed. The consuming API endpoint () was refactored to use the centralized, pre-computed data pipeline ( collection), ensuring data consistency across the application.
+-   **Backend-Driven PDF Generation**: Debugged and fixed a complex issue where the server-side HTML rendering for a PDF was using outdated/incorrect data keys. The fix involved re-mapping the data structures within the Python backend to ensure the generated HTML received the correct, live data.
+-   **Systematic Technical Auditing**: Successfully executing a user-defined, multi-step audit to diagnose a data inconsistency bug, leading to a precise and effective fix.
 
 **key DB schema**
--   **athlete_load_metrics (NEW)**: This collection is now central to performance metrics. It stores pre-calculated EWMA metrics (acute load, chronic load, ACWR, etc.) for each athlete. It is populated on application startup and updated periodically.
+-   **athlete_load_metrics**: Confirmed as the single source of truth for historical, per-date EWMA metrics (ACWR, acute load, chronic load, monotony, strain) for each athlete. This collection is now consumed by both the Team Dashboard and the Dashboard Overview.
 
 **changes in tech stack**
 -   None.
 
 **All files of reference**
--   : Core logic for the ACWR and PDF fixes.
--   : Contains the  function.
--   : Contains the updated PDF export logic.
--   : Displays the corrected ACWR metric.
--   : The technical audit report created during this session.
--   : Test report for the ACWR fix.
--   : Test report for the PDF export fixes.
+-   : Major changes to  and  endpoints.
+-   : Redesigned the navigation menu.
+-   : Updated with new date filters; now suspected of having a rendering bug.
+-   : New audit report created in this session.
+-   : Test report for the ACWR alignment and PDF fixes.
 
 **Areas that need refactoring**:
--   The  component in  remains an inline functional component and should be extracted.
--   With the new  pipeline now feeding the Team Dashboard, other dashboards should be refactored to use the same data source for consistency.
+-   **Dashboard Overview Frontend**: The  component needs to be investigated for the potential rendering bug where it displays  instead of the correct API data.
+-   **Other Dashboards**: Other dashboards and components throughout the app should be audited and refactored to use the central  pipeline to ensure universal data consistency.
 
 **key api endpoints**
--   : **Refactored** to serve pre-calculated EWMA metrics from the  collection.
--   : **Rewritten** to generate an HTML report with embedded SVG charts and print-friendly styling.
+-   : **Refactored**. Now serves unified EWMA data from . Also supports new  parameters:  and .
+-   : **Rewritten**. The data mapping logic was completely fixed to use the correct keys from the  response, solving the all zeros bug.
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   Your immediate priority is to communicate the recent fixes to the user and request verification. A significant amount of work (ACWR fix, PDF fix, plus major features from previous forks) is awaiting user approval.
--   The new pattern for calculating and serving performance metrics is to use the  to populate the  collection on startup. Future features or dashboards should consume data from this collection for consistency and performance, rather than performing inline calculations.
--   After getting user feedback, the next highest priority technical task is investigating the recurring crash in the Análise Científica PDF export feature.
+-   Your immediate priority is to present the substantial body of completed work to the user and request verification.
+-   The next critical task is to investigate the **potential frontend bug** on the Dashboard Overview (). The testing agent report indicated that although the API and PDF are now correct, the main UI might still be showing  for key metrics. Confirm this with a screenshot and fix it.
+-   The architectural pattern is now clear:  is the single source of truth for load metrics. All future work must adhere to this.
+-   The recurring crash in the Análise Científica PDF export remains a high-priority unresolved issue to be addressed after the current work is verified.
 
 **documents and test reports created in this job**
 -   
 -    (Updated)
 -   
--   
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Provided a detailed 7-step technical audit plan to investigate the incorrect ACWR calculation. (Status: COMPLETED)
-2.  **Agent**: Executed the audit, generated a report, and presented the findings. (Status: COMPLETED)
-3.  **User**: Approved the audit findings and provided a 4-step plan to fix the ACWR calculation. (Status: COMPLETED)
-4.  **Agent**: Implemented the fix plan, verified it with tests, and finished the task. (Status: COMPLETED)
-5.  **User**: Submitted a new request to fix three issues with the Dashboard Overview PDF export (missing graphs, dark background, incorrect button behavior). (Status: COMPLETED)
-6.  **Agent**: Investigated the PDF issues by comparing the broken implementation with a working one elsewhere in the app. (Status: COMPLETED)
-7.  **Agent**: Implemented the fixes on both the backend (HTML generation) and frontend (button logic). (Status: COMPLETED)
-8.  **Agent**: Verified the PDF fixes with the testing agent and finished the task. (Status: COMPLETED)
+1.  **User**: Requested a visual redesign of the athlete profile navigation menu. (Status: COMPLETED)
+2.  **User**: Requested adding Today and Yesterday date filters to the Dashboard Overview. (Status: COMPLETED)
+3.  **User**: Requested a detailed technical audit to find the source of ACWR inconsistency. (Status: COMPLETED)
+4.  **Agent**: Presented the audit findings, confirming the data pipeline discrepancy. (Status: COMPLETED)
+5.  **User**: Approved the audit and requested a high-priority fix to align the ACWR metric. (Status: COMPLETED)
+6.  **Agent**: Implemented the ACWR alignment fix on the backend. (Status: COMPLETED)
+7.  **User**: Reported a new bug: the Dashboard Overview PDF export shows all numerical values as '0'. (Status: COMPLETED)
+8.  **Agent**: Investigated and fixed the PDF export bug on the backend. (Status: COMPLETED)
+9.  **Agent**: Ran the testing agent, which passed backend tests but flagged a potential frontend rendering issue. (Status: COMPLETED, new issue flagged)
+10. **Agent**: Finished the job after updating the PRD.
 
 **Project Health Check:**
 -   **Broken**: PDF generation in Análise Científica is known to cause crashes.
--   **Mocked**: None.
--   **User Verification Pending**: ACWR Calculation Fix, Dashboard PDF Export Fixes, UI Modernization, and several major features from previous forks.
+-   **Potentially Broken**: The frontend of the Dashboard Overview may have a rendering bug causing metrics to display as .
+-   **User Verification Pending**: Athlete Profile Menu Redesign, Dashboard Date Filter Enhancement, ACWR Alignment Fix, PDF Export Fix, and all major features from previous forks.
 
 **3rd Party Integrations**
--   No new integrations were added. The existing stack includes Railway, MongoDB Atlas, EAS, , , and .
+-   No new integrations were added. The existing stack is unchanged.
 
 **Testing status**
--   **Testing agent used after significant changes**: YES. The agent was used twice: once to verify the ACWR fix (15/15 tests passed) and once to verify the PDF export fixes (16/16 tests passed).
+-   **Testing agent used after significant changes**: YES. The agent verified the ACWR alignment and PDF export fixes. All 17 tests passed, but it flagged a potential frontend issue.
 -   **Troubleshoot agent used after agent stuck in loop**: NO
 -   **Test files created**:
     -   
-    -   
--   **Known regressions**: None.
+-   **Known regressions**: None from the work performed, but a new potential frontend bug was identified.
 
 **Credentials to test flow:**
 -   **Coach (PRO Override)**:  / 
 -   **App Review Token**: 
 
 **What agent forgot to execute**
--   The agent was highly effective and followed all user instructions precisely. No tasks or steps were forgotten.</analysis>
+-   The agent did not forget to execute any requested tasks. However, it did not investigate the frontend rendering issue flagged by the testing agent before finishing. This should be the next immediate priority.</analysis>
