@@ -8928,26 +8928,29 @@ async def get_dashboard_overview(
         # GPS daily
         gps_recs = gps_by_athlete.get(aid, [])
         daily_gps = build_daily_gps(gps_recs)
+        has_gps_data = len(gps_recs) > 0
         
-        # ACWR from EWMA (athlete_load_metrics) — same source as Team Dashboard
-        athlete_ewma = load_metrics_latest.get(aid)
-        if athlete_ewma:
-            ewma_distance = athlete_ewma.get("distance", {})
-            if isinstance(ewma_distance, dict) and ewma_distance.get("acwr") is not None:
-                acwr = ewma_distance["acwr"]
+        # ACWR from EWMA (athlete_load_metrics) — ONLY when GPS data exists
+        # This matches Team Dashboard logic: no GPS data = no load metrics shown
+        acwr = None
+        acute_load = None
+        chronic_load = None
+        monotony = None
+        strain = None
+        
+        if has_gps_data:
+            athlete_ewma = load_metrics_latest.get(aid)
+            if athlete_ewma:
+                ewma_distance = athlete_ewma.get("distance", {})
+                if isinstance(ewma_distance, dict) and ewma_distance.get("acwr") is not None:
+                    acwr = ewma_distance["acwr"]
+                acute_load = ewma_distance.get("ewma_acute", 0) if isinstance(ewma_distance, dict) else 0
+                chronic_load = ewma_distance.get("ewma_chronic", 0) if isinstance(ewma_distance, dict) else 0
+                monotony = athlete_ewma.get("monotony") or None
+                strain = athlete_ewma.get("strain") or None
             else:
-                acwr = None
-            acute_load = ewma_distance.get("ewma_acute", 0) if isinstance(ewma_distance, dict) else 0
-            chronic_load = ewma_distance.get("ewma_chronic", 0) if isinstance(ewma_distance, dict) else 0
-        else:
-            acwr = None
-            acute_load = 0
-            chronic_load = 0
-        
-        monotony_val = athlete_ewma.get("monotony", 0) if athlete_ewma else 0
-        strain_val = athlete_ewma.get("strain", 0) if athlete_ewma else 0
-        monotony = monotony_val
-        strain = strain_val
+                acute_load = 0
+                chronic_load = 0
         
         # Daily load timeline (for charts)
         daily_timeline = []
@@ -9149,8 +9152,11 @@ async def get_dashboard_overview(
                 "lean_mass_kg": bc.get("lean_mass_kg")
             }
         
-        # LMPI
-        lmpi = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
+        # LMPI — only compute when athlete has GPS/load data (consistent with Team Dashboard)
+        if has_gps_data:
+            lmpi = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
+        else:
+            lmpi = None
         
         # Risk classification
         risk_level = "unknown"
@@ -9161,15 +9167,15 @@ async def get_dashboard_overview(
             else: risk_level = "high"
         
         # Risk score (composite)
-        risk_score = 100 - lmpi  # inverse of performance
+        risk_score = (100 - lmpi) if lmpi is not None else 0
         
         athlete_results.append({
             "id": aid,
             "name": name,
             "position": pos,
             "acwr": acwr,
-            "acute_load": round(acute_load),
-            "chronic_load": round(chronic_load),
+            "acute_load": round(acute_load) if acute_load is not None else None,
+            "chronic_load": round(chronic_load) if chronic_load is not None else None,
             "monotony": monotony,
             "strain": strain,
             "wellness_score": wellness_score,
@@ -9189,7 +9195,8 @@ async def get_dashboard_overview(
             "daily_timeline": daily_timeline,
             "acwr_timeline": acwr_timeline,
             "velocity_zones": velocity_zones,
-            "weekly_heatmap": weekly_heatmap
+            "weekly_heatmap": weekly_heatmap,
+            "has_gps_data": has_gps_data
         })
     
     # ============ AGGREGATION ============
@@ -9199,15 +9206,20 @@ async def get_dashboard_overview(
         filtered = [v for v in vals if v is not None]
         return round(sum(filtered) / len(filtered), 2) if filtered else None
     
-    team_acwr = safe_avg([a["acwr"] for a in athlete_results])
+    # Load-related team averages: only from athletes WITH GPS data (matches Team Dashboard)
+    gps_athletes = [a for a in athlete_results if a.get("has_gps_data")]
+    
+    team_acwr = safe_avg([a["acwr"] for a in gps_athletes])
+    team_monotony = safe_avg([a["monotony"] for a in gps_athletes])
+    team_strain = safe_avg([a["strain"] for a in gps_athletes])
+    team_lmpi = safe_avg([a["lmpi"] for a in gps_athletes])
+    team_acute = safe_avg([a["acute_load"] for a in gps_athletes])
+    team_chronic = safe_avg([a["chronic_load"] for a in gps_athletes])
+    team_rsimod = safe_avg([a["rsimod"] for a in gps_athletes])
+    
+    # Wellness/readiness: from ALL athletes (not gated by GPS, same as Team Dashboard)
     team_wellness = safe_avg([a["wellness_score"] for a in athlete_results])
     team_readiness = safe_avg([a["readiness_score"] for a in athlete_results])
-    team_rsimod = safe_avg([a["rsimod"] for a in athlete_results])
-    team_monotony = safe_avg([a["monotony"] for a in athlete_results])
-    team_strain = safe_avg([a["strain"] for a in athlete_results])
-    team_lmpi = safe_avg([a["lmpi"] for a in athlete_results])
-    team_acute = safe_avg([a["acute_load"] for a in athlete_results])
-    team_chronic = safe_avg([a["chronic_load"] for a in athlete_results])
     
     # Aggregated daily timeline (team/position average)
     agg_timeline = []
