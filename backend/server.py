@@ -8532,13 +8532,21 @@ async def get_dashboard_overview(
     user_id = current_user["_id"]
     
     # Parse date range
-    date_range_map = {"7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    date_range_map = {"today": 0, "yesterday": 1, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
     filter_days = date_range_map.get(date_range, 28)
     
     today = datetime.utcnow()
     today_str = today.strftime("%Y-%m-%d")
-    filter_start = today - timedelta(days=filter_days)
-    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    
+    # For "yesterday", shift both start and end to yesterday
+    if date_range == "yesterday":
+        yesterday = today - timedelta(days=1)
+        filter_start = yesterday
+        filter_start_str = yesterday.strftime("%Y-%m-%d")
+        today_str = yesterday.strftime("%Y-%m-%d")
+    else:
+        filter_start = today - timedelta(days=filter_days)
+        filter_start_str = filter_start.strftime("%Y-%m-%d")
     ninety_days_ago_str = (today - timedelta(days=90)).strftime("%Y-%m-%d")
     seven_days_ago = today - timedelta(days=7)
     twentyeight_days_ago = today - timedelta(days=28)

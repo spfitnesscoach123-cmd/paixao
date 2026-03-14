@@ -27,6 +27,8 @@ const LAYERS = [
 ];
 
 const DATE_RANGES = [
+  { key: 'today', labelPt: 'Hoje', labelEn: 'Today' },
+  { key: 'yesterday', labelPt: 'Ontem', labelEn: 'Yesterday' },
   { key: '7d', labelPt: '7 dias', labelEn: '7 days' },
   { key: '14d', labelPt: '14 dias', labelEn: '14 days' },
   { key: '28d', labelPt: '28 dias', labelEn: '28 days' },

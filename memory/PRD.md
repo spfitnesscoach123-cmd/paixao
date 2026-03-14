@@ -26,6 +26,13 @@ Sports performance management app for coaches to track athletes' GPS data, welln
 
 ## Recent Changes
 
+### 2026-03-14: Dashboard Overview - New Date Filter Options
+- Added "Hoje/Today" and "Ontem/Yesterday" to the global date range selector
+- Frontend: Updated DATE_RANGES array in data.tsx with new options at the top
+- Backend: Added "today" (0 days) and "yesterday" (1 day) to date_range_map in /api/dashboard/overview
+- All layers (Load Intelligence, Smart Summary, Team Status, Neuromuscular, Risk Intelligence) respect the new filters
+- Order: Today > Yesterday > 7d > 14d > 28d > 90d
+
 ### 2026-03-14: Athlete Profile Navigation Menu Redesign
 - Replaced horizontal tab bar with grid-style navigation buttons
 - 5 buttons (Info, GPS Data, Wellness, Assessments, Analysis) in 2-column grid
