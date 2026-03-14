@@ -1,0 +1,99 @@
+{
+  "summary": "PDF Export Dashboard Overview Fix Testing Complete - All 17 tests PASSED. PDF endpoint now correctly reads from actual response keys (summary, athletes, aggregated_timeline) instead of non-existent keys. ACWR is aligned to use EWMA from athlete_load_metrics collection.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "/api/report/dashboard-overview",
+        "issue": "Fixed NoneType format error - when acwr/wellness was None, the .2f format string caused TypeError",
+        "priority": "LOW",
+        "status": "FIXED"
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "Dashboard Overview data display",
+        "issue": "Frontend shows 0.0 values for all metrics (ACWR, Acute, Chronic, etc.) despite API returning correct data (ACWR=1, Acute=3500). This appears to be a pre-existing frontend data mapping/rendering issue - NOT related to the current PDF fix.",
+        "affected_selectors": ["Dashboard Overview page metrics"],
+        "priority": "INFO - Out of scope for PDF fix testing"
+      }
+    ],
+    "design_issues": []
+  },
+  "test_results": {
+    "test_pdf_endpoint_returns_200_not_500": "PASS - PDF endpoint returns HTTP 200 with valid HTML",
+    "test_pdf_contains_correct_acwr_value": "PASS - PDF contains ACWR value 1.00",
+    "test_pdf_contains_acute_chronic_values": "PASS - PDF contains 3,500 for Acute/Chronic",
+    "test_pdf_contains_monotony_strain_lmpi": "PASS - PDF contains Monotony, Strain, LMPI labels",
+    "test_pdf_contains_all_5_sections": "PASS - All 5 sections rendered",
+    "test_pdf_has_svg_acwr_gauge": "PASS - SVG gauge with circles and stroke-dasharray present",
+    "test_pdf_has_white_background": "PASS - Background #ffffff, no dark theme colors",
+    "test_date_range_filters": "PASS - All 6 date ranges (today, yesterday, 7d, 14d, 28d, 90d) return HTTP 200",
+    "test_dashboard_overview_acwr_matches_team_dashboard": "PASS - Both endpoints return team ACWR = 1",
+    "test_athlete_level_acwr_consistency": "PASS - João Silva: acwr=1, Maria/Pedro: acwr=null (consistent)",
+    "test_pdf_reads_from_summary_key": "PASS - Response has summary, athletes, aggregated_timeline keys",
+    "test_pdf_contains_velocity_zones": "PASS - Velocity zones (Low Int, HID Z3, HSR Z4, Sprint Z5) present"
+  },
+  "fixes_applied": {
+    "main_fix_pdf_data_mapping": {
+      "status": "VERIFIED",
+      "description": "PDF endpoint was reading from non-existent keys (load_intelligence, smart_summary, team_status, neuromuscular, risk_intelligence). Now correctly reads from actual response keys (summary, athletes, aggregated_timeline).",
+      "location": "server.py lines 9191-9291 (get_dashboard_overview_pdf function)"
+    },
+    "acwr_ewma_alignment": {
+      "status": "VERIFIED",
+      "description": "Dashboard Overview now uses EWMA ACWR from athlete_load_metrics collection (same source as Team Dashboard)",
+      "location": "server.py lines 8579-8595 (get_dashboard_overview function)"
+    },
+    "minor_fix_nonetype_format": {
+      "status": "FIXED (this session)",
+      "description": "Fixed TypeError when acwr/wellness values are None - added safe_format helper function",
+      "location": "server.py line 9505-9512"
+    }
+  },
+  "api_verification": {
+    "GET /api/dashboard/overview": {
+      "status": "200 OK",
+      "team_acwr": 1,
+      "team_acute_load": 3500,
+      "team_chronic_load": 3500,
+      "team_monotony": 0.13,
+      "team_strain": 1330,
+      "team_lmpi": 40.97
+    },
+    "GET /api/dashboard/team": {
+      "status": "200 OK",
+      "stats.team_avg_acwr": 1
+    },
+    "GET /api/report/dashboard-overview": {
+      "status": "200 OK",
+      "content_type": "text/html",
+      "acwr_in_html": "1.00",
+      "acute_in_html": "3,500",
+      "chronic_in_html": "3,500"
+    }
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_pdf_export_v2.py",
+    "/app/test_reports/pytest/pytest_pdf_export_v2.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Frontend Dashboard Overview page shows 0.0 for all metrics despite API returning correct values - this is a pre-existing frontend issue unrelated to the PDF fix"
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_pdf_export_v2.py",
+    "/app/backend/server.py (fixed NoneType format error in risk_panel)"
+  ],
+  "success_rate": {
+    "backend": "100% (17/17 tests passed)",
+    "frontend": "Page loads correctly, PDF button visible and clickable"
+  },
+  "seed_data_creation": "None - used existing test account and João Silva's GPS data",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "PDF export endpoint GET /api/report/dashboard-overview is fully working. Key fixes verified: (1) Data mapping now reads from correct keys (summary, athletes, aggregated_timeline), (2) ACWR uses EWMA from athlete_load_metrics. Note: Frontend Dashboard Overview shows 0.0 values despite correct API data - this is a separate frontend rendering issue."
+}

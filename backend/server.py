@@ -9188,11 +9188,107 @@ async def get_dashboard_overview_pdf(
     mode = overview.get("mode", "team")
     mode_label = {"team": "Equipe" if is_pt else "Team", "position": "Posicao" if is_pt else "Position", "athlete": "Atleta" if is_pt else "Athlete"}.get(mode, mode)
     
-    load_data = overview.get("load_intelligence", {})
-    summary_data = overview.get("smart_summary", {})
-    status_data = overview.get("team_status", {})
-    neuro_data = overview.get("neuromuscular", {})
-    risk_data = overview.get("risk_intelligence", {})
+    # ── Map actual response data to PDF sections ──
+    summary = overview.get("summary", {})
+    athletes_list = overview.get("athletes", [])
+    agg_timeline = overview.get("aggregated_timeline", [])
+    
+    # Build load_data from summary + athletes + aggregated_timeline
+    # Velocity zones: average across athletes
+    vz_agg = {"low_intensity": 0, "hid_z3": 0, "hsr_z4": 0, "sprint_z5": 0}
+    vz_count = 0
+    for a in athletes_list:
+        vz = a.get("velocity_zones", {})
+        if vz:
+            vz_agg["low_intensity"] += vz.get("low_intensity", 0)
+            vz_agg["hid_z3"] += vz.get("hid_z3", 0)
+            vz_agg["hsr_z4"] += vz.get("hsr_z4", 0)
+            vz_agg["sprint_z5"] += vz.get("sprint_z5", 0)
+            vz_count += 1
+    if vz_count > 1:
+        for k in vz_agg:
+            vz_agg[k] = round(vz_agg[k] / vz_count)
+    
+    load_data = {
+        "acwr": summary.get("team_acwr"),
+        "acute_load": summary.get("team_acute_load"),
+        "chronic_load": summary.get("team_chronic_load"),
+        "monotony": summary.get("team_monotony"),
+        "strain": summary.get("team_strain"),
+        "velocity_zones": vz_agg,
+        "distance_timeline": [{"date": d.get("date", ""), "distance": d.get("total_distance", 0)} for d in agg_timeline],
+    }
+    
+    # Build summary_data from summary + athletes
+    high_risk_athletes = [a for a in athletes_list if a.get("risk_level") == "high"]
+    total = summary.get("total_athletes", len(athletes_list))
+    avail_count = summary.get("available", total)
+    
+    summary_data = {
+        "lmpi": {"score": summary.get("team_lmpi") or 0},
+        "availability": {"available_pct": round(avail_count / total * 100) if total else 0},
+        "high_risk_athletes": [{"name": a.get("name"), "lmpi": a.get("lmpi", 0), "acwr": a.get("acwr", 0)} for a in high_risk_athletes],
+        "performance_profile": {
+            "load": min(100, round((summary.get("team_acwr") or 0) / 1.3 * 100)),
+            "wellness": round((summary.get("team_wellness") or 0) * 10),
+            "neuromuscular": round((summary.get("team_rsimod") or 0) * 100) if summary.get("team_rsimod") else 0,
+            "power": 0,
+        }
+    }
+    
+    # Build status_data from athletes' wellness
+    w_sleep, w_fatigue, w_soreness, w_stress, w_count = 0, 0, 0, 0, 0
+    low_readiness_list = []
+    for a in athletes_list:
+        wd = a.get("wellness_details", {})
+        ws = a.get("wellness_score")
+        if ws is not None:
+            w_sleep += wd.get("sleep", 5)
+            w_fatigue += wd.get("fatigue", 5)
+            w_soreness += wd.get("soreness", 5)
+            w_stress += wd.get("stress", 5)
+            w_count += 1
+            readiness = ws * 10
+            if readiness < 60:
+                low_readiness_list.append({"name": a.get("name"), "readiness": readiness, "wellness": ws})
+    
+    team_wellness_score = (summary.get("team_wellness") or 0)
+    status_data = {
+        "readiness": {"score": round(team_wellness_score * 10)},
+        "wellness_avg": {
+            "sleep": round(w_sleep / w_count, 1) if w_count else 0,
+            "fatigue": round(w_fatigue / w_count, 1) if w_count else 0,
+            "soreness": round(w_soreness / w_count, 1) if w_count else 0,
+            "stress": round(w_stress / w_count, 1) if w_count else 0,
+        },
+        "low_readiness_athletes": low_readiness_list,
+    }
+    
+    # Build neuro_data from athletes' jump metrics
+    rsimod_vals = [a.get("rsimod") for a in athletes_list if a.get("rsimod") is not None]
+    fi_vals = [a.get("jump_metrics", {}).get("fatigue_index") for a in athletes_list if a.get("jump_metrics", {}).get("fatigue_index") is not None]
+    team_rsimod = round(sum(rsimod_vals) / len(rsimod_vals), 3) if rsimod_vals else 0
+    team_fi = round(sum(fi_vals) / len(fi_vals), 1) if fi_vals else 0
+    neuro_score_val = round(50 + (team_rsimod * 50) + (team_fi * 0.5)) if rsimod_vals else 0
+    
+    neuro_data = {
+        "neuro_score": {"score": min(100, max(0, neuro_score_val))},
+        "rsimod": {"value": team_rsimod},
+        "fatigue_index": team_fi,
+    }
+    
+    # Build risk_data from athletes
+    risk_scores = [a.get("risk_score", 50) for a in athletes_list if a.get("risk_level") != "unknown"]
+    team_risk_score = round(sum(risk_scores) / len(risk_scores)) if risk_scores else 0
+    risk_panel = sorted(
+        [{"name": a.get("name"), "risk_score": a.get("risk_score") or 0, "acwr": a.get("acwr") or 0, "wellness": a.get("wellness_score") or 0} for a in athletes_list],
+        key=lambda x: x["risk_score"], reverse=True
+    )
+    
+    risk_data = {
+        "risk_score": {"score": team_risk_score},
+        "risk_panel": risk_panel,
+    }
     
     # ── SVG chart helpers ──
     def make_line_chart_svg(values, dates_list, color, title, unit, w=500, h=140):
@@ -9408,7 +9504,12 @@ async def get_dashboard_overview_pdf(
         
         panel_html = ""
         if risk_panel:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{"#10b981" if a.get("risk_score",0)<30 else "#f59e0b" if a.get("risk_score",0)<60 else "#ef4444"}">{a.get("risk_score",0):.0f}</td><td>{a.get("acwr",0):.2f}</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in risk_panel[:15]])
+            # Handle None values for acwr and wellness safely
+            def safe_format(val, fmt):
+                if val is None:
+                    return "-"
+                return f"{val:{fmt}}"
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{"#10b981" if (a.get("risk_score") or 0)<30 else "#f59e0b" if (a.get("risk_score") or 0)<60 else "#ef4444"}">{safe_format(a.get("risk_score"), ".0f")}</td><td>{safe_format(a.get("acwr"), ".2f")}</td><td>{safe_format(a.get("wellness"), ".0f")}</td></tr>' for a in risk_panel[:15]])
             panel_html = f'<div class="chart-title">{"Painel de Risco" if is_pt else "Risk Panel"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Risk</th><th>ACWR</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
         
         sections_html += f'''<div class="section">
