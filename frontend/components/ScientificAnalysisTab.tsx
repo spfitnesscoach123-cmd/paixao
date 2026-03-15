@@ -469,7 +469,8 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 const PROTO_OPTS = [
   { id: 'cmj', label: 'CMJ' },
   { id: 'sl_cmj', label: 'SL-CMJ' },
-  { id: 'dj', label: 'DJ' },
+  // DJ hidden from UI — code preserved for future reactivation
+  // { id: 'dj', label: 'DJ' },
 ];
 
 const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale: string }) => {

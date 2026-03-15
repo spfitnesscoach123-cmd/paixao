@@ -38,7 +38,8 @@ interface ProtocolOption {
 const PROTOCOLS: ProtocolOption[] = [
   { id: 'cmj', label: 'CMJ', labelPt: 'CMJ', icon: 'trending-up' },
   { id: 'sl_cmj', label: 'SL-CMJ', labelPt: 'SL-CMJ', icon: 'footsteps' },
-  { id: 'dj', label: 'DJ', labelPt: 'DJ', icon: 'arrow-down' },
+  // DJ protocol hidden from UI — code preserved for future reactivation
+  // { id: 'dj', label: 'DJ', labelPt: 'DJ', icon: 'arrow-down' },
 ];
 
 // ---- Animated Number Component ----
@@ -708,70 +709,7 @@ function JumpAssessmentContent() {
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Manual Entry Toggle */}
-        <TouchableOpacity
-          style={s.manualToggle}
-          onPress={() => setShowManualEntry(!showManualEntry)}
-          data-testid="manual-entry-toggle"
-        >
-          <Ionicons name={showManualEntry ? 'chevron-up' : 'create-outline'} size={18} color={colors.text.secondary} />
-          <Text style={s.manualToggleText}>{locale === 'pt' ? 'Avaliacao Manual' : 'Manual Assessment'}</Text>
-        </TouchableOpacity>
-
-        {/* Manual Entry Form (hidden by default) */}
-        {showManualEntry && (
-          <View style={s.formCard}>
-            <View style={s.row}>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <Text style={s.inputLabel}>{locale === 'pt' ? 'Tempo de Voo (ms)' : 'Flight Time (ms)'}</Text>
-                <TextInput style={s.input} value={flightTime} onChangeText={setFlightTime} placeholder="372" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" data-testid="flight-time-input" />
-              </View>
-              <View style={[s.inputGroup, { flex: 1, marginLeft: 10 }]}>
-                <Text style={s.inputLabel}>{selectedProtocol === 'dj' ? (locale === 'pt' ? 'Tempo Contato (ms)' : 'Contact Time (ms)') : (locale === 'pt' ? 'Time-to-Takeoff (ms)' : 'Time-to-Takeoff (ms)')}</Text>
-                <TextInput
-                  style={s.input}
-                  value={selectedProtocol === 'dj' ? contactTime : timeToTakeoff}
-                  onChangeText={selectedProtocol === 'dj' ? setContactTime : setTimeToTakeoff}
-                  placeholder={selectedProtocol === 'dj' ? '250' : '600'}
-                  placeholderTextColor={colors.text.tertiary}
-                  keyboardType="decimal-pad"
-                  data-testid="contact-time-input"
-                />
-              </View>
-            </View>
-            <View style={s.row}>
-              <View style={[s.inputGroup, { flex: 1 }]}>
-                <Text style={s.inputLabel}>{locale === 'pt' ? 'Altura (cm) - Opcional' : 'Height (cm) - Optional'}</Text>
-                <TextInput style={s.input} value={jumpHeight} onChangeText={setJumpHeight} placeholder="auto" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" />
-              </View>
-              {selectedProtocol === 'dj' && (
-                <View style={[s.inputGroup, { flex: 1, marginLeft: 10 }]}>
-                  <Text style={s.inputLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
-                  <TextInput style={s.input} value={boxHeight} onChangeText={setBoxHeight} placeholder="40" placeholderTextColor={colors.text.tertiary} keyboardType="decimal-pad" data-testid="box-height-input" />
-                </View>
-              )}
-            </View>
-            <View style={s.inputGroup}>
-              <Text style={s.inputLabel}>{locale === 'pt' ? 'Data' : 'Date'}</Text>
-              <TextInput style={s.input} value={date} onChangeText={setDate} placeholder="YYYY-MM-DD" placeholderTextColor={colors.text.tertiary} />
-            </View>
-            <TouchableOpacity
-              style={[s.submitBtn, submitMutation.isPending && { opacity: 0.5 }]}
-              onPress={handleSubmit}
-              disabled={submitMutation.isPending}
-              data-testid="submit-button"
-            >
-              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={s.submitBtnGrad}>
-                {submitMutation.isPending ? <ActivityIndicator color="#fff" /> : (
-                  <>
-                    <Ionicons name="save" size={18} color="#fff" />
-                    <Text style={s.submitBtnText}>{locale === 'pt' ? 'Salvar' : 'Save'}</Text>
-                  </>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        )}
+        {/* Manual entry removed — Camera Jump is the only input method */}
 
         {/* Loading */}
         {isLoading && (

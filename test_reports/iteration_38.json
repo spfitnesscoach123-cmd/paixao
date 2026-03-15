@@ -1,0 +1,82 @@
+{
+  "summary": "UI changes testing: DJ protocol hidden from Jump Assessment, Jump Camera, and Scientific Analysis. Manual entry removed from Jump Assessment. All UI changes verified working correctly. Backend unchanged, DJ code preserved for future reactivation.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {
+        "screen": "Jump Assessment empty state",
+        "issues": ["Empty state text says 'Use Jump Camera or add manually' - should be updated to only mention Camera Jump since manual entry was removed"]
+      }
+    ]
+  },
+  "test_scenarios": {
+    "SCENARIO_1_Jump_Assessment": {
+      "status": "PASS",
+      "details": "DJ tab NOT visible, only CMJ and SL-CMJ tabs present. Manual entry toggle NOT visible. Jump Camera button present and accessible."
+    },
+    "SCENARIO_2_Scientific_Analysis": {
+      "status": "PASS",
+      "details": "DJ NOT visible in protocol filters. CMJ and SL-CMJ continue working normally. PROTO_OPTS in code confirmed to exclude DJ."
+    },
+    "SCENARIO_3_Jump_Camera": {
+      "status": "PASS",
+      "details": "DJ NOT visible in protocol modal. Only Counter Movement Jump and Single Leg CMJ options shown. Protocol map changed from ['cmj','sl_cmj','dj'] to ['cmj','sl_cmj']."
+    },
+    "SCENARIO_4_Backend": {
+      "status": "NOT_CHANGED",
+      "details": "Backend unchanged. APIs still exist for all protocols including DJ. UI simply hides DJ option."
+    },
+    "SCENARIO_5_Code_Preserved": {
+      "status": "PASS",
+      "details": "DJ code preserved: types.ts line 241+ contains DJ definition in JUMP_PROTOCOL_INFO. JumpAnalysisCharts.tsx has 18 references to DJ for fallback logic."
+    }
+  },
+  "code_verification": {
+    "jump_assessment_tsx": {
+      "line": "38-43",
+      "status": "DJ commented out from PROTOCOLS array"
+    },
+    "jump_assessment_manual_entry": {
+      "line": "712",
+      "status": "Manual entry removed with comment: 'Manual entry removed — Camera Jump is the only input method'"
+    },
+    "jump_camera_tsx": {
+      "line": "842",
+      "status": "Protocol map changed to ['cmj', 'sl_cmj'] - DJ removed"
+    },
+    "scientific_analysis_tab_tsx": {
+      "line": "469-474",
+      "status": "DJ commented out from PROTO_OPTS"
+    },
+    "types_ts": {
+      "line": "241-249",
+      "status": "DJ entry PRESERVED in JUMP_PROTOCOL_INFO"
+    },
+    "jump_analysis_charts_tsx": {
+      "status": "DJ fallback logic PRESERVED (18 references to dj)"
+    }
+  },
+  "test_report_links": [],
+  "action_items": [
+    "MINOR: Update empty state text in Jump Assessment from 'Use Jump Camera or add manually' to just 'Use Jump Camera'"
+  ],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "N/A - no changes",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "email": "contato@loadmanagerpro.com.br",
+    "password": "#UAE2026"
+  },
+  "seed_data_creation": "None - used existing athletes (João Silva, Maria Santos, Pedro Costa)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "UI-only changes completed. DJ protocol hidden from 3 screens (Jump Assessment, Jump Camera, Scientific Analysis) but code preserved in types.ts and JumpAnalysisCharts.tsx for future reactivation. Manual entry removed from Jump Assessment - only Camera Jump input remains."
+}
