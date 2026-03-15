@@ -798,16 +798,18 @@ export default function DataScreen() {
     const details = mode === 'athlete' ? athletes[0]?.wellness_details : null;
     const wellTimeline = mode === 'athlete' ? athletes[0]?.wellness_timeline : [];
     
-    // Aggregate wellness bars (team mode)
-    const teamWellnessDetails = mode !== 'athlete' && athletes.length > 0 ? {
-      sleep: athletes.reduce((s: number, a: any) => s + (a.wellness_details?.sleep || 0), 0) / athletes.length,
-      fatigue: athletes.reduce((s: number, a: any) => s + (a.wellness_details?.fatigue || 0), 0) / athletes.length,
-      stress: athletes.reduce((s: number, a: any) => s + (a.wellness_details?.stress || 0), 0) / athletes.length,
-      soreness: athletes.reduce((s: number, a: any) => s + (a.wellness_details?.soreness || 0), 0) / athletes.length,
-      mood: athletes.reduce((s: number, a: any) => s + (a.wellness_details?.mood || 0), 0) / athletes.length,
+    // Aggregate wellness bars (team mode) — only from athletes WITH wellness data
+    const athletesWithWellness = athletes.filter((a: any) => a.wellness_details && Object.keys(a.wellness_details).length > 0);
+    const teamWellnessDetails = mode !== 'athlete' && athletesWithWellness.length > 0 ? {
+      sleep: athletesWithWellness.reduce((s: number, a: any) => s + (a.wellness_details?.sleep ?? 0), 0) / athletesWithWellness.length,
+      fatigue: athletesWithWellness.reduce((s: number, a: any) => s + (a.wellness_details?.fatigue ?? 0), 0) / athletesWithWellness.length,
+      stress: athletesWithWellness.reduce((s: number, a: any) => s + (a.wellness_details?.stress ?? 0), 0) / athletesWithWellness.length,
+      soreness: athletesWithWellness.reduce((s: number, a: any) => s + (a.wellness_details?.soreness ?? 0), 0) / athletesWithWellness.length,
+      mood: athletesWithWellness.reduce((s: number, a: any) => s + (a.wellness_details?.mood ?? 0), 0) / athletesWithWellness.length,
     } : details;
     
     const wDet = teamWellnessDetails || {};
+    const hasWellnessData = teamWellnessDetails != null;
     
     // Cumulative load
     const timelineData = mode === 'athlete' && athletes[0]?.daily_timeline
@@ -844,11 +846,11 @@ export default function DataScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Wellness</Text>
           <View style={{ marginTop: 8 }}>
-            <HorizontalBar value={wDet.sleep || 0} max={10} label={locale === 'pt' ? 'Sono' : 'Sleep'} color={COLORS.blue} />
-            <HorizontalBar value={10 - (wDet.fatigue || 5)} max={10} label={locale === 'pt' ? 'Energia (inv. Fadiga)' : 'Energy (inv. Fatigue)'} color={COLORS.cyan} />
-            <HorizontalBar value={10 - (wDet.stress || 5)} max={10} label={locale === 'pt' ? 'Calma (inv. Stress)' : 'Calm (inv. Stress)'} color={COLORS.green} />
-            <HorizontalBar value={10 - (wDet.soreness || 5)} max={10} label={locale === 'pt' ? 'Conforto (inv. Dor)' : 'Comfort (inv. Soreness)'} color={COLORS.purple} />
-            <HorizontalBar value={wDet.mood || 0} max={10} label={locale === 'pt' ? 'Humor' : 'Mood'} color={COLORS.orange} />
+            <HorizontalBar value={hasWellnessData ? (wDet.sleep ?? 0) : 0} max={10} label={locale === 'pt' ? 'Sono' : 'Sleep'} color={COLORS.blue} />
+            <HorizontalBar value={hasWellnessData && wDet.fatigue != null ? (10 - wDet.fatigue) : 0} max={10} label={locale === 'pt' ? 'Energia (inv. Fadiga)' : 'Energy (inv. Fatigue)'} color={COLORS.cyan} />
+            <HorizontalBar value={hasWellnessData && wDet.stress != null ? (10 - wDet.stress) : 0} max={10} label={locale === 'pt' ? 'Calma (inv. Stress)' : 'Calm (inv. Stress)'} color={COLORS.green} />
+            <HorizontalBar value={hasWellnessData && wDet.soreness != null ? (10 - wDet.soreness) : 0} max={10} label={locale === 'pt' ? 'Conforto (inv. Dor)' : 'Comfort (inv. Soreness)'} color={COLORS.purple} />
+            <HorizontalBar value={hasWellnessData ? (wDet.mood ?? 0) : 0} max={10} label={locale === 'pt' ? 'Humor' : 'Mood'} color={COLORS.orange} />
           </View>
         </View>
         

@@ -364,52 +364,6 @@ export default function TeamDashboard() {
 
   // Check if user has no athletes (empty state)
   const hasNoData = data.stats.total_athletes === 0;
-  
-  if (hasNoData) {
-    return (
-      <View style={styles.container}>
-        <LinearGradient
-          colors={colors.gradients.background}
-          style={styles.gradient}
-        >
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>
-              {locale === 'pt' ? 'Dashboard da Equipe' : 'Team Dashboard'}
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              {locale === 'pt' ? 'Visão geral do desempenho' : 'Performance overview'}
-            </Text>
-          </View>
-          
-          <View style={styles.emptyStateContainer}>
-            <Ionicons name="people-outline" size={80} color={colors.text.tertiary} />
-            <Text style={styles.emptyStateTitle}>
-              {locale === 'pt' ? 'Nenhum atleta cadastrado' : 'No athletes registered'}
-            </Text>
-            <Text style={styles.emptyStateSubtitle}>
-              {locale === 'pt' 
-                ? 'Adicione atletas para visualizar estatísticas da equipe' 
-                : 'Add athletes to view team statistics'}
-            </Text>
-            <TouchableOpacity 
-              style={styles.emptyStateButton}
-              onPress={() => router.push('/add-athlete')}
-            >
-              <LinearGradient
-                colors={[colors.accent.primary, colors.accent.secondary]}
-                style={styles.emptyStateButtonGradient}
-              >
-                <Ionicons name="add" size={20} color="#fff" />
-                <Text style={styles.emptyStateButtonText}>
-                  {locale === 'pt' ? 'Adicionar Atleta' : 'Add Athlete'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </LinearGradient>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -456,6 +410,36 @@ export default function TeamDashboard() {
               <Ionicons name="chevron-forward" size={20} color="#ffffff" />
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* EMPTY STATE - shown when no athletes, within the normal page structure */}
+          {hasNoData && (
+            <View style={styles.emptyStateContainer} data-testid="team-empty-state">
+              <Ionicons name="people-outline" size={64} color={colors.text.tertiary} />
+              <Text style={styles.emptyStateTitle}>
+                {locale === 'pt' ? 'Nenhum atleta cadastrado' : 'No athletes registered'}
+              </Text>
+              <Text style={styles.emptyStateSubtitle}>
+                {locale === 'pt' 
+                  ? 'Adicione atletas para visualizar estatísticas da equipe' 
+                  : 'Add athletes to view team statistics'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.emptyStateButton}
+                onPress={() => router.push('/add-athlete')}
+                data-testid="add-athlete-empty-state-btn"
+              >
+                <LinearGradient
+                  colors={[colors.accent.primary, colors.accent.secondary]}
+                  style={styles.emptyStateButtonGradient}
+                >
+                  <Ionicons name="add" size={20} color="#fff" />
+                  <Text style={styles.emptyStateButtonText}>
+                    {locale === 'pt' ? 'Adicionar Atleta' : 'Add Athlete'}
+                  </Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* FILTERS ROW */}
           <View style={styles.filtersRow}>
