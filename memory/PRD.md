@@ -3,24 +3,24 @@
 ## Original Problem Statement
 Aplicativo de monitoramento de carga esportiva com React Native (frontend) + FastAPI (backend) + MongoDB.
 
-## Bug Crítico P0 - Dashboard Visão Geral: Dados Desatualizados
-**Status: CORRIGIDO (2026-03-14)**
+## Bugs Corrigidos
 
-### Causa Raiz
-A função `get_dashboard_overview` em `server.py` computava métricas de carga (ACWR, LMPI, RSI, monotony, strain, acute/chronic load) **independentemente** da existência de GPS data para cada atleta. O `get_team_dashboard` gateava essas computações dentro de `if gps_data:`. Isso causava divergência: após deletar GPS activities, o Team Dashboard zerava tudo, mas o Overview continuava mostrando valores de wellness, RSI e LMPI.
+### Bug P0 - Dashboard Visão Geral: Dados Desatualizados (2026-03-14)
+**Causa raiz**: `get_dashboard_overview` computava ACWR, LMPI, RSI, monotony, strain independente de GPS data. Team Dashboard gateava tudo dentro de `if gps_data:`.
+**Correção**: Flag `has_gps_data` por atleta gates toda computação de load metrics. Team summary averages filtrados por atletas com GPS.
 
-### Correção Aplicada
-1. Adicionado flag `has_gps_data` por atleta
-2. ACWR/monotony/strain/acute/chronic só computados quando `has_gps_data=True`
-3. LMPI = None quando `has_gps_data=False`
-4. Team summary averages (team_acwr, team_rsimod, team_lmpi, etc.) filtrados por atletas com GPS data
-5. Wellness/readiness mantidos para todos atletas (dados válidos independentes de GPS)
+### Bug - Wellness Residual no Estado Vazio (2026-03-14)
+**Causa raiz**: Frontend `data.tsx` usava `|| 5` como fallback nas HorizontalBar de wellness (fatigue, stress, soreness). Quando não há dados, `0 || 5 = 5`, mostrando valores artificiais.
+**Correção**: Substituído `|| 5` por check `hasWellnessData ? value : 0`. Agregação de wellness agora filtra apenas atletas COM wellness_details.
 
-### Validação
-- Testado com curl: delete GPS → ambos dashboards zeram métricas de carga ✓
-- Testado: add GPS → ambos dashboards mostram dados consistentes ✓
-- Testado: recalculate-all após delete → métricas permanecem null ✓
-- **NÃO validado em produção Railway** — requer deploy pelo usuário
+### Bug - Dashboard Equipe Desaparece no Estado Vazio (2026-03-14)
+**Causa raiz**: `team.tsx` fazia early return com view simplificada quando `hasNoData`, removendo filtros, botão CSV e cards da página.
+**Correção**: Removido early return. Empty state integrado dentro do fluxo normal da página (após botão CSV import). Estrutura mantida mesmo com zero atletas.
+
+## Arquivos Alterados
+- `/app/backend/server.py` - `get_dashboard_overview`: has_gps_data gating
+- `/app/frontend/app/(tabs)/data.tsx` - Wellness aggregation + HorizontalBar fallback
+- `/app/frontend/app/(tabs)/team.tsx` - Removido early return, empty state inline
 
 ## Pendentes
 
@@ -30,7 +30,7 @@ A função `get_dashboard_overview` em `server.py` computava métricas de carga 
 
 ### P2
 - Refatorar dashboards para usar Rolling Load Engine consistentemente
-- RSI discrepância entre dashboards (Overview usa latest CMJ RSI, Team usa agregação diferente)
+- RSI discrepância entre Overview (latest CMJ) e Team (agregação diferente)
 
 ### P3/Backlog
 - Internacionalização de ScientificAnalysisTab.tsx e Avaliações
@@ -39,13 +39,7 @@ A função `get_dashboard_overview` em `server.py` computava métricas de carga 
 - Remover diretório ios_backup_before_removal/
 
 ## Arquitetura
-- Backend: FastAPI (`/app/backend/server.py`) - 12K+ lines
+- Backend: FastAPI (`/app/backend/server.py`)
 - Frontend: React Native/Expo (`/app/frontend/`)
 - DB: MongoDB (football_training)
 - Deploy produção: Railway
-
-## Endpoints Chave
-- GET /api/dashboard/overview — Dashboard Visão Geral
-- GET /api/dashboard/team — Team Dashboard
-- POST /api/gps-data/delete-activities — Deletar atividades GPS
-- POST /api/load-metrics/recalculate-all — Recalcular métricas
