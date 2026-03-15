@@ -789,7 +789,7 @@ function JumpAssessmentContent() {
           <View style={s.emptyState}>
             <Ionicons name="fitness-outline" size={48} color={colors.text.tertiary} />
             <Text style={s.emptyTitle}>{locale === 'pt' ? 'Nenhuma avaliacao neste protocolo' : 'No assessments for this protocol'}</Text>
-            <Text style={s.emptySub}>{locale === 'pt' ? 'Use a Jump Camera ou adicione manualmente' : 'Use Jump Camera or add manually'}</Text>
+            <Text style={s.emptySub}>{locale === 'pt' ? 'Use a Jump Camera para avaliar' : 'Use Jump Camera to assess'}</Text>
           </View>
         )}
 
