@@ -74,9 +74,10 @@ export default function UploadCSV() {
       const bytes = new Uint8Array(arrayBuffer);
       setFileContent(bytes);
 
-      // Upload to backend for analysis
+      // Upload to backend for analysis - use Blob for web compatibility
       const formData = new FormData();
-      formData.append('file', { uri: asset.uri, name: asset.name || 'upload.csv', type: 'text/csv' } as any);
+      const fileBlob = new Blob([bytes], { type: 'text/csv' });
+      formData.append('file', fileBlob, asset.name || 'upload.csv');
 
       const { data: resp } = await api.post('/csv/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
