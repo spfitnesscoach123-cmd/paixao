@@ -51,6 +51,9 @@ Fluxo de importação CSV multi-step com detecção de estrutura, preview, mapea
 ### UI - DJ Oculto + Entrada Manual Removida (2026-03-14)
 **Corrigido**: DJ comentado em 3 telas, manual entry removida.
 
+### Bug Crítico - Document Picker iOS (2026-03-16)
+**Corrigido**: `blob.arrayBuffer()` é undefined no React Native nativo (iOS). O código usava APIs Web-only (`Blob`, `arrayBuffer`) para construir o FormData. Corrigido com branch `Platform.OS === 'web'`: web mantém Blob, nativo usa `{ uri, name, type }` padrão do React Native. Afetava `pickFile()` e `handleImport()` em `upload-csv.tsx`.
+
 ## Pendentes
 
 ### P1

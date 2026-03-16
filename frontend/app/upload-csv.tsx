@@ -45,6 +45,7 @@ export default function UploadCSV() {
   const qc = useQueryClient();
   const [step, setStep] = useState<Step>('upload');
   const [fileContent, setFileContent] = useState<Uint8Array | null>(null);
+  const [fileUri, setFileUri] = useState<string>('');
   const [fileName, setFileName] = useState('');
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [mapping, setMapping] = useState<Record<string, string | null>>({});
@@ -67,17 +68,26 @@ export default function UploadCSV() {
       setError('');
       setAnalyzing(true);
 
-      // Read file content as bytes for FormData upload
-      const response = await fetch(asset.uri);
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      setFileContent(bytes);
-
-      // Upload to backend for analysis - use Blob for web compatibility
       const formData = new FormData();
-      const fileBlob = new Blob([bytes], { type: 'text/csv' });
-      formData.append('file', fileBlob, asset.name || 'upload.csv');
+
+      if (Platform.OS === 'web') {
+        // Web: use Blob approach
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        setFileContent(bytes);
+        const fileBlob = new Blob([bytes], { type: 'text/csv' });
+        formData.append('file', fileBlob, asset.name || 'upload.csv');
+      } else {
+        // Native (iOS/Android): use URI-based FormData
+        setFileUri(asset.uri);
+        formData.append('file', {
+          uri: asset.uri,
+          name: asset.name || 'upload.csv',
+          type: asset.mimeType || 'text/csv',
+        } as any);
+      }
 
       const { data: resp } = await api.post('/csv/analyze', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -104,14 +114,24 @@ export default function UploadCSV() {
   }, []);
 
   const handleImport = useCallback(async () => {
-    if (!fileContent || !analysis) return;
+    if (!analysis) return;
+    if (Platform.OS === 'web' && !fileContent) return;
+    if (Platform.OS !== 'web' && !fileUri) return;
     setImporting(true);
     setStep('importing');
     setError('');
     try {
       const formData = new FormData();
-      const blob = new Blob([fileContent], { type: 'text/csv' });
-      formData.append('file', blob, fileName);
+      if (Platform.OS === 'web') {
+        const blob = new Blob([fileContent!], { type: 'text/csv' });
+        formData.append('file', blob, fileName);
+      } else {
+        formData.append('file', {
+          uri: fileUri,
+          name: fileName,
+          type: 'text/csv',
+        } as any);
+      }
       formData.append('mapping_json', JSON.stringify(mapping));
       formData.append('create_missing', 'true');
 
@@ -129,7 +149,7 @@ export default function UploadCSV() {
     } finally {
       setImporting(false);
     }
-  }, [fileContent, analysis, mapping, fileName, qc]);
+  }, [fileContent, fileUri, analysis, mapping, fileName, qc]);
 
   const saveTemplate = useCallback(async () => {
     if (!templateName.trim()) return;
