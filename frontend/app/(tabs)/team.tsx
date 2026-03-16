@@ -388,7 +388,7 @@ export default function TeamDashboard() {
           {/* CSV IMPORT BUTTON */}
           <TouchableOpacity
             style={styles.csvImportButton}
-            onPress={() => router.push('/upload-catapult')}
+            onPress={() => router.push('/upload-csv')}
             activeOpacity={0.8}
             data-testid="csv-import-button"
           >

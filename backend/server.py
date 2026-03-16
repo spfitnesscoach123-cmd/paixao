@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile, Header
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile, Header, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse, FileResponse, JSONResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import bcrypt
 import jwt
@@ -9814,6 +9814,214 @@ async def get_supported_wearables():
             }
         ]
     }
+
+
+# ============= ENHANCED CSV IMPORT — Analyze, Map, Import =============
+
+from csv_analyzer import analyze_csv, apply_custom_mapping, INTERNAL_FIELDS
+
+
+@api_router.post("/csv/analyze")
+async def csv_analyze(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Analyze CSV file structure and return auto-mappings + suggestions."""
+    content = await file.read()
+    analysis = analyze_csv(content, filename=file.filename or "upload.csv")
+
+    # Attach athlete matching info
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]}, {"_id": 0, "id": {"$toString": "$_id"}, "name": 1}
+    ).to_list(1000)
+    # MongoDB $toString may not work in all versions; fallback
+    athlete_list = []
+    async for a in db.athletes.find({"coach_id": current_user["_id"]}):
+        athlete_list.append({"id": str(a["_id"]), "name": a["name"]})
+
+    analysis["existing_athletes"] = athlete_list
+    return analysis
+
+
+class CSVImportMappedRequest(BaseModel):
+    mapping: Dict[str, Optional[str]]
+    create_missing_athletes: bool = True
+
+
+@api_router.post("/csv/import-mapped")
+async def csv_import_mapped(
+    file: UploadFile = File(...),
+    mapping_json: str = Form(...),
+    create_missing: bool = Form(True),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Import CSV with a custom field mapping.
+    Preserves existing athlete auto-creation + GPS data pipeline.
+    """
+    import json as _json
+
+    content = await file.read()
+    mapping = _json.loads(mapping_json)
+
+    records = apply_custom_mapping(content, mapping, filename=file.filename or "upload.csv")
+
+    if not records:
+        raise HTTPException(status_code=400, detail="No valid records found after applying mapping")
+
+    # Get existing athletes
+    existing = {}
+    async for a in db.athletes.find({"coach_id": current_user["_id"]}):
+        existing[a["name"].lower().strip()] = str(a["_id"])
+
+    # Group records by athlete
+    from collections import defaultdict
+    by_athlete: Dict[str, list] = defaultdict(list)
+    for rec in records:
+        name = rec.get("athlete_name", "").strip()
+        if name:
+            by_athlete[name].append(rec)
+
+    session_id = f"csv_import_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    session_name = (file.filename or "CSV Import").replace(".csv", "")
+
+    success_count = 0
+    created_athletes = []
+    errors_list = []
+    imported_by_athlete = {}
+
+    for athlete_name, recs in by_athlete.items():
+        # Resolve athlete ID
+        athlete_id = existing.get(athlete_name.lower().strip())
+
+        if not athlete_id:
+            # Partial match
+            for ex_name, ex_id in existing.items():
+                if ex_name in athlete_name.lower() or athlete_name.lower() in ex_name:
+                    athlete_id = ex_id
+                    break
+
+        if not athlete_id and create_missing:
+            # Auto-create athlete (preserves existing behavior)
+            new_athlete = {
+                "name": athlete_name,
+                "coach_id": current_user["_id"],
+                "birth_date": "2000-01-01",
+                "position": "Não especificado",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            result = await db.athletes.insert_one(new_athlete)
+            athlete_id = str(result.inserted_id)
+            existing[athlete_name.lower().strip()] = athlete_id
+            created_athletes.append(athlete_name)
+
+        if not athlete_id:
+            errors_list.append(f"Athlete not found: {athlete_name}")
+            continue
+
+        for rec in recs:
+            try:
+                gps_doc = {
+                    "athlete_id": athlete_id,
+                    "coach_id": current_user["_id"],
+                    "date": rec.get("session_date", datetime.now().strftime("%Y-%m-%d")),
+                    "session_id": session_id,
+                    "session_name": session_name,
+                    "period_name": rec.get("period_name", "Session") or "Session",
+                    "total_distance": float(rec.get("total_distance", 0) or 0),
+                    "high_intensity_distance": float(rec.get("hid_distance", 0) or 0),
+                    "high_speed_running": float(rec.get("hsr_distance", 0) or 0),
+                    "sprint_distance": float(rec.get("sprint_distance", 0) or 0),
+                    "number_of_sprints": int(float(rec.get("number_of_sprints", 0) or 0)),
+                    "number_of_accelerations": int(float(rec.get("accelerations", 0) or 0)),
+                    "number_of_decelerations": int(float(rec.get("decelerations", 0) or 0)),
+                    "max_speed": float(rec.get("max_speed", 0) or 0) if rec.get("max_speed") else None,
+                    "max_acceleration": float(rec.get("max_acceleration", 0) or 0) if rec.get("max_acceleration") else None,
+                    "max_deceleration": float(rec.get("max_deceleration", 0) or 0) if rec.get("max_deceleration") else None,
+                    "player_load": float(rec.get("player_load", 0) or 0) if rec.get("player_load") else None,
+                    "source": "csv_import",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                await db.gps_data.insert_one(gps_doc)
+                success_count += 1
+                imported_by_athlete[athlete_name] = imported_by_athlete.get(athlete_name, 0) + 1
+            except Exception as e:
+                errors_list.append(f"Error importing {athlete_name}: {str(e)}")
+
+    # Trigger recalculation for affected athletes
+    affected_ids = list(set(
+        existing.get(name.lower().strip()) for name in by_athlete.keys()
+        if existing.get(name.lower().strip())
+    ))
+    for aid in affected_ids:
+        try:
+            from load_engine.rolling_load_engine import RollingLoadEngine
+            engine = RollingLoadEngine(db)
+            await engine.recalculate_athlete(aid)
+        except Exception:
+            pass
+
+    return {
+        "success": True,
+        "records_imported": success_count,
+        "athletes_created": created_athletes,
+        "imported_by_athlete": imported_by_athlete,
+        "errors": errors_list,
+        "session_id": session_id,
+    }
+
+
+# ─── Mapping Templates CRUD ──────────────────────────────────────────────────
+
+class MappingTemplateCreate(BaseModel):
+    name: str
+    provider: Optional[str] = None
+    mapping: Dict[str, Optional[str]]
+
+
+@api_router.get("/csv/mapping-templates")
+async def list_mapping_templates(current_user: dict = Depends(get_current_user)):
+    templates = []
+    async for t in db.csv_mapping_templates.find({"coach_id": current_user["_id"]}):
+        templates.append({
+            "id": str(t["_id"]),
+            "name": t["name"],
+            "provider": t.get("provider"),
+            "mapping": t["mapping"],
+            "created_at": t.get("created_at"),
+        })
+    return templates
+
+
+@api_router.post("/csv/mapping-templates")
+async def save_mapping_template(
+    body: MappingTemplateCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    doc = {
+        "coach_id": current_user["_id"],
+        "name": body.name,
+        "provider": body.provider,
+        "mapping": body.mapping,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await db.csv_mapping_templates.insert_one(doc)
+    return {"id": str(result.inserted_id), "message": "Template saved"}
+
+
+@api_router.delete("/csv/mapping-templates/{template_id}")
+async def delete_mapping_template(
+    template_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    result = await db.csv_mapping_templates.delete_one({
+        "_id": ObjectId(template_id),
+        "coach_id": current_user["_id"],
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"message": "Template deleted"}
+
 
 # ============= CSV IMPORT (via gps_import module) =============
 
