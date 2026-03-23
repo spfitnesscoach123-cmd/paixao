@@ -8314,6 +8314,7 @@ async def get_team_dashboard(
         
         # Calculate ACWR
         acwr = None
+        athlete_ewma = None
         risk_level = "unknown"
         sessions_7d = 0
         distance_7d = 0
@@ -8537,11 +8538,18 @@ async def get_team_dashboard(
             total_body_fat += latest_body_comp["body_fat_percentage"]
             body_fat_count += 1
         
-        # Monotony and Strain (logic unchanged)
+        # RC6: DO NOT compute load metrics manually.
+        # ALWAYS use load_engine as single source of truth.
         monotony_value = None
         strain_value = None
         metric_value_for_athlete = None
         
+        # Read monotony/strain from load_engine (same source as ACWR)
+        if athlete_ewma:
+            monotony_value = athlete_ewma.get("monotony") or None
+            strain_value = athlete_ewma.get("strain") or None
+        
+        # metric_value is a display sum for the filter period (not a load engine metric)
         if gps_data:
             days_to_check = max(1, filter_days) if filter_days == 0 else filter_days
             days_to_check = min(days_to_check, 7)
@@ -8556,16 +8564,6 @@ async def get_team_dashboard(
                 metric_value_for_athlete = daily_loads[0] if daily_loads else 0
             else:
                 metric_value_for_athlete = sum(daily_loads)
-            
-            if len(daily_loads) >= 2:
-                mean_load = sum(daily_loads) / len(daily_loads)
-                if mean_load > 0:
-                    variance = sum((x - mean_load) ** 2 for x in daily_loads) / len(daily_loads)
-                    std_dev = variance ** 0.5
-                    if std_dev > 0:
-                        monotony_value = round(mean_load / std_dev, 2)
-                        weekly_load = sum(daily_loads)
-                        strain_value = round(weekly_load * monotony_value, 0)
         
         athlete_data.append(TeamDashboardAthlete(
             id=athlete_id,

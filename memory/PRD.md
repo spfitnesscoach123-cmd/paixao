@@ -64,7 +64,7 @@ Root causes identificadas (RC1-RC7):
 - RC3: Filtro "Ontem" gera datas erradas na timeline
 - RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis
 - RC5: CSV Import não atualiza métricas — **CORRIGIDO**
-- RC6: Monotony/Strain calculados diferente em Team vs Overview
+- RC6: Monotony/Strain calculados diferente em Team vs Overview — **CORRIGIDO**
 - RC7: Atletas sem dados aparecem com risco alto artificialmente
 
 ## Pendentes
