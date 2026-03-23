@@ -65,6 +65,7 @@ Root causes identificadas (RC1-RC7):
 - RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis
 - RC5: CSV Import não atualiza métricas — **CORRIGIDO**
 - RC6: Monotony/Strain calculados diferente em Team vs Overview — **CORRIGIDO**
+- ACWR Padronização: 5 endpoints `/analysis/acwr-*` migrados de rolling average para load_engine EWMA — **CORRIGIDO**
 - RC7: Atletas sem dados aparecem com risco alto artificialmente
 
 ## Pendentes
