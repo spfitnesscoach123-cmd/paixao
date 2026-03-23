@@ -9948,18 +9948,28 @@ async def csv_import_mapped(
             except Exception as e:
                 errors_list.append(f"Error importing {athlete_name}: {str(e)}")
 
-    # Trigger recalculation for affected athletes
-    affected_ids = list(set(
-        existing.get(name.lower().strip()) for name in by_athlete.keys()
-        if existing.get(name.lower().strip())
-    ))
-    for aid in affected_ids:
+    # Build earliest_date per athlete from imported records
+    earliest_date_by_athlete: Dict[str, str] = {}
+    for athlete_name, recs in by_athlete.items():
+        aid = existing.get(athlete_name.lower().strip())
+        if not aid:
+            continue
+        for rec in recs:
+            rec_date = rec.get("session_date", "")
+            if rec_date and (aid not in earliest_date_by_athlete or rec_date < earliest_date_by_athlete[aid]):
+                earliest_date_by_athlete[aid] = rec_date
+
+    # Trigger recalculation from earliest_date for each affected athlete
+    coach_id_str = str(current_user["_id"])
+    for aid, earliest_date in earliest_date_by_athlete.items():
         try:
-            from load_engine.rolling_load_engine import RollingLoadEngine
-            engine = RollingLoadEngine(db)
-            await engine.recalculate_athlete(aid)
-        except Exception:
-            pass
+            await load_engine.recalculate_from_date(
+                athlete_id=aid,
+                coach_id=coach_id_str,
+                start_date=earliest_date
+            )
+        except Exception as e:
+            logging.error(f"[RC5] Recalculation failed for athlete {aid}: {e}")
 
     return {
         "success": True,

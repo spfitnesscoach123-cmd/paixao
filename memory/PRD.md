@@ -52,7 +52,20 @@ Fluxo de importação CSV multi-step com detecção de estrutura, preview, mapea
 **Corrigido**: DJ comentado em 3 telas, manual entry removida.
 
 ### Bug Crítico - Document Picker iOS (2026-03-16)
-**Corrigido**: `blob.arrayBuffer()` é undefined no React Native nativo (iOS). O código usava APIs Web-only (`Blob`, `arrayBuffer`) para construir o FormData. Corrigido com branch `Platform.OS === 'web'`: web mantém Blob, nativo usa `{ uri, name, type }` padrão do React Native. Afetava `pickFile()` e `handleImport()` em `upload-csv.tsx`.
+**Corrigido**: `blob.arrayBuffer()` é undefined no React Native nativo (iOS). Corrigido com branch `Platform.OS === 'web'` em `upload-csv.tsx`.
+
+### RC5 - CSV Import Não Atualiza Métricas EWMA/ACWR (2026-03-23)
+**Corrigido**: `engine.recalculate_athlete(aid)` chamava método inexistente no `RollingLoadEngine`. Substituído por `load_engine.recalculate_from_date(athlete_id, coach_id, earliest_date)` com `earliest_date` derivada dos registros importados. Erro silenciado (`except: pass`) substituído por `logging.error`. Arquivo: `server.py` L9951-9972.
+
+## Auditoria Dashboard Visão Geral (2026-03-23)
+Root causes identificadas (RC1-RC7):
+- RC1: Gauges não respondem ao filtro de data (EWMA acumulativo, sem filtro)
+- RC2: Filtro "Hoje" (filter_days=0) quebra charts e velocity zones
+- RC3: Filtro "Ontem" gera datas erradas na timeline
+- RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis
+- RC5: CSV Import não atualiza métricas — **CORRIGIDO**
+- RC6: Monotony/Strain calculados diferente em Team vs Overview
+- RC7: Atletas sem dados aparecem com risco alto artificialmente
 
 ## Pendentes
 
