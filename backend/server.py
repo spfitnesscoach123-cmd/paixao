@@ -8483,6 +8483,8 @@ async def get_dashboard_overview(
     # Parse date range
     date_range_map = {"today": 0, "yesterday": 1, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
     filter_days = date_range_map.get(date_range, 28)
+    # RC2: "today" must be treated as 1 valid day, not 0
+    effective_days = max(1, filter_days)
     
     today = datetime.utcnow()
     today_str = today.strftime("%Y-%m-%d")
@@ -8729,9 +8731,10 @@ async def get_dashboard_overview(
                 chronic_load = 0
         
         # Daily load timeline (for charts)
+        # RC2: use effective_days (min 1) so "today" filter generates 1 data point
         daily_timeline = []
-        for i in range(filter_days):
-            d = (today - timedelta(days=filter_days - 1 - i)).strftime("%Y-%m-%d")
+        for i in range(effective_days):
+            d = (today - timedelta(days=effective_days - 1 - i)).strftime("%Y-%m-%d")
             day_data = daily_gps.get(d, {})
             daily_timeline.append({
                 "date": d,
@@ -8774,7 +8777,7 @@ async def get_dashboard_overview(
                 td = day_data.get("total_distance", 0)
                 other = td - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"]
         total_dist_period = sum(daily_gps.get(d, {}).get("total_distance", 0) 
-                               for d in [((today - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(filter_days)])
+                               for d in [((today - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(effective_days)])
         vz_other = max(0, total_dist_period - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"])
         velocity_zones = {
             "low_intensity": round(vz_other),
@@ -8998,10 +9001,11 @@ async def get_dashboard_overview(
     team_readiness = safe_avg([a["readiness_score"] for a in athlete_results])
     
     # Aggregated daily timeline (team/position average)
+    # RC2: use effective_days for consistent timeline generation
     agg_timeline = []
     if mode != "athlete" and n > 0:
-        for day_idx in range(filter_days):
-            d = (today - timedelta(days=filter_days - 1 - day_idx)).strftime("%Y-%m-%d")
+        for day_idx in range(effective_days):
+            d = (today - timedelta(days=effective_days - 1 - day_idx)).strftime("%Y-%m-%d")
             day_vals = [a["daily_timeline"][day_idx] if day_idx < len(a["daily_timeline"]) else {} for a in athlete_results]
             agg_timeline.append({
                 "date": d,

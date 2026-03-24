@@ -60,7 +60,7 @@ Fluxo de importação CSV multi-step com detecção de estrutura, preview, mapea
 ## Auditoria Dashboard Visão Geral (2026-03-23)
 Root causes identificadas (RC1-RC7):
 - RC1: Gauges não respondem ao filtro de data (EWMA acumulativo, sem filtro)
-- RC2: Filtro "Hoje" (filter_days=0) quebra charts e velocity zones
+- RC2: Filtro "Hoje" (filter_days=0) quebra charts e velocity zones — **CORRIGIDO**
 - RC3: Filtro "Ontem" gera datas erradas na timeline
 - RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis
 - RC5: CSV Import não atualiza métricas — **CORRIGIDO**
