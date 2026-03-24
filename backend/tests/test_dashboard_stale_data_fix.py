@@ -6,7 +6,7 @@ Test Dashboard Stale Data Fix:
 
 Test Athlete: João Silva (69a6ca6a85668876432f090a) with GPS on 2026-03-03
 Credentials: contato@loadmanagerpro.com.br / #UAE2026
-API URL: https://deployment-blocker-6.preview.emergentagent.com
+API URL: https://load-engine-1.preview.emergentagent.com
 """
 
 import pytest
@@ -15,7 +15,7 @@ import os
 import time
 from datetime import datetime, timedelta
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://deployment-blocker-6.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://load-engine-1.preview.emergentagent.com").rstrip("/")
 
 # Test athlete info
 JOAO_SILVA_ID = "69a6ca6a85668876432f090a"

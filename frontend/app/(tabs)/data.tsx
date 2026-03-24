@@ -52,6 +52,20 @@ const COLORS = {
   purpleAlpha: 'rgba(139,92,246,0.25)',
 };
 
+// LMPI Classification — mirrors backend thresholds exactly (>=70 optimal, >=40 moderate, <40 high)
+const getLmpiClassification = (lmpi: number | null | undefined, validity: string | undefined, locale: string) => {
+  if (validity === 'invalid' || lmpi == null) {
+    return { label: locale === 'pt' ? 'Sem dados' : 'No data', color: '#64748b', bgColor: 'rgba(100,116,139,0.2)' };
+  }
+  const suffix = validity === 'partial' ? '*' : '';
+  if (lmpi >= 70) {
+    return { label: (locale === 'pt' ? 'Alto' : 'High') + suffix, color: COLORS.green, bgColor: COLORS.greenAlpha };
+  } else if (lmpi >= 40) {
+    return { label: (locale === 'pt' ? 'Moderado' : 'Moderate') + suffix, color: COLORS.yellow, bgColor: COLORS.yellowAlpha };
+  }
+  return { label: (locale === 'pt' ? 'Baixo' : 'Low') + suffix, color: COLORS.red, bgColor: COLORS.redAlpha };
+};
+
 // ============ SVG CHART COMPONENTS ============
 
 // Gauge Component
@@ -685,10 +699,12 @@ export default function DataScreen() {
   
   const renderSmartSummary = () => {
     const lmpi = mode === 'athlete' ? athletes[0]?.lmpi : summary.team_lmpi;
+    const lmpiValidity = mode === 'athlete' ? (athletes[0]?.lmpi_validity || 'invalid') : (lmpi != null ? 'valid' : 'invalid');
     const acwr = mode === 'athlete' ? athletes[0]?.acwr : summary.team_acwr;
     const wellness = mode === 'athlete' ? athletes[0]?.wellness_score : summary.team_wellness;
     const rsimod = mode === 'athlete' ? athletes[0]?.rsimod : summary.team_rsimod;
     const monotony = mode === 'athlete' ? athletes[0]?.monotony : summary.team_monotony;
+    const lmpiClass = getLmpiClassification(lmpi, lmpiValidity, locale);
     
     // Radar data: normalized 0-1
     const radarValues = [
@@ -720,11 +736,20 @@ export default function DataScreen() {
     return (
       <View>
         {/* LMPI Gauge */}
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>LMPI Score</Text>
+        <View style={styles.card} data-testid="lmpi-gauge-card">
+          <Text style={styles.cardTitle}>Score LMPI</Text>
           <Text style={styles.cardSubtitle}>LoadManager Performance Indicator</Text>
           <View style={{ alignItems: 'center', marginTop: 8 }}>
-            <GaugeChart value={lmpi || 0} max={100} label="LMPI" color={lmpi && lmpi > 70 ? COLORS.green : lmpi && lmpi > 40 ? COLORS.yellow : COLORS.red} size={150} />
+            <GaugeChart value={lmpiValidity !== 'invalid' && lmpi != null ? lmpi : 0} max={100} label={lmpiValidity === 'invalid' ? '--' : 'LMPI'} color={lmpiClass.color} size={150} />
+            {/* Classification Badge */}
+            <View data-testid="lmpi-classification-badge" style={{ marginTop: 6, paddingHorizontal: 14, paddingVertical: 4, borderRadius: 12, backgroundColor: lmpiClass.bgColor, borderWidth: 1, borderColor: lmpiClass.color + '40' }}>
+              <Text style={{ color: lmpiClass.color, fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>{lmpiClass.label}</Text>
+            </View>
+            {lmpiValidity === 'partial' && (
+              <Text data-testid="lmpi-partial-indicator" style={{ color: '#94a3b8', fontSize: 10, marginTop: 4 }}>
+                {locale === 'pt' ? '* Dados parciais (apenas carga)' : '* Partial data (load only)'}
+              </Text>
+            )}
           </View>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, flexWrap: 'wrap', gap: 4 }}>
             <View style={styles.metricPill}><Text style={styles.metricPillLabel}>ACWR</Text><Text style={styles.metricPillValue}>{acwr?.toFixed(2) || '--'}</Text></View>
@@ -768,23 +793,34 @@ export default function DataScreen() {
           </View>
         )}
         
-        {/* High Risk Table */}
+        {/* Athlete LMPI Rankings Table */}
         {mode !== 'athlete' && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Maior Risco' : 'Highest Risk Athletes'}</Text>
+          <View style={styles.card} data-testid="lmpi-rankings-table">
+            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Ranking LMPI' : 'LMPI Rankings'}</Text>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
-                <Text style={[styles.tableHeaderText, { flex: 1 }]}>LMPI</Text>
-                <Text style={[styles.tableHeaderText, { flex: 1 }]}>{locale === 'pt' ? 'Risco' : 'Risk'}</Text>
+                <Text style={[styles.tableHeaderText, { flex: 1 }]}>Score</Text>
+                <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>{locale === 'pt' ? 'Classificação' : 'Classification'}</Text>
               </View>
-              {athletes.sort((a: any, b: any) => (a.lmpi || 0) - (b.lmpi || 0)).slice(0, 5).map((a: any, i: number) => (
-                <View key={a.id} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]}>
-                  <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>{a.name}</Text>
-                  <Text style={[styles.tableCell, { flex: 1, color: a.lmpi > 70 ? COLORS.green : a.lmpi > 40 ? COLORS.yellow : COLORS.red }]}>{a.lmpi?.toFixed(0) || '--'}</Text>
-                  <Text style={[styles.tableCell, { flex: 1, color: a.risk_level === 'high' ? COLORS.red : a.risk_level === 'moderate' ? COLORS.yellow : COLORS.green }]}>{a.risk_level || '--'}</Text>
-                </View>
-              ))}
+              {[...athletes]
+                .filter((a: any) => a.lmpi_validity !== 'invalid')
+                .sort((a: any, b: any) => (a.lmpi || 0) - (b.lmpi || 0))
+                .slice(0, 5)
+                .map((a: any, i: number) => {
+                  const cls = getLmpiClassification(a.lmpi, a.lmpi_validity, locale);
+                  return (
+                    <View key={a.id} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]} data-testid={`lmpi-ranking-row-${i}`}>
+                      <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>{a.name}</Text>
+                      <Text style={[styles.tableCell, { flex: 1, color: cls.color, fontWeight: '600' }]}>{a.lmpi?.toFixed(0) || '--'}</Text>
+                      <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, backgroundColor: cls.bgColor }}>
+                          <Text style={{ color: cls.color, fontSize: 11, fontWeight: '600' }}>{cls.label}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
             </View>
           </View>
         )}

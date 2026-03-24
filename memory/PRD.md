@@ -68,6 +68,16 @@ Root causes identificadas (RC1-RC7):
 - ACWR Padronização: 5 endpoints `/analysis/acwr-*` migrados de rolling average para load_engine EWMA — **CORRIGIDO**
 - RC7: Atletas sem dados aparecem com risco alto artificialmente — **CORRIGIDO**
 
+## UI Enhancement — LMPI Score Classification no Smart Summary (2026-03-24)
+**Implementado**: Badge de classificação LMPI exibido no Smart Summary sem alterar lógica do backend.
+- Helper `getLmpiClassification()` mapeia thresholds existentes: >=70 → Alto, >=40 → Moderado, <40 → Baixo
+- Badge com cor/background exibido abaixo do gauge
+- Validade: invalid → "Sem dados", partial → asterisco "*" com nota explicativa
+- Tabela renomeada de "Atletas com Maior Risco" → "Ranking LMPI" com colunas Score + Classificação
+- Atletas com `lmpi_validity === "invalid"` filtrados da tabela
+- Sem "High Risk" visual — classificação reflete performance, não risco direto
+- Arquivo: `frontend/app/(tabs)/data.tsx`
+
 ## Pendentes
 
 ### P1

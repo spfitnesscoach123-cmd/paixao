@@ -1,91 +1,94 @@
 <analysis>**original_problem_statement:**
-The user initially reported a critical data inconsistency bug where the Dashboard Visão Geral showed stale data while the Team Dashboard was correct. This was a recurring issue causing major user frustration. After this was fixed, the user requested several new features and bug fixes in sequence:
+The user initially provided a detailed bug report about the CSV import flow failing on iOS with an  error. After this was fixed, the user requested a deep technical audit of the Dashboard Visão Geral to identify root causes for numerous data inconsistencies. The audit revealed 7 major root causes (RCs). The user then guided the agent through a series of structured tasks to fix these issues systematically:
 
-1.  **Fix Empty State Bugs**: Correct two UI issues that occurred when no athletes were in the system:
-    *   The Dashboard Visão Geral displayed residual, artificial wellness data (e.g., a score of 5).
-    *   The Dashboard da Equipe would become a blank white page, losing its entire UI structure, including the CSV import button.
-2.  **Deactivate DJ Protocol & Manual Entry**: Hide the DJ (Drop Jump) protocol from all user-facing selectors and completely remove the manual data entry flow for jump assessments, enforcing the Camera Jump as the only input method.
-3.  **Robust CSV Import**: Overhaul the rigid CSV import functionality. The goal was to build a flexible, user-guided import flow that could handle various CSV structures from the same provider (Catapult). This included implementing CSV analysis, a data preview and mapping screen, and the ability to save mapping templates, all while ensuring no regressions in existing dashboard calculations or athlete auto-creation logic.
-4.  **Fix Production Deployment Failures**: The user provided build logs from a failing production deployment. The agent was tasked with analyzing the logs, identifying the root causes, and implementing code-level fixes to allow the deployment to succeed.
+1.  **Critical Bug Fix**: Correct the  error during CSV file selection on iOS.
+2.  **Deep Audit**: Perform a full-stack investigation of the Dashboard Visão Geral to map data flows, identify inconsistencies, and find the root causes of bugs related to filters and metric calculations.
+3.  **RC5 Fix (Pipeline)**: Fix the critical issue where CSV imports did not trigger metric recalculations (ACWR, EWMA, etc.).
+4.  **RC6 Fix (Single Source of Truth)**: Unify metric calculations by ensuring the Team Dashboard uses the central  instead of performing its own inline calculations.
+5.  **ACWR Standardization**: Refactor all  endpoints to use the EWMA-based calculation from the , eliminating divergent manual calculations.
+6.  **RC1 UX Fix (Gauges)**: Add labels to the dashboard gauges to clarify that they show current data (7/28d) and are not affected by date filters.
+7.  **RC2 & RC3 Fix (Date Filters)**: Fix the Hoje (Today) filter, which was breaking charts, and the Ontem (Yesterday) filter, which was showing incorrect dates.
+8.  **RC4 & RC7 Fix (LMPI Validity)**: Implement data validity criteria for the LMPI (Load Manager Performance Index) to prevent athletes with insufficient data from being incorrectly ranked as high risk.
 
 **User's preferred language**: Português
 
 **what currently exists?**
-The application has a React Native (Expo) frontend and a FastAPI backend.
-- The initial critical data inconsistency bug has been resolved. The backend logic in  now ensures all load metrics are gated by the presence of GPS data, making dashboard data consistent.
-- The empty state UI bugs have been fixed in the frontend components  and , ensuring the app behaves correctly when no athlete data is present.
-- The DJ protocol and manual jump assessment features have been hidden from the UI by applying filters in the relevant frontend components, without deleting the underlying code.
-- A new, robust, multi-step CSV import feature has been implemented. It includes a new backend module () for file analysis and new endpoints (, ). A corresponding frontend page () provides a full UI for uploading, reviewing, mapping, and importing CSV data.
-- Several critical deployment blockers have been fixed: Jest-related dependencies causing build failures were removed from , an  file was created to exclude unnecessary files from the build, and the API service () was refactored to use environment variables () instead of hardcoded URLs.
+The application consists of a React Native (Expo) frontend and a FastAPI backend. The core data processing logic is centralized in a  in the backend.
+
+A series of critical architectural and logical bugs identified during a deep audit have been systematically resolved:
+- The iOS-specific CSV import bug was fixed by using the native React Native approach for handling file uploads in FormData.
+- The data pipeline is now correctly triggered after a CSV import, ensuring all derived metrics (ACWR, Monotony, Strain, EWMA) are recalculated incrementally (**RC5 fixed**).
+- The Team Dashboard and Overview Dashboard now pull all metrics from the single source of truth, the , ensuring data consistency across the app (**RC6 fixed**).
+- Five separate analysis endpoints () have been standardized to also use the , eliminating conceptual inconsistencies in how ACWR was calculated.
+- The date filters for Hoje (Today) and Ontem (Yesterday) now function correctly without breaking charts or showing incorrect data (**RC2 & RC3 fixed**).
+- The LMPI calculation is now more robust, requiring a minimum set of data (ACWR + Wellness or RSImod) to be considered valid. This prevents athletes with missing data from being incorrectly flagged as high risk (**RC4 & RC7 fixed**).
+- The UI for the dashboard gauges has been updated to clarify that they represent current data windows (7/28d) and are independent of the selected date filter (**UX fix for RC1**).
 
 **Last working item**:
--   Last item agent was working: Fixing a series of production deployment failures reported by the user. The agent identified and corrected three root causes:
-    1.  Jest devDependencies (, , ) were causing the EAS build validation to fail.
-    2.  A hardcoded URL in  was preventing the app from using the correct backend URL in the deployment environment.
-    3.  Cache files () were being included in the build context, which could cause issues.
+-   Last item agent was working: Implementing the LMPI validity criteria (RC4 & RC7). This involved modifying the  function to return a validity status (, , ) based on data availability (requiring ACWR as a minimum) and ensuring that team-level averages and risk panels only consider athletes with valid scores.
 -   Status: USER VERIFICATION PENDING
--   Agent Testing Done: Y (Agent verified that the code changes were applied correctly.)
--   Which testing method agent to use? N/A. The next step requires the user to trigger a new deployment pipeline, which the agent cannot do.
+-   Agent Testing Done: Y
+-   Which testing method agent to use? manual testing by curl/ python -c
 -   User Testing Done: N
 
 **All Pending/In progress Issue list**:
--   **Issue 1**: **P0 - Production Deployment Validation**: The user needs to re-run the deployment pipeline to confirm that the fixes applied by the agent have resolved the build failures.
--   **Issue 2**: **P1 - PDF Generation Crash**: The Análise Científica feature has a known bug where generating a PDF can freeze or crash the app. This was mentioned in the initial handoff but has not been addressed.
--   **Issue 3**: **P2 - Inconsistent Rolling Load Engine Usage**: Other frontend dashboards still do not use the centralized Rolling Load Engine from the backend, leading to potential data inconsistencies.
--   **Issue 4**: **P3 - Incorrect ESLint Configuration**: The project has an incorrect ESLint setup for TypeScript, which should be fixed to improve code quality and maintainability.
+-   **Issue 1: Production Deployment Validation (P0)**
+    -   **Description**: This is a carry-over from the previous session. The user needs to re-run their production deployment pipeline to confirm that the initial fixes for EAS build failures were successful. This is a top-priority blocker for releasing any of the new fixes.
+    -   **Status**: USER VERIFICATION PENDING
+-   **Issue 2: PDF Generation Crash in Análise Científica (P1)**
+    -   **Description**: A known, recurring bug where generating a PDF can freeze or crash the app. This issue has not been addressed yet.
+    -   **Status**: NOT STARTED
 
 **Issues Detail**:
 -   **Issue 1: Production Deployment Validation**
-    -   **Attempted fixes**:
-        1.  Removed , , and  from .
-        2.  Created a  file to exclude  and other non-essential files.
-        3.  Refactored  to use .
-    -   **Next debug checklist**: The user must trigger a new deployment. If it fails, the new logs must be analyzed.
-    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical blocker preventing any new features or fixes from reaching production and the App Store.
+    -   **Attempted fixes**: Removed Jest devDependencies from , created , and refactored  to use environment variables.
+    -   **Next debug checklist**: The user must trigger a new deployment. If it fails again, the new build logs must be analyzed.
+    -   **Why fix this issue and what will be achieved with the fix?**: This is a critical blocker preventing any new features or bug fixes from reaching production users.
     -   **Status**: USER VERIFICATION PENDING
     -   **Is recurring issue?**: N
-    -   **Should Test frontend/backend/both after fix?**: N/A (Requires user action).
+    -   **Should Test frontend/backend/both after fix?**: N/A
     -   **Blocked on other issue**: None.
-
 -   **Issue 2: PDF generation crash in Análise Científica**
     -   **Attempted fixes**: None.
     -   **Next debug checklist**:
-        1.  Analyze the backend endpoint  in .
-        2.  Check for memory-intensive operations or large data loads that could be causing the crash.
+        1.  Analyze the backend endpoint responsible for PDF generation (likely  or similar in ).
+        2.  Check for memory-intensive operations, large data loads, or library conflicts.
         3.  Reproduce the crash and examine backend logs for errors.
     -   **Why fix this issue and what will be achieved with the fix?**: Fixes a critical stability issue on a core feature page.
     -   **Status**: NOT STARTED
     -   **Is recurring issue?**: Y
-    -   **Should Test frontend/backend/both after fix?**: Both.
-    -   **Blocked on other issue**: Blocked on Issue 1 (Deployment Validation).
+    -   **Should Test frontend/backend/both after fix?**: Both
+    -   **Blocked on other issue**: P1, but not a hard blocker for starting investigation.
 
 **In progress Task List**:
--   None. The last task is complete from the agent's side and is awaiting user verification.
+-   None.
 
 **Upcoming and Future Tasks**
 *   **Upcoming Tasks**:
-    *   **(P1)** Address the recurring crash during PDF generation in Análise Científica.
-    *   **(P2)** Refactor other frontend dashboards to use the backend's Rolling Load Engine API for consistency.
+    *   **(P0)** Wait for user confirmation on the Production Deployment Validation (Issue 1).
+    *   **(P1)** Fix the PDF generation crash (Issue 2).
 *   **Future Tasks**:
-    *   Complete the internationalization of  and the Avaliações page.
     *   Fix the incorrect ESLint configuration for TypeScript.
     *   Build a UI for merging duplicate athlete profiles.
     *   Remove the backup directory .
+    *   Complete the internationalization of  and the Avaliações page.
 
 **Completed work in this session**
--   **Data Inconsistency Fix**: Resolved stale data bug in  () by gating calculations on  availability.
--   **Empty State UI Fix**: Corrected UI bugs on  (removed  fallback) and  (removed early return) for when no athletes are present.
--   **UI Flow Deactivation**: Hid the DJ jump protocol and removed the manual jump assessment entry flow across , , and .
--   **CSV Import Feature**: Implemented a full-stack robust CSV import flow with a new backend module (), new API endpoints (, ), and a new frontend page ().
--   **Deployment Fixes**: Resolved EAS build failures by removing Jest dependencies (), adding , and correcting the API URL logic ().
--   **Testing**: Utilized  for comprehensive validation after major changes.
+-   **iOS CSV Import Fix**: Corrected the  error in .
+-   **RC5 Fix (CSV Pipeline)**: Fixed the critical bug where CSV imports didn't trigger metric recalculations in .
+-   **RC6 Fix (Single Source of Truth)**: Refactored the Team Dashboard in  to use the central .
+-   **ACWR Standardization**: Migrated 5  endpoints from manual calculation to use the EWMA-based .
+-   **RC1 UX Fix (Gauges)**: Updated dashboard gauge labels in  to improve user understanding.
+-   **RC2 Fix (Filter Hoje)**: Corrected the Today filter logic in  to prevent broken charts.
+-   **RC3 Fix (Filter Ontem)**: Fixed the Yesterday filter in  to use the correct date anchor.
+-   **RC4 & RC7 Fix (LMPI Validity)**: Implemented robust validity criteria for the LMPI calculation in  to prevent misinterpretation of risk for athletes with missing data.
 
 **Earlier issues found/mentioned but not fixed**
 -   PDF Generation in Análise Científica causes the app to freeze or crash.
 -   Incorrect ESLint configuration for TypeScript.
 
 **Known issue recurrence from previous fork**
--   **PDF generation crash**: A persistent stability issue in the Análise Científica section, mentioned in the initial handoff and still unresolved.
+-   **PDF generation crash**: A persistent stability issue in the Análise Científica section.
     -   **Recurrence count**: >3
     -   **Status**: NOT STARTED
 
@@ -93,90 +96,72 @@ The application has a React Native (Expo) frontend and a FastAPI backend.
 
 
 **Key Technical Concepts**
--   **Additive Feature Development**: The new CSV import feature was built as an isolated module that plugs into the existing data pipeline, minimizing risk to core application logic.
--   **Environment-Specific Logic**: Critical fixes were made to handle differences between local/preview environments and the production deployment environment (e.g., API URLs, build dependencies).
--   **EAS Build Configuration**: The agent worked with Expo Application Services (EAS) build configurations, including  environment variables and the  file, to resolve deployment issues.
--   **Robust Data Handling**: The application logic was improved to handle empty states (no data) gracefully, both in the backend calculations and the frontend UI rendering.
+-   **Root Cause Analysis (RCA)**: The entire session was driven by a deep audit that identified architectural flaws rather than just patching UI symptoms.
+-   **Single Source of Truth**: A core principle applied was to refactor multiple parts of the application (,  endpoints) to pull all derived metrics from the central , ensuring data consistency.
+-   **Data Validity Logic**: Implemented business logic to assess the completeness of a derived metric (LMPI) before it's used in rankings, preventing misleading interpretations of performance and risk.
+-   **Incremental Recalculation**: The data pipeline was fixed to trigger an incremental recalculation () from the earliest affected date, a performant approach for handling historical data imports.
+-   **Platform-Specific Fixes**: Differentiated between web-only APIs () and React Native compatible APIs ( in FormData) to fix a native iOS bug.
 
 **key DB schema**
--   No changes were made to the database schema in this session.
+-   No changes were made to the database schema.
 
 **changes in tech stack**
 -   None.
 
 **All files of reference**
--   : Major changes to dashboard logic and addition of new CSV endpoints.
--   : **Created** to house the new CSV analysis logic.
--   : **Created** as the new multi-step UI for CSV import.
--   : Fixed a fallback logic bug for wellness data.
--   : Fixed a major UI rendering bug for the empty state.
--   : UI changes to hide DJ protocol and manual entry.
--   : UI changes to hide DJ protocol.
--   : UI changes to hide DJ protocol.
--   : Refactored to correctly use environment variables for the API URL.
--   : Modified to remove Jest dependencies.
--   : **Created** to optimize the EAS build context.
-
-**Areas that need refactoring**:
--   Several frontend dashboards are not yet using the backend's centralized Rolling Load Engine, creating a risk of inconsistent data presentation. They should be refactored to use the same backend APIs as the main dashboards.
+-   : The most heavily modified file, containing fixes for the data pipeline (RC5), source of truth (RC6), date filters (RC2, RC3), LMPI validity (RC4, RC7), and ACWR standardization.
+-   : Modified to fix the iOS-specific file upload bug.
+-   : Modified to apply a UX fix to the dashboard gauge labels.
+-   : Updated with the status of all completed RC fixes.
 
 **key api endpoints**
--   : **FIXED**
--   : **VERIFIED** to be consistent with the overview.
--   : **NEW**
--   : **NEW**
+-   : **FIXED** to correctly trigger the metric recalculation pipeline.
+-   : **HEAVILY REFACTORED** to fix date filter logic and implement robust LMPI validity rules.
+-   : **REFACTORED** to consume metrics from the central , ensuring consistency with the overview dashboard.
+-   : All 5 related endpoints were **REFACTORED** to use the EWMA-based  instead of manual, inconsistent calculations.
 
 **Critical Info for New Agent**
 -   **Responda em Português.**
--   The immediate priority is to wait for the user to confirm if the recent deployment fixes were successful. **Do not start new tasks** until you get this confirmation.
--   The user is direct and prefers immediate execution on high-priority tasks over extensive planning. Acknowledge this and act decisively on P0 issues.
--   This project uses **Expo Application Services (EAS)** for builds. Be aware of its configuration (, ) and the distinction between the preview environment and a production build. You do not have access to run the production deployment pipeline.
--   When working on the CSV import flow, be extremely careful not to introduce regressions to the downstream dashboard calculations and rendering, as this was a strict requirement from the user.
+-   The user is highly technical and provides excellent, structured prompts. Match this level of detail and precision in your analysis and responses.
+-   The main audit and its subsequent high-priority fixes (RC2-RC7) are now complete. The application's data consistency is significantly improved.
+-   The immediate priority is to wait for the user to confirm if the production deployment fixes from the *previous* session were successful. After that, the next task is the long-standing PDF generation crash.
+-   The core architectural principle established is that the  is the **single source of truth** for all derived load metrics (EWMA, ACWR, Monotony, Strain). Do not re-introduce inline calculations anywhere.
 
 **documents and test reports created in this job**
--   
--   
--   
--    (updated with the new CSV import feature).
+-    (updated multiple times to reflect progress on RC fixes)
 
 **Last 10 User Messages and any pending HUMAN messages**
-1.  **User**: Reports  error after the new CSV feature was implemented. Asks if changes are in production.
-2.  **Agent**: Investigates and identifies the 422 error as a FormData incompatibility in React Native Web.
-3.  **Agent**: Fixes the FormData construction in .
-4.  **Agent**: Explains that the error was web-specific and that no changes are in production; the user must save to GitHub and deploy.
-5.  **User**: Asks for clarification if the App Store deploy is no longer done via Emergent.
-6.  **Agent**: Clarifies that Emergent is for web preview deploy only and explains the correct native production flow: Save to GitHub -> An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username -> An Expo user account is required to proceed.
-
-Log in to EAS with email or username (exit and run eas login --help to see other login options)
-Input is required, but stdin is not readable. Failed to display prompt: Email or username.
-7.  **User**: Provides deployment error logs and asks the agent to fix the underlying code issues.
-8.  **Agent**: Analyzes logs and identifies three issues: Jest dependencies, hardcoded URLs, and  in the build.
-9.  **Agent**: Implements all three fixes in parallel (removes Jest from , creates , fixes ).
-10. **Agent**: Confirms all fixes are applied and explains them to the user, stating they can now try deploying again.
+1.  **User**: Patches the ACWR standardization, requesting all ACWR calculations to use the load engine.
+2.  **Agent**: Implements the change across 5 endpoints and verifies consistency.
+3.  **User**: Requests a UX improvement to clarify that dashboard gauges are not affected by date filters.
+4.  **Agent**: Implements the label changes and info text on the frontend.
+5.  **User**: Requests a fix for RC2, where the Hoje (Today) filter breaks charts.
+6.  **Agent**: Implements the fix by treating Hoje as a 1-day period instead of a 0-day period.
+7.  **User**: Requests a fix for RC3, where the Ontem (Yesterday) filter shows incorrect dates.
+8.  **Agent**: Implements the fix by introducing a  to anchor all timeline calculations.
+9.  **User**: Defines the final business logic for LMPI validity (RC4 & RC7), requiring ACWR and state indicators for a score to be considered performant.
+10. **Agent**: Implements the LMPI validity criteria, ensuring invalid scores don't affect team averages or risk rankings, and verifies with tests.
 
 **Project Health Check:**
 -   **Broken**:
     -   PDF generation in Análise Científica is known to cause crashes.
 -   **Mocked**: None.
 -   **User Verification Pending**:
-    -   The entire CSV Import feature flow.
-    -   The recent fixes for the production deployment pipeline.
+    -   Production deployment pipeline fixes (from the previous session).
+    -   All the RC fixes implemented in this session have been agent-verified but not yet user-verified in a production build.
 
 **3rd Party Integrations**
--   None added or changed. The project uses Expo Application Services (EAS) for building and deployment, which is a key part of the development lifecycle.
+-   Expo Application Services (EAS) is used for builds, but no changes were made to its configuration in this session.
 
 **Testing status**
--   **Testing agent used after significant changes**: YES. The  was used successfully after the empty state fixes, the DJ protocol removal, and the CSV import feature was developed.
--   **Troubleshoot agent used after agent stuck in loop**: NO
--   **Test files created**: None.
--   **Known regressions**: None were introduced in this session.
+-   **Testing agent used after significant changes**: NO (Not required for these backend-heavy fixes).
+-   **Troubleshoot agent used after agent stuck in loop**: NO.
+-   **Test files created**: None. The agent used a series of ad-hoc  and  scripts to perform targeted validation of each fix, which proved very effective.
+-   **Known regressions**: None. The agent was careful to test for regressions after each change.
 
 **Credentials to test flow:**
 -   **User**: 
 -   **Password**: 
 
 **What agent forgot to execute**
--   The agent successfully addressed all high-priority tasks and user requests from this session. Lower-priority issues from the initial handoff (like the PDF crash and ESLint config) were correctly deprioritized and remain pending for future work.</analysis>
+-   The agent executed all tasks requested by the user methodically and precisely. Nothing was forgotten.</analysis>

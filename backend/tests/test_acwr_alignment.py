@@ -23,7 +23,7 @@ import os
 from datetime import datetime
 
 # Use the public URL from environment (same as frontend)
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://deployment-blocker-6.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://load-engine-1.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

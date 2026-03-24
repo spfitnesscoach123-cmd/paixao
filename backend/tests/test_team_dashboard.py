@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://deployment-blocker-6.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://load-engine-1.preview.emergentagent.com')
 
 class TestTeamDashboard:
     """Team Dashboard endpoint tests"""
