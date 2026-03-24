@@ -793,15 +793,16 @@ export default function DataScreen() {
           </View>
         )}
         
-        {/* Athlete LMPI Rankings Table */}
+        {/* Athlete LMPI Condition Table */}
         {mode !== 'athlete' && (
           <View style={styles.card} data-testid="lmpi-rankings-table">
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Ranking LMPI' : 'LMPI Rankings'}</Text>
+            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Melhor Condição (LMPI)' : 'Athletes by Condition (LMPI)'}</Text>
+            <Text style={{ color: '#64748b', fontSize: 10, marginBottom: 8, marginTop: -2 }}>{locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition'}</Text>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
-                <Text style={[styles.tableHeaderText, { flex: 1 }]}>Score</Text>
-                <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>{locale === 'pt' ? 'Classificação' : 'Classification'}</Text>
+                <Text style={[styles.tableHeaderText, { flex: 1 }]}>Score LMPI</Text>
+                <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>{locale === 'pt' ? 'Condição' : 'Condition'}</Text>
               </View>
               {[...athletes]
                 .filter((a: any) => a.lmpi_validity !== 'invalid')
