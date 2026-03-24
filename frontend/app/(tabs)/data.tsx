@@ -547,12 +547,18 @@ export default function DataScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
             <GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={110} />
             <GaugeChart value={chronicLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Chronic 28d" color={COLORS.blue} size={110} />
-            <GaugeChart value={acwr || 0} max={2} label="ACWR" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
+            <GaugeChart value={acwr || 0} max={2} label="ACWR • Atual" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
           </View>
           </ChartEntryView>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony</Text><AnimatedMetric value={monotony || 0} style={styles.metricPillValue} decimals={1} /></View>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain</Text><AnimatedMetric value={strain || 0} style={styles.metricPillValue} /></View>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony • 7d</Text><AnimatedMetric value={monotony || 0} style={styles.metricPillValue} decimals={1} /></View>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain • 7d</Text><AnimatedMetric value={strain || 0} style={styles.metricPillValue} /></View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, paddingHorizontal: 12 }}>
+            <Ionicons name="information-circle-outline" size={11} color="rgba(148,163,184,0.6)" style={{ marginRight: 4 }} />
+            <Text style={{ fontSize: 9, color: 'rgba(148,163,184,0.6)', textAlign: 'center' }}>
+              {locale === 'pt' ? 'Indicadores atuais (7/28d) — não são afetados pelo filtro de data' : 'Current indicators (7/28d) — not affected by the date filter'}
+            </Text>
           </View>
         </View>
         </FadeInView>
