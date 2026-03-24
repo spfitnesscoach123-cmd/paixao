@@ -8487,20 +8487,22 @@ async def get_dashboard_overview(
     effective_days = max(1, filter_days)
     
     today = datetime.utcnow()
-    today_str = today.strftime("%Y-%m-%d")
     
-    # For "yesterday", shift both start and end to yesterday
+    # RC3: Centralize temporal anchor in reference_date
+    # "yesterday" → reference_date = yesterday; all else → reference_date = today
     if date_range == "yesterday":
-        yesterday = today - timedelta(days=1)
-        filter_start = yesterday
-        filter_start_str = yesterday.strftime("%Y-%m-%d")
-        today_str = yesterday.strftime("%Y-%m-%d")
+        reference_date = today - timedelta(days=1)
     else:
-        filter_start = today - timedelta(days=filter_days)
-        filter_start_str = filter_start.strftime("%Y-%m-%d")
-    ninety_days_ago_str = (today - timedelta(days=90)).strftime("%Y-%m-%d")
-    seven_days_ago = today - timedelta(days=7)
-    twentyeight_days_ago = today - timedelta(days=28)
+        reference_date = today
+    
+    today_str = reference_date.strftime("%Y-%m-%d")
+    
+    filter_start = reference_date - timedelta(days=filter_days)
+    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    
+    ninety_days_ago_str = (reference_date - timedelta(days=90)).strftime("%Y-%m-%d")
+    seven_days_ago = reference_date - timedelta(days=7)
+    twentyeight_days_ago = reference_date - timedelta(days=28)
     
     # Load all athletes
     athletes = await db.athletes.find({"coach_id": user_id}).to_list(200)
@@ -8734,7 +8736,7 @@ async def get_dashboard_overview(
         # RC2: use effective_days (min 1) so "today" filter generates 1 data point
         daily_timeline = []
         for i in range(effective_days):
-            d = (today - timedelta(days=effective_days - 1 - i)).strftime("%Y-%m-%d")
+            d = (reference_date - timedelta(days=effective_days - 1 - i)).strftime("%Y-%m-%d")
             day_data = daily_gps.get(d, {})
             daily_timeline.append({
                 "date": d,
@@ -8751,7 +8753,7 @@ async def get_dashboard_overview(
         for w in range(4):
             week_data = []
             for dow in range(7):  # Mon=0 to Sun=6
-                d = today - timedelta(days=(3-w)*7 + (6 - dow))
+                d = reference_date - timedelta(days=(3-w)*7 + (6 - dow))
                 d_str = d.strftime("%Y-%m-%d")
                 dist = daily_gps.get(d_str, {}).get("total_distance", 0)
                 week_data.append({"date": d_str, "dow": dow, "value": dist})
@@ -8777,7 +8779,7 @@ async def get_dashboard_overview(
                 td = day_data.get("total_distance", 0)
                 other = td - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"]
         total_dist_period = sum(daily_gps.get(d, {}).get("total_distance", 0) 
-                               for d in [((today - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(effective_days)])
+                               for d in [((reference_date - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(effective_days)])
         vz_other = max(0, total_dist_period - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"])
         velocity_zones = {
             "low_intensity": round(vz_other),
@@ -9005,7 +9007,7 @@ async def get_dashboard_overview(
     agg_timeline = []
     if mode != "athlete" and n > 0:
         for day_idx in range(effective_days):
-            d = (today - timedelta(days=effective_days - 1 - day_idx)).strftime("%Y-%m-%d")
+            d = (reference_date - timedelta(days=effective_days - 1 - day_idx)).strftime("%Y-%m-%d")
             day_vals = [a["daily_timeline"][day_idx] if day_idx < len(a["daily_timeline"]) else {} for a in athlete_results]
             agg_timeline.append({
                 "date": d,
