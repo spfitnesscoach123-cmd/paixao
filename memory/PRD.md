@@ -62,11 +62,11 @@ Root causes identificadas (RC1-RC7):
 - RC1: Gauges não respondem ao filtro de data (EWMA acumulativo, sem filtro)
 - RC2: Filtro "Hoje" (filter_days=0) quebra charts e velocity zones — **CORRIGIDO**
 - RC3: Filtro "Ontem" gera datas erradas na timeline — **CORRIGIDO**
-- RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis
+- RC4: LMPI amarelo vs Risk "optimal" — semânticas incompatíveis — **CORRIGIDO**
 - RC5: CSV Import não atualiza métricas — **CORRIGIDO**
 - RC6: Monotony/Strain calculados diferente em Team vs Overview — **CORRIGIDO**
 - ACWR Padronização: 5 endpoints `/analysis/acwr-*` migrados de rolling average para load_engine EWMA — **CORRIGIDO**
-- RC7: Atletas sem dados aparecem com risco alto artificialmente
+- RC7: Atletas sem dados aparecem com risco alto artificialmente — **CORRIGIDO**
 
 ## Pendentes
 

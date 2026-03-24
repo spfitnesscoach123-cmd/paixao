@@ -8649,28 +8649,46 @@ async def get_dashboard_overview(
     
     def calc_lmpi(acwr_val, wellness_val, rsimod_val, vbt_fatigue_pct, monotony_val):
         """
-        LMPI = composite score 0-100.
+        LMPI = Performance Indicator (0-100).
         ACWR→30%, Wellness→25%, RSImod→20%, VBT Fatigue→15%, Monotony→10%
+        
+        VALIDITY RULES:
+        - ACWR is MANDATORY. Without it, LMPI is invalid (returns None).
+        - At least Wellness OR RSImod must be present for full validity.
+        - Missing data ≠ low performance. Return None instead of artificial low score.
         """
+        # RULE: Without ACWR, LMPI cannot be computed
+        if acwr_val is None:
+            return None, "invalid"
+        
+        # Determine data completeness
+        has_wellness = wellness_val is not None and wellness_val > 0
+        has_rsimod = rsimod_val is not None and rsimod_val > 0
+        has_state_data = has_wellness or has_rsimod
+        
+        if has_state_data:
+            validity = "valid"       # ACWR + at least 1 state indicator
+        else:
+            validity = "partial"     # ACWR only, no state data
+        
         score = 0.0
         # ACWR component: optimal=1.0-1.3→100, <0.8→50, >1.5→20
-        if acwr_val is not None:
-            if 0.8 <= acwr_val <= 1.3:
-                acwr_score = 100
-            elif acwr_val < 0.8:
-                acwr_score = max(20, acwr_val / 0.8 * 80)
-            elif acwr_val <= 1.5:
-                acwr_score = max(30, 100 - (acwr_val - 1.3) / 0.2 * 70)
-            else:
-                acwr_score = max(10, 100 - (acwr_val - 1.0) * 60)
-            score += acwr_score * 0.30
+        if 0.8 <= acwr_val <= 1.3:
+            acwr_score = 100
+        elif acwr_val < 0.8:
+            acwr_score = max(20, acwr_val / 0.8 * 80)
+        elif acwr_val <= 1.5:
+            acwr_score = max(30, 100 - (acwr_val - 1.3) / 0.2 * 70)
+        else:
+            acwr_score = max(10, 100 - (acwr_val - 1.0) * 60)
+        score += acwr_score * 0.30
         
         # Wellness: 0-10 scale → 0-100
-        if wellness_val is not None and wellness_val > 0:
+        if has_wellness:
             score += min(100, wellness_val * 10) * 0.25
         
         # RSImod: typical range 0.2-0.6 → 0-100
-        if rsimod_val is not None and rsimod_val > 0:
+        if has_rsimod:
             rsi_score = min(100, (rsimod_val / 0.5) * 100)
             score += rsi_score * 0.20
         
@@ -8678,8 +8696,6 @@ async def get_dashboard_overview(
         if vbt_fatigue_pct is not None:
             vbt_score = max(0, 100 - vbt_fatigue_pct * 5)
             score += vbt_score * 0.15
-        else:
-            score += 50 * 0.15  # neutral if no data
         
         # Monotony: <1.5=good, >2=bad
         if monotony_val is not None:
@@ -8690,10 +8706,20 @@ async def get_dashboard_overview(
             else:
                 mono_score = max(10, 100 - (monotony_val - 1.5) * 60)
             score += mono_score * 0.10
-        else:
-            score += 50 * 0.10
         
-        return round(min(100, max(0, score)), 1)
+        # Normalize: divide by actual weight used (only components present)
+        total_weight = 0.30  # ACWR always present
+        if has_wellness: total_weight += 0.25
+        if has_rsimod: total_weight += 0.20
+        if vbt_fatigue_pct is not None: total_weight += 0.15
+        if monotony_val is not None: total_weight += 0.10
+        
+        if total_weight > 0:
+            normalized = score / total_weight
+        else:
+            normalized = score
+        
+        return round(min(100, max(0, normalized)), 1), validity
     
     # ============ PER-ATHLETE CALCULATIONS ============
     athlete_results = []
@@ -8933,22 +8959,29 @@ async def get_dashboard_overview(
                 "lean_mass_kg": bc.get("lean_mass_kg")
             }
         
-        # LMPI — only compute when athlete has GPS/load data (consistent with Team Dashboard)
+        # LMPI — only compute when athlete has GPS/load data
+        # Returns (score, validity) where validity is "valid", "partial", or "invalid"
+        lmpi = None
+        lmpi_validity = "invalid"
         if has_gps_data:
-            lmpi = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
-        else:
-            lmpi = None
+            lmpi, lmpi_validity = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
         
-        # Risk classification
+        # Risk classification — derived from LMPI when valid, ACWR-only fallback when partial
         risk_level = "unknown"
-        if acwr is not None:
+        if lmpi is not None and lmpi_validity == "valid":
+            # LMPI-based risk (performance-based)
+            if lmpi >= 70: risk_level = "optimal"
+            elif lmpi >= 40: risk_level = "moderate"
+            else: risk_level = "high"
+        elif acwr is not None:
+            # ACWR-only fallback
             if acwr < 0.8: risk_level = "low"
             elif acwr <= 1.3: risk_level = "optimal"
             elif acwr <= 1.5: risk_level = "moderate"
             else: risk_level = "high"
         
-        # Risk score (composite)
-        risk_score = (100 - lmpi) if lmpi is not None else 0
+        # Risk score — None when LMPI is invalid (missing data ≠ low performance)
+        risk_score = (100 - lmpi) if lmpi is not None else None
         
         athlete_results.append({
             "id": aid,
@@ -8971,8 +9004,9 @@ async def get_dashboard_overview(
             "vbt_fatigue_pct": vbt_fatigue_pct,
             "body_comp": body_comp,
             "lmpi": lmpi,
+            "lmpi_validity": lmpi_validity,
             "risk_level": risk_level,
-            "risk_score": round(risk_score, 1),
+            "risk_score": round(risk_score, 1) if risk_score is not None else None,
             "daily_timeline": daily_timeline,
             "acwr_timeline": acwr_timeline,
             "velocity_zones": velocity_zones,
@@ -8993,7 +9027,7 @@ async def get_dashboard_overview(
     team_acwr = safe_avg([a["acwr"] for a in gps_athletes])
     team_monotony = safe_avg([a["monotony"] for a in gps_athletes])
     team_strain = safe_avg([a["strain"] for a in gps_athletes])
-    team_lmpi = safe_avg([a["lmpi"] for a in gps_athletes])
+    team_lmpi = safe_avg([a["lmpi"] for a in gps_athletes if a.get("lmpi") is not None])
     team_acute = safe_avg([a["acute_load"] for a in gps_athletes])
     team_chronic = safe_avg([a["chronic_load"] for a in gps_athletes])
     team_rsimod = safe_avg([a["rsimod"] for a in gps_athletes])
@@ -9170,7 +9204,8 @@ async def get_dashboard_overview_pdf(
     }
     
     # Build summary_data from summary + athletes
-    high_risk_athletes = [a for a in athletes_list if a.get("risk_level") == "high"]
+    # LMPI VALIDITY: Only athletes with valid LMPI appear in risk rankings
+    high_risk_athletes = [a for a in athletes_list if a.get("risk_level") == "high" and a.get("lmpi") is not None]
     total = summary.get("total_athletes", len(athletes_list))
     avail_count = summary.get("available", total)
     
@@ -9228,10 +9263,12 @@ async def get_dashboard_overview_pdf(
     }
     
     # Build risk_data from athletes
-    risk_scores = [a.get("risk_score", 50) for a in athletes_list if a.get("risk_level") != "unknown"]
+    # LMPI VALIDITY: Only include athletes with valid risk_score in rankings
+    risk_scores = [a.get("risk_score") for a in athletes_list if a.get("risk_score") is not None and a.get("lmpi_validity") != "invalid"]
     team_risk_score = round(sum(risk_scores) / len(risk_scores)) if risk_scores else 0
     risk_panel = sorted(
-        [{"name": a.get("name"), "risk_score": a.get("risk_score") or 0, "acwr": a.get("acwr") or 0, "wellness": a.get("wellness_score") or 0} for a in athletes_list],
+        [{"name": a.get("name"), "risk_score": a.get("risk_score") or 0, "acwr": a.get("acwr") or 0, "wellness": a.get("wellness_score") or 0, "lmpi_validity": a.get("lmpi_validity", "invalid")}
+         for a in athletes_list if a.get("risk_score") is not None],
         key=lambda x: x["risk_score"], reverse=True
     )
     
