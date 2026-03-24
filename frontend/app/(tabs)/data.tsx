@@ -796,8 +796,14 @@ export default function DataScreen() {
         {/* Athlete LMPI Condition Table */}
         {mode !== 'athlete' && (
           <View style={styles.card} data-testid="lmpi-rankings-table">
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Melhor Condição (LMPI)' : 'Athletes by Condition (LMPI)'}</Text>
-            <Text style={{ color: '#64748b', fontSize: 10, marginBottom: 8, marginTop: -2 }}>{locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Melhor Condição (LMPI)' : 'Athletes by Condition (LMPI)'}</Text>
+              <Pressable data-testid="lmpi-info-tooltip" onPress={() => Alert.alert('LMPI', locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta.' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition.')}>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>i</Text>
+                </View>
+              </Pressable>
+            </View>
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
