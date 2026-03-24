@@ -555,24 +555,25 @@ export default function DataScreen() {
       <View>
         {/* Acute vs Chronic Gauges */}
         <FadeInView delay={0}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Cronica' : 'Acute vs Chronic Load'}</Text>
+        <View style={styles.card} data-testid="acute-chronic-card">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load'}</Text>
+            <Pressable data-testid="acute-chronic-info-tooltip" onPress={() => Alert.alert(locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load', locale === 'pt' ? 'Acute (7d): média de carga dos últimos 7 dias.\nChronic (28d): média de carga dos últimos 28 dias.\nACWR: razão Acute/Chronic — valores entre 0.8 e 1.3 indicam zona ótima.\nMonotony: variabilidade da carga (< 2.0 ideal).\nStrain: carga acumulada × monotonia.\n\nEstes indicadores refletem dados atuais (7/28d) e não são afetados pelo filtro de data.' : 'Acute (7d): average load over last 7 days.\nChronic (28d): average load over last 28 days.\nACWR: Acute/Chronic ratio — values between 0.8 and 1.3 indicate optimal zone.\nMonotony: load variability (< 2.0 ideal).\nStrain: cumulative load × monotony.\n\nThese indicators reflect current data (7/28d) and are not affected by the date filter.')}>
+              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>i</Text>
+              </View>
+            </Pressable>
+          </View>
           <ChartEntryView delay={100} duration={700}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
             <GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={110} />
             <GaugeChart value={chronicLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Chronic 28d" color={COLORS.blue} size={110} />
-            <GaugeChart value={acwr || 0} max={2} label="ACWR • Atual" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
+            <GaugeChart value={acwr || 0} max={2} label="ACWR" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
           </View>
           </ChartEntryView>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony • 7d</Text><AnimatedMetric value={monotony || 0} style={styles.metricPillValue} decimals={1} /></View>
-            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain • 7d</Text><AnimatedMetric value={strain || 0} style={styles.metricPillValue} /></View>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 8, paddingHorizontal: 12 }}>
-            <Ionicons name="information-circle-outline" size={11} color="rgba(148,163,184,0.6)" style={{ marginRight: 4 }} />
-            <Text style={{ fontSize: 9, color: 'rgba(148,163,184,0.6)', textAlign: 'center' }}>
-              {locale === 'pt' ? 'Indicadores atuais (7/28d) — não são afetados pelo filtro de data' : 'Current indicators (7/28d) — not affected by the date filter'}
-            </Text>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Monotony 7d</Text><AnimatedMetric value={monotony || 0} style={styles.metricPillValue} decimals={1} /></View>
+            <View style={styles.metricPill}><Text style={styles.metricPillLabel}>Strain 7d</Text><AnimatedMetric value={strain || 0} style={styles.metricPillValue} /></View>
           </View>
         </View>
         </FadeInView>
