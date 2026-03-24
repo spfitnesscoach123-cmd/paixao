@@ -68,6 +68,14 @@ Root causes identificadas (RC1-RC7):
 - ACWR Padronização: 5 endpoints `/analysis/acwr-*` migrados de rolling average para load_engine EWMA — **CORRIGIDO**
 - RC7: Atletas sem dados aparecem com risco alto artificialmente — **CORRIGIDO**
 
+## Auditoria VBT Camera + Jump Camera (2026-03-24)
+**Documentado**: Auditoria pre-migracao MediaPipe. Documento completo em `/app/memory/AUDIT_VBT_JUMP_CAMERA.md`.
+- Pipelines VBT (8 etapas) e Jump (8 etapas) mapeados
+- 4 pontos de integracao MediaPipe identificados
+- Patch iOS (2 fixes criticos) documentado
+- 17 arquivos INTOCAVEIS, 7 CUIDADO, 4 SEGUROS classificados
+- Conclusao: Sistema estavel para intervencao
+
 ## UI Enhancement — LMPI Score Classification no Smart Summary (2026-03-24)
 **Implementado**: Badge de classificação LMPI exibido no Smart Summary sem alterar lógica do backend.
 - Helper `getLmpiClassification()` mapeia thresholds existentes: >=70 → Alto, >=40 → Moderado, <40 → Baixo
