@@ -94,18 +94,29 @@ Root causes identificadas (RC1-RC7):
 - Responsividade: ZERO implementacao (sem breakpoints, sem useWindowDimensions, sem layout lateral)
 - 5 causas raiz identificadas, 10 checks de animacao + 10 checks de responsividade
 
+## Implementacao Animacoes SVG Reais (2026-03-31)
+**Implementado**: Animacoes reais nos 5 componentes SVG do dashboard "Visao Geral".
+- Hook `useChartAnimation` criado em `components/animations/useChartAnimation.ts` (pattern identico ao `useAnimatedCounter`)
+- **GaugeChart**: strokeDasharray anima de 0 ate valor final (900ms), texto numerico tambem anima
+- **MiniBarChart**: height das barras anima de 0 ate altura final (700ms, delay 100ms)
+- **LineChart**: strokeDashoffset progressivo esquerda→direita (1000ms, delay 150ms), area fill com opacity animada
+- **DonutChart**: segmentos crescem proporcionalmente mantendo adjacencia (800ms, delay 100ms)
+- **HorizontalBar**: width anima de 0% ate valor final (700ms, delay 50ms)
+- Zero alteracao de logica, dados ou props
+- Wrappers existentes (FadeInView, ChartEntryView) preservados
+- Arquivo principal: `frontend/app/(tabs)/data.tsx`
+
 ## Pendentes
 
 ### P0
-- Implementar animacoes SVG reais (gauges, barras, linhas)
 - Implementar layout responsivo (sidebar em telas grandes)
 
 ### P2
 - Refatorar dashboards para Rolling Load Engine
-- RSI discrepância Overview vs Team
+- RSI discrepancia Overview vs Team
 
 ### P3/Backlog
-- Internacionalização ScientificAnalysisTab.tsx
+- Internacionalizacao ScientificAnalysisTab.tsx
 - ESLint TypeScript config
 - UI merge perfis duplicados
 - Remover ios_backup_before_removal/

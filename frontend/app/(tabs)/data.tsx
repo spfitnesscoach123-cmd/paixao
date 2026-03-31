@@ -13,7 +13,7 @@ import api from '../../services/api';
 import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { AnimatedMetric, SkeletonDashboard, FadeInView, ChartEntryView, AnimatedCard } from '../../components/animations';
+import { AnimatedMetric, SkeletonDashboard, FadeInView, ChartEntryView, AnimatedCard, useChartAnimation } from '../../components/animations';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 64;
@@ -70,10 +70,12 @@ const getLmpiClassification = (lmpi: number | null | undefined, validity: string
 
 // Gauge Component
 const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: number; max?: number; label: string; color: string; size?: number }) => {
+  const animProgress = useChartAnimation(900);
   const radius = (size - 16) / 2;
   const circumference = Math.PI * radius;
   const progress = Math.min(value / max, 1);
-  const dashArray = progress * circumference;
+  const dashArray = progress * animProgress * circumference;
+  const displayVal = typeof value === 'number' && !isNaN(value) ? value * animProgress : 0;
   
   return (
     <View style={{ alignItems: 'center' }}>
@@ -88,7 +90,7 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
           <Circle cx={size/2} cy={size/2} r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${circumference} ${circumference*2}`} />
           <Circle cx={size/2} cy={size/2} r={radius} stroke={`url(#gauge-${label})`} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${dashArray} ${circumference*2}`} />
         </G>
-        <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill="#f1f5f9" fontSize={22} fontWeight="bold">{typeof value === 'number' ? value.toFixed(value < 10 ? 1 : 0) : '--'}</SvgText>
+        <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill="#f1f5f9" fontSize={22} fontWeight="bold">{typeof value === 'number' ? displayVal.toFixed(displayVal < 10 ? 1 : 0) : '--'}</SvgText>
         <SvgText x={size/2} y={size/2 + 14} textAnchor="middle" fill="#94a3b8" fontSize={10}>{label}</SvgText>
       </Svg>
     </View>
@@ -97,14 +99,16 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
 
 // Mini Bar Chart
 const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number[]; color: string; height?: number; barWidth?: number }) => {
+  const animProgress = useChartAnimation(700, 100);
   const max = Math.max(...data, 1);
   const w = Math.min(data.length * (barWidth + 3), CHART_WIDTH - 20);
   return (
     <Svg width={w} height={height}>
       {data.map((v, i) => {
-        const h = (v / max) * (height - 10);
+        const targetH = (v / max) * (height - 10);
+        const h = targetH * animProgress;
         return (
-          <Rect key={i} x={i * (barWidth + 3)} y={height - h - 2} width={barWidth} height={h} rx={2} fill={color} opacity={0.8} />
+          <Rect key={i} x={i * (barWidth + 3)} y={height - h - 2} width={barWidth} height={Math.max(h, 0)} rx={2} fill={color} opacity={0.8} />
         );
       })}
     </Svg>
@@ -113,6 +117,7 @@ const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number
 
 // Line Chart Component (multi-line support)
 const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: { data: number[]; color: string; dashed?: boolean }[]; labels?: string[]; height?: number; showArea?: boolean }) => {
+  const animProgress = useChartAnimation(1000, 150);
   const w = CHART_WIDTH;
   const padding = { top: 10, bottom: 24, left: 4, right: 4 };
   const chartW = w - padding.left - padding.right;
@@ -132,12 +137,22 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
       })}
       
       {lines.map((line, li) => {
-        const points = line.data.map((v, i) => {
+        const pointsXY = line.data.map((v, i) => {
           const x = padding.left + (i / Math.max(line.data.length - 1, 1)) * chartW;
           const y = padding.top + chartH * (1 - (v - minVal) / range);
-          return `${x},${y}`;
+          return { x, y };
         });
+        const points = pointsXY.map(p => `${p.x},${p.y}`);
         const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p}`).join(' ');
+        
+        // Calculate path length for progressive drawing animation
+        let pathLen = 0;
+        for (let j = 1; j < pointsXY.length; j++) {
+          const dx = pointsXY[j].x - pointsXY[j-1].x;
+          const dy = pointsXY[j].y - pointsXY[j-1].y;
+          pathLen += Math.sqrt(dx * dx + dy * dy);
+        }
+        pathLen = Math.max(pathLen, 1);
         
         // Area fill
         let areaPath = '';
@@ -150,8 +165,11 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
         
         return (
           <G key={li}>
-            {showArea && li === 0 && <Path d={areaPath} fill={line.color} opacity={0.15} />}
-            <Path d={pathD} stroke={line.color} strokeWidth={2} fill="none" strokeDasharray={line.dashed ? '6,4' : undefined} opacity={0.9} />
+            {showArea && li === 0 && <Path d={areaPath} fill={line.color} opacity={0.15 * animProgress} />}
+            <Path d={pathD} stroke={line.color} strokeWidth={2} fill="none"
+              strokeDasharray={line.dashed ? '6,4' : `${pathLen}`}
+              strokeDashoffset={line.dashed ? undefined : pathLen * (1 - animProgress)}
+              opacity={0.9} />
           </G>
         );
       })}
@@ -168,6 +186,7 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
 
 // Donut Chart
 const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, centerSubtext }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; centerText?: string; centerSubtext?: string }) => {
+  const animProgress = useChartAnimation(800, 100);
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = segments.reduce((s, seg) => s + seg.value, 0);
@@ -179,8 +198,8 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
         <G rotation="-90" origin={`${size/2}, ${size/2}`}>
           {total > 0 && segments.map((seg, i) => {
             const pct = seg.value / total;
-            const dash = pct * circumference;
-            const currentOffset = -offset * circumference / 360;
+            const dash = pct * circumference * animProgress;
+            const currentOffset = -offset * circumference / 360 * animProgress;
             offset += pct * 360;
             return <Circle key={i} cx={size/2} cy={size/2} r={radius} stroke={seg.color} strokeWidth={strokeWidth} fill="none" strokeDasharray={`${dash} ${circumference}`} strokeDashoffset={currentOffset} strokeLinecap="round" />;
           })}
@@ -331,7 +350,8 @@ const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: 
 
 // Horizontal Bar
 const HorizontalBar = ({ value, max, label, color }: { value: number; max: number; label: string; color: string }) => {
-  const pct = Math.min(value / max, 1) * 100;
+  const animProgress = useChartAnimation(700, 50);
+  const pct = Math.min(value / max, 1) * 100 * animProgress;
   return (
     <View style={{ marginBottom: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>

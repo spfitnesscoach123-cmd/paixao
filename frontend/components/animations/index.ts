@@ -1,4 +1,5 @@
 export { useAnimatedCounter } from './useAnimatedCounter';
+export { useChartAnimation } from './useChartAnimation';
 export { AnimatedCard } from './AnimatedCard';
 export { AnimatedMetric } from './AnimatedMetric';
 export { SkeletonBar, SkeletonCard, SkeletonDashboard, SkeletonList, SkeletonProfile } from './SkeletonLoader';
