@@ -86,10 +86,19 @@ Root causes identificadas (RC1-RC7):
 - Sem "High Risk" visual — classificação reflete performance, não risco direto
 - Arquivo: `frontend/app/(tabs)/data.tsx`
 
+## Auditoria Animacoes + Responsividade (2026-03-24)
+**Documentado**: Auditoria da dashboard "Visao Geral". Documento completo em `/app/memory/AUDIT_ANIMATIONS_RESPONSIVENESS.md`.
+- Animacoes SVG (gauges, barras, linhas): NAO IMPLEMENTADAS nos componentes SVG (renderizam valor final direto)
+- Wrappers (FadeInView, ChartEntryView): FUNCIONAM mas animam container, nao conteudo SVG
+- AnimatedMetric (contagem numerica): FUNCIONA
+- Responsividade: ZERO implementacao (sem breakpoints, sem useWindowDimensions, sem layout lateral)
+- 5 causas raiz identificadas, 10 checks de animacao + 10 checks de responsividade
+
 ## Pendentes
 
-### P1
-- PDF generation crash em "Análise Científica"
+### P0
+- Implementar animacoes SVG reais (gauges, barras, linhas)
+- Implementar layout responsivo (sidebar em telas grandes)
 
 ### P2
 - Refatorar dashboards para Rolling Load Engine
