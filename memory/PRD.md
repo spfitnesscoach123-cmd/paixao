@@ -96,15 +96,20 @@ Root causes identificadas (RC1-RC7):
 
 ## Implementacao Animacoes SVG Reais (2026-03-31)
 **Implementado**: Animacoes reais nos 5 componentes SVG do dashboard "Visao Geral".
-- Hook `useChartAnimation` criado em `components/animations/useChartAnimation.ts` (pattern identico ao `useAnimatedCounter`)
-- **GaugeChart**: strokeDasharray anima de 0 ate valor final (900ms), texto numerico tambem anima
-- **MiniBarChart**: height das barras anima de 0 ate altura final (700ms, delay 100ms)
-- **LineChart**: strokeDashoffset progressivo esquerda→direita (1000ms, delay 150ms), area fill com opacity animada
-- **DonutChart**: segmentos crescem proporcionalmente mantendo adjacencia (800ms, delay 100ms)
-- **HorizontalBar**: width anima de 0% ate valor final (700ms, delay 50ms)
+- Hook `useChartAnimation` evoluido com Reanimated (useSharedValue + withTiming + cancelAnimation)
+- Hook `useAnimatedValue` criado para transicoes data-driven (valor antigo → novo valor)
+- Hook `useReduceMotionPreference` para acessibilidade (web: matchMedia, native: AccessibilityInfo)
+- **GaugeChart**: `useAnimatedValue` — transicao suave entre valores, texto numerico animado (900ms)
+- **MiniBarChart**: `useChartAnimation` com deps — re-anima ao mudar dados (700ms, delay 100ms)
+- **LineChart**: `useChartAnimation` com deps — re-anima linhas ao mudar dados (1000ms, delay 200ms)
+- **DonutChart**: `useChartAnimation` com deps — re-anima segmentos ao mudar dados (800ms, delay 300ms)
+- **HorizontalBar**: `useAnimatedValue` — transicao suave entre valores (700ms, delay 400ms)
+- Stagger orquestrado: 0ms → 100ms → 200ms → 300ms → 400ms entre tipos
+- Reduce motion: detecta preferencia do sistema e renderiza valor final direto
+- Data-driven transitions: GaugeChart e HorizontalBar animam oldValue→newValue
+- Array charts (Bar, Line, Donut): re-animam 0→1 com duration curta (400ms) ao mudar dados
 - Zero alteracao de logica, dados ou props
 - Wrappers existentes (FadeInView, ChartEntryView) preservados
-- Arquivo principal: `frontend/app/(tabs)/data.tsx`
 
 ## Pendentes
 
