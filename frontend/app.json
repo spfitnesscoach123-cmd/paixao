@@ -74,6 +74,19 @@
           "enableLocation": false
         }
       ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "extraPods": [
+              {
+                "name": "MediaPipeTasksVision"
+              }
+            ]
+          }
+        }
+      ],
       "./plugins/withMediaPipePose"
     ],
     "experiments": {

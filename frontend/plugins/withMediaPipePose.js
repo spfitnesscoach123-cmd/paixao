@@ -1,65 +1,59 @@
 /**
  * Expo Config Plugin — MediaPipe Pose Detection via Vision Camera
  *
- * Uses official Expo APIs:
- * - withPodfile: Injects GoogleMediaPipeTasksVision pod (survives prebuild --clean)
- * - withDangerousMod: Sets ios.useFrameworks = static in Podfile.properties.json
- * - withXcodeProject: Adds Swift plugin, Obj-C registrar, and .task model to Xcode project
+ * Pod injection and useFrameworks are handled by expo-build-properties (extraPods).
+ * This plugin only handles:
+ * - Fallback pod injection (safety net via withDangerousMod)
+ * - Copying native Swift plugin, Obj-C registrar, and .task model to Xcode project
  */
 
 const {
   withDangerousMod,
   withXcodeProject,
-  withPodfile,
 } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
 function withMediaPipePose(config) {
 
-  // ─── Step 0: Ensure ios.useFrameworks = static ───
-  // MediaPipeTasksVision REQUIRES use_frameworks! for Swift module maps.
+  // ─── Step 1: Fallback — Verify pod is in Podfile, inject if missing ───
+  // expo-build-properties extraPods should handle this, but we verify as safety net
   config = withDangerousMod(config, [
     'ios',
     (modConfig) => {
-      const propsPath = path.join(
+      const podfilePath = path.join(
         modConfig.modRequest.platformProjectRoot,
-        'Podfile.properties.json'
+        'Podfile'
       );
 
-      let props = {};
-      if (fs.existsSync(propsPath)) {
-        try {
-          props = JSON.parse(fs.readFileSync(propsPath, 'utf-8'));
-        } catch (e) {
-          // Will create fresh
-        }
-      }
+      if (fs.existsSync(podfilePath)) {
+        let contents = fs.readFileSync(podfilePath, 'utf-8');
 
-      if (props['ios.useFrameworks'] !== 'static') {
-        props['ios.useFrameworks'] = 'static';
-        fs.writeFileSync(propsPath, JSON.stringify(props, null, 2));
-        console.log('[withMediaPipePose] Set ios.useFrameworks = static');
+        if (!contents.includes("pod 'MediaPipeTasksVision'")) {
+          // Try to inject after use_native_modules! (after use_frameworks! in template)
+          if (contents.includes('config = use_native_modules!')) {
+            contents = contents.replace(
+              'config = use_native_modules!',
+              "pod 'MediaPipeTasksVision'\n\n  config = use_native_modules!"
+            );
+          } else if (contents.includes('use_expo_modules!')) {
+            // Fallback: inject after use_expo_modules!
+            contents = contents.replace(
+              'use_expo_modules!',
+              "use_expo_modules!\n  pod 'MediaPipeTasksVision'"
+            );
+          }
+
+          fs.writeFileSync(podfilePath, contents);
+          console.log('[withMediaPipePose] Fallback: Injected MediaPipeTasksVision pod into Podfile');
+        } else {
+          console.log('[withMediaPipePose] MediaPipeTasksVision pod already present in Podfile (via extraPods)');
+        }
       }
 
       return modConfig;
     },
   ]);
-
-  // ─── Step 1: Inject pod via withPodfile (official API, survives prebuild) ───
-  config = withPodfile(config, (modConfig) => {
-    const contents = modConfig.modResults.contents;
-
-    if (!contents.includes('MediaPipeTasksVision')) {
-      modConfig.modResults.contents = contents.replace(
-        /use_expo_modules!/,
-        "use_expo_modules!\n  pod 'MediaPipeTasksVision'"
-      );
-      console.log('[withMediaPipePose] Injected MediaPipeTasksVision pod via withPodfile');
-    }
-
-    return modConfig;
-  });
 
   // ─── Step 2: Copy native files + model, add to Xcode project ───
   config = withXcodeProject(config, (modConfig) => {
