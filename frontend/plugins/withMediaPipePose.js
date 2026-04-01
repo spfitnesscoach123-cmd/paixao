@@ -50,12 +50,12 @@ function withMediaPipePose(config) {
   config = withPodfile(config, (modConfig) => {
     const contents = modConfig.modResults.contents;
 
-    if (!contents.includes('GoogleMediaPipeTasksVision')) {
+    if (!contents.includes('MediaPipeTasksVision')) {
       modConfig.modResults.contents = contents.replace(
         /use_expo_modules!/,
-        "use_expo_modules!\n  pod 'GoogleMediaPipeTasksVision'"
+        "use_expo_modules!\n  pod 'MediaPipeTasksVision'"
       );
-      console.log('[withMediaPipePose] Injected GoogleMediaPipeTasksVision pod via withPodfile');
+      console.log('[withMediaPipePose] Injected MediaPipeTasksVision pod via withPodfile');
     }
 
     return modConfig;
