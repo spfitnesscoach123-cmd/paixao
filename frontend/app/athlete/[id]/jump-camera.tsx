@@ -64,30 +64,9 @@ import {
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
 import { format } from 'date-fns';
 
-// Conditional import for native MediaPipe - SAFE GUARDED IMPORT
-let RNMediapipe: any = null;
-let MEDIAPIPE_AVAILABLE = false;
-
-if (Platform.OS !== 'web') {
-  try {
-    const mediapipe = require('@thinksys/react-native-mediapipe');
-    if (mediapipe && mediapipe.RNMediapipe) {
-      RNMediapipe = mediapipe.RNMediapipe;
-      MEDIAPIPE_AVAILABLE = true;
-      console.log('[JUMP_CAMERA] MediaPipe loaded successfully');
-    } else {
-      MEDIAPIPE_AVAILABLE = false;
-      console.log('[JUMP_CAMERA] MediaPipe module found but RNMediapipe component not available');
-    }
-  } catch (e) {
-    // CRITICAL: Silent catch to prevent crash in production builds
-    MEDIAPIPE_AVAILABLE = false;
-    RNMediapipe = null;
-    if (__DEV__) {
-      console.log('[JUMP_CAMERA] MediaPipe not available:', e);
-    }
-  }
-}
+// MediaPipe via Vision Camera + native frame processor plugin (detectPose)
+// Replaces @thinksys/react-native-mediapipe with direct MediaPipe Tasks Vision integration
+import { MediaPipeCamera, MEDIAPIPE_AVAILABLE } from '../../../services/pose/MediaPipeCamera';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -916,24 +895,13 @@ function JumpCameraContent() {
         
         {/* Camera View - Mount when shouldMountCamera is true (LOCAL STATE) */}
         <View style={styles.cameraContainer}>
-          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE ? (
             <View style={styles.camera}>
-              <RNMediapipe
+              <MediaPipeCamera
                 style={StyleSheet.absoluteFill}
-                height={screenHeight}
-                width={screenWidth}
                 onLandmark={handleMediapipeLandmark}
-                face={false}
-                leftArm={false}
-                rightArm={false}
-                leftWrist={false}
-                rightWrist={false}
-                torso={true}
-                leftLeg={true}
-                rightLeg={true}
-                leftAnkle={true}
-                rightAnkle={true}
-                frameLimit={30}
+                cameraType="back"
+                fps={30}
               />
             </View>
           ) : shouldMountCamera ? (
@@ -1049,24 +1017,13 @@ function JumpCameraContent() {
         
         {/* Camera View - Active processing */}
         <View style={styles.cameraContainer}>
-          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && RNMediapipe ? (
+          {shouldMountCamera && Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE ? (
             <View style={styles.camera}>
-              <RNMediapipe
+              <MediaPipeCamera
                 style={StyleSheet.absoluteFill}
-                height={screenHeight}
-                width={screenWidth}
                 onLandmark={handleMediapipeLandmark}
-                face={false}
-                leftArm={false}
-                rightArm={false}
-                leftWrist={false}
-                rightWrist={false}
-                torso={true}
-                leftLeg={true}
-                rightLeg={true}
-                leftAnkle={true}
-                rightAnkle={true}
-                frameLimit={30}
+                cameraType="back"
+                fps={30}
               />
             </View>
           ) : shouldMountCamera ? (

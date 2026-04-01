@@ -32,21 +32,8 @@ import { RecordingPipeline, RecordingResult } from '../../services/vbt/Recording
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-// Conditional import for native MediaPipe
-let RNMediapipe: any = null;
-let nativeSwitchCamera: (() => void) | null = null;
-let MEDIAPIPE_AVAILABLE = false;
-
-if (Platform.OS !== 'web') {
-  try {
-    const mediapipe = require('@thinksys/react-native-mediapipe');
-    RNMediapipe = mediapipe.RNMediapipe;
-    nativeSwitchCamera = mediapipe.switchCamera;
-    MEDIAPIPE_AVAILABLE = !!RNMediapipe;
-  } catch (e) {
-    console.warn('[CameraView] MediaPipe not available:', e);
-  }
-}
+// MediaPipe via Vision Camera + native frame processor plugin (detectPose)
+import { MediaPipeCamera, MEDIAPIPE_AVAILABLE } from '../../services/pose/MediaPipeCamera';
 
 export interface CameraViewProps {
   // Callbacks
@@ -164,13 +151,7 @@ const CameraView = forwardRef<CameraViewRef, CameraViewProps>((props, ref) => {
     setDisplayFacing(newFacing);
     
     // Call native switchCamera if available
-    if (Platform.OS !== 'web' && nativeSwitchCamera) {
-      try {
-        nativeSwitchCamera();
-      } catch (e) {
-        console.warn('[CameraView] nativeSwitchCamera failed:', e);
-      }
-    }
+    // Vision Camera handles switching via cameraType prop — no explicit native call needed
     
     console.log('[CameraView] Camera toggled to:', newFacing);
   }, []);
@@ -257,26 +238,15 @@ const CameraView = forwardRef<CameraViewRef, CameraViewProps>((props, ref) => {
   }, [onLandmark]);
 
   // Render based on platform and MediaPipe availability
-  if (Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && enableMediaPipe && RNMediapipe) {
-    // Native platform with MediaPipe
+  if (Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE && enableMediaPipe) {
+    // Native platform with MediaPipe via Vision Camera
     return (
       <View style={[styles.container, style]}>
-        <RNMediapipe
+        <MediaPipeCamera
           style={StyleSheet.absoluteFill}
-          height={screenHeight}
-          width={screenWidth}
           onLandmark={handleLandmark}
-          face={true}
-          leftArm={true}
-          rightArm={true}
-          leftWrist={true}
-          rightWrist={true}
-          torso={true}
-          leftLeg={true}
-          rightLeg={true}
-          leftAnkle={true}
-          rightAnkle={true}
-          frameLimit={frameLimit}
+          cameraType={displayFacing}
+          fps={frameLimit}
         />
         {children}
       </View>

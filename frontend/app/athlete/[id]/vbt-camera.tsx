@@ -41,30 +41,9 @@ import {
 import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
 import FatigueVisualOverlay from '../../../components/vbt/FatigueVisualOverlay';
 
-// Conditional import for native MediaPipe
-// @thinksys/react-native-mediapipe exports RNMediapipe component with onLandmark callback
-// Also exports switchCamera function to toggle between front/back cameras
-// IMPORTANT: This ONLY works in Development Build or EAS Build, NOT in Expo Go
-let RNMediapipe: any = null;
-let switchCamera: (() => void) | null = null;
-let MEDIAPIPE_AVAILABLE = false;
-
-if (Platform.OS !== 'web') {
-  try {
-    const mediapipe = require('@thinksys/react-native-mediapipe');
-    RNMediapipe = mediapipe.RNMediapipe;
-    switchCamera = mediapipe.switchCamera;
-    MEDIAPIPE_AVAILABLE = !!RNMediapipe;
-    console.log('[VBT_CAMERA] ✅ MediaPipe loaded successfully');
-    console.log('[VBT_CAMERA] RNMediapipe component:', RNMediapipe ? 'AVAILABLE' : 'NOT FOUND');
-    console.log('[VBT_CAMERA] switchCamera function:', switchCamera ? 'AVAILABLE' : 'NOT FOUND');
-  } catch (e) {
-    console.warn('[VBT_CAMERA] ⚠️ MediaPipe not available:', e);
-    console.warn('[VBT_CAMERA] Make sure you are using Development Build or EAS Build, NOT Expo Go');
-  }
-} else {
-  console.log('[VBT_CAMERA] Web platform detected - using expo-camera fallback');
-}
+// MediaPipe via Vision Camera + native frame processor plugin (detectPose)
+// Replaces @thinksys/react-native-mediapipe with direct MediaPipe Tasks Vision integration
+import { MediaPipeCamera, MEDIAPIPE_AVAILABLE } from '../../../services/pose/MediaPipeCamera';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
@@ -316,14 +295,7 @@ function VBTCameraContent() {
     setCameraFacing(newFacing);
     
     // Call native switchCamera in sync with ref update
-    if (Platform.OS !== 'web' && switchCamera) {
-      try {
-        switchCamera();
-        console.log("[VBT_CAMERA] Native switchCamera called successfully");
-      } catch (e) {
-        console.warn("[VBT_CAMERA] switchCamera failed:", e);
-      }
-    }
+    // Vision Camera handles switching via cameraType prop change
     
     console.log("[VBT_CAMERA] Camera switched to:", newFacing, "(ref:", cameraFacingRef.current, ")");
   }, []);
@@ -1308,25 +1280,14 @@ function VBTCameraContent() {
         <View style={styles.pointSelectionContainer}>
           <View style={styles.cameraContainer}>
             {shouldMountCamera && (
-              Platform.OS !== 'web' && RNMediapipe ? (
-                /* Native platform: Use RNMediapipe for real-time pose detection */
+              Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE ? (
+                /* Native platform: Use Vision Camera + MediaPipe for real-time pose detection */
                 <View style={styles.camera}>
-                  <RNMediapipe
+                  <MediaPipeCamera
                     style={StyleSheet.absoluteFill}
-                    height={screenHeight}
-                    width={screenWidth}
                     onLandmark={handleMediapipeLandmark}
-                    face={true}
-                    leftArm={true}
-                    rightArm={true}
-                    leftWrist={true}
-                    rightWrist={true}
-                    torso={true}
-                    leftLeg={true}
-                    rightLeg={true}
-                    leftAnkle={true}
-                    rightAnkle={true}
-                    frameLimit={30}
+                    cameraType={cameraFacing}
+                    fps={30}
                   />
                   
                   {/* Touchable overlay for coach marker */}
@@ -1657,26 +1618,15 @@ function VBTCameraContent() {
         <View style={styles.recordingContainer}>
           <View style={styles.cameraContainer}>
             {shouldMountCamera && (
-              /* Use RNMediapipe for REAL pose detection on native platforms */
-              Platform.OS !== 'web' && RNMediapipe ? (
+              /* Use Vision Camera + MediaPipe for REAL pose detection on native platforms */
+              Platform.OS !== 'web' && MEDIAPIPE_AVAILABLE ? (
                 <View style={styles.camera}>
                   {/* Native MediaPipe Camera Component */}
-                  <RNMediapipe
+                  <MediaPipeCamera
                     style={StyleSheet.absoluteFill}
-                    height={screenHeight}
-                    width={screenWidth}
                     onLandmark={handleMediapipeLandmark}
-                    face={true}
-                    leftArm={true}
-                    rightArm={true}
-                    leftWrist={true}
-                    rightWrist={true}
-                    torso={true}
-                    leftLeg={true}
-                    rightLeg={true}
-                    leftAnkle={true}
-                    rightAnkle={true}
-                    frameLimit={30}
+                    cameraType={cameraFacing}
+                    fps={30}
                   />
                   
                   {/* Overlay UI on top of camera */}

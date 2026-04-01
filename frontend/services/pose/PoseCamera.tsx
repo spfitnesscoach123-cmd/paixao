@@ -27,27 +27,14 @@ import { colors } from '../../constants/theme';
 // CONDITIONAL IMPORTS - Native MediaPipe only on iOS/Android
 // ============================================================================
 
-let MediapipePoseView: any = null;
-let MediapipeModule: any = null;
-let switchCamera: (() => void) | null = null;
-
-// Only import native MediaPipe on iOS/Android
-if (Platform.OS !== 'web') {
-  try {
-    const mediapipe = require('@thinksys/react-native-mediapipe');
-    MediapipePoseView = mediapipe.MediapipePoseView;
-    MediapipeModule = mediapipe.default || mediapipe;
-    switchCamera = mediapipe.switchCamera;
-  } catch (e) {
-    console.warn('[PoseCamera] MediaPipe not available, will use simulation fallback');
-  }
-}
+// MediaPipe via Vision Camera + native frame processor plugin (detectPose)
+import { MediaPipeCamera, MEDIAPIPE_AVAILABLE as mediapipeLoaded } from './MediaPipeCamera';
 
 // Fallback for web
 let CameraView: any = null;
 let useCameraPermissions: any = null;
 
-if (Platform.OS === 'web' || !MediapipePoseView) {
+if (Platform.OS === 'web' || !mediapipeLoaded) {
   try {
     const expoCamera = require('expo-camera');
     CameraView = expoCamera.CameraView;
@@ -172,7 +159,7 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   const onPoseDetectedRef = useRef(onPoseDetected);
   
   // Determine if we should use native MediaPipe or simulation
-  const shouldUseNativeMediapipe = Platform.OS !== 'web' && MediapipePoseView && !useSimulation;
+  const shouldUseNativeMediapipe = Platform.OS !== 'web' && mediapipeLoaded && !useSimulation;
   
   // Log camera facing on mount and changes
   useEffect(() => {
@@ -188,15 +175,8 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   const handleToggleCamera = useCallback(() => {
     console.log("[Camera] Toggle camera requested, current facing:", facing);
     
-    // Use native switchCamera if available (for RNMediapipe)
-    if (Platform.OS !== 'web' && switchCamera) {
-      try {
-        switchCamera();
-        console.log("[Camera] Native switchCamera called");
-      } catch (e) {
-        console.warn("[Camera] switchCamera failed:", e);
-      }
-    }
+    // Use native switchCamera if available (Vision Camera handles via cameraType prop)
+    // No explicit native call needed — camera switches via prop change
     
     // Notify parent component
     if (onCameraToggle) {
@@ -360,18 +340,14 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
   // RENDER - Native MediaPipe Camera
   // ============================================================================
   
-  if (shouldUseNativeMediapipe && MediapipePoseView) {
+  if (shouldUseNativeMediapipe) {
     return (
       <View style={[styles.container, style]}>
-        <MediapipePoseView
+        <MediaPipeCamera
           style={styles.camera}
           cameraType={facing}
-          enablePoseDetection={enablePoseDetection && isDetecting}
-          minPoseDetectionConfidence={minConfidence}
-          minPosePresenceConfidence={minConfidence}
-          minTrackingConfidence={minConfidence}
-          onPoseDetected={handleNativePoseDetected}
-          onCameraReady={handleCameraReady}
+          onLandmark={handleNativePoseDetected}
+          fps={30}
         >
           {/* Custom Overlay */}
           {overlay}
@@ -411,7 +387,7 @@ export const PoseCamera = forwardRef<PoseCameraRef, PoseCameraProps>(({
               <Text style={styles.statusText}>Iniciando câmera com MediaPipe...</Text>
             </View>
           )}
-        </MediapipePoseView>
+        </MediaPipeCamera>
       </View>
     );
   }

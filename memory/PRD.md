@@ -115,6 +115,7 @@ Root causes identificadas (RC1-RC7):
 
 ### P0
 - Implementar layout responsivo (sidebar em telas grandes)
+- Validar build EAS com nova integracao MediaPipe (sem @thinksys)
 
 ### P2
 - Refatorar dashboards para Rolling Load Engine
@@ -125,3 +126,34 @@ Root causes identificadas (RC1-RC7):
 - ESLint TypeScript config
 - UI merge perfis duplicados
 - Remover ios_backup_before_removal/
+
+---
+
+## Migracao MediaPipe iOS (2026-04-01)
+
+**Concluido**: Remocao total de `@thinksys/react-native-mediapipe` e implementacao direta via Vision Camera + MediaPipe Tasks Vision.
+
+### Arquitetura Nova
+```
+Vision Camera (v4.7.3) → Frame Processor (JSI/worklets-core v1.6.3) → detectPose plugin (Swift) → MediaPipe Tasks Vision → 33 landmarks → Pipeline VBT/Jump (INTOCAVEL)
+```
+
+### Arquivos Criados
+- `plugins/ios/PoseDetectionPlugin.swift` — Plugin nativo Swift
+- `plugins/withMediaPipePose.js` — Expo config plugin
+- `services/pose/MediaPipeCamera.tsx` — Componente drop-in replacement
+- `scripts/download-pose-model.js` — Download do modelo
+- `MEDIAPIPE_SETUP.md` — Guia de setup completo
+
+### Arquivos Modificados
+- `vbt-camera.tsx`, `jump-camera.tsx`, `PoseCamera.tsx`, `CameraView.tsx` — RNMediapipe → MediaPipeCamera
+- `app.json` — plugin withMediaPipePose adicionado
+- `package.json` — @thinksys removido, worklets-core adicionado
+
+### Contrato de Saida
+33 landmarks `[{x, y, z, visibility}]` normalizados 0-1, ordem BlazePose. Zero processamento.
+
+### Proximos passos para producao
+1. `node scripts/download-pose-model.js`
+2. `npx expo prebuild --platform ios --clean`
+3. `eas build --platform ios`

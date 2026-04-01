@@ -73,7 +73,8 @@
           "enableMicrophonePermission": false,
           "enableLocation": false
         }
-      ]
+      ],
+      "./plugins/withMediaPipePose"
     ],
     "experiments": {
       "typedRoutes": true
