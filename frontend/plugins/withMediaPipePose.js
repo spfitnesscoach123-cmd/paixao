@@ -20,6 +20,36 @@ const path = require('path');
 const fs = require('fs');
 
 function withMediaPipePose(config) {
+  // ─── Step 0: Ensure ios.useFrameworks = static in Podfile.properties.json ───
+  // MediaPipeTasksVision REQUIRES use_frameworks! to generate Swift module maps.
+  // Without this, Xcode fails with: "no such module 'MediaPipeTasksVision'"
+  config = withDangerousMod(config, [
+    'ios',
+    (modConfig) => {
+      const propsPath = path.join(
+        modConfig.modRequest.platformProjectRoot,
+        'Podfile.properties.json'
+      );
+
+      let props = {};
+      if (fs.existsSync(propsPath)) {
+        try {
+          props = JSON.parse(fs.readFileSync(propsPath, 'utf-8'));
+        } catch (e) {
+          console.warn('[withMediaPipePose] Could not parse Podfile.properties.json, creating new');
+        }
+      }
+
+      if (props['ios.useFrameworks'] !== 'static') {
+        props['ios.useFrameworks'] = 'static';
+        fs.writeFileSync(propsPath, JSON.stringify(props, null, 2));
+        console.log('[withMediaPipePose] Set ios.useFrameworks = static');
+      }
+
+      return modConfig;
+    },
+  ]);
+
   // ─── Step 1: Add MediaPipeTasksVision pod to Podfile ───
   config = withDangerousMod(config, [
     'ios',
