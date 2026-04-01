@@ -1,28 +1,24 @@
 /**
  * Expo Config Plugin — MediaPipe Pose Detection via Vision Camera
  *
- * This plugin configures the iOS build to:
- * 1. Add MediaPipeTasksVision CocoaPod
- * 2. Copy the Swift frame processor plugin to the Xcode project
- * 3. Generate the Obj-C registration file with correct module name
- * 4. Copy the pose_landmarker_full.task model to bundle resources
- *
- * PREREQUISITES:
- * - Run: node scripts/download-pose-model.js (downloads the .task model)
- * - The model must exist at assets/models/pose_landmarker_full.task
+ * Uses official Expo APIs:
+ * - withPodfile: Injects GoogleMediaPipeTasksVision pod (survives prebuild --clean)
+ * - withDangerousMod: Sets ios.useFrameworks = static in Podfile.properties.json
+ * - withXcodeProject: Adds Swift plugin, Obj-C registrar, and .task model to Xcode project
  */
 
 const {
   withDangerousMod,
   withXcodeProject,
+  withPodfile,
 } = require('@expo/config-plugins');
 const path = require('path');
 const fs = require('fs');
 
 function withMediaPipePose(config) {
-  // ─── Step 0: Ensure ios.useFrameworks = static in Podfile.properties.json ───
-  // MediaPipeTasksVision REQUIRES use_frameworks! to generate Swift module maps.
-  // Without this, Xcode fails with: "no such module 'MediaPipeTasksVision'"
+
+  // ─── Step 0: Ensure ios.useFrameworks = static ───
+  // MediaPipeTasksVision REQUIRES use_frameworks! for Swift module maps.
   config = withDangerousMod(config, [
     'ios',
     (modConfig) => {
@@ -36,7 +32,7 @@ function withMediaPipePose(config) {
         try {
           props = JSON.parse(fs.readFileSync(propsPath, 'utf-8'));
         } catch (e) {
-          console.warn('[withMediaPipePose] Could not parse Podfile.properties.json, creating new');
+          // Will create fresh
         }
       }
 
@@ -50,35 +46,20 @@ function withMediaPipePose(config) {
     },
   ]);
 
-  // ─── Step 1: Add MediaPipeTasksVision pod to Podfile ───
-  config = withDangerousMod(config, [
-    'ios',
-    (modConfig) => {
-      const podfilePath = path.join(
-        modConfig.modRequest.platformProjectRoot,
-        'Podfile'
+  // ─── Step 1: Inject pod via withPodfile (official API, survives prebuild) ───
+  config = withPodfile(config, (modConfig) => {
+    const contents = modConfig.modResults.contents;
+
+    if (!contents.includes('GoogleMediaPipeTasksVision')) {
+      modConfig.modResults.contents = contents.replace(
+        /use_expo_modules!/,
+        "use_expo_modules!\n  pod 'GoogleMediaPipeTasksVision'"
       );
+      console.log('[withMediaPipePose] Injected GoogleMediaPipeTasksVision pod via withPodfile');
+    }
 
-      if (!fs.existsSync(podfilePath)) {
-        console.warn('[withMediaPipePose] Podfile not found, skipping pod injection');
-        return modConfig;
-      }
-
-      let podfile = fs.readFileSync(podfilePath, 'utf-8');
-
-      if (!podfile.includes('MediaPipeTasksVision')) {
-        // Insert after use_expo_modules! (standard Expo anchor)
-        podfile = podfile.replace(
-          /use_expo_modules!/,
-          "use_expo_modules!\n  pod 'MediaPipeTasksVision'"
-        );
-        fs.writeFileSync(podfilePath, podfile);
-        console.log('[withMediaPipePose] Added MediaPipeTasksVision pod');
-      }
-
-      return modConfig;
-    },
-  ]);
+    return modConfig;
+  });
 
   // ─── Step 2: Copy native files + model, add to Xcode project ───
   config = withXcodeProject(config, (modConfig) => {
@@ -89,7 +70,6 @@ function withMediaPipePose(config) {
 
     const targetDir = path.join(platformProjectRoot, projectName);
 
-    // Ensure target dir exists
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
@@ -127,13 +107,12 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
       fs.copyFileSync(modelSrc, modelDest);
       console.log('[withMediaPipePose] Copied pose_landmarker_full.task');
     } else {
-      console.warn('[withMediaPipePose] Model not found at', modelSrc);
-      console.warn('[withMediaPipePose] Run: node scripts/download-pose-model.js');
+      console.warn('[withMediaPipePose] Model not found — run: node scripts/download-pose-model.js');
     }
 
     // ── Add files to Xcode project ──
     try {
-      // Find app group by iterating PBXGroup objects directly
+      // Find app group by iterating PBXGroup objects
       const groups = xcodeProject.hash.project.objects['PBXGroup'] || {};
       let appGroupKey = null;
       for (const [key, val] of Object.entries(groups)) {
@@ -142,9 +121,7 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
           break;
         }
       }
-
       if (!appGroupKey) {
-        // Fallback: use main group
         appGroupKey = xcodeProject.getFirstProject().firstProject.mainGroup;
       }
 
@@ -168,8 +145,6 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
 
       // Add model as resource
       if (fs.existsSync(modelDest)) {
-        // Ensure "Resources" PBXGroup exists (Expo projects don't create it by default)
-        // Without this, addResourceFile crashes on correctForResourcesPath
         if (!xcodeProject.pbxGroupByName('Resources')) {
           xcodeProject.addPbxGroup([], 'Resources');
         }
@@ -182,8 +157,8 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
 
       console.log('[withMediaPipePose] Added files to Xcode project');
     } catch (e) {
-      console.warn('[withMediaPipePose] Xcode project manipulation warning:', e.message);
-      console.warn('[withMediaPipePose] Files are copied — add manually to Xcode if needed');
+      console.warn('[withMediaPipePose] Xcode project warning:', e.message);
+      console.warn('[withMediaPipePose] Files copied — may need manual Xcode setup');
     }
 
     return modConfig;
