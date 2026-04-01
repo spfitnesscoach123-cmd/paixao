@@ -133,41 +133,54 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
 
     // ── Add files to Xcode project ──
     try {
-      const appGroupKey = xcodeProject.findPBXGroupKey({ name: projectName })
-        || xcodeProject.findPBXGroupKey({ path: projectName });
-
-      if (appGroupKey) {
-        const targetUuid = xcodeProject.getFirstTarget().uuid;
-
-        // Add Swift source
-        if (fs.existsSync(swiftDest)) {
-          xcodeProject.addSourceFile(
-            `${projectName}/PoseDetectionPlugin.swift`,
-            { target: targetUuid },
-            appGroupKey
-          );
+      // Find app group by iterating PBXGroup objects directly
+      const groups = xcodeProject.hash.project.objects['PBXGroup'] || {};
+      let appGroupKey = null;
+      for (const [key, val] of Object.entries(groups)) {
+        if (typeof val === 'object' && val.name === projectName) {
+          appGroupKey = key;
+          break;
         }
+      }
 
-        // Add Obj-C source
+      if (!appGroupKey) {
+        // Fallback: use main group
+        appGroupKey = xcodeProject.getFirstProject().firstProject.mainGroup;
+      }
+
+      const targetUuid = xcodeProject.getFirstTarget().uuid;
+
+      // Add Swift source
+      if (fs.existsSync(swiftDest)) {
         xcodeProject.addSourceFile(
-          `${projectName}/PoseDetectionPluginRegistrar.m`,
+          `${projectName}/PoseDetectionPlugin.swift`,
           { target: targetUuid },
           appGroupKey
         );
-
-        // Add model as resource
-        if (fs.existsSync(modelDest)) {
-          xcodeProject.addResourceFile(
-            `${projectName}/pose_landmarker_full.task`,
-            { target: targetUuid }
-          );
-        }
-
-        console.log('[withMediaPipePose] Added files to Xcode project');
-      } else {
-        console.warn('[withMediaPipePose] Could not find PBXGroup for', projectName);
-        console.warn('[withMediaPipePose] Files copied but may need manual Xcode setup');
       }
+
+      // Add Obj-C source
+      xcodeProject.addSourceFile(
+        `${projectName}/PoseDetectionPluginRegistrar.m`,
+        { target: targetUuid },
+        appGroupKey
+      );
+
+      // Add model as resource
+      if (fs.existsSync(modelDest)) {
+        // Ensure "Resources" PBXGroup exists (Expo projects don't create it by default)
+        // Without this, addResourceFile crashes on correctForResourcesPath
+        if (!xcodeProject.pbxGroupByName('Resources')) {
+          xcodeProject.addPbxGroup([], 'Resources');
+        }
+        xcodeProject.addResourceFile(
+          `${projectName}/pose_landmarker_full.task`,
+          { target: targetUuid },
+          appGroupKey
+        );
+      }
+
+      console.log('[withMediaPipePose] Added files to Xcode project');
     } catch (e) {
       console.warn('[withMediaPipePose] Xcode project manipulation warning:', e.message);
       console.warn('[withMediaPipePose] Files are copied — add manually to Xcode if needed');
