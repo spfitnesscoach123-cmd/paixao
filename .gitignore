@@ -29,9 +29,7 @@ next-env.d.ts
 /build
 dist/
 
-# Environment files
-*.env
-*.env.*
+# Sensitive files
 *token.json*
 *credentials.json*
 
