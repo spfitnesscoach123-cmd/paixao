@@ -1,131 +1,145 @@
 <analysis>**original_problem_statement**: 
-The user requested a strictly non-destructive, deep technical audit of the VBT Camera and Jump Camera functionalities to map the pipeline, dependencies, and native iOS touchpoints in preparation for an upcoming MediaPipe migration. 
-*Product Requirements*: The audit must be purely read-only (no code changes, no refactoring) and document the pipeline, dependencies, coupling risks, and native iOS implementation to safely isolate the scope for the next update.
+O usuário estava enfrentando falhas contínuas no EAS Build do iOS relacionadas à integração nativa do  e . Após várias tentativas de manipular o  via plugins customizados do Expo, o usuário solicitou um **Reset Técnico Completo**. O objetivo alcançado foi limpar o projeto de qualquer dependência, plugin ou hack do MediaPipe/VisionCamera, estabelecendo um baseline perfeitamente estável e compilável no EAS. Agora, com o baseline limpo confirmado, os próximos passos são reintegrar o MediaPipe de forma segura e corrigir o crash na geração de PDF.
+*PRODUCT REQUIREMENTS*: 
+1. Reintegração segura do MediaPipe (sem quebrar o build do EAS e respeitando o Continuous Native Generation do Expo SDK 54).
+2. Correção de travamento na geração de relatórios em PDF no backend (Análise Científica).
 
-**User's preferred language**: Português (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in the user's preferred language only. The audit report must also be written in Portuguese.)
+**User's preferred language**: Português (O usuário se comunica em Português. INSTRUCT: You MUST respond to the user and write all documentation, code comments, and plans exclusively in Portuguese).
 
 **what currently exists?** 
-A full-stack application with a React Native (Expo) frontend and FastAPI backend. In this session, the agent verified the codebase state post-rollback (confirming previous UI changes in  are still intact) and began reading the frontend camera/pose/vbt/jump services and iOS native module files to gather context for the requested Audit Report. No code has been modified.
+Uma aplicação full-stack React Native (Expo SDK 54) com backend FastAPI. O projeto passou por uma faxina técnica completa: as pastas nativas  e  foram removidas (padrão CNG), dependências nativas problemáticas (, , ) foram desinstaladas, e o motor JS foi alterado de  para . O arquivo  atualmente é um *stub* (). O deploy e o EAS Build estão 100% funcionais e estáveis.
 
 **Last working item**:
-    - Last item agent was working: Gathering file context (reading React Native services and iOS native files) to generate the comprehensive, non-destructive VBT/Jump Camera Audit Report requested by the user.
-    - Status: IN PROGRESS
-    - Agent Testing Done: N/A
-    - Which testing method agent to use? NA (This is a documentation and code-reading task).
-    - User Testing Done: N/A
+    - Last item agent was working: Limpeza de resquícios da arquitetura antiga (remoção da pasta  pré-gerada que causava inconsistência de engine e adição das pastas nativas ao ). O usuário confirmou que o EAS Build finalizou com sucesso e sem crashes.
+    - Status: COMPLETED
+    - Agent Testing Done: Y
+    - Which testing method agent to use? deployment_agent
+    - User Testing Done: Y
 
 **All Pending/In progress Issue list**:
-  - Issue 1: Production Deployment Validation / EAS Build (P0)
-     - Attempted fixes: Fixes applied in previous forks. Wait for user to trigger new EAS production deployment.
-     - Next debug checklist: Check logs if the EAS build fails.
-     - Why fix this issue and what will be achieved with the fix?: Unblocks production releases.
-     - Status: USER VERIFICATION PENDING
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: NA
+  Issue 1: Reintegração do MediaPipe no iOS (P0)
+  Issue 2: PDF Generation Crash em Análise Científica (P1)
+  
+  Issues Detail:
+  - Issue 1: Reintegração do MediaPipe no iOS
+     - Attempted fixes: Na sessão atual, todo o código antigo foi limpo para criar um baseline estável. Soluções antigas via  e manipulação direta de  falharam repetidamente por conflitos com headers do React e sintaxe de Ruby.
+     - Next debug checklist: Projetar cuidadosamente uma nova integração nativa para detecção de pose usando MediaPipe, garantindo compatibilidade com Expo SDK 54 (Hermes, New Architecture). Avaliar se a reintegração será via  + Frame Processors ou outra biblioteca estável.
+     - Why fix this issue and what will be achieved with the fix?: É a funcionalidade core do app (rastreamento VBT/Jump).
+     - Status: NOT STARTED (Aguardando planejamento da nova abordagem)
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix?: Frontend (Testar exaustivamente via EAS logs / user testing).
      - Blocked on other issue: None.
 
-  - Issue 2: PDF Generation Crash in Análise Científica (P1)
-     - Attempted fixes: None yet.
-     - Next debug checklist: Analyze backend endpoint . Check for memory-intensive operations. Reproduce crash and examine logs.
-     - Why fix this issue and what will be achieved with the fix?: Resolves a core feature app freeze/crash.
+  - Issue 2: PDF Generation Crash em Análise Científica
+     - Attempted fixes: Nenhum ainda.
+     - Next debug checklist: Analisar backend endpoint  (ou rota similar em ). Reproduzir o payload, isolar processamento de memória pesada, e validar logs de erro do FastAPI.
+     - Why fix this issue and what will be achieved with the fix?: Previne freeze/crash ao exportar relatórios cruciais para técnicos esportivos.
      - Status: NOT STARTED
      - Is recurring issue? Y
-     - Should Test frontend/backend/both after fix?: Both
+     - Should Test frontend/backend/both after fix?: Both (Usar  para backend isolation e frontend e2e flow).
      - Blocked on other issue: None.
 
 **In progress Task List**:
-  - Task 1: Generate VBT/Jump Camera Audit Report
-     - Where to resume: You have already gathered context from the TS/JS files and the Native iOS files. Now, write the detailed Markdown report exactly following the 9 strict rules and formatting criteria outlined in the user's prompt (Message 9).
-     - What will be achieved with this?: Safely map the codebase to isolate the scope for the upcoming MediaPipe iOS migration with zero risk of breaking existing features.
-     - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix?: NA
-     - Blocked on something: None.
+  - Task 1: Planejamento arquitetural para MediaPipe Reintegration
+     - Where to resume: Consultar o usuário para apresentar o plano de reintegração limpa e testável do módulo de câmera/pose. O  atualmente está stubbado e precisa voltar a funcionar.
+     - What will be achieved with this?: Restauração da detecção de barra/salto.
+     - Status: NOT STARTED
+     - Should Test frontend/backend/both after fix?: Frontend
+     - Blocked on something: Precisa de validação do usuário antes de injetar código nativo.
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P0) MediaPipe iOS Migration/Fix: Using the newly generated Audit Document to safely update the  integration without breaking the progressive validation pipeline.
+    - (P0) Reintegração do MediaPipe / react-native-vision-camera.
+    - (P1) Resolução do crash de PDF na Análise Científica.
     
     Future Tasks:
-    - (P2) Fix incorrect ESLint configuration for TypeScript.
-    - (P2) Build UI for merging duplicate athlete profiles.
-    - (P2) Complete internationalization of  and Avaliações page.
-    - (P3) Remove the backup directory .
+    - (P2) UI para merge de perfis duplicados de atletas.
+    - (P2) Internacionalização completa (i18n) de  e Avaliações.
 
 **Completed work in this session**
-- Verified the state of the codebase post-rollback. Confirmed that the  LMPI UI changes and tooltips were *not* lost.
-- Mapped and read all relevant , , , and  files along with MediaPipe iOS native files for the audit.
+- Limpeza total do MediaPipe: , arquivos Swift, scripts de download (DONE).
+- Remoção de dependências nativas conflituosas: , ,  (DONE).
+- Correção de engine no : alterado de  para  (DONE).
+- Limpeza de diretórios nativos () e correção massiva de duplicatas no  (DONE).
+- Sincronização de versões entre  e  (DONE).
 
 **Earlier issues found/mentioned but not fixed**
-   - Issue 1: PDF Generation crash in Análise Científica.
-     - Debug checklist: Isolate the PDF rendering library and data payload size in .
-     - Why to solve this issue and what will be achieved with this?: Stability for reporting.
+   - Issue 1: PDF Generation Crash
+     - Debug checklist: Checar  e rotas de geração de relatórios PDF.
+     - Why to solve this issue and what will be achieved with this?: Evitar crashes em runtime reportados no histórico passado.
      - Should Test frontend/backend/both after fix: Both
      - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: PDF generation crash
-  - Recurrence count: >3
-  - Status: NOT STARTED
+  - Issue recurrence in previous fork: Falhas críticas no EAS Build relacionadas a injeções de CocoaPods, , e . 
+  - Recurrence count: >5
+  - Status: RESOLVED (Reset técnico realizado). AVISO CRÍTICO AO PRÓXIMO AGENTE: A reintegração *não* deve usar a mesma abordagem hacky do passado.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Progressive Validation Architecture**: The VBT camera uses a 5-stage validation pipeline to prevent tracking errors.
-- **MediaPipe Native Integration**: Relies on a heavily patched  library requiring specific iOS worklets/bridging.
+- **Continuous Native Generation (CNG)**: O projeto usa Expo Prebuild. **NÃO crie ou manipule diretamente os diretórios  e **. Tudo deve ser feito via Config Plugins robustos se necessário, mas o baseline agora está 100% puro.
+- **Hermes Engine**: O motor JS é o Hermes ( no app.json).
 
 **key DB schema**
-  - No database changes in this session.
+  - N/A
 
 **changes in tech stack**
-  - None.
+  - Removido ,  e .
+  - JS Engine alterado para Hermes.
 
 **All files of reference** 
 - 
 - 
-- 
-- 
-- 
+-  (Arquivo alvo para reintegração)
+-  (Garantir que pastas nativas e .env permaneçam ignoradas)
 - 
 
 **Areas that need refactoring**: 
--  (slated for deletion).
-- ESLint TypeScript configuration.
+-  precisará ser reescrito na reintegração do MediaPipe.
 
 **key api endpoints**
-- N/A for current task.
+-  (Provável endpoint causando os crashes detalhados no P1 Issue).
 
 **Critical Info for New Agent** 
-- **STRICT INSTRUCTION**: The user explicitly requested a **NON-DESTRUCTIVE AUDIT**. Do **NOT** modify any code, do **NOT** propose refactoring, and do **NOT** change any logic. Your *only* immediate task is to generate the requested Markdown report based on the files you've read, strictly following the 9 sections requested in Message 9.
-- You must write the report and communicate with the user in Portuguese.
+- **O Baseline está estável**. O usuário acaba de confirmar que o build no EAS passou limpo. SEU PRIMEIRO PASSO: Perguntar ao usuário qual tarefa ele deseja atacar primeiro (ex: a Reintegração segura do MediaPipe ou o Fix do crash do PDF).
+- Se a escolha for a reintegração do MediaPipe, **NÃO REINSERE** os antigos hacks. Pesquise abordagens modernas, limpas e suportadas pelo Expo SDK 54 / RN 0.81.
+- Sempre verifique o  para garantir que ,  e arquivos  não sejam comitados acidentalmente e bloqueiem o .
+- Comunique-se estritamente em **Português**.
 
 **documents and test reports created in this job** 
-  - (Agent was preparing to update/create )
-  - 
+  -  (Atualizado com o baseline limpo).
 
 **Last 10 User Messages and any pending HUMAN messages** 
-1. **User**: Please use ask_human tool and confirm your plan now.
-2. **Agent**: Checks codebase post-rollback, sees changes are still there, asks the user for the next direction via .
-3. **User**: Provides a massive, strict prompt in Portuguese for a non-destructive Audit of the VBT & Jump Camera (mapping pipelines, dependencies, native iOS files, decoupling risks, checklist) to prepare safely for a MediaPipe migration.
-*Pending*: Generate and output the audit report based on the user's specific formatting requirements.
+- **Assistant**: Removeu  folder, limpou pacotes orfãos, e confirmou consistência de configuração.
+- **User**: Ok, build subiu sem mais problemas identificados no app, nem crashes.
+- **Assistant**: Confirmou o sucesso, resumiu a limpeza e relembrou os próximos passos (Reintegração MediaPipe e PDF fix).
+*Pending*: A sessão terminou de forma limpa. O próximo passo é invocar o  para alinhar com o usuário qual desafio ele deseja iniciar agora (Issue 1 ou Issue 2).
 
 **Project Health Check:**
-- Broken: PDF Generation in Análise Científica.
-- Mocked: None.
+- Broken: Nenhum erro de build! (Deploy limpo alcançado). 
+- Mocked:  está mockado ().
 
 **3rd Party Integrations** 
-- Expo Application Services (EAS) - Native builds
--  - Native pose detection (requires careful handling on iOS)
+- Expo Application Services (EAS) — Native builds e CI.
+- (Pendente reintegração) MediaPipe via React Native Vision Camera.
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Reading files only).
+  - Testing agent used after significant changes: NO (usado Deployment Agent extenso e logs EAS pelo usuário).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None
-  - Known regressions: None
+  - Test files created: N/A
+  - Known regressions: Rastreamento de Pose está inativo no app intencionalmente (mockado para permitir o build).
 
 **Credentials to test flow:**
 User: 
 Password: 
 
 **What agent forgot to execute**
-The agent was in the middle of executing ERROR: Please provide a comma-separated list of file or directory paths on multiple files to gather the necessary context for the audit report but was interrupted before generating the actual markdown document. The next step is strictly to write this report.</analysis>
+O agente completou com exatidão o Technical Reset e confirmou a estabilidade. O próximo agente tem o caminho limpo para iniciar as tarefas do backlog pendente listadas em Upcoming and Future Tasks.
+
+**Debugging checklist for current issue**
+    Issue: Reintegração MediaPipe (P0) / Crash PDF (P1)
+    Frontend files to check:  (Mock)
+    Backend files to check:  (Endpoints de PDF)
+    Database to check: MongoDB collections related to reports (if applicable)</analysis>
