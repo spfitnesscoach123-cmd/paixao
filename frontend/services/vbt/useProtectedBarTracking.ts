@@ -51,6 +51,8 @@ import {
 // Import new production modules for bug fixes
 import { VelocityCalculator, VelocityResult } from './VelocityCalculator';
 import { RepDetector, RepDetectorResult, RepPhase } from './RepDetector';
+import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
+import { FrameIntegrityMonitor } from '../frameDrop';
 
 // ============================================================================
 // TYPES
@@ -190,7 +192,12 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   
   // Frame counter for debug logging
   const frameCountRef = useRef(0);
-  
+
+  // Frame integrity monitor para detecção de frame drop (VBT)
+  const frameIntegrityRef = useRef<FrameIntegrityMonitor>(new FrameIntegrityMonitor({
+    targetFps: 30,
+  }));
+
   // Recommended tracking point based on exercise
   const recommendedTrackingPoint = RECOMMENDED_TRACKING_POINTS[config.exercise] || 'left_hip';
   
@@ -283,6 +290,13 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // We need to process frames in all phases for stability and human detection
     if (!protectionSystemRef.current) return;
     
+    // Timestamp monotônico e ID do frame para integridade
+    const frameTimestamp = pose?.timestamp || getFrameTimestamp();
+    const frameId = getNextFrameId();
+    
+    // Detecção de frame drop
+    const integrity = frameIntegrityRef.current.checkFrame(frameId, frameTimestamp);
+    
     // Increment frame counter for debug logging
     frameCountRef.current++;
     
@@ -313,11 +327,12 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
         // Formula: velocity = deltaPosition / deltaTime
         // Smoothing: Moving average over last 5 frames
         // ========================================
-        if (velocityCalculatorRef.current) {
+        // Proteção: pular cálculo de velocidade se frame degradado por drop
+        if (velocityCalculatorRef.current && integrity.isValid) {
           const velocityResult = velocityCalculatorRef.current.update({
             x: result.smoothedPosition.x,
             y: result.smoothedPosition.y,
-            timestamp: pose?.timestamp || Date.now(),
+            timestamp: frameTimestamp,
           });
           
           // Update velocity state
@@ -343,7 +358,8 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
           if (repDetectorRef.current) {
             const repResult = repDetectorRef.current.update(
               velocityResult.smoothedVelocity,
-              velocityResult.direction
+              velocityResult.direction,
+              frameTimestamp
             );
             
             // DEBUG: Log RepDetector state every 30 frames
@@ -403,7 +419,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
             x: result.smoothedPosition.x,
             y: result.smoothedPosition.y,
             confidence: 1,
-            timestamp: Date.now(),
+            timestamp: getFrameTimestamp(),
           };
           trackerRef.current.processPosition(barPosition);
         }
@@ -447,7 +463,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       meanVelocity: Math.round(meanVelocity * 100) / 100,
       peakVelocity: Math.round(peakVelocity * 100) / 100,
       velocityDrop,
-      timestamp: Date.now(),
+      timestamp: getFrameTimestamp(),
       trackingPointUsed: trackingPointName,
     };
     
@@ -535,6 +551,10 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       repDetectorRef.current.reset();
     }
     
+    // Resetar monitor de integridade e contadores de frame para nova sessão
+    frameIntegrityRef.current.reset();
+    resetFrameTime();
+    
     // SINGLE SOURCE OF TRUTH: Call recordingController.start()
     // The state machine will automatically transition to RECORDING when appropriate
     recordingController.start();
@@ -569,7 +589,7 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
           const simPosition = simulatorRef.current.getNextPosition();
           simulatedPose = {
             keypoints: generateSimulatedKeypoints(simPosition, trackingPointInfo.keypointName),
-            timestamp: Date.now(),
+            timestamp: getFrameTimestamp(),
           };
         } else {
           return;

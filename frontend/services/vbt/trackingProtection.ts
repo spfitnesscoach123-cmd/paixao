@@ -1019,7 +1019,7 @@ export class TrackingPointManager {
   getSmoothedPosition(currentPosition: { x: number; y: number } | null): { x: number; y: number } | null {
     if (!currentPosition) return this.lastValidPosition;
 
-    const now = Date.now();
+    const now = performance.now();
     this.positionHistory.push({ ...currentPosition, timestamp: now });
 
     // Keep only recent positions

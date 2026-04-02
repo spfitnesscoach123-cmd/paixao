@@ -1,87 +1,52 @@
-# Load Manager Pro — PRD
+# Load Manager Pro - PRD
 
-## Produto
-App de gestao de carga e performance esportiva com VBT (Velocity Based Training) e deteccao de pose via camera.
+## Problema Original
+Aplicação full-stack React Native (Expo SDK 54) + FastAPI para monitoramento esportivo VBT (Velocity Based Training) e análise de saltos. O pipeline de captura de pose utiliza câmera do dispositivo para rastrear barras e articulações em tempo real.
 
-## Stack
-- **Frontend**: React Native (Expo SDK 54) com TypeScript
-- **Backend**: FastAPI (Python) com MongoDB
-- **Build**: EAS Build (Expo Application Services)
+## Arquitetura
+```
+/app
+├── backend/          → FastAPI (Python)
+│   └── server.py     
+├── frontend/         → React Native (Expo SDK 54, Hermes)
+│   ├── app/          → Telas (Expo Router)
+│   ├── services/
+│   │   ├── frameTime.ts        → [NOVO] Timestamps monotônicos (performance.now)
+│   │   ├── frameDrop.ts        → [NOVO] Monitor de integridade de frames
+│   │   ├── camera/             → Managers do lifecycle da câmera
+│   │   ├── pose/               → Interfaces e stubs do MediaPipe
+│   │   ├── jump/               → Detecção de eventos do Jump
+│   │   └── vbt/                → TrackingSystem, VelocityCalculator, RepDetector
+│   └── docs/
+```
 
-## Usuarios
-- Treinadores (coaches) — gerenciam atletas, monitoram carga
-- Atletas — registram treinos via VBT camera
+## O que foi implementado
 
-## Funcionalidades Core
-1. Dashboard de overview de atletas
-2. Gestao de atletas (CRUD, perfis, historico)
-3. VBT Camera (modo simulacao ativo — MediaPipe removido temporariamente)
-4. Jump Camera (modo simulacao ativo — MediaPipe removido temporariamente)
-5. Analise Cientifica (relatorios, PDF)
-6. Autenticacao JWT
-7. Pipeline de validacao progressiva (5 estagios)
+### Sessão anterior (Abril 2026)
+- Reset técnico completo: remoção de MediaPipe, VisionCamera, plugins nativos
+- Baseline EAS build limpo e estável
+- Correção do crash PDF em Análise Científica
+- Auditoria técnica completa do pipeline VBT/Jump
 
-## Credenciais
-- Email: `contato@loadmanagerpro.com.br`
-- Senha: `#UAE2026`
+### Sessão atual (02/Abril/2026)
+- **Precisão Temporal**: Substituição de `Date.now()` por `performance.now()` monotônico em todo o pipeline de métricas
+- **Frame Drop Detection**: Monitor de integridade detecta e protege contra frames perdidos
+- Testes unitários: 14 testes (frameTime + frameDrop) + 34 testes existentes VBT = 48 passing
 
----
-
-## Historico de Mudancas
-
-### Reset Tecnico — Remocao do MediaPipe (2026-04-02)
-**Objetivo**: Obter baseline build limpo no EAS antes de reintroduzir dependencias nativas.
-
-**Causa raiz dos erros de build**:
-- `expo-build-properties` com `useFrameworks: "static"` causava `ExpoModulesCore not found` e `React/CoreModulesPlugins.h file not found`
-- Plugin customizado `withMediaPipePose.js` injetava pod e modificacoes no Podfile que geravam erros de sintaxe Ruby
-
-**O que foi removido**:
-1. `plugins/withMediaPipePose.js` — Config plugin do MediaPipe (DELETADO)
-2. `plugins/ios/PoseDetectionPlugin.swift` — Codigo nativo Swift (DELETADO)
-3. `scripts/download-pose-model.js` — Script de download do modelo (DELETADO)
-4. `assets/models/pose_landmarker_full.task` — Modelo de 9.4MB (DELETADO)
-5. `ios_backup_before_removal/` — Diretorio backup legado (DELETADO)
-6. `expo-build-properties` plugin removido do `app.json` (useFrameworks: "static")
-7. `withMediaPipePose` plugin removido do `app.json`
-
-**O que foi preservado**:
-- `react-native-vision-camera` — Plugin de camera padrao (nao e MediaPipe)
-- `services/pose/MediaPipeCamera.tsx` — Substituido por STUB (MEDIAPIPE_AVAILABLE = false)
-- Todos os componentes de camera (vbt-camera, jump-camera) — Entram no modo fallback/simulacao automaticamente
-
-**Correcoes adicionais**:
-- `eslint-config-expo` instalado (resolvia falha do `expo doctor`)
-- `.gitignore` limpo (remocao de entradas corrompidas `-e` e regras `*.env`)
-- URL hardcoded Railway removida de `login.tsx`
-
-**Status**: PRONTO PARA DEPLOY — Health check PASS
-
----
+## Estado Atual
+- **Build**: Web export 100% funcional, EAS baseline estável
+- **Mocked**: Motor de pose (MediaPipe) segue mockado (`MEDIAPIPE_AVAILABLE = false`)
+- **Pipeline**: Timestamps monotônicos + frame drop detection ativos no VBT e Jump
 
 ## Backlog Priorizado
 
-### P0 (Bloqueador)
-- [x] Reset tecnico — baseline build limpo (CONCLUIDO)
-- [x] Auditoria tecnica pos-limpeza (CONCLUIDO — zero blockers)
-- [ ] Validar build EAS iOS (usuario precisa disparar deploy)
+### P0 — Crítico
+- [ ] Reintegração segura da visão computacional (MediaPipe ou alternativa)
 
-### P1 (Alta Prioridade)
-- [ ] PDF Generation crash em "Analise Cientifica" (recorrente >3x)
-- [ ] Reintegrar MediaPipe (apos baseline estavel) — usar abordagem de plugin corrigida
-
-### P2 (Media Prioridade)
-- [x] Instalar `eslint-config-expo` (CONCLUIDO)
-- [ ] Internacionalizacao completa do ScientificAnalysisTab e pagina Avaliacoes
-- [ ] Build UI para merge de perfis duplicados de atletas
-
-### P3 (Baixa Prioridade)
-- [x] Remover diretorio backup `frontend/ios_backup_before_removal/` (CONCLUIDO)
-
----
-
-## Proximos passos
-1. Save to Github
-2. Deploy via Emergent
-3. Verificar EAS build iOS (deve compilar limpo sem MediaPipe)
-4. Apos baseline estavel, reintroduzir MediaPipe com abordagem corrigida
+### P2 — Futuro
+- [ ] UI para merge de perfis duplicados de atletas
+- [ ] Internacionalização (i18n) de ScientificAnalysisTab e Avaliações
+- [ ] Refatoração: trackingProtection.ts (1460 linhas → 8 módulos)
+- [ ] Remoção de código legacy (~600 linhas mortas em barTracker.ts + useBarTracking.ts)
+- [ ] Unificação da fórmula RSI entre frontend e backend
+- [ ] Gate de logs com __DEV__

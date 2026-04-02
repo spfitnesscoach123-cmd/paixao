@@ -40,6 +40,8 @@ import {
   detectCMJTakeoff,
   detectCMJLanding,
 } from './jumpDetector';
+import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
+import { FrameIntegrityMonitor } from '../frameDrop';
 
 const { COUNTDOWN_SECONDS, CALIBRATION_FRAMES, MAX_RECORDING_DURATION_MS, BETWEEN_JUMPS_COUNTDOWN } = JUMP_DETECTION_CONFIG;
 
@@ -131,6 +133,11 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const countermovementStartTimeRef = useRef<number | null>(null);
   const takeoffTimeRef = useRef<number | null>(null);
   const contactStartTimeRef = useRef<number | null>(null);
+  
+  // Frame integrity monitor para detecção de frame drop
+  const frameIntegrityRef = useRef<FrameIntegrityMonitor>(new FrameIntegrityMonitor({
+    targetFps: JUMP_DETECTION_CONFIG.TARGET_FPS,
+  }));
 
   // Cleanup on unmount
   useEffect(() => {
@@ -199,7 +206,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           console.log('[JUMP_CAMERA_HOOK] Starting RECORDING phase');
           setPhase('recording');
           setIsRecording(true);
-          recordingStartTimeRef.current = Date.now();
+          recordingStartTimeRef.current = getFrameTimestamp();
+          // Resetar monitor de integridade para nova gravação
+          frameIntegrityRef.current.reset();
+          resetFrameTime();
           
           return 0;
         }
@@ -308,7 +318,12 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const processFrame = useCallback((
     keypoints: Array<{ name: string; x: number; y: number; score: number }>
   ) => {
-    const timestamp = Date.now();
+    // Timestamp monotônico do frame (performance.now) — substitui Date.now()
+    const timestamp = getFrameTimestamp();
+    const frameId = getNextFrameId();
+    
+    // Detecção de frame drop
+    const integrity = frameIntegrityRef.current.checkFrame(frameId, timestamp);
     
     // Extract jump-relevant landmarks
     const landmarks = extractJumpLandmarks(keypoints);
@@ -320,18 +335,22 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
 
     if (phase === 'countdown') {
       // Collect frames for calibration during countdown
+      // Frame drops durante calibração não são críticos — incluir mesmo assim
       calibrationFramesRef.current.push(frameData);
       setCalibrationProgress(
         Math.min(100, (calibrationFramesRef.current.length / CALIBRATION_FRAMES) * 100)
       );
       setFrameCount(prev => prev + 1);
     } else if (phase === 'recording' && isRecording) {
-      // Collect frames during recording
+      // Durante gravação, marcar frames com drop mas NÃO descartar
+      // (a análise offline usa smoothing que mitiga gaps pontuais)
       recordingFramesRef.current.push(frameData);
       setFrameCount(prev => prev + 1);
       
-      // Update real-time metrics
-      updateLiveMetrics(frameData, timestamp);
+      // Update real-time metrics — pular se frame degradado por drop
+      if (integrity.isValid) {
+        updateLiveMetrics(frameData, timestamp);
+      }
       
       // Auto-stop after MAX_RECORDING_DURATION_MS of recording
       if (recordingStartTimeRef.current && 

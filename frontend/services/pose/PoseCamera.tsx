@@ -22,6 +22,7 @@ import {
 import { VBTPoseData, ProcessedKeypoint, LANDMARK_INDEX_TO_VBT_NAME } from './types';
 import { getPoseDetector, PoseDetectorStatus, PoseSimulator } from './poseDetector';
 import { colors } from '../../constants/theme';
+import { getFrameTimestamp } from '../frameTime';
 
 // ============================================================================
 // CONDITIONAL IMPORTS - Native MediaPipe only on iOS/Android
@@ -101,7 +102,7 @@ function convertMediapipeLandmarksToVBT(landmarks: any[]): VBTPoseData {
   const keypoints: ProcessedKeypoint[] = [];
   
   if (!landmarks || !Array.isArray(landmarks)) {
-    return { keypoints: [], timestamp: Date.now() };
+    return { keypoints: [], timestamp: getFrameTimestamp() };
   }
   
   // Map MediaPipe 33 landmarks to VBT 17 keypoints
@@ -121,7 +122,7 @@ function convertMediapipeLandmarksToVBT(landmarks: any[]): VBTPoseData {
   
   return {
     keypoints,
-    timestamp: Date.now(),
+    timestamp: getFrameTimestamp(),
   };
 }
 

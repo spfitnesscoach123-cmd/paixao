@@ -12,6 +12,7 @@
  */
 
 import { ProcessedKeypoint, VBTPoseData, VBT_KEYPOINT_NAMES, VBTKeypointName } from '../pose';
+import { getFrameTimestamp } from '../frameTime';
 
 export interface TrackingConfig {
   confidenceThreshold: number;     // Minimum confidence to accept landmark (default: 0.5)
@@ -336,10 +337,9 @@ export class TrackingSystem {
   private addToHistory(position: { x: number; y: number }, timestamp: number): void {
     this.positionHistory.push({ ...position, timestamp });
     
-    // Keep only recent history
+    // Manter apenas posições recentes (mesma base temporal do frame)
     const maxAge = 500; // ms
-    const now = Date.now();
-    this.positionHistory = this.positionHistory.filter(p => now - p.timestamp < maxAge);
+    this.positionHistory = this.positionHistory.filter(p => timestamp - p.timestamp < maxAge);
     
     // Limit to window size
     while (this.positionHistory.length > this.config.smoothingWindowSize) {

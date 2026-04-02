@@ -14,6 +14,8 @@
  * - Rep lockout period to prevent double counting
  */
 
+import { getFrameTimestamp } from '../frameTime';
+
 export type RepPhase = 
   | 'idle'           // Waiting for movement
   | 'eccentric'      // Descending phase (bar going down)
@@ -102,8 +104,8 @@ export class RepDetector {
    * @param direction - Movement direction from velocity calculator
    * @returns RepDetectorResult with current phase and rep completion status
    */
-  update(velocity: number, direction: 'up' | 'down' | 'stationary'): RepDetectorResult {
-    const now = Date.now();
+  update(velocity: number, direction: 'up' | 'down' | 'stationary', timestamp?: number): RepDetectorResult {
+    const now = timestamp ?? getFrameTimestamp();
     const absVelocity = Math.abs(velocity);
     
     // DEBUG: Log state machine updates (every 15th call to avoid spam)
@@ -420,7 +422,7 @@ export class RepDetector {
    */
   private abortCurrentRep(): void {
     console.log('[RepDetector] Rep aborted - resetting to idle');
-    this.transitionToPhase('idle', Date.now());
+    this.transitionToPhase('idle', getFrameTimestamp());
     this.concentricVelocities = [];
     this.eccentricVelocities = [];
     this.peakConcentricVelocity = 0;

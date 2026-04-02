@@ -24,6 +24,7 @@ import {
   LANDMARK_INDEX_TO_VBT_NAME,
   ProcessedKeypoint,
 } from './types';
+import { getFrameTimestamp } from '../frameTime';
 
 // ============================================================================
 // TYPES
@@ -142,7 +143,7 @@ export class PoseDetector {
       return null;
     }
     
-    const pose = convertLandmarksToKeypoints(landmarks, timestamp ?? Date.now());
+    const pose = convertLandmarksToKeypoints(landmarks, timestamp ?? getFrameTimestamp());
     this.lastPose = pose;
     
     // Update FPS calculation
@@ -269,7 +270,7 @@ export function generateSimulatedPose(
   baseY: number = 0.5,
   trackingPointName: string = 'left_hip'
 ): VBTPoseData {
-  const timestamp = Date.now();
+  const timestamp = getFrameTimestamp();
   const noise = () => (Math.random() - 0.5) * 0.02;
   
   // Generate keypoints in a realistic body configuration
@@ -315,7 +316,7 @@ export function generateSimulatedPose(
  * Generates movement patterns similar to squats/presses
  */
 export class PoseSimulator {
-  private startTime: number = Date.now();
+  private startTime: number = performance.now();
   private repNumber: number = 0;
   
   constructor(
@@ -327,7 +328,7 @@ export class PoseSimulator {
    * Get next simulated pose
    */
   getNextPose(trackingPointName: string = 'left_hip'): VBTPoseData {
-    const now = Date.now();
+    const now = performance.now();
     const elapsed = now - this.startTime;
     
     // Rep cycle: 2.5 seconds per rep
@@ -365,7 +366,7 @@ export class PoseSimulator {
    * Reset simulator
    */
   reset(): void {
-    this.startTime = Date.now();
+    this.startTime = performance.now();
     this.repNumber = 0;
   }
 }
