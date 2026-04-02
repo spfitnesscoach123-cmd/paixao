@@ -8,10 +8,20 @@
  *
  * Estrategia de Podfile (deterministica, sem depender de extraPods):
  * - source 'https://cdn.cocoapods.org/' no topo
- * - use_frameworks! :linkage => :static (global, antes do target)
  * - pod 'MediaPipeTasksVision', '0.10.14' dentro do target
  * - BUILD_LIBRARY_FOR_DISTRIBUTION no post_install
+ * - use_frameworks! delegado ao template do Expo via Podfile.properties.json
  * - Tudo idempotente e com logging extensivo para debug no EAS
+ *
+ * NOTA SOBRE use_frameworks!:
+ * O template do Expo SDK 54 ja aplica use_frameworks! :linkage => :static
+ * DENTRO do target, lendo de Podfile.properties.json (configurado por
+ * expo-build-properties em app.json). NAO injetamos use_frameworks!
+ * diretamente — isso evita duplicacao e conflitos.
+ *
+ * FALLBACK: Se precisar forcar use_frameworks! :linkage => :dynamic,
+ * altere expo-build-properties no app.json:
+ *   "ios": { "useFrameworks": "dynamic" }
  */
 
 const {
@@ -24,11 +34,6 @@ const fs = require('fs');
 // ─── Configuracao Central ───────────────────────────────────────────
 const MEDIAPIPE_POD_LINE = "pod 'MediaPipeTasksVision', '0.10.14'";
 const COCOAPODS_SOURCE = "source 'https://cdn.cocoapods.org/'";
-
-// FALLBACK: Se build continuar falhando com :static, trocar para :dynamic
-// Descomentar a linha abaixo e comentar a de :static
-// const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :dynamic";
-const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :static";
 // ────────────────────────────────────────────────────────────────────
 
 function withMediaPipePose(config) {
@@ -61,52 +66,33 @@ function withMediaPipePose(config) {
         console.log('[withMediaPipePose] [SKIP] source CDN ja presente');
       }
 
-      // ── 1b. Garantir use_frameworks! :linkage => :static (idempotente) ──
-      if (!contents.includes('use_frameworks!')) {
-        // Inserir ANTES da primeira linha 'target' (posicao global)
-        const targetMatch = contents.match(/^(target\s+['"])/m);
-        if (targetMatch) {
-          const idx = contents.indexOf(targetMatch[0]);
-          contents = contents.slice(0, idx) + USE_FRAMEWORKS_LINE + '\n\n' + contents.slice(idx);
-          console.log('[withMediaPipePose] [OK] use_frameworks! inserido antes do target');
-        } else if (contents.includes('prepare_react_native_project!')) {
-          contents = contents.replace(
-            'prepare_react_native_project!',
-            'prepare_react_native_project!\n\n' + USE_FRAMEWORKS_LINE
-          );
-          console.log('[withMediaPipePose] [OK] use_frameworks! inserido apos prepare_react_native_project!');
-        } else {
-          // Ultimo recurso: antes do final do arquivo
-          contents += '\n' + USE_FRAMEWORKS_LINE + '\n';
-          console.log('[withMediaPipePose] [OK] use_frameworks! inserido ao final do Podfile (ultimo recurso)');
-        }
+      // ── 1b. Verificar que use_frameworks! sera aplicado pelo template ──
+      if (contents.includes('use_frameworks!')) {
+        console.log('[withMediaPipePose] [OK] use_frameworks! presente no Podfile (via template/properties)');
       } else {
-        console.log('[withMediaPipePose] [SKIP] use_frameworks! ja presente no Podfile');
-        // Verificar se e :static
-        if (contents.includes(':linkage => :static')) {
-          console.log('[withMediaPipePose]        -> linkage: :static (correto)');
-        } else if (contents.includes(':linkage => :dynamic')) {
-          console.log('[withMediaPipePose]        -> linkage: :dynamic (atentar para possiveis conflitos)');
-        }
+        console.log('[withMediaPipePose] [WARN] use_frameworks! NAO encontrado no Podfile');
+        console.log('[withMediaPipePose]        Verifique que expo-build-properties tem ios.useFrameworks: "static"');
+        console.log('[withMediaPipePose]        e que Podfile.properties.json contem "ios.useFrameworks": "static"');
       }
 
       // ── 1c. Injetar pod MediaPipeTasksVision dentro do target (idempotente) ──
       if (!contents.includes("pod 'MediaPipeTasksVision'")) {
         let injected = false;
 
-        // Estrategia 1: Apos config = use_native_modules!
-        const nativeModulesRegex = /(config\s*=\s*use_native_modules!)/;
+        // Estrategia 1: Apos a LINHA COMPLETA de config = use_native_modules!(...)
+        // IMPORTANTE: captura a linha inteira incluindo parametros como (config_command)
+        const nativeModulesRegex = /(config\s*=\s*use_native_modules![^\n]*)/;
         if (!injected && nativeModulesRegex.test(contents)) {
           contents = contents.replace(nativeModulesRegex, '$1\n\n  ' + MEDIAPIPE_POD_LINE);
           injected = true;
-          console.log('[withMediaPipePose] [OK] Pod injetado apos config = use_native_modules!');
+          console.log('[withMediaPipePose] [OK] Pod injetado apos config = use_native_modules!(...)');
         }
 
         // Estrategia 2: Apos use_expo_modules!
         if (!injected && contents.includes('use_expo_modules!')) {
           contents = contents.replace(
-            'use_expo_modules!',
-            'use_expo_modules!\n  ' + MEDIAPIPE_POD_LINE
+            /use_expo_modules![^\n]*/,
+            '$&\n  ' + MEDIAPIPE_POD_LINE
           );
           injected = true;
           console.log('[withMediaPipePose] [OK] Pod injetado apos use_expo_modules!');
@@ -181,15 +167,12 @@ function withMediaPipePose(config) {
       console.log('[withMediaPipePose]   BUILD_LIBRARY_FOR_DISTRIBUTION:', contents.includes('BUILD_LIBRARY_FOR_DISTRIBUTION') ? 'SIM' : 'NAO');
       console.log('[withMediaPipePose] ======================================================');
 
-      // Dump das primeiras 60 linhas para debug completo no EAS
+      // Dump completo do Podfile para debug no EAS
       const lines = contents.split('\n');
-      console.log('[withMediaPipePose] PODFILE DUMP (primeiras 60 linhas):');
-      lines.slice(0, 60).forEach((line, i) => {
+      console.log('[withMediaPipePose] PODFILE DUMP COMPLETO (' + lines.length + ' linhas):');
+      lines.forEach((line, i) => {
         console.log('[Podfile:' + (i + 1) + '] ' + line);
       });
-      if (lines.length > 60) {
-        console.log('[withMediaPipePose] ... (total: ' + lines.length + ' linhas)');
-      }
       console.log('[withMediaPipePose] ======================================================');
 
       return modConfig;

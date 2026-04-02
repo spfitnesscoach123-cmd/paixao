@@ -54,18 +54,18 @@ Vision Camera (v4.7.3) -> Frame Processor (JSI/worklets-core v1.6.3) -> detectPo
 
 ### Fix EAS Build Error v2 (2026-04-02)
 **Problema**: Mesma falha `no such module 'MediaPipeTasksVision'` persistiu apos fix v1
-**Causa raiz**: `extraPods` do `expo-build-properties` nao e confiavel no EAS SDK 54; injecao anterior via `withDangerousMod` carecia de `source CDN`, versionamento fixo, e `use_frameworks!` explicito no Podfile
+**Solucao aplicada**: Removido extraPods, reescrito withDangerousMod com injecao direta
+**Status**: FALHOU — erro de sintaxe Ruby no Podfile gerado
+
+### Fix EAS Build Error v3 (2026-04-02)
+**Problema**: Build EAS falhou com `Invalid Podfile: syntax error, unexpected '(', expecting 'end'`
+**Causa raiz REAL**: O regex do plugin capturava apenas `config = use_native_modules!` mas o template real do Expo SDK 54 tem `config = use_native_modules!(config_command)`. O pod era injetado no meio da linha, deixando `(config_command)` solto, gerando syntax error. Alem disso, `use_frameworks!` era injetado fora do target pelo plugin, mas o template ja o aplica DENTRO do target via Podfile.properties.json — duplicacao desnecessaria.
 **Solucao aplicada**:
-1. Removido `extraPods` do `expo-build-properties` (mantido apenas `useFrameworks: "static"`)
-2. Reescrito `withMediaPipePose.js` com injecao direta e agressiva:
-   - `source 'https://cdn.cocoapods.org/'` no topo do Podfile
-   - `use_frameworks! :linkage => :static` antes do target
-   - `pod 'MediaPipeTasksVision', '0.10.14'` dentro do target (versao pinada)
-   - `BUILD_LIBRARY_FOR_DISTRIBUTION = 'YES'` no post_install
-3. Logging extensivo para debug completo nos logs do EAS
-4. Todas as operacoes idempotentes (seguras para multiplas execucoes)
-5. Fallback documentado para `:dynamic` se `:static` persistir falhando
-**Testes**: Plugin carrega sem erros, simulacao contra Podfile SDK 54 passa 6/6 verificacoes, idempotencia aprovada
+1. Regex corrigido para capturar LINHA INTEIRA: `/(config\s*=\s*use_native_modules![^\n]*)/`
+2. Removida injecao de `use_frameworks!` — delegado ao template Expo via `expo-build-properties` + `Podfile.properties.json`
+3. Mantido: `source CDN` no topo, `pod 'MediaPipeTasksVision', '0.10.14'` dentro do target, `BUILD_LIBRARY_FOR_DISTRIBUTION` no post_install
+4. Dump COMPLETO do Podfile nos logs do EAS para debug total
+**Testes**: Simulado contra template REAL do Expo SDK 54 (extraido de node_modules/expo/template.tgz) — Podfile gerado sintaticamente correto, pod em linha limpa, idempotencia aprovada
 **Status**: AGUARDANDO VALIDACAO DO USUARIO via novo deploy EAS
 
 ---
