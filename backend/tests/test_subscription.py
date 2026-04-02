@@ -6,7 +6,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://pose-baseline.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://vision-reintegration.preview.emergentagent.com').rstrip('/')
 
 class TestSubscriptionPlans:
     """Test subscription plans endpoint with regional pricing"""
