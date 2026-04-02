@@ -63,7 +63,8 @@ App de gestao de carga e performance esportiva com VBT (Velocity Based Training)
 
 ### P0 (Bloqueador)
 - [x] Reset tecnico — baseline build limpo (CONCLUIDO)
-- [ ] Validar build EAS iOS apos reset (usuario precisa disparar deploy)
+- [x] Auditoria tecnica pos-limpeza (CONCLUIDO — zero blockers)
+- [ ] Validar build EAS iOS (usuario precisa disparar deploy)
 
 ### P1 (Alta Prioridade)
 - [ ] PDF Generation crash em "Analise Cientifica" (recorrente >3x)
