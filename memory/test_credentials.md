@@ -1,5 +1,5 @@
-## Test Credentials
+## Credenciais de Teste
 
-**Coach Login:**
+### Usuario Principal
 - Email: `contato@loadmanagerpro.com.br`
-- Password: `#UAE2026`
+- Senha: `#UAE2026`

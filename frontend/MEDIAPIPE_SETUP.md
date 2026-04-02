@@ -9,13 +9,13 @@ node scripts/download-pose-model.js
 ```
 Isso baixa `pose_landmarker_full.task` (~31MB) para `assets/models/`.
 
-### 2. Gerar projeto iOS (se necessário)
+### 2. Gerar projeto iOS (se necessario)
 ```bash
 npx expo prebuild --platform ios --clean
 ```
 O sistema de plugins automaticamente:
-- `expo-build-properties`: Configura `use_frameworks! :linkage => :static` + adiciona pod via `extraPods`
-- `withMediaPipePose`: Copia `PoseDetectionPlugin.swift` ao projeto Xcode, gera `PoseDetectionPluginRegistrar.m`, copia modelo `.task`, e injeta pod como fallback no Podfile
+- `expo-build-properties`: Configura `useFrameworks: "static"` no `Podfile.properties.json`
+- `withMediaPipePose`: Modifica diretamente o Podfile com injecao robusta e deterministica
 
 ### 3. Instalar pods
 ```bash
@@ -24,7 +24,7 @@ cd ios && pod install && cd ..
 
 ### 4. Build via EAS
 ```bash
-eas build --platform ios --profile production
+eas build --platform ios --profile production --clear-cache
 ```
 
 ## Arquitetura
@@ -36,7 +36,7 @@ Frame Processor (JSI / react-native-worklets-core v1.6.3)
        |
 Plugin Nativo: detectPose (PoseDetectionPlugin.swift)
        |
-MediaPipe Tasks Vision (pod MediaPipeTasksVision + use_frameworks! :linkage => :static)
+MediaPipe Tasks Vision (pod MediaPipeTasksVision 0.10.14 + use_frameworks! :linkage => :static)
        |
 33 Landmarks [{x, y, z, visibility}] — normalizados 0-1, ordem BlazePose
        |
@@ -45,45 +45,50 @@ Pipeline existente (VBT / Jump) — INTOCAVEL
 
 ## Configuracao de Pod (como funciona)
 
-O pod `MediaPipeTasksVision` é injetado de **duas formas** para máxima confiabilidade:
+O pod `MediaPipeTasksVision` e injetado via `withMediaPipePose.js` (withDangerousMod):
 
-1. **`expo-build-properties`** (em `app.json`):
-   - Configura `ios.useFrameworks: "static"` → gera `use_frameworks! :linkage => :static` no Podfile
-   - Configura `extraPods: [{name: "MediaPipeTasksVision"}]` → `use_expo_modules!` adiciona o pod durante `pod install`
-   - Armazena configs em `ios/Podfile.properties.json`
+### O que o plugin faz no Podfile (nesta ordem):
+1. **source CDN**: Adiciona `source 'https://cdn.cocoapods.org/'` no topo do Podfile
+2. **use_frameworks!**: Injeta `use_frameworks! :linkage => :static` antes do bloco target
+3. **Pod injection**: Injeta `pod 'MediaPipeTasksVision', '0.10.14'` dentro do target, apos `config = use_native_modules!`
+4. **BUILD_LIBRARY_FOR_DISTRIBUTION**: Adiciona setting no `post_install` para garantir distribuicao de modulos
 
-2. **`withMediaPipePose.js`** (fallback via `withDangerousMod`):
-   - Verifica se `pod 'MediaPipeTasksVision'` já está no Podfile
-   - Se ausente, injeta explicitamente antes de `config = use_native_modules!`
-   - Garante que o pod está presente mesmo se `extraPods` falhar
+### Comportamento:
+- Todas as operacoes sao **idempotentes** (rodar multiplas vezes nao duplica)
+- Logging extensivo para debug no EAS (dump parcial do Podfile final)
+- **NAO depende de `extraPods`** do `expo-build-properties` (injecao direta)
+
+### FALLBACK (se :static continuar falhando):
+No arquivo `plugins/withMediaPipePose.js`, trocar:
+```js
+// ANTES (static):
+const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :static";
+
+// DEPOIS (dynamic):
+const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :dynamic";
+```
 
 ## Arquivos Criados/Modificados
 
 ### Novos
-| Arquivo | Função |
+| Arquivo | Funcao |
 |---------|--------|
 | `plugins/ios/PoseDetectionPlugin.swift` | Frame processor plugin nativo |
-| `plugins/withMediaPipePose.js` | Expo config plugin (arquivo management + fallback pod) |
+| `plugins/withMediaPipePose.js` | Expo config plugin (Podfile + Xcode project) |
 | `services/pose/MediaPipeCamera.tsx` | Componente React Native (drop-in replacement) |
 | `scripts/download-pose-model.js` | Download do modelo .task |
 
 ### Modificados
-| Arquivo | Mudança |
+| Arquivo | Mudanca |
 |---------|---------|
-| `app/athlete/[id]/vbt-camera.tsx` | `RNMediapipe` → `MediaPipeCamera` |
-| `app/athlete/[id]/jump-camera.tsx` | `RNMediapipe` → `MediaPipeCamera` |
-| `services/pose/PoseCamera.tsx` | `MediapipePoseView` → `MediaPipeCamera` |
-| `components/vbt/CameraView.tsx` | `RNMediapipe` → `MediaPipeCamera` |
-| `app.json` | Plugins: `expo-build-properties` + `withMediaPipePose` |
+| `app/athlete/[id]/vbt-camera.tsx` | `RNMediapipe` -> `MediaPipeCamera` |
+| `app/athlete/[id]/jump-camera.tsx` | `RNMediapipe` -> `MediaPipeCamera` |
+| `services/pose/PoseCamera.tsx` | `MediapipePoseView` -> `MediaPipeCamera` |
+| `components/vbt/CameraView.tsx` | `RNMediapipe` -> `MediaPipeCamera` |
+| `app.json` | Plugins: `expo-build-properties` (useFrameworks only) + `withMediaPipePose` |
 | `package.json` | `@thinksys` removido, `worklets-core` + `expo-build-properties` adicionados |
 
-### Removidos
-| Arquivo | Razão |
-|---------|-------|
-| `patches/@thinksys+react-native-mediapipe+0.0.19.patch` | Dependência removida |
-| `@thinksys/react-native-mediapipe` (dep) | Substituída por integração direta |
-
-## Contrato de Saída (Landmarks)
+## Contrato de Saida (Landmarks)
 
 O plugin nativo retorna **exatamente**:
 ```json
@@ -100,10 +105,10 @@ O plugin nativo retorna **exatamente**:
 ## Troubleshooting
 
 ### "no such module 'MediaPipeTasksVision'" no EAS build
-1. Verificar `ios/Podfile.properties.json` contém `"ios.useFrameworks": "static"`
-2. Verificar `ios/Podfile` contém `pod 'MediaPipeTasksVision'` dentro do target
+1. Verificar nos logs do EAS se os logs `[withMediaPipePose]` mostram `SIM` para todas as verificacoes
+2. Se o Podfile dump mostra o pod dentro do target, o problema pode ser de cache
 3. Limpar cache: `eas build --clear-cache --platform ios`
-4. Verificar que `expo-build-properties` está instalado: `npx expo install expo-build-properties`
+4. Se persistir com `:static`, tentar FALLBACK `:dynamic` (ver secao acima)
 
 ### Pod install falha
 ```bash
@@ -112,12 +117,12 @@ pod repo update
 pod install --repo-update
 ```
 
-### Plugin não encontrado no runtime
-Verificar que `PoseDetectionPlugin.swift` e `PoseDetectionPluginRegistrar.m` estão em **Compile Sources** no Xcode.
+### Plugin nao encontrado no runtime
+Verificar que `PoseDetectionPlugin.swift` e `PoseDetectionPluginRegistrar.m` estao em **Compile Sources** no Xcode.
 
-### Modelo não encontrado
-Verificar que `pose_landmarker_full.task` está em **Copy Bundle Resources** no Xcode.
+### Modelo nao encontrado
+Verificar que `pose_landmarker_full.task` esta em **Copy Bundle Resources** no Xcode.
 
-### Frame processor não funciona
-- Confirmar que `react-native-worklets-core` está instalado
-- Se usar JSC (`jsEngine: "jsc"`), considerar mudar para Hermes se houver problemas com worklets
+### Frame processor nao funciona
+- Confirmar que `react-native-worklets-core` esta instalado
+- Se usar JSC (`jsEngine: "jsc"`), considerar mudar para Hermes

@@ -78,12 +78,7 @@
         "expo-build-properties",
         {
           "ios": {
-            "useFrameworks": "static",
-            "extraPods": [
-              {
-                "name": "MediaPipeTasksVision"
-              }
-            ]
+            "useFrameworks": "static"
           }
         }
       ],

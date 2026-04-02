@@ -1,10 +1,17 @@
 /**
  * Expo Config Plugin — MediaPipe Pose Detection via Vision Camera
  *
- * Pod injection and useFrameworks are handled by expo-build-properties (extraPods).
- * This plugin only handles:
- * - Fallback pod injection (safety net via withDangerousMod)
- * - Copying native Swift plugin, Obj-C registrar, and .task model to Xcode project
+ * Responsabilidades:
+ * 1. Injecao robusta do pod MediaPipeTasksVision no Podfile (withDangerousMod)
+ * 2. Copia de arquivos nativos Swift/Obj-C + modelo .task ao projeto Xcode
+ * 3. Adicao dos arquivos ao Xcode project
+ *
+ * Estrategia de Podfile (deterministica, sem depender de extraPods):
+ * - source 'https://cdn.cocoapods.org/' no topo
+ * - use_frameworks! :linkage => :static (global, antes do target)
+ * - pod 'MediaPipeTasksVision', '0.10.14' dentro do target
+ * - BUILD_LIBRARY_FOR_DISTRIBUTION no post_install
+ * - Tudo idempotente e com logging extensivo para debug no EAS
  */
 
 const {
@@ -14,10 +21,21 @@ const {
 const path = require('path');
 const fs = require('fs');
 
+// ─── Configuracao Central ───────────────────────────────────────────
+const MEDIAPIPE_POD_LINE = "pod 'MediaPipeTasksVision', '0.10.14'";
+const COCOAPODS_SOURCE = "source 'https://cdn.cocoapods.org/'";
+
+// FALLBACK: Se build continuar falhando com :static, trocar para :dynamic
+// Descomentar a linha abaixo e comentar a de :static
+// const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :dynamic";
+const USE_FRAMEWORKS_LINE = "use_frameworks! :linkage => :static";
+// ────────────────────────────────────────────────────────────────────
+
 function withMediaPipePose(config) {
 
-  // ─── Step 1: Fallback — Verify pod is in Podfile, inject if missing ───
-  // expo-build-properties extraPods should handle this, but we verify as safety net
+  // ═══════════════════════════════════════════════════════════════════
+  // STEP 1: Modificacao direta e robusta do Podfile via withDangerousMod
+  // ═══════════════════════════════════════════════════════════════════
   config = withDangerousMod(config, [
     'ios',
     (modConfig) => {
@@ -26,36 +44,161 @@ function withMediaPipePose(config) {
         'Podfile'
       );
 
-      if (fs.existsSync(podfilePath)) {
-        let contents = fs.readFileSync(podfilePath, 'utf-8');
+      if (!fs.existsSync(podfilePath)) {
+        console.error('[withMediaPipePose] ERRO FATAL: Podfile nao encontrado em', podfilePath);
+        return modConfig;
+      }
 
-        if (!contents.includes("pod 'MediaPipeTasksVision'")) {
-          // Try to inject after use_native_modules! (after use_frameworks! in template)
-          if (contents.includes('config = use_native_modules!')) {
-            contents = contents.replace(
-              'config = use_native_modules!',
-              "pod 'MediaPipeTasksVision'\n\n  config = use_native_modules!"
-            );
-          } else if (contents.includes('use_expo_modules!')) {
-            // Fallback: inject after use_expo_modules!
-            contents = contents.replace(
-              'use_expo_modules!',
-              "use_expo_modules!\n  pod 'MediaPipeTasksVision'"
-            );
-          }
+      let contents = fs.readFileSync(podfilePath, 'utf-8');
+      console.log('[withMediaPipePose] ======================================================');
+      console.log('[withMediaPipePose] Podfile encontrado. Tamanho:', contents.length, 'bytes');
 
-          fs.writeFileSync(podfilePath, contents);
-          console.log('[withMediaPipePose] Fallback: Injected MediaPipeTasksVision pod into Podfile');
+      // ── 1a. Adicionar source do CocoaPods no topo (idempotente) ──
+      if (!contents.includes(COCOAPODS_SOURCE)) {
+        contents = COCOAPODS_SOURCE + '\n\n' + contents;
+        console.log('[withMediaPipePose] [OK] source CDN adicionada ao topo do Podfile');
+      } else {
+        console.log('[withMediaPipePose] [SKIP] source CDN ja presente');
+      }
+
+      // ── 1b. Garantir use_frameworks! :linkage => :static (idempotente) ──
+      if (!contents.includes('use_frameworks!')) {
+        // Inserir ANTES da primeira linha 'target' (posicao global)
+        const targetMatch = contents.match(/^(target\s+['"])/m);
+        if (targetMatch) {
+          const idx = contents.indexOf(targetMatch[0]);
+          contents = contents.slice(0, idx) + USE_FRAMEWORKS_LINE + '\n\n' + contents.slice(idx);
+          console.log('[withMediaPipePose] [OK] use_frameworks! inserido antes do target');
+        } else if (contents.includes('prepare_react_native_project!')) {
+          contents = contents.replace(
+            'prepare_react_native_project!',
+            'prepare_react_native_project!\n\n' + USE_FRAMEWORKS_LINE
+          );
+          console.log('[withMediaPipePose] [OK] use_frameworks! inserido apos prepare_react_native_project!');
         } else {
-          console.log('[withMediaPipePose] MediaPipeTasksVision pod already present in Podfile (via extraPods)');
+          // Ultimo recurso: antes do final do arquivo
+          contents += '\n' + USE_FRAMEWORKS_LINE + '\n';
+          console.log('[withMediaPipePose] [OK] use_frameworks! inserido ao final do Podfile (ultimo recurso)');
+        }
+      } else {
+        console.log('[withMediaPipePose] [SKIP] use_frameworks! ja presente no Podfile');
+        // Verificar se e :static
+        if (contents.includes(':linkage => :static')) {
+          console.log('[withMediaPipePose]        -> linkage: :static (correto)');
+        } else if (contents.includes(':linkage => :dynamic')) {
+          console.log('[withMediaPipePose]        -> linkage: :dynamic (atentar para possiveis conflitos)');
         }
       }
+
+      // ── 1c. Injetar pod MediaPipeTasksVision dentro do target (idempotente) ──
+      if (!contents.includes("pod 'MediaPipeTasksVision'")) {
+        let injected = false;
+
+        // Estrategia 1: Apos config = use_native_modules!
+        const nativeModulesRegex = /(config\s*=\s*use_native_modules!)/;
+        if (!injected && nativeModulesRegex.test(contents)) {
+          contents = contents.replace(nativeModulesRegex, '$1\n\n  ' + MEDIAPIPE_POD_LINE);
+          injected = true;
+          console.log('[withMediaPipePose] [OK] Pod injetado apos config = use_native_modules!');
+        }
+
+        // Estrategia 2: Apos use_expo_modules!
+        if (!injected && contents.includes('use_expo_modules!')) {
+          contents = contents.replace(
+            'use_expo_modules!',
+            'use_expo_modules!\n  ' + MEDIAPIPE_POD_LINE
+          );
+          injected = true;
+          console.log('[withMediaPipePose] [OK] Pod injetado apos use_expo_modules!');
+        }
+
+        // Estrategia 3: Logo apos abertura do target
+        if (!injected) {
+          const targetBlockRegex = /(target\s+['"][^'"]+['"]\s+do)/;
+          if (targetBlockRegex.test(contents)) {
+            contents = contents.replace(targetBlockRegex, '$1\n  ' + MEDIAPIPE_POD_LINE);
+            injected = true;
+            console.log('[withMediaPipePose] [OK] Pod injetado apos abertura do bloco target');
+          }
+        }
+
+        if (!injected) {
+          console.error('[withMediaPipePose] [ERRO] Nao foi possivel encontrar ponto de injecao para o pod');
+        }
+      } else {
+        console.log('[withMediaPipePose] [SKIP] Pod MediaPipeTasksVision ja presente no Podfile');
+      }
+
+      // ── 1d. Garantir BUILD_LIBRARY_FOR_DISTRIBUTION no post_install (idempotente) ──
+      if (!contents.includes('BUILD_LIBRARY_FOR_DISTRIBUTION')) {
+        const postInstallRegex = /(post_install\s+do\s+\|installer\|)/;
+        if (postInstallRegex.test(contents)) {
+          const buildDistBlock = [
+            '',
+            '    # -- MediaPipe: garantir distribuicao de modulos --',
+            '    installer.pods_project.targets.each do |t|',
+            '      t.build_configurations.each do |bc|',
+            "        bc.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'",
+            '      end',
+            '    end',
+          ].join('\n');
+          contents = contents.replace(postInstallRegex, '$1' + buildDistBlock);
+          console.log('[withMediaPipePose] [OK] BUILD_LIBRARY_FOR_DISTRIBUTION adicionado ao post_install');
+        } else {
+          // Se nao existe post_install, criar um antes do ultimo 'end'
+          const lastEndIdx = contents.lastIndexOf('\nend');
+          if (lastEndIdx !== -1) {
+            const postInstallBlock = [
+              '',
+              '  post_install do |installer|',
+              '    # -- MediaPipe: garantir distribuicao de modulos --',
+              '    installer.pods_project.targets.each do |t|',
+              '      t.build_configurations.each do |bc|',
+              "        bc.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'",
+              '      end',
+              '    end',
+              '  end',
+            ].join('\n');
+            contents = contents.slice(0, lastEndIdx) + postInstallBlock + contents.slice(lastEndIdx);
+            console.log('[withMediaPipePose] [OK] post_install criado com BUILD_LIBRARY_FOR_DISTRIBUTION');
+          } else {
+            console.warn('[withMediaPipePose] [WARN] Nao foi possivel adicionar BUILD_LIBRARY_FOR_DISTRIBUTION');
+          }
+        }
+      } else {
+        console.log('[withMediaPipePose] [SKIP] BUILD_LIBRARY_FOR_DISTRIBUTION ja presente');
+      }
+
+      // ── Escrever Podfile modificado ──
+      fs.writeFileSync(podfilePath, contents);
+
+      // ── Logging de verificacao final ──
+      console.log('[withMediaPipePose] ======================================================');
+      console.log('[withMediaPipePose] VERIFICACAO FINAL DO PODFILE:');
+      console.log('[withMediaPipePose]   source CDN:                  ', contents.includes(COCOAPODS_SOURCE) ? 'SIM' : 'NAO');
+      console.log('[withMediaPipePose]   use_frameworks!:             ', contents.includes('use_frameworks!') ? 'SIM' : 'NAO');
+      console.log('[withMediaPipePose]   MediaPipeTasksVision pod:    ', contents.includes("pod 'MediaPipeTasksVision'") ? 'SIM' : 'NAO');
+      console.log('[withMediaPipePose]   BUILD_LIBRARY_FOR_DISTRIBUTION:', contents.includes('BUILD_LIBRARY_FOR_DISTRIBUTION') ? 'SIM' : 'NAO');
+      console.log('[withMediaPipePose] ======================================================');
+
+      // Dump das primeiras 60 linhas para debug completo no EAS
+      const lines = contents.split('\n');
+      console.log('[withMediaPipePose] PODFILE DUMP (primeiras 60 linhas):');
+      lines.slice(0, 60).forEach((line, i) => {
+        console.log('[Podfile:' + (i + 1) + '] ' + line);
+      });
+      if (lines.length > 60) {
+        console.log('[withMediaPipePose] ... (total: ' + lines.length + ' linhas)');
+      }
+      console.log('[withMediaPipePose] ======================================================');
 
       return modConfig;
     },
   ]);
 
-  // ─── Step 2: Copy native files + model, add to Xcode project ───
+  // ═══════════════════════════════════════════════════════════════════
+  // STEP 2: Copiar arquivos nativos + modelo, adicionar ao Xcode project
+  // ═══════════════════════════════════════════════════════════════════
   config = withXcodeProject(config, (modConfig) => {
     const xcodeProject = modConfig.modResults;
     const projectRoot = modConfig.modRequest.projectRoot;
@@ -68,7 +211,7 @@ function withMediaPipePose(config) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // ── Copy Swift plugin ──
+    // ── Copiar Swift plugin ──
     const swiftSrc = path.join(projectRoot, 'plugins', 'ios', 'PoseDetectionPlugin.swift');
     const swiftDest = path.join(targetDir, 'PoseDetectionPlugin.swift');
     if (fs.existsSync(swiftSrc)) {
@@ -78,7 +221,7 @@ function withMediaPipePose(config) {
       console.error('[withMediaPipePose] PoseDetectionPlugin.swift not found at', swiftSrc);
     }
 
-    // ── Generate Obj-C registrar with correct module name ──
+    // ── Gerar registrador Obj-C com nome do modulo correto ──
     const moduleName = projectName.replace(/[^a-zA-Z0-9_]/g, '');
     const objcContent = `//
 // PoseDetectionPluginRegistrar.m
@@ -94,7 +237,7 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
     fs.writeFileSync(objcDest, objcContent);
     console.log('[withMediaPipePose] Generated PoseDetectionPluginRegistrar.m (module:', moduleName + ')');
 
-    // ── Copy pose model if available ──
+    // ── Copiar modelo de pose se disponivel ──
     const modelSrc = path.join(projectRoot, 'assets', 'models', 'pose_landmarker_full.task');
     const modelDest = path.join(targetDir, 'pose_landmarker_full.task');
     if (fs.existsSync(modelSrc)) {
@@ -104,9 +247,8 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
       console.warn('[withMediaPipePose] Model not found — run: node scripts/download-pose-model.js');
     }
 
-    // ── Add files to Xcode project ──
+    // ── Adicionar arquivos ao Xcode project ──
     try {
-      // Find app group by iterating PBXGroup objects
       const groups = xcodeProject.hash.project.objects['PBXGroup'] || {};
       let appGroupKey = null;
       for (const [key, val] of Object.entries(groups)) {
@@ -121,7 +263,7 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
 
       const targetUuid = xcodeProject.getFirstTarget().uuid;
 
-      // Add Swift source
+      // Adicionar Swift source
       if (fs.existsSync(swiftDest)) {
         xcodeProject.addSourceFile(
           `${projectName}/PoseDetectionPlugin.swift`,
@@ -130,14 +272,14 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
         );
       }
 
-      // Add Obj-C source
+      // Adicionar Obj-C source
       xcodeProject.addSourceFile(
         `${projectName}/PoseDetectionPluginRegistrar.m`,
         { target: targetUuid },
         appGroupKey
       );
 
-      // Add model as resource
+      // Adicionar modelo como recurso
       if (fs.existsSync(modelDest)) {
         if (!xcodeProject.pbxGroupByName('Resources')) {
           xcodeProject.addPbxGroup([], 'Resources');
@@ -152,7 +294,6 @@ VISION_EXPORT_SWIFT_FRAME_PROCESSOR(PoseDetectionPlugin, detectPose)
       console.log('[withMediaPipePose] Added files to Xcode project');
     } catch (e) {
       console.warn('[withMediaPipePose] Xcode project warning:', e.message);
-      console.warn('[withMediaPipePose] Files copied — may need manual Xcode setup');
     }
 
     return modConfig;
