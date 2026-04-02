@@ -80,3 +80,7 @@ android-sdk/
 
 # Test credentials (sensitive)
 **/test_credentials.md
+-e 
+# Environment files
+*.env
+*.env.*
