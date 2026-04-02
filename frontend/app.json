@@ -73,16 +73,7 @@
           "enableMicrophonePermission": false,
           "enableLocation": false
         }
-      ],
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
-      ],
-      "./plugins/withMediaPipePose"
+      ]
     ],
     "experiments": {
       "typedRoutes": true
