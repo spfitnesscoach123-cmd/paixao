@@ -8,7 +8,7 @@
     "scheme": "loadmanager",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "jsEngine": "jsc",
+    "jsEngine": "hermes",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.silaspaixao.loadmanagerpro",
@@ -64,14 +64,6 @@
         {
           "photosPermission": "Escolha fotos dos atletas",
           "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT."
-        }
-      ],
-      [
-        "react-native-vision-camera",
-        {
-          "cameraPermissionText": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
-          "enableMicrophonePermission": false,
-          "enableLocation": false
         }
       ]
     ],
