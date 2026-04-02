@@ -489,19 +489,18 @@ function JumpCameraContent() {
       return;
     }
     
-    // CMJ or DJ: Save single assessment with time_to_takeoff_ms
+    // CMJ: Save single assessment with time_to_takeoff_ms
     submitMutation.mutate({
       athlete_id: athleteId,
       date: assessmentDate,
       protocol: selectedProtocol,
       flight_time_ms: jumpCamera.metrics.flightTimeMs,
-      contact_time_ms: jumpCamera.metrics.contactTimeMs,
+      contact_time_ms: 0,
       jump_height_cm: jumpCamera.metrics.jumpHeightCm,
-      box_height_cm: selectedProtocol === 'dj' ? parseFloat(boxHeight) : null,
       time_to_takeoff_ms: jumpCamera.metrics.eccentricDurationMs || null,
       notes: `data_source: camera`,
     });
-  }, [athleteId, selectedProtocol, selectedDate, boxHeight, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
+  }, [athleteId, selectedProtocol, selectedDate, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
 
   // ============================================================
   // handleStartCamera - Initiates the progressive initialization
@@ -722,22 +721,6 @@ function JumpCameraContent() {
             <Text style={styles.configTitle}>
               {locale === 'pt' ? 'Configuracao' : 'Configuration'}
             </Text>
-            
-            {/* Box Height (DJ only) */}
-            {selectedProtocol === 'dj' && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>{t.boxHeight}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={boxHeight}
-                  onChangeText={setBoxHeight}
-                  keyboardType="numeric"
-                  placeholder="40"
-                  placeholderTextColor={colors.text.tertiary}
-                  data-testid="box-height-input"
-                />
-              </View>
-            )}
             
             {/* Athlete Height */}
             <View style={styles.inputGroup}>
@@ -1086,14 +1069,6 @@ function JumpCameraContent() {
                       </Text>
                     </View>
                   )}
-                  {selectedProtocol === 'dj' && jumpCamera.liveMetrics.contactTimeMs > 0 && (
-                    <View style={styles.liveMetricItem}>
-                      <Text style={styles.liveMetricLabel}>{t.liveContact}</Text>
-                      <Text style={styles.liveMetricValue}>
-                        {(jumpCamera.liveMetrics.contactTimeMs / 1000).toFixed(2)}s
-                      </Text>
-                    </View>
-                  )}
                 </View>
                 
                 <Text style={styles.frameCountText}>
@@ -1216,14 +1191,6 @@ function JumpCameraContent() {
                   <Text style={styles.metricLabel}>{t.flightTime} (ms)</Text>
                 </View>
                 
-                {(selectedProtocol === 'dj' || jumpCamera.metrics.contactTimeMs > 0) && (
-                  <View style={styles.metricCard} data-testid="metric-contact-time">
-                    <Text style={styles.metricValue}>
-                      {jumpCamera.metrics.contactTimeMs.toFixed(0)}
-                    </Text>
-                    <Text style={styles.metricLabel}>{t.contactTime} (ms)</Text>
-                  </View>
-                )}
               </View>
               
               {/* Secondary Metrics */}

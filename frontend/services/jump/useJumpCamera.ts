@@ -402,7 +402,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       feetAboveGround,
       eccentricTimeMs,
       flightTimeMs,
-      contactTimeMs: 0, // Updated for DJ only
+      contactTimeMs: 0,
       jumpDetected,
     });
   }, [groundCalibration]);

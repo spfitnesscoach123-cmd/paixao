@@ -469,8 +469,6 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 const PROTO_OPTS = [
   { id: 'cmj', label: 'CMJ' },
   { id: 'sl_cmj', label: 'SL-CMJ' },
-  // DJ hidden from UI — code preserved for future reactivation
-  // { id: 'dj', label: 'DJ' },
 ];
 
 const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale: string }) => {
@@ -496,8 +494,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
   const fi = pData?.fatigue_index;
   const asym = pData?.asymmetry;
   const hist = pData?.history;
-  const isDj = proto === 'dj';
-  const metricLabel = isDj ? 'RSI' : 'RSImod';
+  const metricLabel = 'RSImod';
 
   const rsiColor = (cls: string) => {
     const map: Record<string, string> = { excellent: '#22c55e', very_good: '#10b981', good: '#84cc16', average: '#f59e0b', below_average: '#f97316', poor: '#ef4444' };

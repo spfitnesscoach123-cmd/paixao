@@ -1,43 +1,38 @@
 # Load Manager Pro - PRD
 
 ## Problema Original
-Aplicacao full-stack React Native (Expo SDK 54) + FastAPI para monitoramento esportivo VBT (Velocity Based Training) e analise de saltos.
+Aplicacao full-stack React Native (Expo SDK 54) + FastAPI para monitoramento esportivo VBT e analise de saltos.
 
-## Arquitetura
-```
-/app
-├── backend/          -> FastAPI (Python)
-│   └── server.py     
-├── frontend/         -> React Native (Expo SDK 54, Hermes)
-│   ├── app/          -> Telas (Expo Router)
-│   ├── services/
-│   │   ├── frameTime.ts        -> Timestamps monotonicos (performance.now)
-│   │   ├── frameDrop.ts        -> Monitor de integridade de frames
-│   │   ├── camera/             -> Managers do lifecycle da camera
-│   │   ├── pose/               -> Interfaces e stubs do MediaPipe
-│   │   ├── jump/               -> Deteccao de eventos do Jump
-│   │   └── vbt/                -> TrackingSystem, VelocityCalculator, RepDetector
-│   └── docs/
-```
+## Protocolos Ativos
+- CMJ (Counter Movement Jump)
+- SL-CMJ Right / Left (Single Leg CMJ)
 
-## Implementado - Sessao atual (02/Abril/2026)
-- Precisao Temporal: Date.now() substituido por performance.now() monotonico no pipeline de metricas
-- Frame Drop Detection: FrameIntegrityMonitor detecta e protege contra frames perdidos
-- Unificacao RSI -> RSImod: Formula unica jumpHeight(m)/time_to_takeoff(s) em CMJ+DJ+SL-CMJ, frontend+backend
-- Testes: 48 unit tests + 3 validacoes API (CMJ/DJ/SL-CMJ) confirmadas via curl
+## Formula Padrao Unica
+RSImod = jumpHeight(m) / time_to_takeoff(s)
+- jumpHeight = (g * flight_time^2) / 8
+- time_to_takeoff = t_takeoff - t_movement_start
+
+## Implementado
+
+### Sessao 02/Abril/2026
+1. Precisao Temporal: Date.now() -> performance.now() monotonico no pipeline
+2. Frame Drop Detection: FrameIntegrityMonitor com protecao no VBT e Jump
+3. Unificacao RSI -> RSImod (formula unica em todo o sistema)
+4. Remocao completa de Drop Jump (DJ): enum, funcoes, UI, endpoints, analises
 
 ## Estado Atual
-- Build: Web export 100% funcional, EAS baseline estavel
-- Mocked: Motor de pose (MediaPipe) mockado (MEDIAPIPE_AVAILABLE = false)
-- RSI: Formula unificada RSImod validada com diferenca 0% frontend/backend
+- Build: Web export 100% funcional
+- Mocked: Motor de pose (MediaPipe) mockado
+- Protocolos: CMJ + SL-CMJ apenas (DJ removido)
+- RSImod: Formula unica validada, diferenca 0% frontend/backend
 
 ## Backlog
 ### P0
-- [ ] Reintegracao segura da visao computacional (MediaPipe ou alternativa)
+- [ ] Reintegracao segura da visao computacional (MediaPipe)
 
 ### P2
 - [ ] UI merge de perfis duplicados de atletas
 - [ ] i18n de ScientificAnalysisTab e Avaliacoes
-- [ ] Refatoracao trackingProtection.ts (1460 linhas)
-- [ ] Remocao de codigo legacy (~600 linhas mortas)
+- [ ] Refatoracao trackingProtection.ts
+- [ ] Remocao de codigo legacy VBT
 - [ ] Gate de logs com __DEV__

@@ -8,7 +8,7 @@
 /**
  * Jump protocols supported
  */
-export type JumpProtocol = 'cmj' | 'sl_cmj' | 'sl_cmj_right' | 'sl_cmj_left' | 'dj';
+export type JumpProtocol = 'cmj' | 'sl_cmj' | 'sl_cmj_right' | 'sl_cmj_left';
 
 /**
  * Active leg for single-leg jumps
@@ -47,9 +47,6 @@ export interface JumpEvents {
   takeoffTime: number | null;       // Feet left ground
   landingTime: number | null;       // First foot touched ground
   peakHeightTime: number | null;    // Maximum height reached
-  // DJ-specific
-  djInitialLandingTime: number | null; // First land from box (DJ)
-  djContactEndTime: number | null;     // Takeoff after ground contact (DJ)
 }
 
 /**
@@ -120,7 +117,7 @@ export type JumpCameraPhase =
  */
 export interface JumpCameraConfig {
   protocol: JumpProtocol;
-  boxHeightCm: number;        // Only for DJ protocol
+  boxHeightCm: number;        // Reservado para uso futuro
   athleteHeightCm: number;    // For height estimation calibration
   frameRate: number;          // Target FPS (30)
 }
@@ -236,15 +233,6 @@ export const JUMP_PROTOCOL_INFO: Record<JumpProtocol, {
     descriptionPt: 'Salto usando apenas a perna direita',
     icon: 'accessibility',
     requiresBoxHeight: false,
-    requiresLegSelection: false,
-  },
-  dj: {
-    name: 'Drop Jump',
-    namePt: 'Salto em Profundidade',
-    description: 'Jump from box with quick ground contact',
-    descriptionPt: 'Salto a partir de caixa com contato rapido no solo',
-    icon: 'arrow-down',
-    requiresBoxHeight: true,
     requiresLegSelection: false,
   },
 };

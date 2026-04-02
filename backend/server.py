@@ -5052,7 +5052,7 @@ STRENGTH_NORMATIVES = {
     "fatigue_index": {"low": 30, "moderate": 50, "high": 70, "critical": 85, "unit": "%"}
 }
 
-# ============= JUMP ASSESSMENT MODELS (CMJ, SL-CMJ, DJ) =============
+# ============= JUMP ASSESSMENT MODELS (CMJ, SL-CMJ) =============
 
 import math
 
@@ -5060,17 +5060,15 @@ class JumpProtocol(str, Enum):
     CMJ = "cmj"  # Counter Movement Jump
     SL_CMJ_RIGHT = "sl_cmj_right"  # Single Leg CMJ - Right
     SL_CMJ_LEFT = "sl_cmj_left"  # Single Leg CMJ - Left
-    DJ = "dj"  # Drop Jump
 
 class JumpAssessmentCreate(BaseModel):
     athlete_id: str
     date: str
     protocol: JumpProtocol
     flight_time_ms: float  # Tempo de Voo em milissegundos
-    contact_time_ms: float  # Tempo de Contato em milissegundos (DJ only)
+    contact_time_ms: float = 0  # Mantido para compatibilidade (sempre 0 para CMJ/SL-CMJ)
     jump_height_cm: Optional[float] = None  # Altura do salto (pode ser calculada)
-    box_height_cm: Optional[float] = None  # Altura da caixa (apenas para DJ)
-    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (CMJ/SL-CMJ: eccentric+concentric)
+    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (eccentric+concentric)
     notes: Optional[str] = None
 
 class JumpAssessment(BaseModel):
@@ -5129,33 +5127,29 @@ def calculate_jump_height_from_flight_time(flight_time_ms: float) -> float:
     height_m = (g * (flight_time_s ** 2)) / 8
     return round(height_m * 100, 2)  # Convert to cm
 
-def calculate_rsi(jump_height_cm: float, contact_time_ms: float) -> float:
+def calculate_rsi(jump_height_cm: float, time_to_takeoff_ms: float) -> float:
     """
     Calculate RSImod (Reactive Strength Index Modified)
     RSImod = Jump Height (m) / Time to Takeoff (s)
     
-    Para DJ: time_to_takeoff = contact_time (tempo no solo até decolar)
-    Para CMJ: time_to_takeoff = fase excêntrica + concêntrica
+    Unica formula de RSI no sistema.
     """
-    if contact_time_ms <= 0:
+    if time_to_takeoff_ms <= 0:
         return 0
     jump_height_m = jump_height_cm / 100
-    time_to_takeoff_s = contact_time_ms / 1000
+    time_to_takeoff_s = time_to_takeoff_ms / 1000
     rsi = jump_height_m / time_to_takeoff_s
     return round(rsi, 2)
 
-def calculate_rsi_modified(flight_time_ms: float, contact_time_ms: float) -> float:
+def calculate_rsi_modified(flight_time_ms: float, time_to_takeoff_ms: float) -> float:
     """
     DEPRECATED: Mantido para compatibilidade.
-    Agora usa mesma fórmula do RSImod padrão.
-    Use calculate_rsi() diretamente.
+    Usa mesma formula RSImod = jumpHeight / time_to_takeoff.
     """
-    # Fallback: estimar altura do salto a partir do tempo de voo
-    # e calcular RSImod = height / time_to_takeoff
-    if contact_time_ms <= 0 or flight_time_ms <= 0:
+    if time_to_takeoff_ms <= 0 or flight_time_ms <= 0:
         return 0
     jump_height_cm = calculate_jump_height_from_flight_time(flight_time_ms)
-    return calculate_rsi(jump_height_cm, contact_time_ms)
+    return calculate_rsi(jump_height_cm, time_to_takeoff_ms)
 
 def calculate_peak_power_sayers(jump_height_cm: float, body_mass_kg: float) -> float:
     """
@@ -5271,15 +5265,6 @@ async def get_jump_protocols(lang: str = "pt"):
             "optional_fields": ["jump_height_cm"],
             "icon": "fitness"
         },
-        "dj": {
-            "id": "dj",
-            "name": "DJ" if lang == "en" else "DJ",
-            "full_name": "Drop Jump" if lang == "en" else "Drop Jump",
-            "description": "Drop jump from a box to assess reactive strength" if lang == "en" else "Salto de queda de uma caixa para avaliar força reativa",
-            "required_fields": ["flight_time_ms", "contact_time_ms", "box_height_cm"],
-            "optional_fields": ["jump_height_cm"],
-            "icon": "arrow-down"
-        }
     }
     return protocols
 
@@ -5305,22 +5290,14 @@ async def create_jump_assessment(
     if not jump_height_cm or jump_height_cm <= 0:
         jump_height_cm = calculate_jump_height_from_flight_time(data.flight_time_ms)
     
-    # Calculate RSI - protocol-specific
-    # CMJ/SL-CMJ: RSImod = jumpHeight(m) / timeToTakeoff(s) — NEVER use contactTime
-    # DJ: RSI = jumpHeight(m) / contactTime(s) — classic reactive strength index
-    if data.protocol.value in ("cmj", "sl_cmj_left", "sl_cmj_right"):
-        # For CMJ/SL-CMJ use time_to_takeoff_ms (eccentric + concentric phase)
-        ttt = data.time_to_takeoff_ms or 0
-        if ttt > 0:
-            rsi = round((jump_height_cm / 100) / (ttt / 1000), 2)
-            rsi_modified = rsi  # RSImod = same formula for CMJ
-        else:
-            rsi = 0.0
-            rsi_modified = 0.0
+    # Calculate RSImod = jumpHeight(m) / timeToTakeoff(s) — formula unica
+    ttt = data.time_to_takeoff_ms or 0
+    if ttt > 0:
+        rsi = round((jump_height_cm / 100) / (ttt / 1000), 2)
+        rsi_modified = rsi
     else:
-        # DJ: RSImod = jumpHeight(m) / contactTime(s) — contactTime é time_to_takeoff no DJ
-        rsi = calculate_rsi(jump_height_cm, data.contact_time_ms)
-        rsi_modified = rsi  # Fórmula única: jumpHeight / time_to_takeoff
+        rsi = 0.0
+        rsi_modified = 0.0
     
     # Calculate Peak Power (Sayers Equation)
     peak_power = calculate_peak_power_sayers(jump_height_cm, body_mass_kg)
@@ -5364,7 +5341,6 @@ async def create_jump_assessment(
         flight_time_ms=data.flight_time_ms,
         contact_time_ms=data.contact_time_ms,
         jump_height_cm=jump_height_cm,
-        box_height_cm=data.box_height_cm,
         time_to_takeoff_ms=data.time_to_takeoff_ms,
         rsi=rsi,
         rsi_modified=rsi_modified,
@@ -5457,13 +5433,11 @@ async def get_jump_analysis(
     cmj_assessments = [a for a in all_assessments if a.get("protocol") == "cmj"]
     sl_right_assessments = [a for a in all_assessments if a.get("protocol") == "sl_cmj_right"]
     sl_left_assessments = [a for a in all_assessments if a.get("protocol") == "sl_cmj_left"]
-    dj_assessments = [a for a in all_assessments if a.get("protocol") == "dj"]
     
     # Get latest assessment for each protocol
     latest_cmj = cmj_assessments[0] if cmj_assessments else None
     latest_sl_right = sl_right_assessments[0] if sl_right_assessments else None
     latest_sl_left = sl_left_assessments[0] if sl_left_assessments else None
-    latest_dj = dj_assessments[0] if dj_assessments else None
     
     # Build analysis response
     analysis = {
@@ -5574,32 +5548,8 @@ async def get_jump_analysis(
             "interpretation": get_asymmetry_interpretation(asymmetry_rsi, lang)
         }
     
-    # Process DJ data
-    if latest_dj:
-        analysis["protocols"]["dj"] = {
-            "latest": {
-                "date": latest_dj.get("date"),
-                "box_height_cm": latest_dj.get("box_height_cm"),
-                "jump_height_cm": latest_dj.get("jump_height_cm"),
-                "contact_time_ms": latest_dj.get("contact_time_ms"),
-                "rsi": latest_dj.get("rsi"),
-                "rsi_modified": latest_dj.get("rsi_modified"),
-                "peak_power_w": latest_dj.get("peak_power_w"),
-                "peak_velocity_ms": latest_dj.get("peak_velocity_ms"),
-                "relative_power_wkg": latest_dj.get("relative_power_wkg"),
-                "rsi_classification": latest_dj.get("rsi_classification", "average")
-            },
-            "history": [
-                {
-                    "date": a.get("date"),
-                    "rsi": a.get("rsi"),
-                    "box_height_cm": a.get("box_height_cm")
-                } for a in dj_assessments[:10]
-            ]
-        }
-    
-    # Power-Velocity Insights (using CMJ or DJ data)
-    primary_assessment = latest_cmj or latest_dj
+    # Power-Velocity Insights (using CMJ data)
+    primary_assessment = latest_cmj
     if primary_assessment:
         peak_power = primary_assessment.get("peak_power_w", 0)
         peak_velocity = primary_assessment.get("peak_velocity_ms", 0)
@@ -5888,11 +5838,8 @@ async def get_jump_protocol_analysis(
 
     selected_date = selected.get("date")
 
-    # Determine which metric to use for classification and fatigue
-    # CMJ/SL-CMJ → RSImod, DJ → RSI classic
-    use_rsi_mod = protocol in ("cmj", "sl_cmj_left", "sl_cmj_right")
-    metric_key = "rsi" if not use_rsi_mod else "rsi"  # both stored as "rsi" in DB
-    metric_label = "RSImod" if use_rsi_mod else "RSI"
+    # Determine metric label — RSImod e o padrao unico
+    metric_label = "RSImod"
 
     current_metric_value = selected.get("rsi", 0)
 
@@ -5908,7 +5855,6 @@ async def get_jump_protocol_analysis(
         "peak_power_w": selected.get("peak_power_w"),
         "peak_velocity_ms": selected.get("peak_velocity_ms"),
         "relative_power_wkg": selected.get("relative_power_wkg"),
-        "box_height_cm": selected.get("box_height_cm"),
     }
 
     # === SCIENTIFIC FATIGUE INDEX ===
@@ -6843,7 +6789,7 @@ WELLNESS (últimos {w['records_count']} registros):
         latest = j.get('latest', {})
         hist = j.get('historical', {})
         context_parts.append(f"""
-AVALIAÇÃO DE SALTO (CMJ/DJ):
+AVALIACAO DE SALTO (CMJ/SL-CMJ):
 - RSI atual: {latest.get('rsi', 0)} ({latest.get('rsi_classification', '')})
 - Altura do salto: {latest.get('jump_height_cm', 0)} cm
 - Pico de potência: {latest.get('peak_power_w', 0)} W
@@ -8858,12 +8804,11 @@ async def get_dashboard_overview(
                         "mood": w.get("mood", 5)
                     })
         
-        # Jump data — CMJ (primary neuromuscular), SL-CMJ (asymmetry), DJ (complementary)
+        # Jump data — CMJ (primary neuromuscular), SL-CMJ (asymmetry)
         j_recs = jump_by_athlete.get(aid, [])
         cmj_recs = [j for j in j_recs if j.get("protocol") == "cmj"]
         sl_right_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_right"]
         sl_left_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_left"]
-        dj_recs = [j for j in j_recs if j.get("protocol") == "dj"]
         rsimod = None
         rsimod_timeline = []
         jump_metrics = {}

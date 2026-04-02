@@ -234,41 +234,6 @@ export function detectSLCMJLanding(
   return false;
 }
 
-/**
- * DJ Initial Landing Detection
- */
-export function detectDJInitialLanding(
-  frame: JumpFrameData,
-  calibration: GroundCalibration,
-  previousFrame: JumpFrameData | null
-): boolean {
-  const threshold = calibration.groundThreshold;
-  if (!previousFrame) return false;
-  const wasInAir = previousFrame.leftToeY < threshold && previousFrame.rightToeY < threshold;
-  const nowOnGround = frame.leftToeY >= threshold || frame.rightToeY >= threshold;
-  return wasInAir && nowOnGround;
-}
-
-/**
- * DJ Takeoff Detection (after ground contact)
- */
-export function detectDJTakeoff(
-  frame: JumpFrameData,
-  calibration: GroundCalibration
-): boolean {
-  return detectCMJTakeoff(frame, calibration);
-}
-
-/**
- * DJ Final Landing Detection
- */
-export function detectDJFinalLanding(
-  frame: JumpFrameData,
-  calibration: GroundCalibration
-): boolean {
-  return detectCMJLanding(frame, calibration);
-}
-
 // ============================================================
 // COUNTERMOVEMENT DETECTION
 // ============================================================
@@ -381,11 +346,7 @@ export function analyzeJumpFrames(
   const events: JumpEvents = createEmptyEvents();
   let minHipY = Infinity;
 
-  if (protocol === 'dj') {
-    return analyzeDJ(frames, calibration, events, athleteHeightCm);
-  } else {
-    return analyzeCMJ(frames, calibration, events, protocol, activeLeg, athleteHeightCm);
-  }
+  return analyzeCMJ(frames, calibration, events, protocol, activeLeg, athleteHeightCm);
 }
 
 /**
@@ -510,7 +471,7 @@ function analyzeCMJ(
         eccentricDurationMs = frames[takeoffFrameIdx].timestamp - frames[countermovementStartIdx].timestamp;
       }
       
-      // For CMJ: contactTimeMs is NOT applicable (reactive contact is a DJ concept)
+      // contactTimeMs nao se aplica ao CMJ/SL-CMJ
       // timeToTakeoff = eccentricDuration (from movement start to takeoff)
       const contactTimeMs = 0;
       const timeToTakeoffMs = eccentricDurationMs;
@@ -570,114 +531,6 @@ function analyzeCMJ(
 }
 
 /**
- * DJ Analysis
- */
-function analyzeDJ(
-  frames: JumpFrameData[],
-  calibration: GroundCalibration,
-  events: JumpEvents,
-  athleteHeightCm: number
-): JumpAnalysisResult {
-  let djInitialLandingIdx: number | null = null;
-  let djTakeoffIdx: number | null = null;
-  let djFinalLandingIdx: number | null = null;
-  let minHipY = Infinity;
-  
-  let state: 'waiting_land' | 'on_ground' | 'in_air' | 'final_land' = 'waiting_land';
-  let consecutiveTakeoffFrames = 0;
-  
-  for (let i = 1; i < frames.length; i++) {
-    const frame = frames[i];
-    const prevFrame = frames[i - 1];
-    
-    if (state === 'waiting_land') {
-      if (detectDJInitialLanding(frame, calibration, prevFrame)) {
-        djInitialLandingIdx = i;
-        events.djInitialLandingTime = frame.timestamp;
-        state = 'on_ground';
-        console.log('[JUMP_DETECTOR] DJ initial landing at frame ' + i);
-      }
-    } else if (state === 'on_ground') {
-      if (detectDJTakeoff(frame, calibration)) {
-        consecutiveTakeoffFrames++;
-        if (consecutiveTakeoffFrames >= MIN_TAKEOFF_FRAMES) {
-          djTakeoffIdx = i - MIN_TAKEOFF_FRAMES + 1;
-          events.takeoffTime = frames[djTakeoffIdx].timestamp;
-          events.djContactEndTime = frames[djTakeoffIdx].timestamp;
-          state = 'in_air';
-          console.log('[LOG_JUMP_TAKEOFF_DETECTED] DJ takeoff at frame ' + djTakeoffIdx);
-        }
-      } else {
-        consecutiveTakeoffFrames = 0;
-      }
-    } else if (state === 'in_air') {
-      if (frame.hipCenterY < minHipY) {
-        minHipY = frame.hipCenterY;
-        events.peakHeightTime = frame.timestamp;
-      }
-      
-      if (detectDJFinalLanding(frame, calibration)) {
-        djFinalLandingIdx = i;
-        events.landingTime = frame.timestamp;
-        state = 'final_land';
-        console.log('[LOG_JUMP_LANDING_DETECTED] DJ final landing at frame ' + i);
-        break;
-      }
-    }
-  }
-  
-  // Calculate DJ metrics
-  if (djInitialLandingIdx !== null && djTakeoffIdx !== null && djFinalLandingIdx !== null) {
-    const contactTimeMs = frames[djTakeoffIdx].timestamp - frames[djInitialLandingIdx].timestamp;
-    const flightTimeMs = frames[djFinalLandingIdx].timestamp - frames[djTakeoffIdx].timestamp;
-    
-    console.log('[JUMP_DETECTOR] DJ contact time: ' + contactTimeMs + 'ms');
-    console.log('[JUMP_DETECTOR] DJ flight time: ' + flightTimeMs + 'ms');
-    
-    if (flightTimeMs >= MIN_FLIGHT_TIME_MS && flightTimeMs <= MAX_FLIGHT_TIME_MS) {
-      const jumpHeightCm = calculateJumpHeightFromFlightTime(flightTimeMs);
-      const hipDisplacement = calculateJumpHeightFromHipDisplacement(
-        calibration.standingHipY,
-        minHipY,
-        athleteHeightCm
-      );
-      
-      // RSImod for DJ = jumpHeight (m) / contactTime (s) — contactTime = time_to_takeoff no DJ
-      const rsi = contactTimeMs > 0 ? (jumpHeightCm / 100) / (contactTimeMs / 1000) : 0;
-      
-      const metrics: JumpMetrics = {
-        flightTimeMs,
-        contactTimeMs,
-        jumpHeightCm,
-        hipDisplacementCm: hipDisplacement,
-        takeoffVelocityMs: Math.sqrt(2 * 9.81 * (jumpHeightCm / 100)),
-        eccentricDurationMs: 0, // N/A for DJ
-        rsiMod: Math.round(rsi * 100) / 100,
-      };
-      
-      console.log('[LOG_JUMP_METRICS_CALCULATED] DJ Metrics:');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   flightTime=' + flightTimeMs + 'ms');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   contactTime=' + contactTimeMs + 'ms');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   jumpHeight=' + jumpHeightCm.toFixed(1) + 'cm');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   RSImod=' + rsi.toFixed(2) + ' (jumpHeight/contactTime)');
-      
-      return {
-        events,
-        metrics,
-        phase: 'complete',
-      };
-    }
-  }
-  
-  return {
-    events,
-    metrics: null,
-    phase: 'idle',
-    error: 'Could not detect complete drop jump. Ensure the drop from box and subsequent jump are clearly visible.',
-  };
-}
-
-/**
  * Helper to create empty events object
  */
 function createEmptyEvents(): JumpEvents {
@@ -688,8 +541,6 @@ function createEmptyEvents(): JumpEvents {
     takeoffTime: null,
     landingTime: null,
     peakHeightTime: null,
-    djInitialLandingTime: null,
-    djContactEndTime: null,
   };
 }
 

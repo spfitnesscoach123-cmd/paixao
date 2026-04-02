@@ -26,7 +26,7 @@ import { format } from 'date-fns';
 
 const { width: screenWidth } = Dimensions.get('window');
 
-type JumpProtocol = 'cmj' | 'sl_cmj' | 'dj';
+type JumpProtocol = 'cmj' | 'sl_cmj';
 
 interface ProtocolOption {
   id: JumpProtocol;
@@ -38,8 +38,7 @@ interface ProtocolOption {
 const PROTOCOLS: ProtocolOption[] = [
   { id: 'cmj', label: 'CMJ', labelPt: 'CMJ', icon: 'trending-up' },
   { id: 'sl_cmj', label: 'SL-CMJ', labelPt: 'SL-CMJ', icon: 'footsteps' },
-  // DJ protocol hidden from UI — code preserved for future reactivation
-  // { id: 'dj', label: 'DJ', labelPt: 'DJ', icon: 'arrow-down' },
+  // Protocolos disponiveis: CMJ e SL-CMJ
 ];
 
 // ---- Animated Number Component ----
@@ -76,9 +75,8 @@ const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; clas
   const startAngle = Math.PI;
   const endAngle = 0;
 
-  const isDj = protocol === 'dj';
-  const metricLabel = isDj ? 'RSI' : 'RSImod';
-  const maxVal = isDj ? 3.5 : 1.5;
+  const metricLabel = 'RSImod';
+  const maxVal = 1.5;
 
   const getColor = (cls: string) => {
     const map: Record<string, string> = {
@@ -119,7 +117,7 @@ const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; clas
   const valPath = `M ${bgStart.x} ${bgStart.y} A ${radius} ${radius} 0 ${largeArc} 1 ${valEnd.x} ${valEnd.y}`;
 
   // Tick marks
-  const ticks = isDj ? [0.5, 1.0, 1.5, 2.0, 2.5, 3.0] : [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
+  const ticks = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
 
   return (
     <View style={s.gaugeCard} data-testid="rsi-gauge">
@@ -380,8 +378,7 @@ const RSIEvolutionChart = ({ history, protocol, locale }: { history: any[]; prot
     reversed.map((h, i) => `L ${getX(i)},${getY(h.rsi)}`).join(' ') +
     ` L ${getX(reversed.length - 1)},${pad.t + iH} L ${getX(0)},${pad.t + iH} Z`;
 
-  const isDj = protocol === 'dj';
-  const metricLabel = isDj ? 'RSI' : 'RSImod';
+  const metricLabel = 'RSImod';
 
   return (
     <View style={s.card} data-testid="rsi-evolution-chart">
@@ -537,7 +534,7 @@ function JumpAssessmentContent() {
         `RSI: ${data.calculations.rsi}\n${locale === 'pt' ? 'Potencia' : 'Power'}: ${data.calculations.peak_power_w}W`,
         [{ text: 'OK' }]
       );
-      setFlightTime(''); setContactTime(''); setJumpHeight(''); setBoxHeight(''); setTimeToTakeoff(''); setNotes('');
+      setFlightTime(''); setJumpHeight(''); setTimeToTakeoff(''); setNotes('');
       setShowManualEntry(false);
     },
     onError: (error: any) => {
@@ -546,12 +543,8 @@ function JumpAssessmentContent() {
   });
 
   const handleSubmit = () => {
-    if (!flightTime || (!contactTime && selectedProtocol === 'dj')) {
+    if (!flightTime) {
       Alert.alert(locale === 'pt' ? 'Dados Incompletos' : 'Incomplete Data', locale === 'pt' ? 'Preencha os campos obrigatorios' : 'Fill required fields');
-      return;
-    }
-    if (selectedProtocol === 'dj' && !boxHeight) {
-      Alert.alert(locale === 'pt' ? 'Altura da Caixa' : 'Box Height', locale === 'pt' ? 'Informe a altura da caixa' : 'Enter box height');
       return;
     }
     // For SL-CMJ, submit for both legs with the same data
@@ -561,9 +554,8 @@ function JumpAssessmentContent() {
       date,
       protocol: submitProtocol,
       flight_time_ms: parseFloat(flightTime.replace(',', '.')),
-      contact_time_ms: contactTime ? parseFloat(contactTime.replace(',', '.')) : 0,
+      contact_time_ms: 0,
       jump_height_cm: jumpHeight ? parseFloat(jumpHeight.replace(',', '.')) : null,
-      box_height_cm: boxHeight ? parseFloat(boxHeight.replace(',', '.')) : null,
       time_to_takeoff_ms: timeToTakeoff ? parseFloat(timeToTakeoff.replace(',', '.')) : null,
       notes: notes || null,
     });
@@ -746,12 +738,6 @@ function JumpAssessmentContent() {
                 <AnimatedNumber value={metrics.relative_power_wkg || 0} decimals={1} style={s.metricVal} />
                 <Text style={s.metricLabel}>W/kg</Text>
               </View>
-              {selectedProtocol === 'dj' && metrics.box_height_cm && (
-                <View style={s.metricCard}>
-                  <AnimatedNumber value={metrics.box_height_cm} decimals={0} style={s.metricVal} />
-                  <Text style={s.metricLabel}>{locale === 'pt' ? 'Caixa (cm)' : 'Box (cm)'}</Text>
-                </View>
-              )}
             </View>
 
             {/* Fatigue Index */}
