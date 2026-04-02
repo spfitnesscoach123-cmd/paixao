@@ -5131,24 +5131,31 @@ def calculate_jump_height_from_flight_time(flight_time_ms: float) -> float:
 
 def calculate_rsi(jump_height_cm: float, contact_time_ms: float) -> float:
     """
-    Calculate Reactive Strength Index
-    RSI = Jump Height (m) / Contact Time (s)
+    Calculate RSImod (Reactive Strength Index Modified)
+    RSImod = Jump Height (m) / Time to Takeoff (s)
+    
+    Para DJ: time_to_takeoff = contact_time (tempo no solo até decolar)
+    Para CMJ: time_to_takeoff = fase excêntrica + concêntrica
     """
     if contact_time_ms <= 0:
         return 0
     jump_height_m = jump_height_cm / 100
-    contact_time_s = contact_time_ms / 1000
-    rsi = jump_height_m / contact_time_s
+    time_to_takeoff_s = contact_time_ms / 1000
+    rsi = jump_height_m / time_to_takeoff_s
     return round(rsi, 2)
 
 def calculate_rsi_modified(flight_time_ms: float, contact_time_ms: float) -> float:
     """
-    Calculate Modified RSI (for Drop Jump)
-    RSI-mod = Flight Time / Contact Time
+    DEPRECATED: Mantido para compatibilidade.
+    Agora usa mesma fórmula do RSImod padrão.
+    Use calculate_rsi() diretamente.
     """
-    if contact_time_ms <= 0:
+    # Fallback: estimar altura do salto a partir do tempo de voo
+    # e calcular RSImod = height / time_to_takeoff
+    if contact_time_ms <= 0 or flight_time_ms <= 0:
         return 0
-    return round(flight_time_ms / contact_time_ms, 2)
+    jump_height_cm = calculate_jump_height_from_flight_time(flight_time_ms)
+    return calculate_rsi(jump_height_cm, contact_time_ms)
 
 def calculate_peak_power_sayers(jump_height_cm: float, body_mass_kg: float) -> float:
     """
@@ -5311,9 +5318,9 @@ async def create_jump_assessment(
             rsi = 0.0
             rsi_modified = 0.0
     else:
-        # DJ: use contactTime as before
+        # DJ: RSImod = jumpHeight(m) / contactTime(s) — contactTime é time_to_takeoff no DJ
         rsi = calculate_rsi(jump_height_cm, data.contact_time_ms)
-        rsi_modified = calculate_rsi_modified(data.flight_time_ms, data.contact_time_ms)
+        rsi_modified = rsi  # Fórmula única: jumpHeight / time_to_takeoff
     
     # Calculate Peak Power (Sayers Equation)
     peak_power = calculate_peak_power_sayers(jump_height_cm, body_mass_kg)

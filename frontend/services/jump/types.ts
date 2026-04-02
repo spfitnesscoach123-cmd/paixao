@@ -62,7 +62,7 @@ export interface JumpMetrics {
   hipDisplacementCm: number;  // Vertical hip displacement (cm)
   takeoffVelocityMs: number;  // Estimated takeoff velocity (m/s)
   eccentricDurationMs: number; // Countermovement/eccentric phase duration (CMJ)
-  rsiMod: number;             // RSI modified = jumpHeight / contactTime (for CMJ)
+  rsiMod: number;             // RSImod = jumpHeight(m) / timeToTakeoff(s)
 }
 
 /**

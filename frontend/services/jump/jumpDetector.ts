@@ -642,8 +642,8 @@ function analyzeDJ(
         athleteHeightCm
       );
       
-      // RSI for DJ = flight_time / contact_time
-      const rsi = contactTimeMs > 0 ? flightTimeMs / contactTimeMs : 0;
+      // RSImod for DJ = jumpHeight (m) / contactTime (s) — contactTime = time_to_takeoff no DJ
+      const rsi = contactTimeMs > 0 ? (jumpHeightCm / 100) / (contactTimeMs / 1000) : 0;
       
       const metrics: JumpMetrics = {
         flightTimeMs,
@@ -659,7 +659,7 @@ function analyzeDJ(
       console.log('[LOG_JUMP_METRICS_CALCULATED]   flightTime=' + flightTimeMs + 'ms');
       console.log('[LOG_JUMP_METRICS_CALCULATED]   contactTime=' + contactTimeMs + 'ms');
       console.log('[LOG_JUMP_METRICS_CALCULATED]   jumpHeight=' + jumpHeightCm.toFixed(1) + 'cm');
-      console.log('[LOG_JUMP_METRICS_CALCULATED]   RSI=' + rsi.toFixed(2));
+      console.log('[LOG_JUMP_METRICS_CALCULATED]   RSImod=' + rsi.toFixed(2) + ' (jumpHeight/contactTime)');
       
       return {
         events,
