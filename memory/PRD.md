@@ -21,10 +21,10 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 4. Remocao completa de Drop Jump (DJ): enum, funcoes, UI, endpoints, analises
 
 ### Sessao 03/Abril/2026
-5. Reintegracao MediaPipe — Expo Local Module autossuficiente (Opcao B)
+5. Reintegracao MediaPipe — Expo Local Module autossuficiente
    - Modulo nativo: `modules/mediapipe-pose/`
    - iOS: AVCaptureSession + MediaPipe Tasks Vision (Swift, LIVE_STREAM)
-   - Android: CameraX + MediaPipe Tasks Vision (Kotlin, LIVE_STREAM)
+   - Android: CameraX + MediaPipe Tasks Vision (Kotlin, VIDEO)
    - TypeScript: Types, View wrapper, NATIVE_POSE_AVAILABLE flag
    - MediaPipeCamera.tsx atualizado para usar modulo nativo com fallback web
    - Modelo: pose_landmarker_lite.task (5.6MB) incluso nos assets nativos
@@ -32,11 +32,20 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
    - CNG-safe: nenhuma alteracao em Podfile, sem use_frameworks!, autocontido
    - Validado: Web export OK, 48/48 Jest tests passando, zero regressoes
 
+6. iOS XCFramework Vendored (NOVO - 03/Abril/2026)
+   - Resolucao do bloqueio P0: `MediaPipeTasksVision` linkado via XCFramework vendored
+   - ZERO CocoaPods dependency para MediaPipe (bypassa use_frameworks! :linkage => :static)
+   - XCFrameworks de SwiftTasksVision v0.10.21 (arm64 device + arm64/x86_64 simulator)
+   - `import MediaPipeTasksVision` direto (sem #if canImport)
+   - PoseLandmarkerService: liveStream mode com PoseLandmarkerLiveStreamDelegate
+   - Podspec: vendored_frameworks + static_framework + linker flags (-ObjC, -lc++)
+   - Pendente: validacao EAS Build iOS
+
 ## Estado Atual
 - Build Web: 100% funcional, sem erros
-- Build Nativo: Modulo criado, aguarda primeiro EAS build para validacao
-- Motor de Pose: Modulo nativo pronto (MEDIAPIPE_AVAILABLE=true apos EAS build)
-- Fallback Web: Simulacao mantida (MEDIAPIPE_AVAILABLE=false na web)
+- Build Nativo iOS: XCFrameworks vendored, aguardando EAS build
+- Build Nativo Android: tasks-vision via Gradle, aguardando EAS build
+- Motor de Pose: REAL no nativo (nao mock), fallback na web
 - Protocolos: CMJ + SL-CMJ apenas (DJ removido)
 - RSImod: Formula unica validada
 
@@ -44,29 +53,42 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 
 ```
 modules/mediapipe-pose/
-├── ios/    (Swift: AVCaptureSession + PoseLandmarker)
-├── android/ (Kotlin: CameraX + PoseLandmarker)
-├── src/   (TypeScript: tipos + view wrapper)
+├── ios/
+│   ├── Frameworks/
+│   │   ├── MediaPipeTasksVision.xcframework (7.5MB)
+│   │   └── MediaPipeCommonGraphLibraries.xcframework (117MB)
+│   ├── MediaPipePose.podspec (vendored, sem CocoaPods dependency)
+│   ├── MediaPipePoseModule.swift (Expo Module Definition)
+│   ├── MediaPipePoseView.swift (AVCaptureSession + ExpoView)
+│   ├── PoseLandmarkerService.swift (import direto, liveStream mode)
+│   └── pose_landmarker_lite.task (modelo ML)
+├── android/
+│   ├── build.gradle (tasks-vision:0.10.21 via Maven)
+│   └── src/main/java/expo/modules/mediapipepose/
+├── src/ (TypeScript bindings)
 └── expo-module.config.json (autolinking CNG)
 ```
 
-Pipeline nativo:
+Pipeline nativo iOS:
 ```
-Camera Nativa → Frame (native thread) → MediaPipe PoseLandmarker (LIVE_STREAM)
-  → 33 landmarks + timestamp → EventDispatcher → JS Thread
+Camera (AVCaptureSession) → CMSampleBuffer → PoseLandmarkerService.detectAsync()
+  → PoseLandmarkerLiveStreamDelegate callback → 33 landmarks serializados
+  → DispatchQueue.main → EventDispatcher → JS Thread
   → frameTime.ts → frameDrop.ts → jumpDetector.ts / VBT pipeline
 ```
 
 ## Proximo Passo Critico
-- Executar `npx expo prebuild --clean` + `eas build` para validar build nativo
-- Testar em device real (iOS + Android)
-- Se build falhar por conflito MediaPipeTasksVision/CocoaPods:
-  alternativa = vendored XCFramework no podspec
+- Executar `eas build --platform ios` para validar build nativo
+- Confirmar import real de MediaPipeTasksVision sem erro de linker
+- Testar em device real: landmarks > 0 em runtime
+- Se build OK: testar Android tambem
 
 ## Backlog
 ### P0
 - [x] Reintegracao segura da visao computacional (MediaPipe) — MODULO CRIADO
-- [ ] Validacao EAS Build (iOS + Android) — PROXIMO
+- [x] iOS XCFramework vendored — IMPLEMENTADO
+- [ ] Validacao EAS Build iOS — PROXIMO
+- [ ] Validacao EAS Build Android
 
 ### P2
 - [ ] UI merge de perfis duplicados de atletas
