@@ -3,22 +3,28 @@
  *
  * Renderiza a câmera nativa com processamento MediaPipe.
  * Na web, retorna null (fallback é gerenciado pelo PoseCamera.tsx pai).
+ *
+ * Compativel com Fabric (New Architecture) via requireNativeViewManager.
  */
 
 import React from 'react';
-import { Platform, requireNativeComponent, UIManager, View, Text, StyleSheet } from 'react-native';
+import { Platform, View, Text, StyleSheet } from 'react-native';
 import type { MediaPipePoseViewProps } from './MediaPipePose.types';
 
-const NATIVE_VIEW_NAME = 'MediaPipePoseView';
+// Nome do modulo Expo (definido em MediaPipePoseModule.swift: Name("MediaPipePose"))
+const MODULE_NAME = 'MediaPipePose';
 
-const isNativeAvailable =
-  Platform.OS !== 'web' &&
-  UIManager.getViewManagerConfig != null &&
-  UIManager.getViewManagerConfig(NATIVE_VIEW_NAME) != null;
+// Carrega a view nativa via expo-modules-core (compativel com Fabric + Paper)
+let NativeView: React.ComponentType<any> | null = null;
 
-const NativeView = isNativeAvailable
-  ? requireNativeComponent<MediaPipePoseViewProps>(NATIVE_VIEW_NAME)
-  : null;
+if (Platform.OS !== 'web') {
+  try {
+    const { requireNativeViewManager } = require('expo-modules-core');
+    NativeView = requireNativeViewManager(MODULE_NAME);
+  } catch {
+    // Modulo nao linkado nesta plataforma
+  }
+}
 
 /**
  * Componente React que encapsula a view nativa de câmera + MediaPipe.
