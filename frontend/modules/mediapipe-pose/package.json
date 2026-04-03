@@ -1,0 +1,12 @@
+{
+  "name": "mediapipe-pose",
+  "version": "1.0.0",
+  "main": "src/index",
+  "types": "src/index.ts",
+  "scripts": {},
+  "peerDependencies": {
+    "expo": ">=54.0.0",
+    "react": "*",
+    "react-native": "*"
+  }
+}
