@@ -20,86 +20,59 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 3. Unificacao RSI -> RSImod (formula unica em todo o sistema)
 4. Remocao completa de Drop Jump (DJ): enum, funcoes, UI, endpoints, analises
 
-### Sessao 03/Abril/2026
-5. Reintegracao MediaPipe — Expo Local Module autossuficiente
-   - Modulo nativo: `modules/mediapipe-pose/`
+### Sessao 03-04/Abril/2026
+5. Reintegracao MediaPipe — Expo Local Module
+   - Modulo nativo: modules/mediapipe-pose/
    - iOS: AVCaptureSession + MediaPipe Tasks Vision (Swift, LIVE_STREAM)
    - Android: CameraX + MediaPipe Tasks Vision (Kotlin, VIDEO)
    - TypeScript: Types, View wrapper, NATIVE_POSE_AVAILABLE flag
-   - MediaPipeCamera.tsx atualizado para usar modulo nativo com fallback web
-   - Modelo: pose_landmarker_lite.task (5.6MB) incluso nos assets nativos
-   - Zero dependencias externas novas (sem VisionCamera, sem worklets-core)
-   - CNG-safe: nenhuma alteracao em Podfile, sem use_frameworks!, autocontido
 
 6. iOS XCFramework Vendored
-   - Resolucao do bloqueio P0: `MediaPipeTasksVision` linkado via XCFramework vendored
-   - ZERO CocoaPods dependency para MediaPipe (bypassa use_frameworks! :linkage => :static)
-   - XCFrameworks de SwiftTasksVision v0.10.21 (arm64 device + arm64/x86_64 simulator)
-   - `import MediaPipeTasksVision` direto (sem #if canImport)
-   - PoseLandmarkerService: liveStream mode com PoseLandmarkerLiveStreamDelegate
-   - Podspec: vendored_frameworks + static_framework + linker flags (-ObjC, -lc++)
+   - MediaPipeTasksVision + MediaPipeCommonGraphLibraries vendored (bypass CocoaPods)
+   - import direto (sem #if canImport)
+   - Podspec: vendored_frameworks + static_framework + linker flags
 
-7. Fix Fabric/New Architecture compatibility (03/Abril/2026)
-   - Problema: UIManager.getViewManagerConfig nao funciona no Fabric
-   - src/index.ts: requireOptionalNativeModule('MediaPipePose') de expo-modules-core
-   - src/MediaPipePoseView.tsx: requireNativeViewManager('MediaPipePose') de expo-modules-core
-   - Removido: UIManager, requireNativeComponent (APIs Paper-only)
-   - 48/48 Jest tests passando, zero regressoes
+7. Fix Fabric/New Architecture compatibility
+   - requireOptionalNativeModule + requireNativeViewManager (expo-modules-core)
+
+8. Fix NSLog → os_log (privacy: .public)
+   - Logger(subsystem: "com.loadmanagerpro.mediapipe", category: "pose/view")
+
+9. Fix crash no deinit da MediaPipePoseView
+   - Causa: stopSession() com [weak self] no async dispatch — self nil apos dealloc
+   - Fix: videoOutput.setSampleBufferDelegate(nil) imediato + referencias locais strong
+   - Resultado: ZERO crashes em device real
+
+### MARCO: Pipeline End-to-End Funcional (04/Abril/2026)
+- Camera → MediaPipe → 33 Landmarks → JS → JumpDetector/VBT → Resultados
+- Jump Camera: tempo de voo registrado, graficos funcionais
+- VBT Camera: repeticoes salvas com velocidade m/s
+- Testado em iPhone 16 Pro Max via TestFlight
+- Zero crashes ao iniciar/parar gravacao
 
 ## Estado Atual
-- Build Web: 100% funcional, sem erros
-- Build Nativo iOS: XCFrameworks vendored + Fabric-compatible TS, aguardando EAS build
-- Build Nativo Android: tasks-vision via Gradle, aguardando EAS build
-- Motor de Pose: REAL no nativo (nao mock), fallback na web
-- Protocolos: CMJ + SL-CMJ apenas (DJ removido)
+- Build iOS: FUNCIONAL em device real via TestFlight
+- Build Android: Aguardando teste
+- Motor de Pose: REAL (MediaPipe Tasks Vision 0.10.21)
+- Jump Camera: Funcional (valores precisam validacao fina)
+- VBT Camera: Funcional (skeleto nao renderizado, apenas pontos verdes)
+- Protocolos: CMJ + SL-CMJ
 - RSImod: Formula unica validada
-
-## Arquitetura do Modulo MediaPipe
-
-```
-modules/mediapipe-pose/
-├── ios/
-│   ├── Frameworks/
-│   │   ├── MediaPipeTasksVision.xcframework (7.5MB)
-│   │   └── MediaPipeCommonGraphLibraries.xcframework (117MB)
-│   ├── MediaPipePose.podspec (vendored, sem CocoaPods dependency)
-│   ├── MediaPipePoseModule.swift (Expo Module Definition)
-│   ├── MediaPipePoseView.swift (AVCaptureSession + ExpoView)
-│   ├── PoseLandmarkerService.swift (import direto, liveStream mode)
-│   └── pose_landmarker_lite.task (modelo ML)
-├── android/
-│   ├── build.gradle (tasks-vision:0.10.21 via Maven)
-│   └── src/main/java/expo/modules/mediapipepose/
-├── src/ (TypeScript bindings — Fabric-compatible)
-│   ├── index.ts (requireOptionalNativeModule)
-│   ├── MediaPipePoseView.tsx (requireNativeViewManager)
-│   └── MediaPipePose.types.ts
-└── expo-module.config.json (autolinking CNG)
-```
-
-Pipeline nativo iOS:
-```
-Camera (AVCaptureSession) → CMSampleBuffer → PoseLandmarkerService.detectAsync()
-  → PoseLandmarkerLiveStreamDelegate callback → 33 landmarks serializados
-  → DispatchQueue.main → EventDispatcher → JS Thread
-  → frameTime.ts → frameDrop.ts → jumpDetector.ts / VBT pipeline
-```
-
-## Proximo Passo Critico
-- Executar `eas build --platform ios` para validar build nativo
-- Confirmar logs no device:
-  - [PoseLandmarkerService] MediaPipe initialized
-  - [MediaPipePoseView] Frame processed
-  - [PoseLandmarkerService] Landmarks detected: 33
-- Se build OK: testar Android tambem
+- Deploy Web: requirements.txt limpo (41 pacotes vs 140)
 
 ## Backlog
 ### P0
 - [x] Reintegracao segura da visao computacional (MediaPipe)
 - [x] iOS XCFramework vendored
 - [x] Fix Fabric/New Architecture compatibility
-- [ ] Validacao EAS Build iOS — PROXIMO
+- [x] Fix crash deinit
+- [x] Pipeline end-to-end funcional
+- [ ] Validacao de precisao dos valores (jump height, flight time, RSImod)
 - [ ] Validacao EAS Build Android
+
+### P1
+- [ ] Renderizacao de skeleto no VBT (atualmente so pontos verdes)
+- [ ] Estabilidade: testes extensivos de crash em multiplas sessoes
 
 ### P2
 - [ ] UI merge de perfis duplicados de atletas
