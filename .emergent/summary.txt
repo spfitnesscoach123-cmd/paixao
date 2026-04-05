@@ -1,131 +1,152 @@
-<analysis>Here is the handover summary for the next agent:
-
-**original_problem_statement**: 
-The user requested critical fixes to the VBT and Jump Camera pipeline focusing on temporal precision (removing  in favor of monotonic frame timestamps) and frame integrity (frame drop detection). Afterwards, the user requested the complete unification of the RSI formula to use  globally. Finally, the user requested the complete removal of the Drop Jump (DJ) protocol from the entire system (frontend UI, backend endpoints, and detection logic), keeping only CMJ and SL-CMJ. 
+<analysis>**original_problem_statement**: 
+The user requested the safe reintegration of Computer Vision (MediaPipeTasksVision) for iOS in an Expo SDK 54 environment. The strict requirement was to use a vendored XCFramework to bypass CocoaPods  linkage conflicts that previously broke the EAS build. Additionally, the user requested fixing a backend deployment Docker build failure caused by a bloated  file.
 *PRODUCT REQUIREMENTS*: 
-1. Implement temporal precision and frame drop detection in the VBT/Jump pipeline without breaking existing logic.
-2. Ensure RSImod is the sole metric for reactive strength.
-3. Completely remove Drop Jump (DJ) traces from the codebase.
-4. Eventually, safely reintegrate MediaPipe (P0 task).
+1. Link MediaPipeTasksVision in iOS as a vendored XCFramework.
+2. Ensure the custom native module correctly mounts in React Native's New Architecture (Fabric).
+3. Ensure no crashes happen during camera lifecycle transitions (start/stop recording).
+4. Clean the backend dependencies so the deployment pipeline succeeds.
 
-**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in the user's preferred language only. The next agent MUST write all responses, code comments, and documentation exclusively in Portuguese).
+**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in the user's preferred language only. All interactions, comments, and docs must be in Portuguese).
 
 **what currently exists?** 
-A full-stack React Native (Expo SDK 54, Hermes engine) app with a FastAPI backend. The native codebase has been stripped of previously failing native vision packages (baseline is clean). The VBT/Jump pipeline now uses a robust 5-stage progressive validation architecture with accurate frame-based temporal tracking () and frame drop detection. The Drop Jump (DJ) protocol is completely gone. CMJ and SL-CMJ protocols accurately calculate RSImod. The actual pose detection engine is still mocked (). 
+A React Native Expo app with a FastAPI backend. The iOS app now natively runs MediaPipe Pose Detection (no longer mocked) via a custom Expo local module (). The module successfully uses vendored XCFrameworks and mounts under the New Architecture (Fabric). The backend has a clean, minimal  and deploys to Kubernetes successfully.
 
 **Last working item**:
-    - Last item agent was working: Complete removal of the Drop Jump (DJ) protocol and standardizing RSImod () across frontend and backend.
-    - Status: COMPLETED (Verified via Python test scripts showing successful CMJ/SL-CMJ processing and DJ endpoint rejection).
+    - Last item agent was working: Fixing a native iOS crash occurring on  when stopping the Jump/VBT camera recording, and cleaning the backend  to fix Docker deployment.
+    - Status: COMPLETED (User verified on a physical iPhone 16 Pro Max that the E2E pipeline works, detects flight time, and doesn't crash).
     - Agent Testing Done: Y
-    - Which testing method agent to use? python -c / bash (Jest for frontend logic, Python for backend endpoints).
-    - User Testing Done: N/A
+    - Which testing method agent to use? EAS iOS Build / Deployment Agent.
+    - User Testing Done: Y
 
 **All Pending/In progress Issue list**:
-  Issue 1: Safe Reintegration of Computer Vision (MediaPipe V2) (P0)
-     - Attempted fixes: The project was previously stripped of failing native packages to establish a clean, buildable baseline. The VBT/Jump pipeline was thoroughly audited and upgraded (temporal precision, frame drops) to prepare for real video frames.
-     - Next debug checklist: Design a clean native integration for pose detection using MediaPipe (or a robust alternative) compatible with Expo SDK 54. Connect the real frame streams to the newly created  and  logic.
-     - Why fix this issue and what will be achieved with the fix?: Restores the core feature of the app (real-time bar and jump tracking), replacing the current simulated mocks.
+  Issue 1: RSImod calculation bug
+     - Attempted fixes: None in this session. The user noted this is a pre-existing bug.
+     - Next debug checklist: Review the jump assessment math for RSImod (flight_time / contact_time or jump_height / time_to_takeoff, based on recent standardizations) to ensure correct outputs.
+     - Why fix this issue and what will be achieved with the fix?: Ensures scientific accuracy of jump metrics.
      - Status: NOT STARTED
-     - Is recurring issue? Y (Historically caused EAS build crashes).
-     - Should Test frontend/backend/both after fix?: Frontend
+     - Is recurring issue? Y (Reported by user as an older issue).
+     - Should Test frontend/backend/both after fix?: Both.
+     - Blocked on other issue: None.
+
+  Issue 2: VBT Skeleton rendering incomplete
+     - Attempted fixes: None.
+     - Next debug checklist: The camera currently only displays green dots for the tracking points, but the full skeletal lines are missing. Review the SVG/Canvas rendering logic in the VBT UI overlay.
+     - Why fix this issue and what will be achieved with the fix?: Visual feedback for the athlete.
+     - Status: NOT STARTED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Frontend.
+     - Blocked on other issue: None.
+
+  Issue 3: PDF Export detail fix
+     - Attempted fixes: None.
+     - Next debug checklist: Wait for the user to specify what exact detail is wrong in the PDF generation.
+     - Status: NOT STARTED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Backend.
      - Blocked on other issue: None.
 
 **In progress Task List**:
-  *(None. The previous tasks were fully completed and tested.)*
+  *(None - The user explicitly requested to pause development for the day)*
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P0) Safe Reintegration of Computer Vision (MediaPipe V2 or alternative) replacing  mocks.
+    - (P0) Fix RSImod calculation logic.
+    - (P1) Implement new, modern UI for VBT and Jump Camera recording screens (User has a ready design).
     
     Future Tasks:
-    - (P2) UI for merging duplicated athlete profiles.
-    - (P2) Full internationalization (i18n) of  and Assessments.
-    - (P2) Refactor  and remove legacy VBT code.
+    - (P1) Redesign Navigation to an Activity Hub: Change the flow so the user selects the activity first (Jump / VBT / GPS / Wellness) and THEN selects the athlete from a list, improving group workflow on iPads.
+    - (P1) Create a dedicated Menu for VBT.
+    - (P2) Data Import via PDF (Convert PDF to CSV internally to import athlete data).
+    - (P2) Export App Data to CSV.
+    - (P3) UI for merging duplicated athlete profiles.
+    - (P3) Full internationalization (i18n) of  and Assessments.
 
 **Completed work in this session**
-- Temporal Precision Fix: Created  and replaced  with  monotonic timestamps across the pipeline (DONE).
-- Frame Integrity: Created  to detect and handle dropped frames in the pipeline (DONE).
-- RSI Unification: Updated backend and frontend formulas to exclusively use  (DONE).
-- Drop Jump (DJ) Complete Removal: Stripped all DJ references from  backend models, endpoints, JumpDetector logic, React components, and scientific analysis charts (DONE).
-- Zero Regressions: All 34 VBT Jest tests and 14 new Frame Integrity Jest tests passed successfully (DONE).
+- iOS Vendored XCFramework Integration: Bypassed  conflicts by vendoring MediaPipe directly in the local module's podspec (DONE).
+- Fabric Compatibility Fix: Replaced  with  to correctly mount the native camera view in React Native's New Architecture (DONE).
+- iOS Camera Lifecycle Crash Fix: Fixed an asynchronous  cleanup issue in  that crashed the app when starting/stopping recordings (DONE).
+- Backend Deployment Fix: Cleaned a bloated  (removed 100+ unnecessary packages like , ) allowing the Docker build to pass (DONE).
+- System Logging: Implemented  with  for native iOS debugging via Console.app (DONE).
 
 **Earlier issues found/mentioned but not fixed**
-   *(None)*
+   *(Listed under Pending Issue List above)*
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: Critical EAS Build failures due to CocoaPods manipulations, , and outdated  /  integrations.
+  - Issue recurrence in previous fork: iOS EAS Build failures due to CocoaPods conflicts with MediaPipe.
   - Recurrence count: >5
-  - Status: RESOLVED (Technical reset achieved in prior session). CRITICAL WARNING: The upcoming MediaPipe reintegration must NOT use the old, hacky approaches. 
+  - Status: RESOLVED (Fixed permanently by using Vendored XCFrameworks).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Continuous Native Generation (CNG)**: Uses Expo Prebuild. Do not manually modify  or . 
-- **VBT Progressive Validation Architecture**: A strict 5-stage validation pipeline for movement tracking. It now utilizes monotonic frame timestamps instead of global JS thread time ().
-- **Simulators**: Currently,  generates simulated/mocked movement data.
+- **Vendored XCFrameworks**: Distributing heavy pre-compiled iOS frameworks directly in the module to avoid dependency resolution conflicts.
+- **Expo New Architecture (Fabric)**: Native views must be required using  from  rather than the legacy .
+- ** Lifecycle**: Strict cleanup required on  to prevent delivering frames to dead objects.
 
 **key DB schema**
-  - : Tracks  (cmj or sl_cmj), , , and . (DJ fields like  and  have been removed or ignored).
+  -  (Unchanged)
+  -  (Unchanged)
 
 **changes in tech stack**
-  - No new libraries added. MediaPipe remains removed.
+  - Backend  drastically reduced to core dependencies.
+  - Native iOS  is fully active.
 
 **All files of reference** 
--  (New)
--  (New)
 - 
 - 
 - 
--  (Updated with latest changes)
+- 
+- 
 
 **Areas that need refactoring**: 
--  needs a complete rewrite for the P0 computer vision reintegration.
--  and legacy VBT code (P2 backlog).
+-  and legacy VBT logic.
+- UI flow (needs to be inverted to Activity -> Athlete, per user's future requests).
 
 **key api endpoints**
--  (POST/GET) - Processes CMJ and SL-CMJ data.
--  (GET)
+- 
 
 **Critical Info for New Agent** 
-- **Language**: Always interact, comment code, and write documentation in **Portuguese**.
-- **DJ is Gone**: Drop Jump protocol was deliberately and surgically removed from the entire app. Do not attempt to calculate contact time or re-add DJ options.
-- **RSI**: The only valid reactive strength metric is  ().
-- **Next Big Task (P0)**: The codebase is fully prepared for real computer vision frames. The user's next logical step is reintegrating MediaPipe (or a stable modern alternative). When doing so, ensure the new native frame processor passes proper monotonic timestamps to .
+- **CRITICAL DIRECTIVE**: The user explicitly stated: *TUDO ISSO nao e para AGORA, por enquanto nao altere absolutamente nada* (All of this is not for now, for the time being do not change absolutely anything). **DO NOT** begin implementing the new features or bug fixes until the user sends a new prompt initiating the work.
+- **Language**: Portuguese ONLY.
+- **MediaPipe Status**: It is now 100% functional on device. Do not revert to mocks.
+- **Backend**: Deployment works. Do not use  directly without filtering in the future.
 
 **documents and test reports created in this job** 
-  - 
-  - 
+  -  (Updated)
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Requested the complete removal of Drop Jump (DJ) and standardization of RSImod as the sole metric. Provided strict rules not to break CMJ/SL-CMJ.
-- **Assistant**: Conducted a thorough sweep of the frontend and backend, successfully removing all DJ references, standardizing the formulas, running API validations, and providing the required final report. 
-- *Pending*: None. The agent successfully finished the user's prompt. 
+- **User**: Noted that the app doesn't crash anymore! Jump E2E pipeline works (flight time, graphs) and VBT saves reps. Console logs are invisible but the app functions. Mentioned future tasks (RSImod fix, new UI for VBT/Jump). (Finished)
+- **Assistant**: Acknowledged the success and asked what the user wants to prioritize next. (Finished)
+- **User**: Not for now, do not implement anything yet. Mentioned the RSImod fix is next, then new UI. Said they are resting today and will return next week. (Finished)
+- **Assistant**: Acknowledged and confirmed the backlog. (Finished)
+- **User**: Added more items to the backlog: PDF to CSV import, CSV export, minor PDF export fix, and a major redesign of the navigation (Activity Hub -> Athlete Selection instead of Athlete -> Activity). Concluded with: BUT ALL OF THIS is not for NOW, do not change absolutely anything for the time being. (Finished)
+- *Pending*: None. **WAIT FOR THE USER TO INITIATE WORK.**
 
 **Project Health Check:**
-- Broken: None (Web builds, TS compilation, and Jest tests are all green).
-- Mocked:  and pose inference engine.
+- Broken: None.
+- Mocked: None.
 
 **3rd Party Integrations** 
-- Expo Application Services (EAS) — Native builds.
-- MediaPipe (Pending re-integration).
+- Expo Application Services (EAS)
+- MediaPipeTasksVision (Native iOS)
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Agent performed rigorous self-testing using Jest  and custom Python API scripts, resulting in 100% test pass rate).
-  - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: 
-  - Known regressions: Pose tracking remains intentionally mocked.
+  - Testing agent used after significant changes: NO (relied on Deployment Agent and User's physical device testing).
+  - Troubleshoot agent used after agent stuck in loop: YES (Deployment agent used to debug backend Docker fail).
+  - Test files created: None.
+  - Known regressions: None.
 
 **Credentials to test flow:**
 User: 
 Password: 
 
 **What agent forgot to execute**
-Nothing. The agent executed all directives flawlessly.
+Nothing. The agent successfully unblocked the native implementation and fixed the deployment.
 
 **Debugging checklist for current issue**
-    Issue: P0 - Safe Reintegration of Computer Vision
-    Frontend files to check:  (Target for native integration)
+    Issue: Wait for User Input
+    Frontend files to check: N/A
     Backend files to check: N/A
     Database to check: N/A
-    Note: Ensure any new native camera module respects Expo CNG and uses  or native frame timestamps for temporal precision.</analysis>
+    Note: Do not start coding. Acknowledge the handoff and ask the user which of the backlog items (RSImod, VBT UI, Activity Hub, etc.) they want to tackle first now that they are back.</analysis>

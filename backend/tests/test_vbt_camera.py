@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # Use public URL for testing
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://vision-reintegration.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://pose-detection-vbt.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "coach_test@test.com"
