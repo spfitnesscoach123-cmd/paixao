@@ -43,7 +43,28 @@ import {
 import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
 import { FrameIntegrityMonitor } from '../frameDrop';
 
-const { COUNTDOWN_SECONDS, CALIBRATION_FRAMES, MAX_RECORDING_DURATION_MS, BETWEEN_JUMPS_COUNTDOWN } = JUMP_DETECTION_CONFIG;
+const { 
+  COUNTDOWN_SECONDS, CALIBRATION_FRAMES, MAX_RECORDING_DURATION_MS, BETWEEN_JUMPS_COUNTDOWN,
+  SCANNER_COLLECT_MS, SCANNER_STABILITY_MS,
+  CONFIDENCE_AUTO_START, CONFIDENCE_WARNING, CONFIDENCE_BLOCK,
+  MAX_RECALIBRATION_RETRIES,
+} = JUMP_DETECTION_CONFIG;
+
+/**
+ * Scanner phase for calibration UI
+ */
+export type ScannerPhase = 'inactive' | 'collecting' | 'analyzing' | 'countdown' | 'ready' | 'blocked';
+
+export interface ScannerState {
+  phase: ScannerPhase;
+  progress: number;          // 0-100 for current phase
+  confidenceScore: number;   // 0-1 combined score
+  footStability: number;     // 0-1
+  poseConfidence: number;    // 0-1
+  groundStability: number;   // 0-1
+  retryCount: number;        // Number of recalibration retries
+  warningMessage: string | null;
+}
 
 export interface UseJumpCameraConfig {
   protocol: JumpProtocol;
@@ -60,6 +81,9 @@ export interface UseJumpCameraResult {
   frameCount: number;
   activeLeg: ActiveLeg;
   groundCalibration: GroundCalibration;
+  
+  // Scanner state
+  scannerState: ScannerState;
   
   // Results
   metrics: JumpMetrics | null;
@@ -79,6 +103,7 @@ export interface UseJumpCameraResult {
   stopRecording: () => void;
   processFrame: (keypoints: Array<{ name: string; x: number; y: number; score: number }>) => void;
   reset: () => void;
+  retryCalibration: () => void;
   
   // Progress
   calibrationProgress: number;
@@ -90,7 +115,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
 
   // State
   const [phase, setPhase] = useState<JumpCameraPhase>('setup');
-  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const [countdown, setCountdown] = useState<number>(COUNTDOWN_SECONDS);
   const [isRecording, setIsRecording] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
   const [activeLeg, setActiveLeg] = useState<ActiveLeg>(null);
@@ -100,12 +125,29 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     calibrationFrames: 0,
     isCalibrated: false,
     standingHipY: 0.5,
+    confidenceScore: 0,
+    footStability: 0,
+    poseConfidence: 0,
+    groundStability: 0,
+    lockedLandmark: 'ankle',
   });
   const [metrics, setMetrics] = useState<JumpMetrics | null>(null);
   const [events, setEvents] = useState<JumpEvents | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  
+  // Scanner state
+  const [scannerState, setScannerState] = useState<ScannerState>({
+    phase: 'inactive',
+    progress: 0,
+    confidenceScore: 0,
+    footStability: 0,
+    poseConfidence: 0,
+    groundStability: 0,
+    retryCount: 0,
+    warningMessage: null,
+  });
   
   // SL-CMJ dual jump state
   const [slCmjLeg1, setSlCmjLeg1] = useState<SlCmjLegResult | null>(null);
@@ -129,12 +171,16 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingStartTimeRef = useRef<number | null>(null);
   
+  // Scanner timing refs
+  const scannerStartTimeRef = useRef<number | null>(null);
+  const scannerRetryCountRef = useRef(0);
+  
   // Refs for real-time tracking
   const countermovementStartTimeRef = useRef<number | null>(null);
   const takeoffTimeRef = useRef<number | null>(null);
   const contactStartTimeRef = useRef<number | null>(null);
   
-  // Frame integrity monitor para detecção de frame drop
+  // Frame integrity monitor
   const frameIntegrityRef = useRef<FrameIntegrityMonitor>(new FrameIntegrityMonitor({
     targetFps: JUMP_DETECTION_CONFIG.TARGET_FPS,
   }));
@@ -149,7 +195,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   }, []);
 
   /**
-   * Start countdown - begins calibration phase
+   * Start scanner + countdown flow
+   * Phase 1 (0-3s): Scanner collecting calibration data
+   * Phase 2 (3-5s): Analyzing stability + confidence
+   * Phase 3 (5s countdown): Standard countdown if confidence OK
    */
   const startCountdown = useCallback(() => {
     console.log('[JUMP_CAMERA_HOOK] ========================================');
@@ -158,7 +207,8 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     console.log('[JUMP_CAMERA_HOOK] Jump #' + slCmjJumpNumber);
     console.log('[JUMP_CAMERA_HOOK] ========================================');
     
-    setPhase('countdown');
+    // Start scanner phase
+    setPhase('scanning');
     setCountdown(COUNTDOWN_SECONDS);
     setError(null);
     calibrationFramesRef.current = [];
@@ -166,6 +216,18 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     countermovementStartTimeRef.current = null;
     takeoffTimeRef.current = null;
     contactStartTimeRef.current = null;
+    scannerStartTimeRef.current = Date.now();
+    
+    setScannerState(prev => ({
+      ...prev,
+      phase: 'collecting',
+      progress: 0,
+      confidenceScore: 0,
+      footStability: 0,
+      poseConfidence: 0,
+      groundStability: 0,
+      warningMessage: null,
+    }));
     
     setLiveMetrics({
       currentHipY: 0,
@@ -176,38 +238,117 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       contactTimeMs: 0,
       jumpDetected: false,
     });
+  }, [protocol, slCmjJumpNumber]);
 
-    // Start countdown timer
+  /**
+   * Evaluate scanner data and decide: proceed to countdown, warn, or block
+   * Called internally when scanner phases complete
+   */
+  const evaluateCalibration = useCallback(() => {
+    console.log('[JUMP_CAMERA_HOOK] Evaluating calibration...');
+    console.log('[JUMP_CAMERA_HOOK] Calibration frames collected: ' + calibrationFramesRef.current.length);
+    
+    const calibration = calibrateGround(calibrationFramesRef.current);
+    setGroundCalibration(calibration);
+    
+    // Detect active leg for SL-CMJ
+    if (protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right') {
+      const detected = detectActiveLeg(calibrationFramesRef.current);
+      setActiveLeg(detected);
+      if (!detected) {
+        setActiveLeg(protocol === 'sl_cmj_left' ? 'left' : 'right');
+      }
+    }
+    
+    const score = calibration.confidenceScore;
+    console.log('[JUMP_CAMERA_HOOK] Confidence score: ' + score.toFixed(3));
+    
+    if (score >= CONFIDENCE_AUTO_START) {
+      // AUTO START — high confidence
+      console.log('[JUMP_CAMERA_HOOK] Confidence OK (>= ' + CONFIDENCE_AUTO_START + '), starting countdown');
+      setScannerState(prev => ({
+        ...prev,
+        phase: 'countdown',
+        confidenceScore: score,
+        footStability: calibration.footStability,
+        poseConfidence: calibration.poseConfidence,
+        groundStability: calibration.groundStability,
+        warningMessage: null,
+      }));
+      beginCountdown();
+    } else if (score >= CONFIDENCE_WARNING) {
+      // WARNING — proceed but notify
+      console.log('[JUMP_CAMERA_HOOK] Confidence marginal (' + score.toFixed(3) + '), starting with warning');
+      setScannerState(prev => ({
+        ...prev,
+        phase: 'countdown',
+        confidenceScore: score,
+        footStability: calibration.footStability,
+        poseConfidence: calibration.poseConfidence,
+        groundStability: calibration.groundStability,
+        warningMessage: 'Calibracao instavel. Resultados podem variar.',
+      }));
+      beginCountdown();
+    } else {
+      // BLOCK — confidence too low
+      console.log('[JUMP_CAMERA_HOOK] Confidence TOO LOW (' + score.toFixed(3) + ')');
+      const currentRetries = scannerRetryCountRef.current;
+      
+      if (currentRetries < MAX_RECALIBRATION_RETRIES) {
+        // Auto-retry
+        scannerRetryCountRef.current = currentRetries + 1;
+        console.log('[JUMP_CAMERA_HOOK] Auto-retry #' + (currentRetries + 1));
+        setScannerState(prev => ({
+          ...prev,
+          phase: 'collecting',
+          progress: 0,
+          retryCount: currentRetries + 1,
+          confidenceScore: score,
+          footStability: calibration.footStability,
+          poseConfidence: calibration.poseConfidence,
+          groundStability: calibration.groundStability,
+          warningMessage: 'Recalibrando... (' + (currentRetries + 1) + '/' + MAX_RECALIBRATION_RETRIES + ')',
+        }));
+        // Reset frames and restart scanner
+        calibrationFramesRef.current = [];
+        scannerStartTimeRef.current = Date.now();
+      } else {
+        // Max retries reached — block and show manual retry button
+        console.log('[JUMP_CAMERA_HOOK] Max retries reached, blocking');
+        setScannerState(prev => ({
+          ...prev,
+          phase: 'blocked',
+          confidenceScore: score,
+          footStability: calibration.footStability,
+          poseConfidence: calibration.poseConfidence,
+          groundStability: calibration.groundStability,
+          retryCount: currentRetries,
+          warningMessage: 'Calibracao falhou. Ajuste a posicao e tente novamente.',
+        }));
+      }
+    }
+  }, [protocol]);
+
+  /**
+   * Begin the actual countdown (Phase 3) after scanner approval
+   */
+  const beginCountdown = useCallback(() => {
+    setPhase('countdown');
+    setCountdown(COUNTDOWN_SECONDS);
+    
     countdownTimerRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
-          // Countdown finished - start recording
           if (countdownTimerRef.current) {
             clearInterval(countdownTimerRef.current);
             countdownTimerRef.current = null;
           }
           
           console.log('[JUMP_CAMERA_HOOK] Countdown complete');
-          console.log('[JUMP_CAMERA_HOOK] Calibration frames: ' + calibrationFramesRef.current.length);
-          
-          // Process calibration data collected during countdown
-          const calibration = calibrateGround(calibrationFramesRef.current);
-          setGroundCalibration(calibration);
-          
-          // Detect active leg for SL-CMJ
-          if (protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right') {
-            const detected = detectActiveLeg(calibrationFramesRef.current);
-            setActiveLeg(detected);
-            if (!detected) {
-              setActiveLeg(protocol === 'sl_cmj_left' ? 'left' : 'right');
-            }
-          }
-          
           console.log('[JUMP_CAMERA_HOOK] Starting RECORDING phase');
           setPhase('recording');
           setIsRecording(true);
           recordingStartTimeRef.current = getFrameTimestamp();
-          // Resetar monitor de integridade para nova gravação
           frameIntegrityRef.current.reset();
           resetFrameTime();
           
@@ -216,7 +357,28 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         return prev - 1;
       });
     }, 1000);
-  }, [protocol, slCmjJumpNumber]);
+  }, []);
+
+  /**
+   * Manual retry calibration (when blocked after max retries)
+   */
+  const retryCalibration = useCallback(() => {
+    console.log('[JUMP_CAMERA_HOOK] Manual retry calibration');
+    scannerRetryCountRef.current = 0;
+    calibrationFramesRef.current = [];
+    scannerStartTimeRef.current = Date.now();
+    setScannerState({
+      phase: 'collecting',
+      progress: 0,
+      confidenceScore: 0,
+      footStability: 0,
+      poseConfidence: 0,
+      groundStability: 0,
+      retryCount: 0,
+      warningMessage: null,
+    });
+    setPhase('scanning');
+  }, []);
 
   /**
    * Stop recording and analyze
@@ -313,53 +475,81 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
 
   /**
    * Process a single frame from pose detection
-   * Handles calibration, recording, and real-time metric updates
+   * Handles scanning, calibration, recording, and real-time metric updates
    */
   const processFrame = useCallback((
     keypoints: Array<{ name: string; x: number; y: number; score: number }>
   ) => {
-    // Timestamp monotônico do frame (performance.now) — substitui Date.now()
+    // Timestamp do frame
     const timestamp = getFrameTimestamp();
     const frameId = getNextFrameId();
     
     // Detecção de frame drop
     const integrity = frameIntegrityRef.current.checkFrame(frameId, timestamp);
     
-    // Extract jump-relevant landmarks
-    const landmarks = extractJumpLandmarks(keypoints);
+    // Extract jump-relevant landmarks (use locked landmark from calibration if available)
+    const lockedLandmark = groundCalibration.isCalibrated ? groundCalibration.lockedLandmark : undefined;
+    const landmarks = extractJumpLandmarks(keypoints, lockedLandmark);
     const frameData = createJumpFrameData(landmarks, timestamp);
     
     if (!frameData) {
       return;  // Skip frames with insufficient landmarks
     }
 
-    if (phase === 'countdown') {
-      // Collect frames for calibration during countdown
-      // Frame drops durante calibração não são críticos — incluir mesmo assim
+    if (phase === 'scanning') {
+      // SCANNER: collect frames and track progress
+      calibrationFramesRef.current.push(frameData);
+      setFrameCount(prev => prev + 1);
+      
+      const elapsed = Date.now() - (scannerStartTimeRef.current || Date.now());
+      const totalScannerTime = SCANNER_COLLECT_MS + SCANNER_STABILITY_MS;
+      
+      if (elapsed < SCANNER_COLLECT_MS) {
+        // Phase 1: Collecting data
+        const progress = Math.min(100, (elapsed / SCANNER_COLLECT_MS) * 100);
+        setScannerState(prev => {
+          if (prev.phase !== 'collecting') return prev;
+          return { ...prev, progress };
+        });
+        setCalibrationProgress(
+          Math.min(100, (calibrationFramesRef.current.length / CALIBRATION_FRAMES) * 100)
+        );
+      } else if (elapsed < totalScannerTime) {
+        // Phase 2: Analyzing stability
+        const analyzeProgress = Math.min(100, ((elapsed - SCANNER_COLLECT_MS) / SCANNER_STABILITY_MS) * 100);
+        setScannerState(prev => {
+          if (prev.phase === 'analyzing') return { ...prev, progress: analyzeProgress };
+          return { ...prev, phase: 'analyzing', progress: analyzeProgress };
+        });
+      } else {
+        // Scanner phases complete — evaluate calibration
+        evaluateCalibration();
+      }
+    } else if (phase === 'countdown') {
+      // Continue collecting frames during countdown for extra calibration data
       calibrationFramesRef.current.push(frameData);
       setCalibrationProgress(
         Math.min(100, (calibrationFramesRef.current.length / CALIBRATION_FRAMES) * 100)
       );
       setFrameCount(prev => prev + 1);
     } else if (phase === 'recording' && isRecording) {
-      // Durante gravação, marcar frames com drop mas NÃO descartar
-      // (a análise offline usa smoothing que mitiga gaps pontuais)
+      // During recording, use locked landmark and store frames
       recordingFramesRef.current.push(frameData);
       setFrameCount(prev => prev + 1);
       
-      // Update real-time metrics — pular se frame degradado por drop
+      // Update real-time metrics
       if (integrity.isValid) {
         updateLiveMetrics(frameData, timestamp);
       }
       
-      // Auto-stop after MAX_RECORDING_DURATION_MS of recording
+      // Auto-stop after MAX_RECORDING_DURATION_MS
       if (recordingStartTimeRef.current && 
           timestamp - recordingStartTimeRef.current > MAX_RECORDING_DURATION_MS) {
         console.log('[JUMP_CAMERA_HOOK] Auto-stop: max recording duration reached (' + MAX_RECORDING_DURATION_MS + 'ms)');
         stopRecording();
       }
     }
-  }, [phase, isRecording, stopRecording]);
+  }, [phase, isRecording, stopRecording, groundCalibration, evaluateCalibration]);
 
   /**
    * Update real-time metrics during recording
@@ -466,6 +656,11 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       calibrationFrames: 0,
       isCalibrated: false,
       standingHipY: 0.5,
+      confidenceScore: 0,
+      footStability: 0,
+      poseConfidence: 0,
+      groundStability: 0,
+      lockedLandmark: 'ankle',
     });
     setMetrics(null);
     setEvents(null);
@@ -484,6 +679,18 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       contactTimeMs: 0,
       jumpDetected: false,
     });
+    setScannerState({
+      phase: 'inactive',
+      progress: 0,
+      confidenceScore: 0,
+      footStability: 0,
+      poseConfidence: 0,
+      groundStability: 0,
+      retryCount: 0,
+      warningMessage: null,
+    });
+    scannerRetryCountRef.current = 0;
+    scannerStartTimeRef.current = null;
     
     calibrationFramesRef.current = [];
     recordingFramesRef.current = [];
@@ -501,6 +708,9 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     frameCount,
     activeLeg,
     groundCalibration,
+    
+    // Scanner state
+    scannerState,
     
     // Results
     metrics,
@@ -520,6 +730,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     stopRecording,
     processFrame,
     reset,
+    retryCalibration,
     
     // Progress
     calibrationProgress,

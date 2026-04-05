@@ -194,6 +194,16 @@ function JumpCameraContent() {
     liveEccentric: locale === 'pt' ? 'Exc.' : 'Ecc.',
     liveFlight: locale === 'pt' ? 'Voo' : 'Flight',
     liveContact: locale === 'pt' ? 'Contato' : 'Contact',
+    // Scanner
+    scannerCollecting: locale === 'pt' ? 'Escaneando...' : 'Scanning...',
+    scannerAnalyzing: locale === 'pt' ? 'Analisando estabilidade...' : 'Analyzing stability...',
+    scannerReady: locale === 'pt' ? 'Pronto!' : 'Ready!',
+    scannerBlocked: locale === 'pt' ? 'Calibracao falhou' : 'Calibration failed',
+    scannerRetry: locale === 'pt' ? 'Recalibrar' : 'Recalibrate',
+    scannerStandStill: locale === 'pt' ? 'Fique parado, pes no chao' : 'Stand still, feet on ground',
+    scannerAdjustPosition: locale === 'pt' ? 'Ajuste a posicao e tente novamente' : 'Adjust position and try again',
+    scannerGroundLine: locale === 'pt' ? 'Linha do Solo' : 'Ground Line',
+    scannerConfidence: locale === 'pt' ? 'Confianca' : 'Confidence',
   };
 
   // Convert MediaPipe landmarks to keypoints array
@@ -380,11 +390,12 @@ function JumpCameraContent() {
       // ALL STAGES COMPLETE - SAFE TO PROCESS
       // ========================================
       // Only now can we process frames for jump detection
-      // And only during the 'recording' UI phase
+      // During 'recording' UI phase: scanning, countdown, and recording all need frames
       if (uiPhase === 'recording') {
         const keypoints = convertMediapipeLandmarks(landmarkData);
         
         if (keypoints && keypoints.length > 0) {
+          // processFrame handles scanning/countdown/recording internally based on jumpCamera.phase
           jumpCamera.processFrame(keypoints);
           
           // Log periodically during active processing
@@ -1026,6 +1037,103 @@ function JumpCameraContent() {
           
           {/* Overlay based on jump detection phase */}
           <View style={styles.cameraOverlay}>
+            {/* Scanner Overlay (Parte 5) */}
+            {jumpCamera.phase === 'scanning' && (
+              <View style={styles.scannerOverlay} data-testid="scanner-overlay">
+                {/* Ground line indicator */}
+                {jumpCamera.groundCalibration.groundLevel > 0 && (
+                  <View 
+                    style={[
+                      styles.scannerGroundLine,
+                      { 
+                        top: `${jumpCamera.groundCalibration.groundLevel * 100}%`,
+                        backgroundColor: jumpCamera.scannerState.confidenceScore >= 0.80 
+                          ? '#22c55e' 
+                          : jumpCamera.scannerState.confidenceScore >= 0.65 
+                            ? '#eab308' 
+                            : '#ef4444',
+                      }
+                    ]} 
+                  />
+                )}
+                
+                {/* Scanner animated bar */}
+                <View style={styles.scannerBarContainer}>
+                  <View 
+                    style={[
+                      styles.scannerBar,
+                      { 
+                        width: `${jumpCamera.scannerState.progress}%`,
+                        backgroundColor: jumpCamera.scannerState.phase === 'blocked' 
+                          ? '#ef4444' 
+                          : jumpCamera.scannerState.confidenceScore >= 0.80 
+                            ? '#22c55e' 
+                            : jumpCamera.scannerState.confidenceScore >= 0.65 
+                              ? '#eab308' 
+                              : '#3b82f6',
+                      }
+                    ]} 
+                  />
+                </View>
+                
+                {/* Scanner status text */}
+                <View style={styles.scannerStatusContainer}>
+                  {jumpCamera.scannerState.phase === 'collecting' && (
+                    <>
+                      <ActivityIndicator size="small" color="#3b82f6" />
+                      <Text style={styles.scannerStatusText}>{t.scannerCollecting}</Text>
+                      <Text style={styles.scannerHintText}>{t.scannerStandStill}</Text>
+                    </>
+                  )}
+                  {jumpCamera.scannerState.phase === 'analyzing' && (
+                    <>
+                      <ActivityIndicator size="small" color="#eab308" />
+                      <Text style={styles.scannerStatusText}>{t.scannerAnalyzing}</Text>
+                    </>
+                  )}
+                  {jumpCamera.scannerState.phase === 'blocked' && (
+                    <>
+                      <Ionicons name="alert-circle" size={36} color="#ef4444" />
+                      <Text style={[styles.scannerStatusText, { color: '#ef4444' }]}>{t.scannerBlocked}</Text>
+                      <Text style={styles.scannerHintText}>{t.scannerAdjustPosition}</Text>
+                      <TouchableOpacity 
+                        style={styles.scannerRetryButton}
+                        onPress={jumpCamera.retryCalibration}
+                        data-testid="scanner-retry-btn"
+                      >
+                        <Text style={styles.scannerRetryText}>{t.scannerRetry}</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+                
+                {/* Confidence score display */}
+                {jumpCamera.scannerState.confidenceScore > 0 && (
+                  <View style={styles.scannerScoreContainer}>
+                    <Text style={[
+                      styles.scannerScoreText,
+                      { 
+                        color: jumpCamera.scannerState.confidenceScore >= 0.80 
+                          ? '#22c55e' 
+                          : jumpCamera.scannerState.confidenceScore >= 0.65 
+                            ? '#eab308' 
+                            : '#ef4444' 
+                      }
+                    ]}>
+                      {t.scannerConfidence}: {Math.round(jumpCamera.scannerState.confidenceScore * 100)}%
+                    </Text>
+                  </View>
+                )}
+                
+                {/* Warning message */}
+                {jumpCamera.scannerState.warningMessage && (
+                  <View style={styles.scannerWarning}>
+                    <Text style={styles.scannerWarningText}>{jumpCamera.scannerState.warningMessage}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+            
             {/* Countdown */}
             {jumpCamera.phase === 'countdown' && (
               <View style={styles.countdownOverlay}>
@@ -1040,6 +1148,12 @@ function JumpCameraContent() {
                   />
                 </View>
                 <Text style={styles.calibrationText}>{t.calibrating}</Text>
+                {/* Show scanner warning during countdown if confidence was marginal */}
+                {jumpCamera.scannerState.warningMessage && jumpCamera.scannerState.phase === 'countdown' && (
+                  <View style={styles.scannerWarning}>
+                    <Text style={styles.scannerWarningText}>{jumpCamera.scannerState.warningMessage}</Text>
+                  </View>
+                )}
               </View>
             )}
             
@@ -1637,6 +1751,85 @@ const styles = StyleSheet.create({
   stopButton: {
     borderRadius: 40,
     overflow: 'hidden',
+  },
+  // Scanner styles (Parte 5)
+  scannerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center' as const,
+    alignItems: 'center' as const,
+  },
+  scannerGroundLine: {
+    position: 'absolute' as const,
+    left: 0,
+    right: 0,
+    height: 2,
+    opacity: 0.8,
+  },
+  scannerBarContainer: {
+    width: 240,
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 3,
+    overflow: 'hidden' as const,
+    marginBottom: 16,
+  },
+  scannerBar: {
+    height: '100%' as const,
+    borderRadius: 3,
+  },
+  scannerStatusContainer: {
+    alignItems: 'center' as const,
+    gap: 8,
+  },
+  scannerStatusText: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
+  },
+  scannerHintText: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center' as const,
+  },
+  scannerRetryButton: {
+    marginTop: 16,
+    backgroundColor: 'rgba(239, 68, 68, 0.9)',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  scannerRetryText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#ffffff',
+  },
+  scannerScoreContainer: {
+    marginTop: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 8,
+  },
+  scannerScoreText: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+  },
+  scannerWarning: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(234, 179, 8, 0.2)',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.4)',
+  },
+  scannerWarningText: {
+    fontSize: 12,
+    color: '#eab308',
+    textAlign: 'center' as const,
   },
   countdownOverlay: {
     alignItems: 'center',

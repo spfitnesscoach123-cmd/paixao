@@ -35,6 +35,11 @@ export interface GroundCalibration {
   calibrationFrames: number;  // Number of frames used for calibration
   isCalibrated: boolean;
   standingHipY: number;       // Average hip Y during calibration (for countermovement)
+  confidenceScore: number;    // Calibration quality score (0-1)
+  footStability: number;      // Foot position stability during calibration (0-1)
+  poseConfidence: number;     // Average pose confidence during calibration (0-1)
+  groundStability: number;    // Ground level consistency during calibration (0-1)
+  lockedLandmark: 'foot_index' | 'ankle'; // Locked landmark for this jump attempt
 }
 
 /**
@@ -106,6 +111,7 @@ export interface JumpRecordingSession {
  */
 export type JumpCameraPhase = 
   | 'setup'           // Configuration screen
+  | 'scanning'        // Scanner calibration phase (collecting + analyzing)
   | 'countdown'       // Countdown before recording
   | 'recording'       // Active recording
   | 'processing'      // Analyzing video
@@ -152,13 +158,14 @@ export interface LiveMetrics {
  */
 export const JUMP_DETECTION_CONFIG = {
   // Ground calibration
-  CALIBRATION_FRAMES: 60,            // Frames to use for ground calibration (~2 seconds at 30fps)
-  GROUND_THRESHOLD_MARGIN: 0.025,    // 2.5% of screen height as margin
+  CALIBRATION_FRAMES: 90,            // Frames for calibration (~3 seconds at 30fps, scanner phase 1)
+  GROUND_THRESHOLD_MARGIN: 0.025,    // Legacy - replaced by adaptive clamp in calibrateGround
   
   // Event detection
-  MIN_FLIGHT_TIME_MS: 80,            // Minimum valid flight time (lowered for sensitivity)
+  MIN_FLIGHT_TIME_MS: 80,            // Minimum valid flight time
   MAX_FLIGHT_TIME_MS: 2000,          // Maximum valid flight time
   MIN_TAKEOFF_FRAMES: 2,             // Frames needed to confirm takeoff
+  MIN_LANDING_FRAMES: 2,             // Frames needed to confirm landing (symmetric with takeoff)
   
   // Countermovement detection
   COUNTERMOVEMENT_THRESHOLD: 0.008,  // Hip must move down by this ratio to start countermovement
@@ -168,14 +175,22 @@ export const JUMP_DETECTION_CONFIG = {
   HIP_TO_HEIGHT_RATIO: 0.53,         // Hip height as ratio of total height (standing)
   
   // Confidence thresholds
-  MIN_LANDMARK_CONFIDENCE: 0.4,      // Minimum confidence for landmark detection (lowered)
+  MIN_LANDMARK_CONFIDENCE: 0.4,      // Minimum confidence for landmark detection
   MIN_POSE_CONFIDENCE: 0.5,          // Minimum overall pose confidence
   
   // Smoothing
   SMOOTHING_WINDOW: 3,               // Moving average window for noise reduction
   
-  // Countdown
-  COUNTDOWN_SECONDS: 5,              // Countdown duration
+  // Countdown / Scanner
+  COUNTDOWN_SECONDS: 5,              // Countdown duration (phase 3 of scanner)
+  SCANNER_COLLECT_MS: 3000,          // Phase 1: scanner data collection (3s)
+  SCANNER_STABILITY_MS: 2000,        // Phase 2: stability calculation (2s)
+  
+  // Calibration confidence thresholds
+  CONFIDENCE_AUTO_START: 0.80,       // Score >= 0.80: auto start
+  CONFIDENCE_WARNING: 0.65,          // 0.65 <= score < 0.80: start with warning
+  CONFIDENCE_BLOCK: 0.65,            // Score < 0.65: block
+  MAX_RECALIBRATION_RETRIES: 2,      // Maximum automatic recalibration attempts
   
   // Frame processing
   TARGET_FPS: 30,                    // Target frame rate

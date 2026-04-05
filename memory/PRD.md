@@ -50,11 +50,40 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 - Testado em iPhone 16 Pro Max via TestFlight
 - Zero crashes ao iniciar/parar gravacao
 
+### Sessao 05/Abril/2026 — Correcao Timing Jump Camera v2
+10. Simetria de Eventos (Parte 1.1)
+    - MIN_LANDING_FRAMES = 2 (simetrico com MIN_TAKEOFF_FRAMES = 2)
+    - Landing agora exige 2 frames consecutivos confirmando contato
+    - Timestamp do landing = primeiro frame da sequencia confirmada
+
+11. Compensacao de Latencia (Parte 1.2)
+    - takeoffFrameIdx compensado: max(0, idx - 1)
+    - landingFrameIdx compensado: min(totalFrames - 1, idx + 1)
+    - Aplicado APOS confirmacao do evento e validacao de limites
+
+12. Threshold Adaptativo com Clamp (Parte 2)
+    - Substituido max(0.025, stdDev * 2.5) por clamp(stdDev * 1.5, 0.008, 0.02)
+    - Zona morta reduzida de 2.5% para max 2% da tela
+    - Minimo 0.8% para manter robustez contra ruido
+
+13. Consistencia de Landmarks (Parte 4)
+    - Landmark travado no inicio da calibracao (foot_index OU ankle)
+    - Sem alternancia durante o salto (elimina inconsistencia de referencia)
+
+14. Scanner de Calibracao (Parte 5)
+    - Nova fase 'scanning' antes do countdown
+    - Fase 1 (0-3s): Coleta de dados de calibracao
+    - Fase 2 (3-5s): Analise de estabilidade + calculo de confidenceScore
+    - Score = foot_stability*0.5 + pose_confidence*0.3 + ground_stability*0.2
+    - Thresholds: >= 0.80 auto-start, 0.65-0.80 aviso, < 0.65 bloqueio
+    - Auto-retry ate 2x, depois botao manual "Recalibrar"
+    - Overlay visual: linha do solo, barra de progresso, cores (verde/amarelo/vermelho)
+
 ## Estado Atual
 - Build iOS: FUNCIONAL em device real via TestFlight
 - Build Android: Aguardando teste
 - Motor de Pose: REAL (MediaPipe Tasks Vision 0.10.21)
-- Jump Camera: Funcional (valores precisam validacao fina)
+- Jump Camera: Funcional com correcoes de timing v2 (scanner + compensacao)
 - VBT Camera: Funcional (skeleto nao renderizado, apenas pontos verdes)
 - Protocolos: CMJ + SL-CMJ
 - RSImod: Formula unica validada
@@ -67,14 +96,21 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 - [x] Fix Fabric/New Architecture compatibility
 - [x] Fix crash deinit
 - [x] Pipeline end-to-end funcional
-- [ ] Validacao de precisao dos valores (jump height, flight time, RSImod)
+- [x] Correcao de timing Jump Camera v2 (Partes 1-5)
+- [ ] Validacao de precisao em device real (usuario testar com salto conhecido)
 - [ ] Validacao EAS Build Android
 
 ### P1
 - [ ] Renderizacao de skeleto no VBT (atualmente so pontos verdes)
+- [ ] Nova UI moderna para telas VBT e Jump Camera (design pronto)
+- [ ] Redesign Navegacao "Activity Hub" (selecionar atividade → depois atleta)
+- [ ] Menu dedicado VBT
 - [ ] Estabilidade: testes extensivos de crash em multiplas sessoes
 
 ### P2
+- [ ] Importacao dados via PDF (PDF → CSV)
+- [ ] Exportacao dados para CSV
+- [ ] Detalhe no PDF Export (aguardando especificacao)
 - [ ] UI merge de perfis duplicados de atletas
 - [ ] i18n de ScientificAnalysisTab e Avaliacoes
 - [ ] Refatoracao trackingProtection.ts

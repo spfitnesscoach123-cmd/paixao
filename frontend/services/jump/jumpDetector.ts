@@ -34,12 +34,20 @@ const {
   MIN_FLIGHT_TIME_MS,
   MAX_FLIGHT_TIME_MS,
   MIN_TAKEOFF_FRAMES,
+  MIN_LANDING_FRAMES,
   DEFAULT_ATHLETE_HEIGHT_CM,
   HIP_TO_HEIGHT_RATIO,
   MIN_LANDMARK_CONFIDENCE,
   COUNTERMOVEMENT_THRESHOLD,
   SMOOTHING_WINDOW,
 } = JUMP_DETECTION_CONFIG;
+
+// ============================================================
+// UTILITY: clamp
+// ============================================================
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
 
 // ============================================================
 // FRAME SMOOTHING
@@ -89,15 +97,22 @@ export function smoothFrames(frames: JumpFrameData[], windowSize: number = SMOOT
  * Calculates ground level and standing hip position from countdown frames
  */
 export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
+  const defaultResult: GroundCalibration = {
+    groundLevel: 0.9,
+    groundThreshold: 0.9 - 0.015,
+    calibrationFrames: frames.length,
+    isCalibrated: false,
+    standingHipY: 0.5,
+    confidenceScore: 0,
+    footStability: 0,
+    poseConfidence: 0,
+    groundStability: 0,
+    lockedLandmark: 'ankle',
+  };
+
   if (frames.length < 10) {
     console.log('[JUMP_DETECTOR] Calibration: insufficient frames (' + frames.length + ')');
-    return {
-      groundLevel: 0.9,
-      groundThreshold: 0.9 - GROUND_THRESHOLD_MARGIN,
-      calibrationFrames: frames.length,
-      isCalibrated: false,
-      standingHipY: 0.5,
-    };
+    return defaultResult;
   }
 
   // Use middle 60% of frames (skip first/last 20% for stability)
@@ -107,14 +122,22 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
   
   if (stableFrames.length < 5) {
     console.log('[JUMP_DETECTOR] Calibration: insufficient stable frames');
-    return {
-      groundLevel: 0.9,
-      groundThreshold: 0.9 - GROUND_THRESHOLD_MARGIN,
-      calibrationFrames: frames.length,
-      isCalibrated: false,
-      standingHipY: 0.5,
-    };
+    return defaultResult;
   }
+
+  // PART 4: Lock landmark - determine if foot_index is consistently available
+  // Check if leftToeY and leftAnkleY differ significantly (foot_index vs ankle fallback)
+  let footIndexCount = 0;
+  for (const f of stableFrames) {
+    // foot_index and ankle differ when foot_index is truly detected
+    const leftDiff = Math.abs(f.leftToeY - f.leftAnkleY);
+    const rightDiff = Math.abs(f.rightToeY - f.rightAnkleY);
+    if (leftDiff > 0.005 || rightDiff > 0.005) {
+      footIndexCount++;
+    }
+  }
+  const lockedLandmark: 'foot_index' | 'ankle' = 
+    (footIndexCount / stableFrames.length) > 0.7 ? 'foot_index' : 'ankle';
 
   // Calculate average Y position of feet (higher Y = lower on screen = on ground)
   const footYPositions = stableFrames.map(f => {
@@ -132,15 +155,43 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
     footYPositions.reduce((sum, y) => sum + Math.pow(y - groundLevel, 2), 0) / footYPositions.length
   );
   
-  // Use max of fixed margin and 2x stddev for threshold
-  const adaptiveMargin = Math.max(GROUND_THRESHOLD_MARGIN, stdDev * 2.5);
+  // PART 2: Use clamp instead of max for adaptive margin
+  // adaptiveMargin = clamp(stdDev * 1.5, 0.008, 0.02)
+  const adaptiveMargin = clamp(stdDev * 1.5, 0.008, 0.02);
+  
+  // === CONFIDENCE SCORE CALCULATION (PART 5) ===
+  
+  // Component 1: Foot stability (0-1) — lower stdDev = more stable
+  // stdDev < 0.003 = perfectly stable (1.0), stdDev > 0.02 = unstable (0.0)
+  const footStability = clamp(1.0 - (stdDev / 0.02), 0, 1);
+  
+  // Component 2: Pose confidence (0-1) — average confidence across calibration frames
+  const avgConfidence = stableFrames.reduce((sum, f) => sum + f.confidence, 0) / stableFrames.length;
+  const poseConfidence = clamp(avgConfidence, 0, 1);
+  
+  // Component 3: Ground stability (0-1) — consistency of ground level
+  const hipStdDev = Math.sqrt(
+    hipYPositions.reduce((sum, y) => sum + Math.pow(y - standingHipY, 2), 0) / hipYPositions.length
+  );
+  const groundStability = clamp(1.0 - (hipStdDev / 0.015), 0, 1);
+  
+  // Combined score: foot_stability * 0.5 + pose_confidence * 0.3 + ground_stability * 0.2
+  const confidenceScore = clamp(
+    (footStability * 0.5) + (poseConfidence * 0.3) + (groundStability * 0.2),
+    0, 1
+  );
   
   console.log('[JUMP_DETECTOR] Calibration complete:');
   console.log('[JUMP_DETECTOR]   groundLevel=' + groundLevel.toFixed(4));
   console.log('[JUMP_DETECTOR]   standingHipY=' + standingHipY.toFixed(4));
   console.log('[JUMP_DETECTOR]   stdDev=' + stdDev.toFixed(4));
-  console.log('[JUMP_DETECTOR]   adaptiveMargin=' + adaptiveMargin.toFixed(4));
+  console.log('[JUMP_DETECTOR]   adaptiveMargin=' + adaptiveMargin.toFixed(4) + ' (clamped)');
   console.log('[JUMP_DETECTOR]   threshold=' + (groundLevel - adaptiveMargin).toFixed(4));
+  console.log('[JUMP_DETECTOR]   lockedLandmark=' + lockedLandmark);
+  console.log('[JUMP_DETECTOR]   confidenceScore=' + confidenceScore.toFixed(3));
+  console.log('[JUMP_DETECTOR]   footStability=' + footStability.toFixed(3));
+  console.log('[JUMP_DETECTOR]   poseConfidence=' + poseConfidence.toFixed(3));
+  console.log('[JUMP_DETECTOR]   groundStability=' + groundStability.toFixed(3));
   console.log('[JUMP_DETECTOR]   frames used=' + stableFrames.length);
   
   return {
@@ -149,6 +200,11 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
     calibrationFrames: stableFrames.length,
     isCalibrated: true,
     standingHipY,
+    confidenceScore,
+    footStability,
+    poseConfidence,
+    groundStability,
+    lockedLandmark,
   };
 }
 
@@ -368,6 +424,7 @@ function analyzeCMJ(
   
   let state: 'waiting_countermovement' | 'countermovement' | 'waiting_takeoff' | 'in_air' | 'landed' = 'waiting_countermovement';
   let consecutiveTakeoffFrames = 0;
+  let consecutiveLandingFrames = 0;
   
   for (let i = 0; i < frames.length; i++) {
     const frame = frames[i];
@@ -424,9 +481,7 @@ function analyzeCMJ(
       continue;
     }
     
-    // Skip waiting_takeoff - handled above
-    
-    // PHASE 3: In air - track peak height and detect landing
+    // PHASE 3: In air - track peak height and detect landing (SYMMETRIC: MIN_LANDING_FRAMES)
     if (state === 'in_air') {
       if (frame.hipCenterY < minHipY) {
         minHipY = frame.hipCenterY;
@@ -442,19 +497,32 @@ function analyzeCMJ(
       }
       
       if (isLanding) {
-        landingFrameIdx = i;
-        events.landingTime = frame.timestamp;
-        state = 'landed';
-        console.log('[LOG_JUMP_LANDING_DETECTED] Landing at frame ' + i);
-        break;
+        consecutiveLandingFrames++;
+        if (consecutiveLandingFrames >= MIN_LANDING_FRAMES) {
+          // Symmetric with takeoff: use first frame of confirmed landing sequence
+          landingFrameIdx = i - MIN_LANDING_FRAMES + 1;
+          events.landingTime = frames[landingFrameIdx].timestamp;
+          state = 'landed';
+          console.log('[LOG_JUMP_LANDING_DETECTED] Landing at frame ' + landingFrameIdx + ' (confirmed after ' + MIN_LANDING_FRAMES + ' frames)');
+          break;
+        }
+      } else {
+        consecutiveLandingFrames = 0;
       }
     }
   }
   
   // Calculate metrics
   if (takeoffFrameIdx !== null && landingFrameIdx !== null) {
-    const flightTimeMs = frames[landingFrameIdx].timestamp - frames[takeoffFrameIdx].timestamp;
+    // PART 1.2: LATENCY COMPENSATION
+    // Apply AFTER event confirmation, with bounds validation
+    const compensatedTakeoffIdx = Math.max(0, takeoffFrameIdx - 1);
+    const compensatedLandingIdx = Math.min(frames.length - 1, landingFrameIdx + 1);
     
+    const flightTimeMs = frames[compensatedLandingIdx].timestamp - frames[compensatedTakeoffIdx].timestamp;
+    
+    console.log('[JUMP_DETECTOR] Raw takeoff=' + takeoffFrameIdx + ' compensated=' + compensatedTakeoffIdx);
+    console.log('[JUMP_DETECTOR] Raw landing=' + landingFrameIdx + ' compensated=' + compensatedLandingIdx);
     console.log('[JUMP_DETECTOR] Flight time: ' + flightTimeMs + 'ms');
     
     if (flightTimeMs >= MIN_FLIGHT_TIME_MS && flightTimeMs <= MAX_FLIGHT_TIME_MS) {
@@ -546,9 +614,11 @@ function createEmptyEvents(): JumpEvents {
 
 /**
  * Extract pose landmarks relevant for jump detection
+ * Uses locked landmark from calibration when available
  */
 export function extractJumpLandmarks(
-  keypoints: Array<{ name: string; x: number; y: number; score: number }>
+  keypoints: Array<{ name: string; x: number; y: number; score: number }>,
+  lockedLandmark?: 'foot_index' | 'ankle'
 ): JumpPoseLandmarks {
   const findLandmark = (name: string) => {
     const kp = keypoints.find(k => k.name === name);
@@ -557,9 +627,31 @@ export function extractJumpLandmarks(
       : null;
   };
 
+  // PART 4: Consistent landmark selection - no alternation during a jump
+  let leftToe: { x: number; y: number; score: number } | null = null;
+  let rightToe: { x: number; y: number; score: number } | null = null;
+
+  if (lockedLandmark === 'foot_index') {
+    // Locked to foot_index: use it if available, else null (don't fallback to ankle)
+    leftToe = findLandmark('left_foot_index');
+    rightToe = findLandmark('right_foot_index');
+    // If foot_index not detected this frame, use ankle as emergency fallback
+    // but keep it consistent (still targeting foot-level position)
+    if (!leftToe) leftToe = findLandmark('left_ankle');
+    if (!rightToe) rightToe = findLandmark('right_ankle');
+  } else if (lockedLandmark === 'ankle') {
+    // Locked to ankle: always use ankle, never foot_index
+    leftToe = findLandmark('left_ankle');
+    rightToe = findLandmark('right_ankle');
+  } else {
+    // No lock (pre-calibration): use foot_index with ankle fallback (original behavior)
+    leftToe = findLandmark('left_foot_index') || findLandmark('left_ankle');
+    rightToe = findLandmark('right_foot_index') || findLandmark('right_ankle');
+  }
+
   return {
-    leftToe: findLandmark('left_foot_index') || findLandmark('left_ankle'),
-    rightToe: findLandmark('right_foot_index') || findLandmark('right_ankle'),
+    leftToe,
+    rightToe,
     leftAnkle: findLandmark('left_ankle'),
     rightAnkle: findLandmark('right_ankle'),
     leftHip: findLandmark('left_hip'),
