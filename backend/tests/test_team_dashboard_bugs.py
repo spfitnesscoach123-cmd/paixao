@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://pose-detection-vbt.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://jump-camera-audit.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "testuser@test.com"

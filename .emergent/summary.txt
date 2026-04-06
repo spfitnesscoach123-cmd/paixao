@@ -1,152 +1,151 @@
 <analysis>**original_problem_statement**: 
-The user requested the safe reintegration of Computer Vision (MediaPipeTasksVision) for iOS in an Expo SDK 54 environment. The strict requirement was to use a vendored XCFramework to bypass CocoaPods  linkage conflicts that previously broke the EAS build. Additionally, the user requested fixing a backend deployment Docker build failure caused by a bloated  file.
+The user requested corrections to the Jump Camera's flight time calculation due to underestimation. After a detailed audit, the user provided strict mathematical and logical constraints to fix the timing (latency compensation, symmetrical frame detection) and added a pre-jump scanner/calibration flow. Subsequently, the user requested a full correction of the  classification thresholds across the frontend and backend to align with scientific CMJ literature (replacing standard Drop Jump RSI thresholds), while strictly avoiding any changes to the general dashboard or metric calculations.
 *PRODUCT REQUIREMENTS*: 
-1. Link MediaPipeTasksVision in iOS as a vendored XCFramework.
-2. Ensure the custom native module correctly mounts in React Native's New Architecture (Fabric).
-3. Ensure no crashes happen during camera lifecycle transitions (start/stop recording).
-4. Clean the backend dependencies so the deployment pipeline succeeds.
+1. Fix jump flight time via latency compensation (, ) and symmetrical frame validation ().
+2. Add a pre-jump scanner phase (0-5s) to assess stability and confidence score before allowing a jump.
+3. Correct RSImod classification to scientifically accurate ranges (0.25 to 1.00+) with specific color mappings.
+4. Apply on-the-fly reclassification for older database records in both backend APIs and frontend UI components.
 
 **User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in the user's preferred language only. All interactions, comments, and docs must be in Portuguese).
 
 **what currently exists?** 
-A React Native Expo app with a FastAPI backend. The iOS app now natively runs MediaPipe Pose Detection (no longer mocked) via a custom Expo local module (). The module successfully uses vendored XCFrameworks and mounts under the New Architecture (Fabric). The backend has a clean, minimal  and deploys to Kubernetes successfully.
+A React Native Expo app with a FastAPI backend. The Jump Camera accurately calculates flight time and jump height using a refined, symmetrical frame-detection logic and a pre-jump stability scanner. RSImod classification uses scientifically accurate CMJ thresholds across the app (excluding the dashboard, per user request), retroactively applying the correct labels and colors to historical data via on-the-fly backend adjustments and a new reusable frontend module.
 
 **Last working item**:
-    - Last item agent was working: Fixing a native iOS crash occurring on  when stopping the Jump/VBT camera recording, and cleaning the backend  to fix Docker deployment.
-    - Status: COMPLETED (User verified on a physical iPhone 16 Pro Max that the E2E pipeline works, detects flight time, and doesn't crash).
+    - Last item agent was working: Fixing the RSImod classification thresholds in the backend () and frontend (, ), including tooltips with scientific citations (McMahon et al., Comfort et al.).
+    - Status: USER VERIFICATION PENDING
     - Agent Testing Done: Y
-    - Which testing method agent to use? EAS iOS Build / Deployment Agent.
-    - User Testing Done: Y
+    - Which testing method agent to use? Manual testing by curl / python -c (for backend endpoints) and  for frontend. Testing agent can be used for UI validation.
+    - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  Issue 1: RSImod calculation bug
-     - Attempted fixes: None in this session. The user noted this is a pre-existing bug.
-     - Next debug checklist: Review the jump assessment math for RSImod (flight_time / contact_time or jump_height / time_to_takeoff, based on recent standardizations) to ensure correct outputs.
-     - Why fix this issue and what will be achieved with the fix?: Ensures scientific accuracy of jump metrics.
-     - Status: NOT STARTED
-     - Is recurring issue? Y (Reported by user as an older issue).
-     - Should Test frontend/backend/both after fix?: Both.
-     - Blocked on other issue: None.
-
-  Issue 2: VBT Skeleton rendering incomplete
-     - Attempted fixes: None.
-     - Next debug checklist: The camera currently only displays green dots for the tracking points, but the full skeletal lines are missing. Review the SVG/Canvas rendering logic in the VBT UI overlay.
-     - Why fix this issue and what will be achieved with the fix?: Visual feedback for the athlete.
+  Issue 1: VBT Skeleton rendering incomplete (P1)
+     - Attempted fixes: None in this session.
+     - Next debug checklist: Review the SVG/Canvas rendering logic in the VBT UI overlay. The camera currently only displays green dots for tracking points; full skeletal lines are missing.
+     - Why fix this issue and what will be achieved with the fix?: Visual feedback for the athlete during VBT.
      - Status: NOT STARTED
      - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: Frontend.
-     - Blocked on other issue: None.
+     - Should Test frontend/backend/both after fix?: Frontend
+     - Blocked on other issue: None
 
-  Issue 3: PDF Export detail fix
+  Issue 2: PDF Export detail fix (P2)
      - Attempted fixes: None.
      - Next debug checklist: Wait for the user to specify what exact detail is wrong in the PDF generation.
+     - Why fix this issue and what will be achieved with the fix?: Ensures data exports are accurate for coaches.
      - Status: NOT STARTED
      - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: Backend.
-     - Blocked on other issue: None.
+     - Should Test frontend/backend/both after fix?: Backend
+     - Blocked on other issue: None
 
 **In progress Task List**:
-  *(None - The user explicitly requested to pause development for the day)*
+  *(None)*
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P0) Fix RSImod calculation logic.
     - (P1) Implement new, modern UI for VBT and Jump Camera recording screens (User has a ready design).
+    - (P1) Render full skeleton (lines + points) in VBT camera.
+    - (P1) Redesign Navigation to an Activity Hub: Change flow so the user selects Activity first -> Athlete second.
     
     Future Tasks:
-    - (P1) Redesign Navigation to an Activity Hub: Change the flow so the user selects the activity first (Jump / VBT / GPS / Wellness) and THEN selects the athlete from a list, improving group workflow on iPads.
-    - (P1) Create a dedicated Menu for VBT.
-    - (P2) Data Import via PDF (Convert PDF to CSV internally to import athlete data).
+    - (P2) Data Import via PDF (Convert PDF to CSV internally).
     - (P2) Export App Data to CSV.
     - (P3) UI for merging duplicated athlete profiles.
     - (P3) Full internationalization (i18n) of  and Assessments.
 
 **Completed work in this session**
-- iOS Vendored XCFramework Integration: Bypassed  conflicts by vendoring MediaPipe directly in the local module's podspec (DONE).
-- Fabric Compatibility Fix: Replaced  with  to correctly mount the native camera view in React Native's New Architecture (DONE).
-- iOS Camera Lifecycle Crash Fix: Fixed an asynchronous  cleanup issue in  that crashed the app when starting/stopping recordings (DONE).
-- Backend Deployment Fix: Cleaned a bloated  (removed 100+ unnecessary packages like , ) allowing the Docker build to pass (DONE).
-- System Logging: Implemented  with  for native iOS debugging via Console.app (DONE).
+- Jump Camera Audit: Full end-to-end analysis of MediaPipe landmarks, frame smoothing, and timestamp jitter (DONE).
+- Flight Time Fix: Applied latency compensation, , dynamic clamped threshold, and landmark lock ( vs ) (DONE).
+- Pre-Jump Scanner: Added a 3-phase calibration scanner with visual UI overlay, confidence score calculation, and auto-retry blocking (DONE).
+- Backend RSImod Fix: Updated  in  to scientific CMJ thresholds and implemented on-the-fly reclassification for GET endpoints (DONE).
+- Frontend RSImod Fix: Created , updated  and  with new UI labels, colors, and scientific tooltips (DONE).
 
 **Earlier issues found/mentioned but not fixed**
-   *(Listed under Pending Issue List above)*
+   - Issue 1: VBT Skeleton rendering incomplete. (Recorded in Pending Issues).
+   - Issue 2: PDF Export detail fix. (Recorded in Pending Issues).
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: iOS EAS Build failures due to CocoaPods conflicts with MediaPipe.
-  - Recurrence count: >5
-  - Status: RESOLVED (Fixed permanently by using Vendored XCFrameworks).
+  - Issue recurrence in previous fork: None.
+  - Recurrence count: 0
+  - Status: RESOLVED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Vendored XCFrameworks**: Distributing heavy pre-compiled iOS frameworks directly in the module to avoid dependency resolution conflicts.
-- **Expo New Architecture (Fabric)**: Native views must be required using  from  rather than the legacy .
-- ** Lifecycle**: Strict cleanup required on  to prevent delivering frames to dead objects.
+- **MediaPipe Pose Tracking**: Real-time extraction of keypoints (foot_index, ankle).
+- **Time-Series Smoothing & Detection**: Use of moving averages combined with precise latency compensation to determine exact takeoff/landing frames.
+- **Data Normalization vs Display**: Historical DB records hold legacy RSI classifications (poor, good). The system now parses these on-the-fly in GET endpoints and frontend components using a unified mapping function.
 
 **key DB schema**
-  -  (Unchanged)
-  -  (Unchanged)
+  - : Stores , , , etc. (Legacy  strings in the DB are now dynamically overwritten by the backend/frontend during reads).
 
 **changes in tech stack**
-  - Backend  drastically reduced to core dependencies.
-  - Native iOS  is fully active.
+  - None.
 
 **All files of reference** 
 - 
+- 
+-  (Created)
 - 
 - 
 - 
 - 
 
 **Areas that need refactoring**: 
--  and legacy VBT logic.
-- UI flow (needs to be inverted to Activity -> Athlete, per user's future requests).
+-  (Legacy VBT logic).
+- UI navigation flow (Needs inversion to Activity -> Athlete).
 
 **key api endpoints**
-- 
+-  (POST)
+-  (GET - now dynamically reclassifies old RSImod records)
+-  (GET - now dynamically reclassifies old RSImod records)
 
 **Critical Info for New Agent** 
-- **CRITICAL DIRECTIVE**: The user explicitly stated: *TUDO ISSO nao e para AGORA, por enquanto nao altere absolutamente nada* (All of this is not for now, for the time being do not change absolutely anything). **DO NOT** begin implementing the new features or bug fixes until the user sends a new prompt initiating the work.
+- **CRITICAL DIRECTIVE**: The user provides VERY specific instructions (e.g., NÃO alterar cálculo, NÃO usar detecção por velocidade). ALWAYS follow these explicit bounds exactly. Do not refactor code or apply best practices that contradict the user's explicit rules.
 - **Language**: Portuguese ONLY.
-- **MediaPipe Status**: It is now 100% functional on device. Do not revert to mocks.
-- **Backend**: Deployment works. Do not use  directly without filtering in the future.
+- **RSImod vs RSI**: RSImod (CMJ) ranges from 0.25 to >1.00. Standard RSI (Drop Jump) ranges from 1.0 to >2.8. Ensure these logic paths remain separated. The Dashboard (Visão Geral) explicitly ignores these classifications and relies purely on normalized numeric values. DO NOT modify the Dashboard RSI displays.
+- App Store Connect build delays (Processing) were encountered; this is an Apple-side issue and not a codebase failure.
 
 **documents and test reports created in this job** 
-  -  (Updated)
+  -  (Updated with Session 3 progress)
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Noted that the app doesn't crash anymore! Jump E2E pipeline works (flight time, graphs) and VBT saves reps. Console logs are invisible but the app functions. Mentioned future tasks (RSImod fix, new UI for VBT/Jump). (Finished)
-- **Assistant**: Acknowledged the success and asked what the user wants to prioritize next. (Finished)
-- **User**: Not for now, do not implement anything yet. Mentioned the RSImod fix is next, then new UI. Said they are resting today and will return next week. (Finished)
-- **Assistant**: Acknowledged and confirmed the backlog. (Finished)
-- **User**: Added more items to the backlog: PDF to CSV import, CSV export, minor PDF export fix, and a major redesign of the navigation (Activity Hub -> Athlete Selection instead of Athlete -> Activity). Concluded with: BUT ALL OF THIS is not for NOW, do not change absolutely anything for the time being. (Finished)
-- *Pending*: None. **WAIT FOR THE USER TO INITIATE WORK.**
+- **User**: Asks what ECC and Flight mean on the camera overlay. (Resolved)
+- **Assistant**: Explains Eccentric Time and Flight Time. (Resolved)
+- **User**: Asks how to fix the flight time underestimation without changing code yet. (Resolved)
+- **Assistant**: Proposes 3 technical solutions (velocity detection, smoothing reduction, native timestamps). (Resolved)
+- **User**: Rejects proposals completely. Tells agent to wait for explicit instructions. (Resolved)
+- **User**: Provides a very strict set of 5 rules to fix timing (latency compensation, symmetrical detection) and add a pre-jump scanner. (Resolved)
+- **Assistant**: Confirms plan via ask_human. (Resolved)
+- **User**: Adds constraints (clamp function, render-only UI thread for scanner, 2 retry limit). (Resolved)
+- **User**: Reports App Store Connect build is stuck at processing. (Resolved - Noted as Apple issue).
+- **User**: Requests correction of the RSImod classification thresholds (Scientific ranges) in the Frontend (Gauge, Profiles) and Backend, adding tooltips, but strictly ignoring the Dashboard overview. (Resolved)
+- *Pending*: None. Await the user's command for the next backlog item (Likely UI design or VBT skeleton).
 
 **Project Health Check:**
-- Broken: None.
-- Mocked: None.
+- Broken: None
+- Mocked: None
 
 **3rd Party Integrations** 
-- Expo Application Services (EAS)
-- MediaPipeTasksVision (Native iOS)
+- Expo Application Services (EAS) (Native Build required for Camera testing)
+- MediaPipeTasksVision (Native iOS SDK)
 
 **Testing status**
-  - Testing agent used after significant changes: NO (relied on Deployment Agent and User's physical device testing).
-  - Troubleshoot agent used after agent stuck in loop: YES (Deployment agent used to debug backend Docker fail).
-  - Test files created: None.
-  - Known regressions: None.
+  - Testing agent used after significant changes: NO (Self-tested via backend  validation and  for TS errors).
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None
+  - Known regressions: None
 
 **Credentials to test flow:**
 User: 
 Password: 
 
 **What agent forgot to execute**
-Nothing. The agent successfully unblocked the native implementation and fixed the deployment.
+Nothing. The agent successfully implemented the complex math and logic constraints exactly as requested by the user.
 
 **Debugging checklist for current issue**
     Issue: Wait for User Input
     Frontend files to check: N/A
     Backend files to check: N/A
     Database to check: N/A
-    Note: Do not start coding. Acknowledge the handoff and ask the user which of the backlog items (RSImod, VBT UI, Activity Hub, etc.) they want to tackle first now that they are back.</analysis>
+    Note: Do not start coding. Review the Pending Issue list and wait for the user to initiate the next piece of work (likely the VBT Skeleton rendering or UI overhaul).</analysis>
