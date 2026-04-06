@@ -138,6 +138,20 @@ export interface JumpPoseLandmarks {
   rightAnkle: { x: number; y: number; score: number } | null;
   leftHip: { x: number; y: number; score: number } | null;
   rightHip: { x: number; y: number; score: number } | null;
+  leftShoulder: { x: number; y: number; score: number } | null;
+  rightShoulder: { x: number; y: number; score: number } | null;
+  leftKnee: { x: number; y: number; score: number } | null;
+  rightKnee: { x: number; y: number; score: number } | null;
+}
+
+/**
+ * Orientation validation result
+ */
+export interface OrientationResult {
+  isValid: boolean;
+  shoulderWidth: number;
+  hipWidth: number;
+  message: string | null;
 }
 
 /**
@@ -194,6 +208,9 @@ export const JUMP_DETECTION_CONFIG = {
   
   // Frame processing
   TARGET_FPS: 30,                    // Target frame rate
+  
+  // Orientation validation
+  ORIENTATION_MIN_WIDTH: 0.06,       // Min shoulder/hip X-distance to consider "facing camera"
   
   // Recording
   MAX_RECORDING_DURATION_MS: 6000,   // Max recording time (6 seconds)

@@ -29,6 +29,7 @@ import {
   JumpEvents,
   LiveMetrics,
   SlCmjLegResult,
+  OrientationResult,
   JUMP_DETECTION_CONFIG,
 } from './types';
 import {
@@ -39,6 +40,7 @@ import {
   createJumpFrameData,
   detectCMJTakeoff,
   detectCMJLanding,
+  checkAthleteOrientation,
 } from './jumpDetector';
 import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
 import { FrameIntegrityMonitor } from '../frameDrop';
@@ -64,6 +66,7 @@ export interface ScannerState {
   groundStability: number;   // 0-1
   retryCount: number;        // Number of recalibration retries
   warningMessage: string | null;
+  showContinueButton: boolean; // For 65-79% confidence, shown after 500ms
 }
 
 export interface UseJumpCameraConfig {
@@ -101,9 +104,13 @@ export interface UseJumpCameraResult {
   // Actions
   startCountdown: () => void;
   stopRecording: () => void;
-  processFrame: (keypoints: Array<{ name: string; x: number; y: number; score: number }>) => void;
+  processFrame: (keypoints: Array<{ name: string; x: number; y: number; score: number }>, nativeTimestamp?: number) => void;
   reset: () => void;
   retryCalibration: () => void;
+  confirmContinue: () => void;
+  
+  // Orientation
+  orientationResult: OrientationResult;
   
   // Progress
   calibrationProgress: number;
@@ -147,6 +154,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     groundStability: 0,
     retryCount: 0,
     warningMessage: null,
+    showContinueButton: false,
   });
   
   // SL-CMJ dual jump state
@@ -174,6 +182,12 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   // Scanner timing refs
   const scannerStartTimeRef = useRef<number | null>(null);
   const scannerRetryCountRef = useRef(0);
+  const stableScoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  // Orientation tracking
+  const [orientationResult, setOrientationResult] = useState<OrientationResult>({
+    isValid: true, shoulderWidth: 0, hipWidth: 0, message: null,
+  });
   
   // Refs for real-time tracking
   const countermovementStartTimeRef = useRef<number | null>(null);
@@ -263,8 +277,31 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     const score = calibration.confidenceScore;
     console.log('[JUMP_CAMERA_HOOK] Confidence score: ' + score.toFixed(3));
     
+    // Check orientation at the decision point
+    const latestLandmarks = calibrationFramesRef.current.length > 0
+      ? extractJumpLandmarks([], calibration.lockedLandmark) // dummy — orientation uses stored result
+      : null;
+    const orientation = orientationResult; // Use latest tracked orientation
+    console.log('[JUMP_CAMERA_HOOK] Orientation valid: ' + orientation.isValid +
+      ' shoulderW=' + orientation.shoulderWidth.toFixed(4) +
+      ' hipW=' + orientation.hipWidth.toFixed(4));
+    
     if (score >= CONFIDENCE_AUTO_START) {
-      // AUTO START — high confidence
+      // HIGH CONFIDENCE — check orientation before auto-start
+      if (!orientation.isValid) {
+        console.log('[JUMP_CAMERA_HOOK] Score OK but orientation INVALID — blocking');
+        setScannerState(prev => ({
+          ...prev,
+          phase: 'blocked',
+          confidenceScore: score,
+          footStability: calibration.footStability,
+          poseConfidence: calibration.poseConfidence,
+          groundStability: calibration.groundStability,
+          warningMessage: orientation.message || 'Ajuste sua posicao: fique de frente para a camera',
+          showContinueButton: false,
+        }));
+        return;
+      }
       console.log('[JUMP_CAMERA_HOOK] Confidence OK (>= ' + CONFIDENCE_AUTO_START + '), starting countdown');
       setScannerState(prev => ({
         ...prev,
@@ -274,21 +311,30 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         poseConfidence: calibration.poseConfidence,
         groundStability: calibration.groundStability,
         warningMessage: null,
+        showContinueButton: false,
       }));
       beginCountdown();
     } else if (score >= CONFIDENCE_WARNING) {
-      // WARNING — proceed but notify
-      console.log('[JUMP_CAMERA_HOOK] Confidence marginal (' + score.toFixed(3) + '), starting with warning');
+      // MARGINAL CONFIDENCE — show "Continue anyway" button after 500ms stable
+      console.log('[JUMP_CAMERA_HOOK] Confidence marginal (' + score.toFixed(3) + '), showing ready state');
       setScannerState(prev => ({
         ...prev,
-        phase: 'countdown',
+        phase: 'ready',
         confidenceScore: score,
         footStability: calibration.footStability,
         poseConfidence: calibration.poseConfidence,
         groundStability: calibration.groundStability,
         warningMessage: 'Calibracao instavel. Resultados podem variar.',
+        showContinueButton: false,
       }));
-      beginCountdown();
+      // Show "Continue" button after 500ms of stable score
+      if (stableScoreTimerRef.current) clearTimeout(stableScoreTimerRef.current);
+      stableScoreTimerRef.current = setTimeout(() => {
+        setScannerState(prev => {
+          if (prev.phase !== 'ready') return prev;
+          return { ...prev, showContinueButton: true };
+        });
+      }, 500);
     } else {
       // BLOCK — confidence too low
       console.log('[JUMP_CAMERA_HOOK] Confidence TOO LOW (' + score.toFixed(3) + ')');
@@ -308,6 +354,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           poseConfidence: calibration.poseConfidence,
           groundStability: calibration.groundStability,
           warningMessage: 'Recalibrando... (' + (currentRetries + 1) + '/' + MAX_RECALIBRATION_RETRIES + ')',
+          showContinueButton: false,
         }));
         // Reset frames and restart scanner
         calibrationFramesRef.current = [];
@@ -324,10 +371,11 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           groundStability: calibration.groundStability,
           retryCount: currentRetries,
           warningMessage: 'Calibracao falhou. Ajuste a posicao e tente novamente.',
+          showContinueButton: false,
         }));
       }
     }
-  }, [protocol]);
+  }, [protocol, orientationResult]);
 
   /**
    * Begin the actual countdown (Phase 3) after scanner approval
@@ -367,6 +415,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     scannerRetryCountRef.current = 0;
     calibrationFramesRef.current = [];
     scannerStartTimeRef.current = Date.now();
+    if (stableScoreTimerRef.current) {
+      clearTimeout(stableScoreTimerRef.current);
+      stableScoreTimerRef.current = null;
+    }
     setScannerState({
       phase: 'collecting',
       progress: 0,
@@ -376,9 +428,37 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       groundStability: 0,
       retryCount: 0,
       warningMessage: null,
+      showContinueButton: false,
     });
     setPhase('scanning');
   }, []);
+
+  /**
+   * Confirm continue with marginal confidence (65-79%)
+   * Checks orientation on click — blocks if invalid
+   */
+  const confirmContinue = useCallback(() => {
+    console.log('[JUMP_CAMERA_HOOK] confirmContinue() — user accepted marginal confidence');
+    if (!orientationResult.isValid) {
+      console.log('[JUMP_CAMERA_HOOK] Orientation invalid on confirm — blocking');
+      setScannerState(prev => ({
+        ...prev,
+        warningMessage: orientationResult.message || 'Ajuste sua posicao: fique de frente para a camera',
+      }));
+      return;
+    }
+    if (stableScoreTimerRef.current) {
+      clearTimeout(stableScoreTimerRef.current);
+      stableScoreTimerRef.current = null;
+    }
+    setScannerState(prev => ({
+      ...prev,
+      phase: 'countdown',
+      showContinueButton: false,
+      warningMessage: 'Calibracao instavel. Resultados podem variar.',
+    }));
+    beginCountdown();
+  }, [orientationResult, beginCountdown]);
 
   /**
    * Stop recording and analyze
@@ -476,12 +556,14 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   /**
    * Process a single frame from pose detection
    * Handles scanning, calibration, recording, and real-time metric updates
+   * Accepts optional nativeTimestamp from camera hardware for precision
    */
   const processFrame = useCallback((
-    keypoints: Array<{ name: string; x: number; y: number; score: number }>
+    keypoints: Array<{ name: string; x: number; y: number; score: number }>,
+    nativeTimestamp?: number
   ) => {
-    // Timestamp do frame
-    const timestamp = getFrameTimestamp();
+    // P0.2: Use native timestamp when available, fallback to performance.now()
+    const timestamp = getFrameTimestamp(nativeTimestamp);
     const frameId = getNextFrameId();
     
     // Detecção de frame drop
@@ -500,6 +582,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       // SCANNER: collect frames and track progress
       calibrationFramesRef.current.push(frameData);
       setFrameCount(prev => prev + 1);
+      
+      // P0.1: Track orientation during scanning (visual feedback, doesn't block here)
+      const orientation = checkAthleteOrientation(landmarks);
+      setOrientationResult(orientation);
       
       const elapsed = Date.now() - (scannerStartTimeRef.current || Date.now());
       const totalScannerTime = SCANNER_COLLECT_MS + SCANNER_STABILITY_MS;
@@ -688,9 +774,15 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       groundStability: 0,
       retryCount: 0,
       warningMessage: null,
+      showContinueButton: false,
     });
+    setOrientationResult({ isValid: true, shoulderWidth: 0, hipWidth: 0, message: null });
     scannerRetryCountRef.current = 0;
     scannerStartTimeRef.current = null;
+    if (stableScoreTimerRef.current) {
+      clearTimeout(stableScoreTimerRef.current);
+      stableScoreTimerRef.current = null;
+    }
     
     calibrationFramesRef.current = [];
     recordingFramesRef.current = [];
@@ -731,6 +823,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     processFrame,
     reset,
     retryCalibration,
+    confirmContinue,
+    
+    // Orientation
+    orientationResult,
     
     // Progress
     calibrationProgress,

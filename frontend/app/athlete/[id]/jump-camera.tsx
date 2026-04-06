@@ -62,6 +62,7 @@ import {
   JUMP_PROTOCOL_INFO,
 } from '../../../services/jump/types';
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
+import { OverlayLayer } from '../../../components/jump/OverlayLayer';
 import { format } from 'date-fns';
 
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
@@ -204,7 +205,14 @@ function JumpCameraContent() {
     scannerAdjustPosition: locale === 'pt' ? 'Ajuste a posicao e tente novamente' : 'Adjust position and try again',
     scannerGroundLine: locale === 'pt' ? 'Linha do Solo' : 'Ground Line',
     scannerConfidence: locale === 'pt' ? 'Confianca' : 'Confidence',
+    // New labels
+    scannerContinueAnyway: locale === 'pt' ? 'Continuar mesmo assim' : 'Continue anyway',
+    orientationWarning: locale === 'pt' ? 'Ajuste sua posicao: fique de frente para a camera' : 'Adjust position: face the camera',
   };
+
+  // Overlay keypoints for visual feedback (throttled to ~15fps)
+  const [overlayKeypoints, setOverlayKeypoints] = useState<ProcessedKeypoint[]>([]);
+  const overlayFrameCountRef = useRef(0);
 
   // Convert MediaPipe landmarks to keypoints array
   const convertMediapipeLandmarks = useCallback((landmarkData: any): ProcessedKeypoint[] => {
@@ -301,7 +309,7 @@ function JumpCameraContent() {
   //
   // CRITICAL: Each stage MUST complete before the next begins
   // ============================================================
-  const handleMediapipeLandmark = useCallback((event: any) => {
+  const handleMediapipeLandmark = useCallback((event: any, nativeTimestamp?: number) => {
     // ========================================
     // GUARD 1: Prevent re-entrant processing
     // ========================================
@@ -395,8 +403,14 @@ function JumpCameraContent() {
         const keypoints = convertMediapipeLandmarks(landmarkData);
         
         if (keypoints && keypoints.length > 0) {
-          // processFrame handles scanning/countdown/recording internally based on jumpCamera.phase
-          jumpCamera.processFrame(keypoints);
+          // P0.2: Pass native timestamp for precision
+          jumpCamera.processFrame(keypoints, nativeTimestamp);
+          
+          // Throttled overlay update (~15fps for visual smoothness)
+          overlayFrameCountRef.current++;
+          if (overlayFrameCountRef.current % 2 === 0) {
+            setOverlayKeypoints(keypoints);
+          }
           
           // Log periodically during active processing
           if (frameCountRef.current % 60 === 0) {
@@ -1037,26 +1051,20 @@ function JumpCameraContent() {
           
           {/* Overlay based on jump detection phase */}
           <View style={styles.cameraOverlay}>
-            {/* Scanner Overlay (Parte 5) */}
-            {jumpCamera.phase === 'scanning' && (
+            {/* P1.1: OverlayLayer — visual skeleton, dots, scan line (isolated, read-only) */}
+            <OverlayLayer
+              keypoints={overlayKeypoints}
+              phase={jumpCamera.phase}
+              scannerPhase={jumpCamera.scannerState.phase}
+              groundLevel={jumpCamera.groundCalibration.groundLevel}
+              confidenceScore={jumpCamera.scannerState.confidenceScore}
+              orientationValid={jumpCamera.orientationResult.isValid}
+              showSkeleton={jumpCamera.phase === 'scanning' || jumpCamera.phase === 'countdown'}
+            />
+            
+            {/* Scanner Overlay (text/bars/buttons) */}
+            {(jumpCamera.phase === 'scanning') && (
               <View style={styles.scannerOverlay} data-testid="scanner-overlay">
-                {/* Ground line indicator */}
-                {jumpCamera.groundCalibration.groundLevel > 0 && (
-                  <View 
-                    style={[
-                      styles.scannerGroundLine,
-                      { 
-                        top: `${jumpCamera.groundCalibration.groundLevel * 100}%`,
-                        backgroundColor: jumpCamera.scannerState.confidenceScore >= 0.80 
-                          ? '#22c55e' 
-                          : jumpCamera.scannerState.confidenceScore >= 0.65 
-                            ? '#eab308' 
-                            : '#ef4444',
-                      }
-                    ]} 
-                  />
-                )}
-                
                 {/* Scanner animated bar */}
                 <View style={styles.scannerBarContainer}>
                   <View 
@@ -1091,11 +1099,33 @@ function JumpCameraContent() {
                       <Text style={styles.scannerStatusText}>{t.scannerAnalyzing}</Text>
                     </>
                   )}
+                  {jumpCamera.scannerState.phase === 'ready' && (
+                    <>
+                      <Ionicons name="checkmark-circle" size={36} color="#eab308" />
+                      <Text style={[styles.scannerStatusText, { color: '#eab308' }]}>
+                        {t.scannerConfidence}: {Math.round(jumpCamera.scannerState.confidenceScore * 100)}%
+                      </Text>
+                      <Text style={styles.scannerHintText}>
+                        {jumpCamera.scannerState.warningMessage}
+                      </Text>
+                      {jumpCamera.scannerState.showContinueButton && (
+                        <TouchableOpacity 
+                          style={[styles.scannerRetryButton, { backgroundColor: '#eab308' }]}
+                          onPress={jumpCamera.confirmContinue}
+                          data-testid="scanner-continue-btn"
+                        >
+                          <Text style={styles.scannerRetryText}>{t.scannerContinueAnyway}</Text>
+                        </TouchableOpacity>
+                      )}
+                    </>
+                  )}
                   {jumpCamera.scannerState.phase === 'blocked' && (
                     <>
                       <Ionicons name="alert-circle" size={36} color="#ef4444" />
                       <Text style={[styles.scannerStatusText, { color: '#ef4444' }]}>{t.scannerBlocked}</Text>
-                      <Text style={styles.scannerHintText}>{t.scannerAdjustPosition}</Text>
+                      <Text style={styles.scannerHintText}>
+                        {jumpCamera.scannerState.warningMessage || t.scannerAdjustPosition}
+                      </Text>
                       <TouchableOpacity 
                         style={styles.scannerRetryButton}
                         onPress={jumpCamera.retryCalibration}
@@ -1108,7 +1138,7 @@ function JumpCameraContent() {
                 </View>
                 
                 {/* Confidence score display */}
-                {jumpCamera.scannerState.confidenceScore > 0 && (
+                {jumpCamera.scannerState.confidenceScore > 0 && jumpCamera.scannerState.phase !== 'ready' && (
                   <View style={styles.scannerScoreContainer}>
                     <Text style={[
                       styles.scannerScoreText,
@@ -1126,7 +1156,7 @@ function JumpCameraContent() {
                 )}
                 
                 {/* Warning message */}
-                {jumpCamera.scannerState.warningMessage && (
+                {jumpCamera.scannerState.warningMessage && jumpCamera.scannerState.phase !== 'ready' && jumpCamera.scannerState.phase !== 'blocked' && (
                   <View style={styles.scannerWarning}>
                     <Text style={styles.scannerWarningText}>{jumpCamera.scannerState.warningMessage}</Text>
                   </View>

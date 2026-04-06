@@ -25,6 +25,7 @@ import {
   JumpFrameData,
   GroundCalibration,
   JumpPoseLandmarks,
+  OrientationResult,
   JUMP_DETECTION_CONFIG,
 } from './types';
 
@@ -40,6 +41,7 @@ const {
   MIN_LANDMARK_CONFIDENCE,
   COUNTERMOVEMENT_THRESHOLD,
   SMOOTHING_WINDOW,
+  ORIENTATION_MIN_WIDTH,
 } = JUMP_DETECTION_CONFIG;
 
 // ============================================================
@@ -656,7 +658,44 @@ export function extractJumpLandmarks(
     rightAnkle: findLandmark('right_ankle'),
     leftHip: findLandmark('left_hip'),
     rightHip: findLandmark('right_hip'),
+    leftShoulder: findLandmark('left_shoulder'),
+    rightShoulder: findLandmark('right_shoulder'),
+    leftKnee: findLandmark('left_knee'),
+    rightKnee: findLandmark('right_knee'),
   };
+}
+
+/**
+ * Check athlete orientation (frontal vs lateral)
+ * Returns whether the athlete is facing the camera (valid) or sideways (invalid).
+ * Uses horizontal distance between paired landmarks as proxy.
+ */
+export function checkAthleteOrientation(
+  landmarks: JumpPoseLandmarks
+): OrientationResult {
+  const { leftShoulder, rightShoulder, leftHip, rightHip } = landmarks;
+
+  // If key landmarks not detected, don't block (graceful degradation)
+  if (!leftShoulder || !rightShoulder || !leftHip || !rightHip) {
+    return { isValid: true, shoulderWidth: 0, hipWidth: 0, message: null };
+  }
+
+  const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
+  const hipWidth = Math.abs(leftHip.x - rightHip.x);
+
+  // Both widths below threshold → athlete is likely sideways
+  if (shoulderWidth < ORIENTATION_MIN_WIDTH && hipWidth < ORIENTATION_MIN_WIDTH) {
+    console.log('[JUMP_DETECTOR] Orientation INVALID: shoulderW=' + shoulderWidth.toFixed(4) +
+      ' hipW=' + hipWidth.toFixed(4) + ' threshold=' + ORIENTATION_MIN_WIDTH);
+    return {
+      isValid: false,
+      shoulderWidth,
+      hipWidth,
+      message: 'Ajuste sua posicao: fique de frente para a camera',
+    };
+  }
+
+  return { isValid: true, shoulderWidth, hipWidth, message: null };
 }
 
 /**

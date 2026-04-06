@@ -1,144 +1,96 @@
-# Load Manager Pro - PRD
+# Load Manager Pro — PRD
 
-## Problema Original
-Aplicacao full-stack React Native (Expo SDK 54) + FastAPI para monitoramento esportivo VBT e analise de saltos.
+## Produto
+App de monitoramento de carga atletica com camera inteligente para avaliacao de saltos (CMJ, SL-CMJ) e VBT.
 
-## Protocolos Ativos
-- CMJ (Counter Movement Jump)
-- SL-CMJ Right / Left (Single Leg CMJ)
+## Stack
+- **Frontend**: React Native Expo (TypeScript)
+- **Backend**: FastAPI (Python)
+- **DB**: MongoDB
+- **Camera**: MediaPipe Pose Tasks (iOS nativo)
 
-## Formula Padrao Unica
-RSImod = jumpHeight(m) / time_to_takeoff(s)
-- jumpHeight = (g * flight_time^2) / 8
-- time_to_takeoff = t_takeoff - t_movement_start
+## Arquitetura do Jump Camera Pipeline
+```
+Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
+→ handleMediapipeLandmark(event, nativeTimestamp)
+→ convertMediapipeLandmarks → keypoints[]
+→ processFrame(keypoints, nativeTimestamp)
+  ├─ Scanning: orientation check + calibration frames
+  ├─ Countdown: continue collecting calibration
+  ├─ Recording: jump detection frames
+  └─ Processing: analyzeJumpFrames()
+→ OverlayLayer (visual only, isolated)
+```
 
 ## Implementado
 
-### Sessao 02/Abril/2026
-1. Precisao Temporal: Date.now() -> performance.now() monotonico no pipeline
-2. Frame Drop Detection: FrameIntegrityMonitor com protecao no VBT e Jump
-3. Unificacao RSI -> RSImod (formula unica em todo o sistema)
-4. Remocao completa de Drop Jump (DJ): enum, funcoes, UI, endpoints, analises
+### Session 1-2 (antes)
+- [x] Pipeline completo Jump Camera com MediaPipe
+- [x] Pre-Jump Scanner 3 fases (collect + analyze + decision)
+- [x] Flight time com compensacao de latencia
+- [x] MIN_LANDING_FRAMES=2 simetrico
+- [x] RSImod classificacao cientifica (CMJ thresholds)
+- [x] Backend reclassificacao on-the-fly
+- [x] ScientificAnalysisTab com tooltips
 
-### Sessao 03-04/Abril/2026
-5. Reintegracao MediaPipe — Expo Local Module
-   - Modulo nativo: modules/mediapipe-pose/
-   - iOS: AVCaptureSession + MediaPipe Tasks Vision (Swift, LIVE_STREAM)
-   - Android: CameraX + MediaPipe Tasks Vision (Kotlin, VIDEO)
-   - TypeScript: Types, View wrapper, NATIVE_POSE_AVAILABLE flag
+### Session 3 (2026-02-XX)
+- [x] Auditoria tecnica completa do Jump Camera (7 secoes)
 
-6. iOS XCFramework Vendored
-   - MediaPipeTasksVision + MediaPipeCommonGraphLibraries vendored (bypass CocoaPods)
-   - import direto (sem #if canImport)
-   - Podspec: vendored_frameworks + static_framework + linker flags
+### Session 4 (2026-04-06) — P0 + P1
+- [x] **P0.1 — Validacao de Orientacao**: `checkAthleteOrientation()` em jumpDetector.ts
+  - Captura coordenadas X de ombros e quadril
+  - Threshold `ORIENTATION_MIN_WIDTH: 0.06`
+  - Tracking durante scanning (visual feedback)
+  - Bloqueio apenas no ponto de decisao (nao durante ajuste)
+  - >= 0.80 + orientacao invalida → bloqueia
+  - 0.65-0.79 + confirmContinue verifica orientacao
+- [x] **P0.2 — Timestamp Nativo**: Propagacao do timestamp do MediaPipe
+  - handleMediapipeLandmark(event, nativeTimestamp?)
+  - processFrame(keypoints, nativeTimestamp?)
+  - getFrameTimestamp(nativeTimestamp) usa nativo quando disponivel
+- [x] **P1.1 — OverlayLayer**: Componente visual isolado
+  - /components/jump/OverlayLayer.tsx
+  - pointerEvents="none", nunca altera logica
+  - onLayout para medir dimensoes do container
+- [x] **P1.2 — Scanner Visual Animado**:
+  - Scan line animada (top→bottom loop, 2s)
+  - Linha do solo com animacao pulse
+  - Pontos nos pes (12px, cor por qualidade)
+  - Skeleton leve (8 conexoes, ~45% opacidade, sem maos/face)
+  - Dots nas articulacoes (8px)
+  - Banner de orientacao invalida
+- [x] **P1.3/P1.4 — Fluxo de Confianca Controlado**:
+  - >= 80% + orientacao OK → auto-start
+  - 65-79% → fase 'ready', botao "Continuar mesmo assim" apos 500ms estavel
+  - < 65% → retry automatico (2x) ou bloqueio
+  - confirmContinue() verifica orientacao antes de prosseguir
+- [x] **Performance**: Overlay throttled a ~15fps (cada 2 frames)
 
-7. Fix Fabric/New Architecture compatibility
-   - requireOptionalNativeModule + requireNativeViewManager (expo-modules-core)
+## Arquivos Modificados/Criados (Session 4)
+- `services/jump/types.ts` — JumpPoseLandmarks + OrientationResult + ORIENTATION_MIN_WIDTH
+- `services/jump/jumpDetector.ts` — checkAthleteOrientation + shoulders/knees
+- `services/jump/useJumpCamera.ts` — timestamp, orientacao, confirmContinue, showContinueButton
+- `app/athlete/[id]/jump-camera.tsx` — OverlayLayer, timestamp, overlay keypoints, scanner 'ready'
+- `components/jump/OverlayLayer.tsx` — NOVO componente visual isolado
 
-8. Fix NSLog → os_log (privacy: .public)
-   - Logger(subsystem: "com.loadmanagerpro.mediapipe", category: "pose/view")
-
-9. Fix crash no deinit da MediaPipePoseView
-   - Causa: stopSession() com [weak self] no async dispatch — self nil apos dealloc
-   - Fix: videoOutput.setSampleBufferDelegate(nil) imediato + referencias locais strong
-   - Resultado: ZERO crashes em device real
-
-### MARCO: Pipeline End-to-End Funcional (04/Abril/2026)
-- Camera → MediaPipe → 33 Landmarks → JS → JumpDetector/VBT → Resultados
-- Jump Camera: tempo de voo registrado, graficos funcionais
-- VBT Camera: repeticoes salvas com velocidade m/s
-- Testado em iPhone 16 Pro Max via TestFlight
-- Zero crashes ao iniciar/parar gravacao
-
-### Sessao 06/Abril/2026 — Correcao Classificacao RSImod (Backend + Frontend)
-15. Backend: RSI_REFERENCES atualizado para thresholds CMJ-specific
-    - Antigo: excellent>=2.8, very_good>=2.4, good>=2.0, average>=1.5, below_average>=1.0, poor<1.0
-    - Novo: excellent>=1.00, very_good>=0.80, good>=0.60, moderate>=0.40, low>=0.25, very_low<0.25
-    - Baseado em: McMahon et al. (2018), Comfort et al. (2015), McGuigan (2017)
-
-16. Backend: Reclassificacao on-the-fly em GET endpoints
-    - GET /jump/assessments/{id}: reclassifica RSI pelo valor numerico
-    - GET /jump/analysis/{id}: reclassifica latest RSI pelo valor numerico
-    - GET perfil atleta: reclassifica RSI pelo valor numerico
-    - Recomendacoes atualizadas para thresholds CMJ (0.40, 0.60)
-
-17. Frontend: Modulo reutilizavel classifyRSImod()
-    - Arquivo: services/jump/rsimodClassification.ts
-    - Funcoes: classifyRSImod, getRSImodColor, getRSImodLabel, getRSImodRanges
-    - Tooltip content e detailed scientific view incluidos
-
-18. Frontend: RSIGauge atualizado (jump-assessment.tsx)
-    - Usa classifyRSImod baseado no VALOR numerico (nao classificacao do backend)
-    - Tooltip com tabela de classificacao
-    - Gradiente do gauge atualizado para 6 niveis
-
-19. Frontend: ScientificAnalysisTab atualizado
-    - Usa classifyRSImod para cor e label
-    - Tooltip com classificacao pratica
-    - Link "Ver detalhes cientificos" com view expandida
-    - Conteudo: explicacao RSImod, interpretacao, tabela, referencias, observacao
-10. Simetria de Eventos (Parte 1.1)
-    - MIN_LANDING_FRAMES = 2 (simetrico com MIN_TAKEOFF_FRAMES = 2)
-    - Landing agora exige 2 frames consecutivos confirmando contato
-    - Timestamp do landing = primeiro frame da sequencia confirmada
-
-11. Compensacao de Latencia (Parte 1.2)
-    - takeoffFrameIdx compensado: max(0, idx - 1)
-    - landingFrameIdx compensado: min(totalFrames - 1, idx + 1)
-    - Aplicado APOS confirmacao do evento e validacao de limites
-
-12. Threshold Adaptativo com Clamp (Parte 2)
-    - Substituido max(0.025, stdDev * 2.5) por clamp(stdDev * 1.5, 0.008, 0.02)
-    - Zona morta reduzida de 2.5% para max 2% da tela
-    - Minimo 0.8% para manter robustez contra ruido
-
-13. Consistencia de Landmarks (Parte 4)
-    - Landmark travado no inicio da calibracao (foot_index OU ankle)
-    - Sem alternancia durante o salto (elimina inconsistencia de referencia)
-
-14. Scanner de Calibracao (Parte 5)
-    - Nova fase 'scanning' antes do countdown
-    - Fase 1 (0-3s): Coleta de dados de calibracao
-    - Fase 2 (3-5s): Analise de estabilidade + calculo de confidenceScore
-    - Score = foot_stability*0.5 + pose_confidence*0.3 + ground_stability*0.2
-    - Thresholds: >= 0.80 auto-start, 0.65-0.80 aviso, < 0.65 bloqueio
-    - Auto-retry ate 2x, depois botao manual "Recalibrar"
-    - Overlay visual: linha do solo, barra de progresso, cores (verde/amarelo/vermelho)
-
-## Estado Atual
-- Build iOS: FUNCIONAL em device real via TestFlight
-- Build Android: Aguardando teste
-- Motor de Pose: REAL (MediaPipe Tasks Vision 0.10.21)
-- Jump Camera: Funcional com correcoes de timing v2 (scanner + compensacao)
-- VBT Camera: Funcional (skeleto nao renderizado, apenas pontos verdes)
-- Protocolos: CMJ + SL-CMJ
-- RSImod: Formula unica validada
-- Deploy Web: requirements.txt limpo (41 pacotes vs 140)
-
-## Backlog
-### P0
-- [x] Reintegracao segura da visao computacional (MediaPipe)
-- [x] iOS XCFramework vendored
-- [x] Fix Fabric/New Architecture compatibility
-- [x] Fix crash deinit
-- [x] Pipeline end-to-end funcional
-- [x] Correcao de timing Jump Camera v2 (Partes 1-5)
-- [ ] Validacao de precisao em device real (usuario testar com salto conhecido)
-- [ ] Validacao EAS Build Android
+## Pendente / Backlog
 
 ### P1
-- [ ] Renderizacao de skeleto no VBT (atualmente so pontos verdes)
-- [ ] Nova UI moderna para telas VBT e Jump Camera (design pronto)
-- [ ] Redesign Navegacao "Activity Hub" (selecionar atividade → depois atleta)
-- [ ] Menu dedicado VBT
-- [ ] Estabilidade: testes extensivos de crash em multiplas sessoes
+- [ ] Nova UI moderna para VBT e Jump Camera (design do usuario)
+- [ ] Skeleton completo no VBT camera
+- [ ] Redesign navegacao "Activity Hub" (Atividade → Atleta)
 
 ### P2
-- [ ] Importacao dados via PDF (PDF → CSV)
-- [ ] Exportacao dados para CSV
-- [ ] Detalhe no PDF Export (aguardando especificacao)
-- [ ] UI merge de perfis duplicados de atletas
+- [ ] Importacao de dados via PDF (PDF → CSV)
+- [ ] Exportacao de dados para CSV
+- [ ] UI para merge de perfis duplicados
+- [ ] Detalhe no PDF Export
+
+### P3
 - [ ] i18n de ScientificAnalysisTab e Avaliacoes
-- [ ] Refatoracao trackingProtection.ts
-- [ ] Remocao de codigo legacy VBT
+- [ ] Refatoracao trackingProtection.ts (codigo legacy VBT)
 - [ ] Gate de logs com __DEV__
+
+## Credenciais
+- User: contato@loadmanagerpro.com.br
+- Password: #UAE2026
