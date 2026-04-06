@@ -18,6 +18,7 @@ import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import api from '../services/api';
 import { colors } from '../constants/theme';
+import { classifyRSImod, getRSImodColor, getRSImodLabel, getRSImodTooltipContent, getRSImodDetailContent } from '../services/jump/rsimodClassification';
 import { useLanguage } from '../contexts/LanguageContext';
 import { ACWREvolutionChart } from './ACWREvolutionChart';
 import { FadeInView, ChartEntryView, SkeletonDashboard, AnimatedMetric } from './animations';
@@ -501,6 +502,18 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
     return map[cls] || '#8b5cf6';
   };
 
+  // RSImod classification based on numeric value (overrides backend classification)
+  const rsiValue = m?.rsi || 0;
+  const rsiCls = classifyRSImod(rsiValue);
+  const rsiClsColor = rsiCls.color;
+  const rsiClsLabel = locale === 'pt' ? rsiCls.labelPt : rsiCls.labelEn;
+
+  // RSImod tooltip + detail states
+  const [showRsiTooltip, setShowRsiTooltip] = useState(false);
+  const [showRsiDetail, setShowRsiDetail] = useState(false);
+  const rsiTooltipLines = getRSImodTooltipContent(locale);
+  const rsiDetailContent = getRSImodDetailContent(locale);
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
@@ -602,14 +615,50 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
 
       {!pLoading && m && (
         <>
-          {/* RSI Value + Classification */}
+          {/* RSI Value + Classification (using classifyRSImod based on value, not backend classification) */}
           <View style={{ alignItems: 'center', marginBottom: 10, paddingVertical: 8, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 10 }}>
-            <Text style={{ fontSize: 10, color: colors.text.tertiary, textTransform: 'uppercase' as const, letterSpacing: 1 }}>{metricLabel}</Text>
-            <Text style={{ fontSize: 36, fontWeight: 'bold', color: rsiColor(m.rsi_classification) }}>{(m.rsi || 0).toFixed(2)}</Text>
-            <Text style={{ fontSize: 12, color: rsiColor(m.rsi_classification), fontWeight: '600' }}>
-              {m.rsi_classification?.replace(/_/g, ' ').toUpperCase()}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ fontSize: 10, color: colors.text.tertiary, textTransform: 'uppercase' as const, letterSpacing: 1 }}>{metricLabel}</Text>
+              <TouchableOpacity onPress={() => setShowRsiTooltip(!showRsiTooltip)} data-testid="sci-rsi-tooltip-btn">
+                <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.35)" />
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 36, fontWeight: 'bold', color: rsiClsColor }}>{rsiValue.toFixed(2)}</Text>
+            <Text style={{ fontSize: 12, color: rsiClsColor, fontWeight: '600' }}>
+              {rsiClsLabel.toUpperCase()}
             </Text>
+            {/* Tooltip */}
+            {showRsiTooltip && (
+              <View style={{ backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: 12, marginTop: 8, width: '100%' }} data-testid="sci-rsi-tooltip">
+                {rsiTooltipLines.map((line, i) => (
+                  <Text key={i} style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 16, ...(i === 0 ? { fontWeight: '700' as const, marginBottom: 4 } : {}) }}>{line}</Text>
+                ))}
+                <TouchableOpacity onPress={() => { setShowRsiTooltip(false); setShowRsiDetail(true); }} style={{ marginTop: 8 }} data-testid="sci-rsi-detail-btn">
+                  <Text style={{ fontSize: 11, color: colors.accent.primary, fontWeight: '600' }}>
+                    {locale === 'pt' ? 'Ver detalhes cientificos' : 'View scientific details'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
+
+          {/* RSImod Detailed View */}
+          {showRsiDetail && (
+            <View style={{ backgroundColor: colors.dark.card, borderRadius: 12, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }} data-testid="sci-rsi-detail-view">
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text.primary }}>{rsiDetailContent.title}</Text>
+                <TouchableOpacity onPress={() => setShowRsiDetail(false)} data-testid="sci-rsi-detail-close">
+                  <Ionicons name="close-circle" size={22} color="rgba(255,255,255,0.4)" />
+                </TouchableOpacity>
+              </View>
+              {rsiDetailContent.sections.map((section, i) => (
+                <View key={i} style={{ marginBottom: 12 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: colors.accent.primary, marginBottom: 4 }}>{section.heading}</Text>
+                  <Text style={{ fontSize: 11, color: colors.text.secondary, lineHeight: 18 }}>{section.body}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {/* Metrics Grid */}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>

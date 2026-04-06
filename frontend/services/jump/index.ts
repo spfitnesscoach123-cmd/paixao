@@ -13,3 +13,4 @@
 export * from './types';
 export * from './jumpDetector';
 export * from './useJumpCamera';
+export * from './rsimodClassification';

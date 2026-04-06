@@ -5100,13 +5100,18 @@ class JumpAssessment(BaseModel):
         json_encoders = {ObjectId: str}
 
 # RSI Reference Values (based on sports science literature)
+# RSImod Classification (CMJ-specific)
+# Based on: McMahon et al. (2018), Comfort et al. (2015), McGuigan (2017)
+# NOTE: These are RSImod thresholds (CMJ), NOT classic RSI (drop jump).
+# Classic RSI uses contact_time and ranges 1.0-3.0+.
+# RSImod uses time-to-takeoff and ranges 0.1-1.2+.
 RSI_REFERENCES = {
-    "excellent": {"min": 2.8, "label_pt": "Excelente", "label_en": "Excellent"},
-    "very_good": {"min": 2.4, "label_pt": "Muito Bom", "label_en": "Very Good"},
-    "good": {"min": 2.0, "label_pt": "Bom", "label_en": "Good"},
-    "average": {"min": 1.5, "label_pt": "Médio", "label_en": "Average"},
-    "below_average": {"min": 1.0, "label_pt": "Abaixo da Média", "label_en": "Below Average"},
-    "poor": {"min": 0, "label_pt": "Fraco", "label_en": "Poor"}
+    "excellent": {"min": 1.00, "label_pt": "Excelente", "label_en": "Excellent"},
+    "very_good": {"min": 0.80, "label_pt": "Muito Bom", "label_en": "Very Good"},
+    "good": {"min": 0.60, "label_pt": "Bom", "label_en": "Good"},
+    "moderate": {"min": 0.40, "label_pt": "Moderado", "label_en": "Moderate"},
+    "low": {"min": 0.25, "label_pt": "Baixo", "label_en": "Low"},
+    "very_low": {"min": 0, "label_pt": "Muito Baixo", "label_en": "Very Low"}
 }
 
 # Fatigue Index based on RSI variation (CNS Fatigue Detection)
@@ -5174,11 +5179,11 @@ def calculate_peak_velocity(jump_height_cm: float) -> float:
     return round(velocity, 2)
 
 def classify_rsi(rsi: float) -> str:
-    """Classify RSI based on reference values"""
+    """Classify RSImod based on CMJ-specific reference values (McMahon et al., 2018)"""
     for classification, values in RSI_REFERENCES.items():
         if rsi >= values["min"]:
             return classification
-    return "poor"
+    return "very_low"
 
 def get_fatigue_status(rsi_variation_percent: float) -> dict:
     """Get fatigue status based on RSI variation from baseline"""
@@ -5396,6 +5401,10 @@ async def get_jump_assessments(
     
     for a in assessments:
         a["_id"] = str(a["_id"])
+        # Re-classify RSImod using current CMJ-specific thresholds
+        # (fixes legacy assessments stored with old drop-jump thresholds)
+        if a.get("rsi") is not None:
+            a["rsi_classification"] = classify_rsi(a["rsi"])
     
     return assessments
 
@@ -5477,7 +5486,7 @@ async def get_jump_analysis(
                 "time_to_takeoff_ms": latest_cmj.get("time_to_takeoff_ms"),
                 "rsi": latest_cmj.get("rsi"),
                 "rsi_modified": latest_cmj.get("rsi_modified"),
-                "rsi_classification": latest_cmj.get("rsi_classification"),
+                "rsi_classification": classify_rsi(latest_cmj.get("rsi", 0)),
                 "peak_power_w": latest_cmj.get("peak_power_w"),
                 "peak_velocity_ms": latest_cmj.get("peak_velocity_ms"),
                 "relative_power_wkg": latest_cmj.get("relative_power_wkg")
@@ -5717,18 +5726,18 @@ def generate_jump_recommendations(analysis: dict, lang: str) -> List[str]:
     if cmj_data:
         latest = cmj_data.get("latest", {})
         rsi = latest.get("rsi", 0)
-        rsi_class = latest.get("rsi_classification", "")
+        rsi_class = classify_rsi(rsi)
         
-        if rsi < 1.0:
+        if rsi < 0.40:
             if lang == "pt":
-                recommendations.append("⚠️ RSI muito baixo (<1.0). Evitar: exercícios explosivos, COD (mudanças de direção), pliométricos com ênfase concêntrica, sprints e trabalhos de velocidade máxima.")
+                recommendations.append("RSImod muito baixo (<0.40). Focar em desenvolvimento de forca base e potencia. Limitar exercicios explosivos de alta intensidade.")
             else:
-                recommendations.append("⚠️ Very low RSI (<1.0). Avoid: explosive exercises, COD, concentric-emphasis plyometrics, sprints and max velocity work.")
-        elif rsi < 1.5:
+                recommendations.append("Very low RSImod (<0.40). Focus on base strength and power development. Limit high-intensity explosive exercises.")
+        elif rsi < 0.60:
             if lang == "pt":
-                recommendations.append("RSI abaixo da média. Limitar volume de exercícios de alta intensidade e focar em força base.")
+                recommendations.append("RSImod moderado. Continuar desenvolvendo capacidade de producao rapida de forca com pliometricos progressivos.")
             else:
-                recommendations.append("Below average RSI. Limit high-intensity exercise volume and focus on base strength.")
+                recommendations.append("Moderate RSImod. Continue developing rapid force production capacity with progressive plyometrics.")
     
     # Fatigue-based recommendations
     fatigue = analysis.get("fatigue_analysis", {})
@@ -5851,7 +5860,7 @@ async def get_jump_protocol_analysis(
         "time_to_takeoff_ms": selected.get("time_to_takeoff_ms"),
         "rsi": selected.get("rsi"),
         "rsi_modified": selected.get("rsi_modified"),
-        "rsi_classification": selected.get("rsi_classification", classify_rsi(current_metric_value)),
+        "rsi_classification": classify_rsi(selected.get("rsi", 0)),
         "peak_power_w": selected.get("peak_power_w"),
         "peak_velocity_ms": selected.get("peak_velocity_ms"),
         "relative_power_wkg": selected.get("relative_power_wkg"),
@@ -6520,7 +6529,7 @@ async def get_scientific_analysis(
                     "flight_time_ms": latest.get("flight_time_ms", 0),
                     "contact_time_ms": latest.get("contact_time_ms", 0),
                     "rsi": round(latest.get("rsi", 0), 2),
-                    "rsi_classification": latest.get("rsi_classification", ""),
+                    "rsi_classification": classify_rsi(round(latest.get("rsi", 0), 2)),
                     "peak_power_w": round(latest.get("peak_power_w", 0), 0),
                     "peak_velocity_ms": round(latest.get("peak_velocity_ms", 0), 2),
                     "relative_power_wkg": round(latest.get("relative_power_wkg", 0), 1),

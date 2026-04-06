@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/core';
 import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { classifyRSImod, getRSImodColor, getRSImodLabel, getRSImodTooltipContent, getRSImodDetailContent, getRSImodRanges } from '../../../services/jump/rsimodClassification';
 import PremiumGate from '../../../components/PremiumGate';
 import { format } from 'date-fns';
 
@@ -65,8 +66,8 @@ const AnimatedNumber = ({ value, decimals = 1, suffix = '', style }: { value: nu
   return <Text style={style}>{display}{suffix}</Text>;
 };
 
-// ---- RSI Gauge Component (Modernized) ----
-const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; classification: string; protocol: string; locale: string }) => {
+// ---- RSI Gauge Component (Modernized with RSImod classification) ----
+const RSIGauge = ({ rsi, protocol, locale }: { rsi: number; protocol: string; locale: string }) => {
   const chartW = Math.min(screenWidth - 48, 320);
   const chartH = 160;
   const cx = chartW / 2;
@@ -78,28 +79,12 @@ const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; clas
   const metricLabel = 'RSImod';
   const maxVal = 1.5;
 
-  const getColor = (cls: string) => {
-    const map: Record<string, string> = {
-      excellent: '#22c55e', very_good: '#10b981', good: '#84cc16',
-      average: '#f59e0b', below_average: '#f97316', poor: '#ef4444',
-    };
-    return map[cls] || '#8b5cf6';
-  };
-
-  const getLabel = (cls: string) => {
-    const labels: Record<string, { pt: string; en: string }> = {
-      excellent: { pt: 'Excelente', en: 'Excellent' },
-      very_good: { pt: 'Muito Bom', en: 'Very Good' },
-      good: { pt: 'Bom', en: 'Good' },
-      average: { pt: 'Medio', en: 'Average' },
-      below_average: { pt: 'Abaixo da Media', en: 'Below Average' },
-      poor: { pt: 'Fraco', en: 'Poor' },
-    };
-    return labels[cls]?.[locale === 'pt' ? 'pt' : 'en'] || cls;
-  };
+  // Use classifyRSImod based on the numeric VALUE (ignores backend classification)
+  const cls = classifyRSImod(rsi);
+  const color = cls.color;
+  const label = locale === 'pt' ? cls.labelPt : cls.labelEn;
 
   const normalized = Math.min(Math.max(rsi / maxVal, 0), 1);
-  const color = getColor(classification);
 
   // Arc path helpers
   const arcPoint = (angle: number, r: number) => ({
@@ -119,16 +104,35 @@ const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; clas
   // Tick marks
   const ticks = [0.2, 0.4, 0.6, 0.8, 1.0, 1.2];
 
+  // Tooltip state
+  const [showTooltip, setShowTooltip] = React.useState(false);
+  const tooltipLines = getRSImodTooltipContent(locale);
+
   return (
     <View style={s.gaugeCard} data-testid="rsi-gauge">
-      <Text style={s.gaugeLabel}>{metricLabel}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text style={s.gaugeLabel}>{metricLabel}</Text>
+        <TouchableOpacity onPress={() => setShowTooltip(!showTooltip)} data-testid="rsi-tooltip-btn">
+          <Ionicons name="information-circle-outline" size={16} color="rgba(255,255,255,0.4)" />
+        </TouchableOpacity>
+      </View>
+      {/* Tooltip */}
+      {showTooltip && (
+        <View style={s.rsiTooltip} data-testid="rsi-tooltip">
+          {tooltipLines.map((line, i) => (
+            <Text key={i} style={[s.rsiTooltipText, i === 0 && { fontWeight: '700', marginBottom: 4 }]}>{line}</Text>
+          ))}
+        </View>
+      )}
       <Svg width={chartW} height={chartH}>
         <Defs>
           <SvgLinearGradient id="gaugeGrad" x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor="#ef4444" />
-            <Stop offset="0.35" stopColor="#f59e0b" />
+            <Stop offset="0.25" stopColor="#f97316" />
+            <Stop offset="0.45" stopColor="#eab308" />
             <Stop offset="0.65" stopColor="#84cc16" />
-            <Stop offset="1" stopColor="#22c55e" />
+            <Stop offset="0.85" stopColor="#22c55e" />
+            <Stop offset="1" stopColor="#15803d" />
           </SvgLinearGradient>
         </Defs>
         {/* Background arc */}
@@ -165,7 +169,7 @@ const RSIGauge = ({ rsi, classification, protocol, locale }: { rsi: number; clas
         <Circle cx={cx} cy={cy} r="3" fill="#0a0e1a" />
         {/* Value text */}
         <SvgText x={cx} y={cy - 25} textAnchor="middle" fill={color} fontSize="36" fontWeight="bold">{rsi.toFixed(2)}</SvgText>
-        <SvgText x={cx} y={cy - 8} textAnchor="middle" fill={color} fontSize="13" fontWeight="600">{getLabel(classification)}</SvgText>
+        <SvgText x={cx} y={cy - 8} textAnchor="middle" fill={color} fontSize="13" fontWeight="600">{label}</SvgText>
       </Svg>
     </View>
   );
@@ -715,7 +719,6 @@ function JumpAssessmentContent() {
             {/* RSI Gauge */}
             <RSIGauge
               rsi={metrics.rsi || 0}
-              classification={metrics.rsi_classification || 'poor'}
               protocol={selectedProtocol}
               locale={locale}
             />
@@ -901,6 +904,10 @@ const s = StyleSheet.create({
   // Gauge
   gaugeCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, alignItems: 'center' },
   gaugeLabel: { fontSize: 12, fontWeight: '600', color: colors.text.secondary, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 },
+
+  // RSI Tooltip
+  rsiTooltip: { backgroundColor: 'rgba(0,0,0,0.85)', borderRadius: 10, padding: 12, marginBottom: 8, width: '100%' },
+  rsiTooltipText: { fontSize: 11, color: 'rgba(255,255,255,0.8)', lineHeight: 16 },
 
   // Fatigue metrics
   fatigueMetricsRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },

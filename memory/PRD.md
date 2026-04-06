@@ -50,7 +50,33 @@ RSImod = jumpHeight(m) / time_to_takeoff(s)
 - Testado em iPhone 16 Pro Max via TestFlight
 - Zero crashes ao iniciar/parar gravacao
 
-### Sessao 05/Abril/2026 — Correcao Timing Jump Camera v2
+### Sessao 06/Abril/2026 — Correcao Classificacao RSImod (Backend + Frontend)
+15. Backend: RSI_REFERENCES atualizado para thresholds CMJ-specific
+    - Antigo: excellent>=2.8, very_good>=2.4, good>=2.0, average>=1.5, below_average>=1.0, poor<1.0
+    - Novo: excellent>=1.00, very_good>=0.80, good>=0.60, moderate>=0.40, low>=0.25, very_low<0.25
+    - Baseado em: McMahon et al. (2018), Comfort et al. (2015), McGuigan (2017)
+
+16. Backend: Reclassificacao on-the-fly em GET endpoints
+    - GET /jump/assessments/{id}: reclassifica RSI pelo valor numerico
+    - GET /jump/analysis/{id}: reclassifica latest RSI pelo valor numerico
+    - GET perfil atleta: reclassifica RSI pelo valor numerico
+    - Recomendacoes atualizadas para thresholds CMJ (0.40, 0.60)
+
+17. Frontend: Modulo reutilizavel classifyRSImod()
+    - Arquivo: services/jump/rsimodClassification.ts
+    - Funcoes: classifyRSImod, getRSImodColor, getRSImodLabel, getRSImodRanges
+    - Tooltip content e detailed scientific view incluidos
+
+18. Frontend: RSIGauge atualizado (jump-assessment.tsx)
+    - Usa classifyRSImod baseado no VALOR numerico (nao classificacao do backend)
+    - Tooltip com tabela de classificacao
+    - Gradiente do gauge atualizado para 6 niveis
+
+19. Frontend: ScientificAnalysisTab atualizado
+    - Usa classifyRSImod para cor e label
+    - Tooltip com classificacao pratica
+    - Link "Ver detalhes cientificos" com view expandida
+    - Conteudo: explicacao RSImod, interpretacao, tabela, referencias, observacao
 10. Simetria de Eventos (Parte 1.1)
     - MIN_LANDING_FRAMES = 2 (simetrico com MIN_TAKEOFF_FRAMES = 2)
     - Landing agora exige 2 frames consecutivos confirmando contato
