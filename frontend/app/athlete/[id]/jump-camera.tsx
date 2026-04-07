@@ -473,6 +473,18 @@ function JumpCameraContent() {
     const today = format(new Date(), 'yyyy-MM-dd');
     const assessmentDate = selectedDate || today;
     
+    // SL-CMJ: Block save if incomplete data
+    if (isSlCmj && (!jumpCamera.slCmjLeg1 || !jumpCamera.slCmjLeg2)) {
+      Alert.alert(
+        locale === 'pt' ? 'Dados Incompletos' : 'Incomplete Data',
+        locale === 'pt' 
+          ? 'Dois saltos nao foram detectados corretamente. Tente novamente.'
+          : 'Both jumps were not detected correctly. Please try again.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    
     // SL-CMJ: Save BOTH legs as separate assessments
     if (isSlCmj && jumpCamera.slCmjLeg1 && jumpCamera.slCmjLeg2) {
       try {
@@ -1522,9 +1534,9 @@ function JumpCameraContent() {
               
               {/* Action Buttons */}
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, !!jumpCamera.error && { opacity: 0.5 }]}
                 onPress={handleSaveAssessment}
-                disabled={submitMutation.isPending}
+                disabled={submitMutation.isPending || !!jumpCamera.error}
                 data-testid="save-assessment-btn"
               >
                 <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.saveButtonGradient}>

@@ -706,8 +706,17 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       // =============================================
       // LANDING-BASED AUTO-STOP
       // =============================================
-      const bothFeetAbove = frameData.leftToeY < groundCalibration.groundThreshold && 
-                            frameData.rightToeY < groundCalibration.groundThreshold;
+      // CMJ: BOTH feet above threshold = in air
+      // SL-CMJ: ANY foot above threshold = in air (single-leg)
+      let bothFeetAbove: boolean;
+      if (isSlCmj) {
+        const leftAbove = frameData.leftToeY < groundCalibration.groundThreshold;
+        const rightAbove = frameData.rightToeY < groundCalibration.groundThreshold;
+        bothFeetAbove = leftAbove || rightAbove;
+      } else {
+        bothFeetAbove = frameData.leftToeY < groundCalibration.groundThreshold && 
+                        frameData.rightToeY < groundCalibration.groundThreshold;
+      }
       
       if (takeoffTimeRef.current !== null && !bothFeetAbove) {
         // Feet back on ground after takeoff = potential landing
@@ -777,6 +786,17 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       const maxDuration = isSlCmj ? MAX_RECORDING_DURATION_SLCMJ_MS : MAX_RECORDING_DURATION_MS;
       if (recordingStartTimeRef.current && 
           timestamp - recordingStartTimeRef.current > maxDuration) {
+        // SL-CMJ: provide specific error feedback based on which jump failed
+        if (isSlCmj) {
+          const currentSlState = slcmjRecordingStateRef.current;
+          if (currentSlState === 'waiting_first') {
+            console.log('[JUMP_CAMERA_HOOK] SL-CMJ fallback: first jump never detected');
+            setError('Salto nao detectado. Ajuste a posicao e tente novamente.');
+          } else if (currentSlState === 'first_detected' || currentSlState === 'waiting_second') {
+            console.log('[JUMP_CAMERA_HOOK] SL-CMJ fallback: second jump never detected');
+            setError('Segundo salto nao detectado. Tente novamente.');
+          }
+        }
         console.log('[JUMP_CAMERA_HOOK] Fallback auto-stop: max recording duration reached (' + maxDuration + 'ms)');
         stopRecording();
       }
@@ -789,8 +809,17 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const updateLiveMetrics = useCallback((frame: JumpFrameData, timestamp: number) => {
     if (!groundCalibration.isCalibrated) return;
     
-    const feetAboveGround = frame.leftToeY < groundCalibration.groundThreshold && 
-                            frame.rightToeY < groundCalibration.groundThreshold;
+    // CMJ: BOTH feet must be above threshold
+    // SL-CMJ: ANY foot above threshold (single-leg jump)
+    let feetAboveGround: boolean;
+    if (isSlCmj) {
+      const leftAbove = frame.leftToeY < groundCalibration.groundThreshold;
+      const rightAbove = frame.rightToeY < groundCalibration.groundThreshold;
+      feetAboveGround = leftAbove || rightAbove;
+    } else {
+      feetAboveGround = frame.leftToeY < groundCalibration.groundThreshold && 
+                         frame.rightToeY < groundCalibration.groundThreshold;
+    }
     
     const hipDelta = frame.hipCenterY - groundCalibration.standingHipY;
     
@@ -827,7 +856,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       contactTimeMs: 0,
       jumpDetected,
     });
-  }, [groundCalibration]);
+  }, [groundCalibration, isSlCmj]);
 
   /**
    * Start second jump for SL-CMJ sequence
