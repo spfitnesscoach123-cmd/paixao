@@ -63,6 +63,7 @@ import {
 } from '../../../services/jump/types';
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
 import { OverlayLayer } from '../../../components/jump/OverlayLayer';
+import { JumpGraph } from '../../../components/jump/JumpGraph';
 import { format } from 'date-fns';
 
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
@@ -130,6 +131,9 @@ function JumpCameraContent() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [firstLeg, setFirstLeg] = useState<'left' | 'right'>('right');
   
+  // Hip Y history for JumpGraph (CMJ only)
+  const hipYHistoryRef = useRef<number[]>([]);
+  
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
   
@@ -149,6 +153,17 @@ function JumpCameraContent() {
     athleteHeightCm: parseFloat(athleteHeight) || 175,
     firstLeg,
   });
+
+  // Collect hip Y data for JumpGraph during CMJ recording
+  const isCmjProtocol = selectedProtocol === 'cmj';
+  useEffect(() => {
+    if (jumpCamera.phase === 'recording' && isCmjProtocol && jumpCamera.liveMetrics.currentHipY > 0) {
+      hipYHistoryRef.current.push(jumpCamera.liveMetrics.currentHipY);
+    }
+    if (jumpCamera.phase !== 'recording') {
+      hipYHistoryRef.current = [];
+    }
+  }, [jumpCamera.phase, jumpCamera.liveMetrics.currentHipY, isCmjProtocol]);
 
   // Labels
   const t = {
@@ -1245,10 +1260,10 @@ function JumpCameraContent() {
                   />
                 </View>
                 <Text style={styles.calibrationText}>{t.calibrating}</Text>
-                {/* P1: Confidence score visible during countdown */}
+                {/* P1: Confidence score — top center, discrete */}
                 {jumpCamera.scannerState.confidenceScore > 0 && (
-                  <View style={[styles.confidenceBadge, { marginTop: 8 }]} data-testid="confidence-badge-countdown">
-                    <Text style={[styles.confidenceBadgeText, {
+                  <View style={[styles.confidenceBadgeTopCenter, { position: 'relative', marginTop: 8, alignSelf: 'center' }]} data-testid="confidence-badge-countdown">
+                    <Text style={[styles.confidenceBadgeTopText, {
                       color: jumpCamera.scannerState.confidenceScore >= 0.80 ? '#22c55e' 
                         : jumpCamera.scannerState.confidenceScore >= 0.65 ? '#eab308' : '#ef4444',
                     }]}>
@@ -1265,18 +1280,13 @@ function JumpCameraContent() {
               </View>
             )}
             
-            {/* Recording - with live metrics overlay + confidence badge */}
+            {/* Recording - clean overlay with graph (CMJ) or feedback (SL-CMJ) */}
             {jumpCamera.phase === 'recording' && (
               <View style={styles.recordingOverlay}>
-                <View style={styles.recordingBadge}>
-                  <View style={styles.recordingDot} />
-                  <Text style={styles.recordingText}>{t.jumpNow}</Text>
-                </View>
-                
-                {/* P1: Confidence score always visible */}
+                {/* Confidence badge — top center, discrete */}
                 {jumpCamera.scannerState.confidenceScore > 0 && (
-                  <View style={styles.confidenceBadge} data-testid="confidence-badge-recording">
-                    <Text style={[styles.confidenceBadgeText, {
+                  <View style={styles.confidenceBadgeTopCenter} data-testid="confidence-badge-recording">
+                    <Text style={[styles.confidenceBadgeTopText, {
                       color: jumpCamera.scannerState.confidenceScore >= 0.80 ? '#22c55e' 
                         : jumpCamera.scannerState.confidenceScore >= 0.65 ? '#eab308' : '#ef4444',
                     }]}>
@@ -1285,25 +1295,25 @@ function JumpCameraContent() {
                   </View>
                 )}
                 
-                {/* Real-time metrics overlay */}
-                <View style={styles.liveMetricsPanel} data-testid="live-metrics-panel">
-                  {jumpCamera.liveMetrics.eccentricTimeMs > 0 && (
-                    <View style={styles.liveMetricItem}>
-                      <Text style={styles.liveMetricLabel}>{t.liveEccentric}</Text>
-                      <Text style={styles.liveMetricValue}>
-                        {(jumpCamera.liveMetrics.eccentricTimeMs / 1000).toFixed(2)}s
-                      </Text>
-                    </View>
-                  )}
-                  {jumpCamera.liveMetrics.flightTimeMs > 0 && (
-                    <View style={styles.liveMetricItem}>
-                      <Text style={styles.liveMetricLabel}>{t.liveFlight}</Text>
-                      <Text style={styles.liveMetricValue}>
-                        {(jumpCamera.liveMetrics.flightTimeMs / 1000).toFixed(2)}s
-                      </Text>
-                    </View>
-                  )}
+                {/* Recording badge */}
+                <View style={styles.recordingBadge}>
+                  <View style={styles.recordingDot} />
+                  <Text style={styles.recordingText}>{t.jumpNow}</Text>
                 </View>
+                
+                {/* CMJ: Jump displacement graph */}
+                {isCmjProtocol && (
+                  <View style={styles.jumpGraphContainer} data-testid="jump-graph-overlay">
+                    <JumpGraph
+                      points={hipYHistoryRef.current}
+                      baseline={jumpCamera.groundCalibration?.standingHipY ?? 0}
+                      eccentricMs={jumpCamera.liveMetrics.eccentricTimeMs}
+                      flightMs={jumpCamera.liveMetrics.flightTimeMs}
+                      width={260}
+                      height={90}
+                    />
+                  </View>
+                )}
                 
                 {/* SL-CMJ: Real-time feedback during continuous recording */}
                 {(selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
@@ -1333,7 +1343,8 @@ function JumpCameraContent() {
                   </View>
                 )}
                 
-                {jumpCamera.activeLeg && (
+                {/* Active leg — SL-CMJ only */}
+                {jumpCamera.activeLeg && !isCmjProtocol && (
                   <Text style={styles.activeLegText}>
                     {t.activeLeg}: {jumpCamera.activeLeg === 'left' ? t.left : t.right}
                   </Text>
@@ -2305,6 +2316,26 @@ const styles = StyleSheet.create({
   confidenceBadgeText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  // Confidence badge — top center, discrete
+  confidenceBadgeTopCenter: {
+    position: 'absolute',
+    top: 8,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    zIndex: 10,
+  },
+  confidenceBadgeTopText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  // Jump graph container (CMJ recording overlay)
+  jumpGraphContainer: {
+    marginTop: 8,
+    alignItems: 'center',
   },
   // SL-CMJ leg selection
   legOption: {
