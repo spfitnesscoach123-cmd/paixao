@@ -93,13 +93,46 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
   - "Aguardando salto 2..."
   - "Salto 2 detectado / Processando..."
 
-## Arquivos Modificados/Criados (Session 5)
-- `services/jump/types.ts` — ORIENTATION_MIN_WIDTH: 0.05, constantes SL-CMJ
-- `services/frameTime.ts` — normalizeTimestamp(), integracao em getFrameTimestamp
-- `services/jump/jumpDetector.ts` — checkAthleteOrientation invertida, identifyJumpLeg()
-- `services/jump/useJumpCamera.ts` — Landing auto-stop, SL-CMJ continuous pipeline, firstLeg
-- `app/athlete/[id]/jump-camera.tsx` — Leg selection UI, confidence badge, feedback, scientific btn
-- `components/jump/OverlayLayer.tsx` — Mensagem de orientacao atualizada
+### Session 5b (2026-04-07) — VBT V2 Implementation
+- [x] **MovementDetector** (NEW): Displacement-based movement detection
+  - Direction detection via deltaY with 3-frame confirmation
+  - Min displacement threshold: 8% of screen (0.08)
+  - Direction threshold: 0.5% (0.005)
+  - Phase displacement tracking with reset between reps
+- [x] **RepDetectorV2** (NEW): Displacement-driven rep state machine
+  - Transitions driven by displacement, NOT velocity
+  - Velocity collected for metrics only, not for gating
+  - Supports eccentric-first (Squat/Bench) and concentric-first (Deadlift)
+  - Min phase displacement: 3% (0.03)
+  - Same timing guards: 150ms min phase, 300ms lockout, 10s max
+- [x] **VBTAnalyzer** (NEW): Performance analysis brain
+  - Baseline = max(first 3 reps mean velocities)
+  - Optional baseline update when faster rep detected
+  - Rep classification: FAST (>=75% baseline), NORMAL, FATIGUED (<50%)
+  - Calibration phase: first 3 reps show "CALIBRANDO..."
+  - Drop % clamped to 0 (no negative drops)
+- [x] **VelocityCalculator** (MODIFIED): Lower noise + adaptive smoothing
+  - noiseThreshold: 0.02 -> 0.005 m/s
+  - Adaptive window: 3 frames for slow (<0.1 m/s), 5 frames for fast
+- [x] **VBTGauge** (NEW): SVG circular gauge component
+  - 270-degree arc with progress (velocity/baseline)
+  - Center: rep count (large), velocity (small), drop % with trend arrow
+  - Color: green (<10%), yellow (10-20%), red (>20%), blue (calibrating)
+- [x] **UI Layout V2**: Gauge-based overlay
+  - Top-left: REPS badge, Top-right: DROP % badge
+  - Center: VBTGauge, Bottom: phase indicator
+  - Applied to both native and web/simulation camera views
+
+## New Files Created (Session 5b)
+- `services/vbt/MovementDetector.ts`
+- `services/vbt/RepDetectorV2.ts`
+- `services/vbt/VBTAnalyzer.ts`
+- `components/vbt/VBTGauge.tsx`
+
+## Files Modified (Session 5b)
+- `services/vbt/VelocityCalculator.ts` — noise threshold + adaptive smoothing
+- `services/vbt/useProtectedBarTracking.ts` — V2 module integration
+- `app/athlete/[id]/vbt-camera.tsx` — Gauge UI layout
 
 ## Pendente / Backlog
 

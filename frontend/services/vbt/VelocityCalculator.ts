@@ -50,7 +50,7 @@ const DEFAULT_CALIBRATION: VelocityCalibration = {
 
 const DEFAULT_CONFIG: VelocityCalculatorConfig = {
   smoothingWindowSize: 5,
-  noiseThresholdMs: 0.02,  // 2cm/s minimum
+  noiseThresholdMs: 0.005,  // V2: lowered from 0.02 to detect slow movements
   maxValidVelocityMs: 3.0, // 3m/s maximum
   calibration: DEFAULT_CALIBRATION,
 };
@@ -187,15 +187,24 @@ export class VelocityCalculator {
   }
 
   /**
-   * Calculate moving average of velocity buffer
+   * Calculate moving average with adaptive window.
+   * Slow movements (< 0.1 m/s) use 3-frame window for faster response.
+   * Fast movements use full window for stability.
    */
   private calculateSmoothedVelocity(): number {
     if (this.velocityBuffer.length === 0) {
       return 0;
     }
-    
-    const sum = this.velocityBuffer.reduce((acc, v) => acc + v, 0);
-    return sum / this.velocityBuffer.length;
+
+    // Adaptive window: use fewer frames for slow movements
+    const lastVel = this.velocityBuffer[this.velocityBuffer.length - 1];
+    const windowSize = lastVel < 0.1
+      ? Math.min(3, this.velocityBuffer.length)
+      : this.velocityBuffer.length;
+
+    const slice = this.velocityBuffer.slice(-windowSize);
+    const sum = slice.reduce((acc, v) => acc + v, 0);
+    return sum / slice.length;
   }
 
   /**

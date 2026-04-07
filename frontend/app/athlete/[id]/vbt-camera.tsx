@@ -40,6 +40,7 @@ import {
 } from '../../../services/pose';
 import VBTDiagnosticOverlay from '../../../components/vbt/VBTDiagnosticOverlay';
 import FatigueVisualOverlay from '../../../components/vbt/FatigueVisualOverlay';
+import { VBTGauge } from '../../../components/vbt/VBTGauge';
 
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
 // Replaces @thinksys/react-native-mediapipe with direct MediaPipe Tasks Vision integration
@@ -146,6 +147,14 @@ function VBTCameraContent() {
     repCount,
     repPhase,
     repsData,
+    
+    // VBT V2
+    repClassification,
+    isCalibrating,
+    calibrationProgress,
+    vbtBaseline,
+    gaugeProgress,
+    velocityTrend,
     
     // Feedback
     feedbackColor,
@@ -1705,43 +1714,42 @@ function VBTCameraContent() {
                       </TouchableOpacity>
                     )}
                     
-                    {/* Velocity Display - Only show when canCalculate */}
-                    {canCalculate && (
-                      <View style={styles.velocityDisplay}>
-                        <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                        <Text style={[
-                          styles.velocityValue,
-                          feedbackColor === 'red' && styles.velocityValueRed
-                        ]}>
-                          {currentVelocity.toFixed(2)} m/s
-                        </Text>
-                      </View>
-                    )}
+                    {/* VBT V2: Gauge-based overlay layout */}
                     
-                    {/* Rep Counter */}
-                    <View style={styles.repCounter}>
-                      <Text style={styles.repLabel}>{labels.repCount}</Text>
-                      <Text style={styles.repValue}>{repCount}</Text>
-                      {repPhase !== 'idle' && (
-                        <Text style={styles.repPhaseText}>{repPhase}</Text>
-                      )}
+                    {/* Top-left: REPS */}
+                    <View style={styles.vbtTopLeft} data-testid="vbt-reps-badge">
+                      <Text style={styles.vbtTopLabel}>{labels.repCount}</Text>
+                      <Text style={styles.vbtTopValue}>{repCount}</Text>
                     </View>
                     
-                    {/* Status Badge */}
-                    {canCalculate && (
-                      <View style={[
-                        styles.statusBadge,
-                        feedbackColor === 'green' && styles.statusBadgeGreen,
-                        feedbackColor === 'red' && styles.statusBadgeRed,
-                      ]}>
-                        <Ionicons 
-                          name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
-                          size={16} 
-                          color="#ffffff" 
-                        />
-                        <Text style={styles.statusText}>
-                          {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
-                        </Text>
+                    {/* Top-right: % DROP */}
+                    <View style={styles.vbtTopRight} data-testid="vbt-drop-badge">
+                      <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
+                      <Text style={[styles.vbtTopValue, {
+                        color: velocityDrop > 20 ? '#ef4444' : velocityDrop > 10 ? '#eab308' : '#22c55e',
+                      }]}>
+                        {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
+                      </Text>
+                    </View>
+                    
+                    {/* Center: GAUGE */}
+                    <View style={styles.vbtGaugeCenter} data-testid="vbt-gauge-center">
+                      <VBTGauge
+                        progress={gaugeProgress}
+                        repCount={repCount}
+                        velocity={currentVelocity}
+                        dropPercent={velocityDrop}
+                        trend={velocityTrend}
+                        isCalibrating={isCalibrating}
+                        calibrationProgress={calibrationProgress}
+                        size={160}
+                      />
+                    </View>
+                    
+                    {/* Phase indicator (small, below gauge) */}
+                    {repPhase !== 'idle' && (
+                      <View style={styles.vbtPhaseIndicator}>
+                        <Text style={styles.vbtPhaseText}>{repPhase}</Text>
                       </View>
                     )}
                   </View>
@@ -1813,43 +1821,42 @@ function VBTCameraContent() {
                         </TouchableOpacity>
                       )}
                       
-                      {/* Velocity Display - Only show when canCalculate */}
-                      {canCalculate && (
-                        <View style={styles.velocityDisplay}>
-                          <Text style={styles.velocityLabel}>{labels.currentVelocity}</Text>
-                          <Text style={[
-                            styles.velocityValue,
-                            feedbackColor === 'red' && styles.velocityValueRed
-                          ]}>
-                            {currentVelocity.toFixed(2)} m/s
-                          </Text>
-                        </View>
-                      )}
+                      {/* VBT V2: Gauge-based overlay layout (Simulation) */}
                       
-                      {/* Rep Counter */}
-                      <View style={styles.repCounter}>
-                        <Text style={styles.repLabel}>{labels.repCount}</Text>
-                        <Text style={styles.repValue}>{repCount}</Text>
-                        {repPhase !== 'idle' && (
-                          <Text style={styles.repPhaseText}>{repPhase}</Text>
-                        )}
+                      {/* Top-left: REPS */}
+                      <View style={styles.vbtTopLeft}>
+                        <Text style={styles.vbtTopLabel}>{labels.repCount}</Text>
+                        <Text style={styles.vbtTopValue}>{repCount}</Text>
                       </View>
                       
-                      {/* Status Badge */}
-                      {canCalculate && (
-                        <View style={[
-                          styles.statusBadge,
-                          feedbackColor === 'green' && styles.statusBadgeGreen,
-                          feedbackColor === 'red' && styles.statusBadgeRed,
-                        ]}>
-                          <Ionicons 
-                            name={feedbackColor === 'green' ? 'checkmark-circle' : 'warning'} 
-                            size={16} 
-                            color="#ffffff" 
-                          />
-                          <Text style={styles.statusText}>
-                            {feedbackColor === 'green' ? labels.withinLimit : labels.exceedsLimit}
-                          </Text>
+                      {/* Top-right: % DROP */}
+                      <View style={styles.vbtTopRight}>
+                        <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
+                        <Text style={[styles.vbtTopValue, {
+                          color: velocityDrop > 20 ? '#ef4444' : velocityDrop > 10 ? '#eab308' : '#22c55e',
+                        }]}>
+                          {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
+                        </Text>
+                      </View>
+                      
+                      {/* Center: GAUGE */}
+                      <View style={styles.vbtGaugeCenter}>
+                        <VBTGauge
+                          progress={gaugeProgress}
+                          repCount={repCount}
+                          velocity={currentVelocity}
+                          dropPercent={velocityDrop}
+                          trend={velocityTrend}
+                          isCalibrating={isCalibrating}
+                          calibrationProgress={calibrationProgress}
+                          size={160}
+                        />
+                      </View>
+                      
+                      {/* Phase indicator */}
+                      {repPhase !== 'idle' && (
+                        <View style={styles.vbtPhaseIndicator}>
+                          <Text style={styles.vbtPhaseText}>{repPhase}</Text>
                         </View>
                       )}
                     </View>
@@ -3066,5 +3073,65 @@ const styles = StyleSheet.create({
     zIndex: 100,
     borderWidth: 1,
     borderColor: '#374151',
+  },
+  // VBT V2 Gauge Layout
+  vbtTopLeft: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  vbtTopRight: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  vbtTopLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.6)',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  vbtTopValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#ffffff',
+    lineHeight: 24,
+  },
+  vbtGaugeCenter: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -80 }, { translateY: -80 }],
+    zIndex: 10,
+  },
+  vbtPhaseIndicator: {
+    position: 'absolute',
+    bottom: 60,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 6,
+    paddingVertical: 3,
+    paddingHorizontal: 10,
+    zIndex: 10,
+  },
+  vbtPhaseText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
 });

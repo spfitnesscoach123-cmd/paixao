@@ -54,6 +54,11 @@ import { RepDetector, RepDetectorResult, RepPhase } from './RepDetector';
 import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
 import { FrameIntegrityMonitor } from '../frameDrop';
 
+// VBT V2 modules
+import { MovementDetector, MovementFrame } from './MovementDetector';
+import { RepDetectorV2, RepDetectorV2Result, RepPhaseV2 } from './RepDetectorV2';
+import { VBTAnalyzer, VBTRepAnalysis, RepClassification } from './VBTAnalyzer';
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -103,6 +108,14 @@ export interface ProtectedTrackingResult {
   repCount: number;
   repPhase: string;
   repsData: ProtectedRepData[];
+  
+  // VBT V2 analysis
+  repClassification: RepClassification;
+  isCalibrating: boolean;
+  calibrationProgress: number;
+  vbtBaseline: number | null;
+  gaugeProgress: number;
+  velocityTrend: 'up' | 'down' | 'stable';
   
   // Feedback
   feedbackColor: 'green' | 'red' | 'neutral';
@@ -170,6 +183,14 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   // Feedback
   const [feedbackColor, setFeedbackColor] = useState<'green' | 'red' | 'neutral'>('neutral');
   
+  // VBT V2 state
+  const [repClassification, setRepClassification] = useState<RepClassification>('calibrating');
+  const [isCalibrating, setIsCalibrating] = useState(true);
+  const [calibrationProgress, setCalibrationProgress] = useState(0);
+  const [vbtBaseline, setVbtBaseline] = useState<number | null>(null);
+  const [gaugeProgress, setGaugeProgress] = useState(0);
+  const [velocityTrend, setVelocityTrend] = useState<'up' | 'down' | 'stable'>('stable');
+  
   // Simulation state
   const [simulationEnabled, setSimulationEnabled] = useState(config.useSimulation !== false);
   
@@ -186,6 +207,12 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
   // ========================================
   const velocityCalculatorRef = useRef<VelocityCalculator | null>(null);
   const repDetectorRef = useRef<RepDetector | null>(null);
+  
+  // VBT V2 modules
+  const movementDetectorRef = useRef<MovementDetector | null>(null);
+  const repDetectorV2Ref = useRef<RepDetectorV2 | null>(null);
+  const vbtAnalyzerRef = useRef<VBTAnalyzer | null>(null);
+  const prevVelocityRef = useRef<number>(0); // For trend detection
   
   // BUG 5 FIX: Tracking landmark stored as INDEX, not screen coordinates
   const trackingLandmarkIndexRef = useRef<number | null>(null);
@@ -351,64 +378,115 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
           }
           
           // ========================================
-          // BUG 4 FIX: Detect reps using RepDetector
-          // Full rep cycle: eccentric -> transition -> concentric -> completion
-          // Prevents false positives with thresholds
+          // VBT V2: Displacement-driven rep detection
+          // MovementDetector → RepDetectorV2 → VBTAnalyzer
+          // Velocity is for METRICS only, NOT for detection gating
           // ========================================
-          if (repDetectorRef.current) {
-            const repResult = repDetectorRef.current.update(
+          
+          // 1. Feed position to MovementDetector
+          const movFrame = movementDetectorRef.current
+            ? movementDetectorRef.current.update(result.smoothedPosition.y)
+            : null;
+          
+          // 2. Feed displacement + velocity to RepDetectorV2
+          if (repDetectorV2Ref.current && movFrame) {
+            const repV2 = repDetectorV2Ref.current.update(
+              movFrame.confirmedDirection,
+              movFrame.phaseDisplacement,
               velocityResult.smoothedVelocity,
-              velocityResult.direction,
-              frameTimestamp
+              frameTimestamp,
             );
             
-            // DEBUG: Log RepDetector state every 30 frames
+            // DEBUG: Log every 30 frames
             if (frameCountRef.current % 30 === 0) {
-              console.log('[VBT_REP_DEBUG] velocity:', velocityResult.smoothedVelocity.toFixed(3), 
-                'm/s | direction:', velocityResult.direction, 
-                '| phase:', repResult.phase, 
-                '| deltaY:', velocityResult.deltaY?.toFixed(4) || 'N/A',
-                '| repCount:', repResult.repCount);
+              console.log('[VBT_V2] vel:', velocityResult.smoothedVelocity.toFixed(3),
+                '| dir:', movFrame.confirmedDirection,
+                '| disp:', movFrame.phaseDisplacement.toFixed(3),
+                '| phase:', repV2.phase,
+                '| reps:', repV2.repCount);
             }
             
             // Update rep phase
-            setRepPhase(repResult.phase);
+            setRepPhase(repV2.phase);
+            
+            // On direction change within V2 detection, reset phase displacement
+            if (repV2.phase === 'eccentric' || repV2.phase === 'concentric') {
+              // Phase displacement is managed by MovementDetector's confirmed direction changes
+            }
             
             // Handle rep completion
-            if (repResult.repCompleted && repResult.currentRep) {
-              const newRepCount = repResult.repCount;
+            if (repV2.repCompleted && repV2.currentRep) {
+              const newRepCount = repV2.repCount;
               setRepCount(newRepCount);
-              setVelocityDrop(repResult.currentRep.velocityDrop);
+              
+              // 3. Feed completed rep to VBTAnalyzer
+              const analysis = vbtAnalyzerRef.current
+                ? vbtAnalyzerRef.current.analyzeRep(
+                    newRepCount,
+                    repV2.currentRep.meanVelocity,
+                    repV2.currentRep.peakVelocity
+                  )
+                : null;
+              
+              // Update VBT V2 state
+              if (analysis) {
+                setVelocityDrop(analysis.dropPercent);
+                setRepClassification(analysis.classification);
+                setIsCalibrating(analysis.isCalibrating);
+                setCalibrationProgress(vbtAnalyzerRef.current?.getCalibrationProgress() ?? 0);
+                setVbtBaseline(vbtAnalyzerRef.current?.getBaseline() ?? null);
+                
+                // Gauge progress
+                const bl = vbtAnalyzerRef.current?.getBaseline();
+                if (bl && bl > 0) {
+                  setGaugeProgress(Math.min(1, repV2.currentRep.meanVelocity / bl));
+                }
+              } else {
+                setVelocityDrop(0);
+              }
+              
+              // Velocity trend
+              if (repV2.currentRep.meanVelocity > prevVelocityRef.current * 1.05) {
+                setVelocityTrend('up');
+              } else if (repV2.currentRep.meanVelocity < prevVelocityRef.current * 0.95) {
+                setVelocityTrend('down');
+              } else {
+                setVelocityTrend('stable');
+              }
+              prevVelocityRef.current = repV2.currentRep.meanVelocity;
+              
+              // Reset phase displacement for next rep
+              movementDetectorRef.current?.resetPhase();
               
               // Add to reps data
               const newRepData: ProtectedRepData = {
                 rep: newRepCount,
-                meanVelocity: repResult.currentRep.meanVelocity,
-                peakVelocity: repResult.currentRep.peakVelocity,
-                velocityDrop: repResult.currentRep.velocityDrop,
-                timestamp: repResult.currentRep.timestamp,
+                meanVelocity: repV2.currentRep.meanVelocity,
+                peakVelocity: repV2.currentRep.peakVelocity,
+                velocityDrop: analysis?.dropPercent ?? 0,
+                timestamp: repV2.currentRep.timestamp,
                 trackingPointUsed: result.trackingPoint?.keypointName || '',
               };
               setRepsData(prev => [...prev, newRepData]);
               
-              console.log(`[VBT] ============= REP ${newRepCount} COMPLETED =============`);
-              console.log(`[VBT] Mean Velocity: ${repResult.currentRep.meanVelocity.toFixed(3)} m/s`);
-              console.log(`[VBT] Peak Velocity: ${repResult.currentRep.peakVelocity.toFixed(3)} m/s`);
-              console.log(`[VBT] Velocity Drop: ${repResult.currentRep.velocityDrop.toFixed(1)}%`);
-              console.log(`[VBT] newRepData:`, JSON.stringify(newRepData));
-            } else if (repResult.repCompleted) {
-              // DEBUG: Log if repCompleted is true but currentRep is null
-              console.warn('[VBT] WARNING: repCompleted=true but currentRep is null!');
-              console.warn('[VBT] repResult:', JSON.stringify(repResult));
+              console.log(`[VBT_V2] ===== REP ${newRepCount} ===== mean=${repV2.currentRep.meanVelocity.toFixed(3)} peak=${repV2.currentRep.peakVelocity.toFixed(3)} drop=${analysis?.dropPercent.toFixed(1)}% class=${analysis?.classification}`);
             }
             
-            // Update feedback color based on velocity drop
-            if (repResult.currentRep && repResult.currentRep.velocityDrop > VELOCITY_DROP_THRESHOLD) {
-              setFeedbackColor('red');
-            } else if (velocityResult.smoothedVelocity > 0.1) {
-              setFeedbackColor('green');
+            // Feedback color based on VBTAnalyzer state
+            if (vbtAnalyzerRef.current?.isCalibrationComplete()) {
+              const liveDrop = vbtAnalyzerRef.current.getCurrentDrop(velocityResult.smoothedVelocity);
+              if (liveDrop > 20) setFeedbackColor('red');
+              else if (liveDrop > 10) setFeedbackColor('neutral');
+              else if (velocityResult.smoothedVelocity > 0.05) setFeedbackColor('green');
+              else setFeedbackColor('neutral');
+              
+              // Update live gauge
+              const bl = vbtAnalyzerRef.current.getBaseline();
+              if (bl && bl > 0 && velocityResult.smoothedVelocity > 0.01) {
+                setGaugeProgress(Math.min(1, velocityResult.smoothedVelocity / bl));
+              }
             } else {
-              setFeedbackColor('neutral');
+              setFeedbackColor(velocityResult.smoothedVelocity > 0.05 ? 'green' : 'neutral');
             }
           }
         }
@@ -551,6 +629,30 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
       repDetectorRef.current.reset();
     }
     
+    // VBT V2: Initialize/reset new modules
+    if (!movementDetectorRef.current) {
+      movementDetectorRef.current = new MovementDetector();
+    } else {
+      movementDetectorRef.current.reset();
+    }
+    if (!repDetectorV2Ref.current) {
+      repDetectorV2Ref.current = new RepDetectorV2({ startDirection: 'down' });
+    } else {
+      repDetectorV2Ref.current.reset();
+    }
+    if (!vbtAnalyzerRef.current) {
+      vbtAnalyzerRef.current = new VBTAnalyzer();
+    } else {
+      vbtAnalyzerRef.current.reset();
+    }
+    prevVelocityRef.current = 0;
+    setRepClassification('calibrating');
+    setIsCalibrating(true);
+    setCalibrationProgress(0);
+    setVbtBaseline(null);
+    setGaugeProgress(0);
+    setVelocityTrend('stable');
+    
     // Resetar monitor de integridade e contadores de frame para nova sessão
     frameIntegrityRef.current.reset();
     resetFrameTime();
@@ -667,6 +769,18 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     // Also reset recording controller
     recordingController.reset();
     
+    // Reset VBT V2 modules
+    movementDetectorRef.current?.reset();
+    repDetectorV2Ref.current?.reset();
+    vbtAnalyzerRef.current?.reset();
+    prevVelocityRef.current = 0;
+    setRepClassification('calibrating');
+    setIsCalibrating(true);
+    setCalibrationProgress(0);
+    setVbtBaseline(null);
+    setGaugeProgress(0);
+    setVelocityTrend('stable');
+    
     // Also clear tracking point on full reset
     setIsTrackingPointSet(false);
     setTrackingPointState(null);
@@ -719,6 +833,14 @@ export function useProtectedBarTracking(config: ProtectedTrackingConfig): Protec
     repCount,
     repPhase,
     repsData,
+    
+    // VBT V2 analysis
+    repClassification,
+    isCalibrating,
+    calibrationProgress,
+    vbtBaseline,
+    gaugeProgress,
+    velocityTrend,
     
     // Feedback
     feedbackColor,
