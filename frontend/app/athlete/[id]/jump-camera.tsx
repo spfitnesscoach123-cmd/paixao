@@ -128,6 +128,7 @@ function JumpCameraContent() {
   const [athleteHeight, setAthleteHeight] = useState('175');
   const [showProtocolModal, setShowProtocolModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [firstLeg, setFirstLeg] = useState<'left' | 'right'>('right');
   
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
@@ -136,7 +137,9 @@ function JumpCameraContent() {
   const frameCountRef = useRef(0);
   
   // Map selected protocol to internal camera protocol
-  const cameraProtocol = selectedProtocol === 'sl_cmj' ? 'sl_cmj_left' : selectedProtocol;
+  const cameraProtocol = selectedProtocol === 'sl_cmj' 
+    ? (firstLeg === 'left' ? 'sl_cmj_left' : 'sl_cmj_right') 
+    : selectedProtocol;
   
   // Use jump camera hook
   const jumpCamera = useJumpCamera({
@@ -144,6 +147,7 @@ function JumpCameraContent() {
     athleteId: athleteId || '',
     boxHeightCm: parseFloat(boxHeight) || 40,
     athleteHeightCm: parseFloat(athleteHeight) || 175,
+    firstLeg,
   });
 
   // Labels
@@ -207,7 +211,14 @@ function JumpCameraContent() {
     scannerConfidence: locale === 'pt' ? 'Confianca' : 'Confidence',
     // New labels
     scannerContinueAnyway: locale === 'pt' ? 'Continuar mesmo assim' : 'Continue anyway',
-    orientationWarning: locale === 'pt' ? 'Ajuste sua posicao: fique de frente para a camera' : 'Adjust position: face the camera',
+    orientationWarning: locale === 'pt' ? 'Posicione-se de lado para a camera' : 'Position yourself sideways to the camera',
+    // SL-CMJ
+    slcmjFirstLeg: locale === 'pt' ? 'Qual perna primeiro?' : 'Which leg first?',
+    slcmjJump1Detected: locale === 'pt' ? 'Salto 1 detectado' : 'Jump 1 detected',
+    slcmjPrepareSecond: locale === 'pt' ? 'Prepare-se para o proximo salto' : 'Prepare for next jump',
+    slcmjJump2Detected: locale === 'pt' ? 'Salto 2 detectado' : 'Jump 2 detected',
+    slcmjProcessing: locale === 'pt' ? 'Processando...' : 'Processing...',
+    scientificDetails: locale === 'pt' ? 'Ver Detalhes Cientificos' : 'View Scientific Details',
   };
 
   // Overlay keypoints for visual feedback (throttled to ~15fps)
@@ -797,6 +808,50 @@ function JumpCameraContent() {
             </View>
           </View>
           
+          {/* SL-CMJ: Leg selection */}
+          {(selectedProtocol === 'sl_cmj') && (
+            <View style={styles.configCard} data-testid="leg-selection-card">
+              <Text style={styles.configTitle}>{t.slcmjFirstLeg}</Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[
+                    styles.legOption,
+                    firstLeg === 'right' && styles.legOptionActive,
+                  ]}
+                  onPress={() => setFirstLeg('right')}
+                  data-testid="leg-right-btn"
+                >
+                  <Text style={[
+                    styles.legOptionText,
+                    firstLeg === 'right' && styles.legOptionTextActive,
+                  ]}>
+                    {t.right}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.legOption,
+                    firstLeg === 'left' && styles.legOptionActive,
+                  ]}
+                  onPress={() => setFirstLeg('left')}
+                  data-testid="leg-left-btn"
+                >
+                  <Text style={[
+                    styles.legOptionText,
+                    firstLeg === 'left' && styles.legOptionTextActive,
+                  ]}>
+                    {t.left}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.text.tertiary, marginTop: 8 }}>
+                {locale === 'pt' 
+                  ? `1o salto: ${firstLeg === 'right' ? 'PERNA DIREITA' : 'PERNA ESQUERDA'}\n2o salto: ${firstLeg === 'right' ? 'PERNA ESQUERDA' : 'PERNA DIREITA'}`
+                  : `1st jump: ${firstLeg === 'right' ? 'RIGHT LEG' : 'LEFT LEG'}\n2nd jump: ${firstLeg === 'right' ? 'LEFT LEG' : 'RIGHT LEG'}`}
+              </Text>
+            </View>
+          )}
+          
           {/* Start Button */}
           <TouchableOpacity
             style={styles.startButton}
@@ -1178,6 +1233,17 @@ function JumpCameraContent() {
                   />
                 </View>
                 <Text style={styles.calibrationText}>{t.calibrating}</Text>
+                {/* P1: Confidence score visible during countdown */}
+                {jumpCamera.scannerState.confidenceScore > 0 && (
+                  <View style={[styles.confidenceBadge, { marginTop: 8 }]} data-testid="confidence-badge-countdown">
+                    <Text style={[styles.confidenceBadgeText, {
+                      color: jumpCamera.scannerState.confidenceScore >= 0.80 ? '#22c55e' 
+                        : jumpCamera.scannerState.confidenceScore >= 0.65 ? '#eab308' : '#ef4444',
+                    }]}>
+                      {t.scannerConfidence}: {Math.round(jumpCamera.scannerState.confidenceScore * 100)}%
+                    </Text>
+                  </View>
+                )}
                 {/* Show scanner warning during countdown if confidence was marginal */}
                 {jumpCamera.scannerState.warningMessage && jumpCamera.scannerState.phase === 'countdown' && (
                   <View style={styles.scannerWarning}>
@@ -1187,13 +1253,25 @@ function JumpCameraContent() {
               </View>
             )}
             
-            {/* Recording - with live metrics overlay */}
+            {/* Recording - with live metrics overlay + confidence badge */}
             {jumpCamera.phase === 'recording' && (
               <View style={styles.recordingOverlay}>
                 <View style={styles.recordingBadge}>
                   <View style={styles.recordingDot} />
                   <Text style={styles.recordingText}>{t.jumpNow}</Text>
                 </View>
+                
+                {/* P1: Confidence score always visible */}
+                {jumpCamera.scannerState.confidenceScore > 0 && (
+                  <View style={styles.confidenceBadge} data-testid="confidence-badge-recording">
+                    <Text style={[styles.confidenceBadgeText, {
+                      color: jumpCamera.scannerState.confidenceScore >= 0.80 ? '#22c55e' 
+                        : jumpCamera.scannerState.confidenceScore >= 0.65 ? '#eab308' : '#ef4444',
+                    }]}>
+                      {t.scannerConfidence}: {Math.round(jumpCamera.scannerState.confidenceScore * 100)}%
+                    </Text>
+                  </View>
+                )}
                 
                 {/* Real-time metrics overlay */}
                 <View style={styles.liveMetricsPanel} data-testid="live-metrics-panel">
@@ -1215,18 +1293,37 @@ function JumpCameraContent() {
                   )}
                 </View>
                 
-                <Text style={styles.frameCountText}>
-                  {t.framesRecorded}: {jumpCamera.frameCount}
-                </Text>
+                {/* SL-CMJ: Real-time feedback during continuous recording */}
+                {(selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
+                  <View style={styles.slcmjFeedback} data-testid="slcmj-feedback">
+                    {jumpCamera.slcmjRecordingState === 'waiting_first' && (
+                      <Text style={styles.slcmjFeedbackText}>
+                        {locale === 'pt' ? 'Aguardando salto 1...' : 'Waiting for jump 1...'}
+                      </Text>
+                    )}
+                    {jumpCamera.slcmjRecordingState === 'first_detected' && (
+                      <Text style={[styles.slcmjFeedbackText, { color: '#22c55e' }]}>
+                        {t.slcmjJump1Detected} ({firstLeg === 'right' ? t.right : t.left})
+                        {'\n'}{t.slcmjPrepareSecond} ({firstLeg === 'right' ? t.left : t.right})
+                      </Text>
+                    )}
+                    {jumpCamera.slcmjRecordingState === 'waiting_second' && (
+                      <Text style={[styles.slcmjFeedbackText, { color: '#eab308' }]}>
+                        {locale === 'pt' ? 'Aguardando salto 2...' : 'Waiting for jump 2...'}
+                      </Text>
+                    )}
+                    {jumpCamera.slcmjRecordingState === 'completed' && (
+                      <Text style={[styles.slcmjFeedbackText, { color: '#22c55e' }]}>
+                        {t.slcmjJump2Detected}
+                        {'\n'}{t.slcmjProcessing}
+                      </Text>
+                    )}
+                  </View>
+                )}
+                
                 {jumpCamera.activeLeg && (
                   <Text style={styles.activeLegText}>
                     {t.activeLeg}: {jumpCamera.activeLeg === 'left' ? t.left : t.right}
-                  </Text>
-                )}
-                {/* SL-CMJ jump number indicator */}
-                {(selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right') && (
-                  <Text style={styles.activeLegText}>
-                    Jump {jumpCamera.slCmjJumpNumber}/2
                   </Text>
                 )}
               </View>
@@ -1409,6 +1506,19 @@ function JumpCameraContent() {
                     : 'RSI, Power, and other metrics will be calculated automatically when you save.'}
                 </Text>
               </View>
+              
+              {/* Scientific Details button */}
+              <TouchableOpacity
+                style={styles.scientificDetailsButton}
+                onPress={() => {
+                  // Navigate to scientific analysis for this athlete
+                  router.push(`/athlete/${athleteId}` as any);
+                }}
+                data-testid="scientific-details-btn"
+              >
+                <Ionicons name="analytics" size={18} color={colors.accent.primary} />
+                <Text style={styles.scientificDetailsText}>{t.scientificDetails}</Text>
+              </TouchableOpacity>
               
               {/* Action Buttons */}
               <TouchableOpacity
@@ -2168,5 +2278,72 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
     fontWeight: '600',
+  },
+  // Confidence badge (visible during countdown + recording)
+  confidenceBadge: {
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    alignSelf: 'flex-end',
+    position: 'absolute',
+    top: 8,
+    right: 8,
+  },
+  confidenceBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  // SL-CMJ leg selection
+  legOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    alignItems: 'center',
+  },
+  legOptionActive: {
+    borderColor: '#8b5cf6',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+  },
+  legOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.secondary,
+  },
+  legOptionTextActive: {
+    color: '#8b5cf6',
+  },
+  // SL-CMJ real-time feedback
+  slcmjFeedback: {
+    marginTop: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  slcmjFeedbackText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  // Scientific details button
+  scientificDetailsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderRadius: 10,
+  },
+  scientificDetailsText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.accent.primary,
   },
 });

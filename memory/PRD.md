@@ -66,12 +66,40 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
   - confirmContinue() verifica orientacao antes de prosseguir
 - [x] **Performance**: Overlay throttled a ~15fps (cada 2 frames)
 
-## Arquivos Modificados/Criados (Session 4)
-- `services/jump/types.ts` — JumpPoseLandmarks + OrientationResult + ORIENTATION_MIN_WIDTH
-- `services/jump/jumpDetector.ts` — checkAthleteOrientation + shoulders/knees
-- `services/jump/useJumpCamera.ts` — timestamp, orientacao, confirmContinue, showContinueButton
-- `app/athlete/[id]/jump-camera.tsx` — OverlayLayer, timestamp, overlay keypoints, scanner 'ready'
-- `components/jump/OverlayLayer.tsx` — NOVO componente visual isolado
+### Session 5 (2026-04-07) — Bug Fixes + SL-CMJ Continuous Pipeline
+- [x] **P0.1 — Auto-stop baseado em Landing**: Landing detection no processFrame
+  - CMJ: 3 frames consecutivos no solo apos takeoff → auto-stop 300ms
+  - Timeout fallback mantido (6s CMJ, 15s SL-CMJ)
+- [x] **P0.2 — Consistencia de Timestamp**: normalizeTimestamp() em frameTime.ts
+  - Converte timestamps nativos de segundos para ms quando necessario
+  - recordingStartTimeRef agora usa timestamp do primeiro frame (mesma fonte)
+- [x] **P0.3 — Orientacao Lateral Obrigatoria**: Inversao da logica
+  - Lateral (ombros/quadril < 0.05) = VALIDO
+  - Frontal (ombros/quadril >= 0.05) = INVALIDO → bloqueia
+  - Mensagem: "Posicione-se de lado para a camera"
+- [x] **P1.4 — Confidence Score Sempre Visivel**: Badge durante countdown e recording
+- [x] **P1.5 — Frame Count Removido**: Removido da UI, apenas interno
+- [x] **P1.6 — Botao "Ver Detalhes Cientificos"**: Na tela de resultados
+- [x] **P1.5 — SL-CMJ Continuous Pipeline**: Gravacao unica com 2 saltos
+  - State machine: WAITING_FIRST → FIRST_DETECTED → WAITING_SECOND → COMPLETED
+  - Intervalo minimo 500ms entre saltos (ignora ruido)
+  - Split de frames para analise independente de cada salto
+  - Reset limpo de refs de deteccao entre saltos
+- [x] **P1.5.8 — Selecao de Perna**: UI para escolher qual perna primeiro (SL-CMJ)
+  - Exibe ordem: "1o salto: PERNA DIREITA / 2o salto: PERNA ESQUERDA"
+- [x] **P1.5.10 — Feedback em Tempo Real**: Mensagens durante gravacao SL-CMJ
+  - "Aguardando salto 1..."
+  - "Salto 1 detectado (Perna Direita) / Prepare-se..."
+  - "Aguardando salto 2..."
+  - "Salto 2 detectado / Processando..."
+
+## Arquivos Modificados/Criados (Session 5)
+- `services/jump/types.ts` — ORIENTATION_MIN_WIDTH: 0.05, constantes SL-CMJ
+- `services/frameTime.ts` — normalizeTimestamp(), integracao em getFrameTimestamp
+- `services/jump/jumpDetector.ts` — checkAthleteOrientation invertida, identifyJumpLeg()
+- `services/jump/useJumpCamera.ts` — Landing auto-stop, SL-CMJ continuous pipeline, firstLeg
+- `app/athlete/[id]/jump-camera.tsx` — Leg selection UI, confidence badge, feedback, scientific btn
+- `components/jump/OverlayLayer.tsx` — Mensagem de orientacao atualizada
 
 ## Pendente / Backlog
 
@@ -79,6 +107,7 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - [ ] Nova UI moderna para VBT e Jump Camera (design do usuario)
 - [ ] Skeleton completo no VBT camera
 - [ ] Redesign navegacao "Activity Hub" (Atividade → Atleta)
+- [ ] identifyJumpLeg() — validar perna detectada vs perna esperada no SL-CMJ
 
 ### P2
 - [ ] Importacao de dados via PDF (PDF → CSV)
@@ -90,6 +119,7 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - [ ] i18n de ScientificAnalysisTab e Avaliacoes
 - [ ] Refatoracao trackingProtection.ts (codigo legacy VBT)
 - [ ] Gate de logs com __DEV__
+- [ ] Remover codigo morto (between_jumps, startSecondJump)
 
 ## Credenciais
 - User: contato@loadmanagerpro.com.br

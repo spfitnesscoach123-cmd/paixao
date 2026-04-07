@@ -666,9 +666,9 @@ export function extractJumpLandmarks(
 }
 
 /**
- * Check athlete orientation (frontal vs lateral)
- * Returns whether the athlete is facing the camera (valid) or sideways (invalid).
- * Uses horizontal distance between paired landmarks as proxy.
+ * Check athlete orientation — LATERAL (side profile) is REQUIRED.
+ * Small shoulder/hip widths = overlapping = lateral = VALID.
+ * Large widths = frontal (facing camera) = INVALID.
  */
 export function checkAthleteOrientation(
   landmarks: JumpPoseLandmarks
@@ -683,19 +683,49 @@ export function checkAthleteOrientation(
   const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
   const hipWidth = Math.abs(leftHip.x - rightHip.x);
 
-  // Both widths below threshold → athlete is likely sideways
-  if (shoulderWidth < ORIENTATION_MIN_WIDTH && hipWidth < ORIENTATION_MIN_WIDTH) {
-    console.log('[JUMP_DETECTOR] Orientation INVALID: shoulderW=' + shoulderWidth.toFixed(4) +
+  // Lateral (side profile): both widths below threshold (overlapping landmarks)
+  const isLateral = shoulderWidth < ORIENTATION_MIN_WIDTH && hipWidth < ORIENTATION_MIN_WIDTH;
+
+  if (!isLateral) {
+    console.log('[JUMP_DETECTOR] Orientation INVALID (frontal): shoulderW=' + shoulderWidth.toFixed(4) +
       ' hipW=' + hipWidth.toFixed(4) + ' threshold=' + ORIENTATION_MIN_WIDTH);
     return {
       isValid: false,
       shoulderWidth,
       hipWidth,
-      message: 'Ajuste sua posicao: fique de frente para a camera',
+      message: 'Posicione-se de lado para a camera',
     };
   }
 
   return { isValid: true, shoulderWidth, hipWidth, message: null };
+}
+
+/**
+ * Identify which leg performed the jump based on ankle impulse.
+ * Uses cumulative ankle Y displacement during the jump window.
+ * The leg with MORE displacement is the active (jumping) leg.
+ */
+export function identifyJumpLeg(
+  frames: JumpFrameData[],
+  startIdx: number,
+  endIdx: number
+): 'left' | 'right' | null {
+  if (frames.length < 2) return null;
+
+  const safeStart = Math.max(0, startIdx);
+  const safeEnd = Math.min(frames.length - 1, endIdx);
+
+  let impulseLeft = 0;
+  let impulseRight = 0;
+
+  for (let i = safeStart + 1; i <= safeEnd; i++) {
+    impulseLeft += Math.abs(frames[i].leftAnkleY - frames[i - 1].leftAnkleY);
+    impulseRight += Math.abs(frames[i].rightAnkleY - frames[i - 1].rightAnkleY);
+  }
+
+  if (impulseLeft > impulseRight * 1.2) return 'left';
+  if (impulseRight > impulseLeft * 1.2) return 'right';
+  return null;
 }
 
 /**

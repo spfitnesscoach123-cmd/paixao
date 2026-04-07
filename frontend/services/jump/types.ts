@@ -209,8 +209,14 @@ export const JUMP_DETECTION_CONFIG = {
   // Frame processing
   TARGET_FPS: 30,                    // Target frame rate
   
-  // Orientation validation
-  ORIENTATION_MIN_WIDTH: 0.06,       // Min shoulder/hip X-distance to consider "facing camera"
+  // Orientation validation — lateral (side profile) required
+  ORIENTATION_MIN_WIDTH: 0.05,       // Max shoulder/hip X-distance to consider "lateral" (side profile)
+
+  // SL-CMJ continuous pipeline
+  MAX_RECORDING_DURATION_SLCMJ_MS: 15000, // Max recording for SL-CMJ (2 jumps + interval)
+  SLCMJ_MIN_JUMP_INTERVAL_MS: 500,        // Min interval between jumps (ignore noise)
+  SLCMJ_MAX_JUMP_INTERVAL_MS: 5000,       // Max wait for second jump
+  MIN_LANDING_FRAMES_AUTO_STOP: 3,         // Consecutive landing frames to trigger auto-stop
   
   // Recording
   MAX_RECORDING_DURATION_MS: 6000,   // Max recording time (6 seconds)

@@ -30,7 +30,8 @@ export function getFrameTimestamp(nativeTimestamp?: number): number {
 
   if (nativeTimestamp != null && nativeTimestamp > 0) {
     // Prioridade 1: Timestamp nativo do frame da câmera
-    ts = nativeTimestamp;
+    // Normaliza para ms (alguns provedores retornam em segundos)
+    ts = normalizeTimestamp(nativeTimestamp);
   } else {
     // Prioridade 2: performance.now() — monotônico, sub-ms de precisão
     ts = performance.now();
@@ -59,6 +60,16 @@ export function getNextFrameId(): number {
  */
 export function resetFrameId(): void {
   frameIdCounter = 0;
+}
+
+/**
+ * Normaliza timestamp para milissegundos.
+ * Alguns provedores (MediaPipe nativo) podem retornar em segundos ou microsegundos.
+ * Esta função garante consistência em ms.
+ */
+export function normalizeTimestamp(ts: number): number {
+  if (ts < 100000) return ts * 1000; // Provavelmente em segundos → converter para ms
+  return ts;
 }
 
 /**

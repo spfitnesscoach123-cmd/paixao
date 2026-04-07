@@ -50,7 +50,14 @@ const {
   SCANNER_COLLECT_MS, SCANNER_STABILITY_MS,
   CONFIDENCE_AUTO_START, CONFIDENCE_WARNING, CONFIDENCE_BLOCK,
   MAX_RECALIBRATION_RETRIES,
+  MAX_RECORDING_DURATION_SLCMJ_MS, SLCMJ_MIN_JUMP_INTERVAL_MS,
+  MIN_LANDING_FRAMES_AUTO_STOP,
 } = JUMP_DETECTION_CONFIG;
+
+/**
+ * SL-CMJ continuous recording sub-state
+ */
+export type SlCmjRecordingState = 'idle' | 'waiting_first' | 'first_detected' | 'waiting_second' | 'completed';
 
 /**
  * Scanner phase for calibration UI
@@ -74,6 +81,7 @@ export interface UseJumpCameraConfig {
   athleteId: string;
   boxHeightCm?: number;
   athleteHeightCm?: number;
+  firstLeg?: 'left' | 'right';
 }
 
 export interface UseJumpCameraResult {
@@ -112,13 +120,17 @@ export interface UseJumpCameraResult {
   // Orientation
   orientationResult: OrientationResult;
   
+  // SL-CMJ continuous pipeline state
+  slcmjRecordingState: SlCmjRecordingState;
+  
   // Progress
   calibrationProgress: number;
   analysisProgress: number;
 }
 
 export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult {
-  const { protocol, athleteId, boxHeightCm = 0, athleteHeightCm = 175 } = config;
+  const { protocol, athleteId, boxHeightCm = 0, athleteHeightCm = 175, firstLeg = 'right' } = config;
+  const isSlCmj = protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right' || protocol === 'sl_cmj';
 
   // State
   const [phase, setPhase] = useState<JumpCameraPhase>('setup');
@@ -198,6 +210,16 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const frameIntegrityRef = useRef<FrameIntegrityMonitor>(new FrameIntegrityMonitor({
     targetFps: JUMP_DETECTION_CONFIG.TARGET_FPS,
   }));
+
+  // Landing-based auto-stop refs
+  const landingAutoStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const landingFrameCountRef = useRef(0);
+  
+  // SL-CMJ continuous pipeline refs
+  const [slcmjRecordingState, setSlcmjRecordingState] = useState<SlCmjRecordingState>('idle');
+  const slcmjRecordingStateRef = useRef<SlCmjRecordingState>('idle');
+  const firstJumpFrameEndRef = useRef<number>(0);
+  const firstJumpLandingTimestampRef = useRef<number>(0);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -297,7 +319,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           footStability: calibration.footStability,
           poseConfidence: calibration.poseConfidence,
           groundStability: calibration.groundStability,
-          warningMessage: orientation.message || 'Ajuste sua posicao: fique de frente para a camera',
+          warningMessage: orientation.message || 'Posicione-se de lado para a camera',
           showContinueButton: false,
         }));
         return;
@@ -396,9 +418,23 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           console.log('[JUMP_CAMERA_HOOK] Starting RECORDING phase');
           setPhase('recording');
           setIsRecording(true);
-          recordingStartTimeRef.current = getFrameTimestamp();
+          // P0.2: Defer recordingStartTime to first recording frame
+          // This ensures both baseline and frame timestamps use same source
+          recordingStartTimeRef.current = null;
           frameIntegrityRef.current.reset();
           resetFrameTime();
+          
+          // Reset landing detection
+          landingAutoStopRef.current = null;
+          landingFrameCountRef.current = 0;
+          
+          // Initialize SL-CMJ continuous pipeline
+          if (isSlCmj) {
+            slcmjRecordingStateRef.current = 'waiting_first';
+            setSlcmjRecordingState('waiting_first');
+            firstJumpFrameEndRef.current = 0;
+            firstJumpLandingTimestampRef.current = 0;
+          }
           
           return 0;
         }
@@ -443,7 +479,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       console.log('[JUMP_CAMERA_HOOK] Orientation invalid on confirm — blocking');
       setScannerState(prev => ({
         ...prev,
-        warningMessage: orientationResult.message || 'Ajuste sua posicao: fique de frente para a camera',
+        warningMessage: orientationResult.message || 'Posicione-se de lado para a camera',
       }));
       return;
     }
@@ -470,6 +506,12 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     console.log('[JUMP_CAMERA_HOOK] Frames collected: ' + recordingFramesRef.current.length);
     console.log('[JUMP_CAMERA_HOOK] ========================================');
     
+    // Clear any pending auto-stop timeout
+    if (landingAutoStopRef.current) {
+      clearTimeout(landingAutoStopRef.current);
+      landingAutoStopRef.current = null;
+    }
+    
     setIsRecording(false);
     setPhase('processing');
     setAnalysisProgress(0);
@@ -488,6 +530,61 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       
       setAnalysisProgress(50);
       
+      // SL-CMJ CONTINUOUS: Split frames and analyze each jump segment
+      if (isSlCmj && firstJumpFrameEndRef.current > 0) {
+        const allFrames = recordingFramesRef.current;
+        const splitIdx = firstJumpFrameEndRef.current;
+        
+        // Buffer: skip ~15 frames after first landing for re-stabilization
+        const bufferFrames = 15;
+        const jump2StartIdx = Math.min(splitIdx + bufferFrames, allFrames.length - 1);
+        
+        const jump1Frames = allFrames.slice(0, splitIdx);
+        const jump2Frames = allFrames.slice(jump2StartIdx);
+        
+        console.log('[JUMP_CAMERA_HOOK] SL-CMJ split: jump1=[0..' + splitIdx + '] jump2=[' + jump2StartIdx + '..' + allFrames.length + ']');
+        
+        // Determine protocols for each leg
+        const firstLegProtocol = protocol === 'sl_cmj_left' ? 'sl_cmj_left' : 'sl_cmj_right';
+        const secondLegProtocol = protocol === 'sl_cmj_left' ? 'sl_cmj_right' : 'sl_cmj_left';
+        const firstLegSide = protocol === 'sl_cmj_left' ? 'left' : 'right';
+        const secondLegSide = firstLegSide === 'left' ? 'right' : 'left';
+        
+        const result1 = analyzeJumpFrames(
+          jump1Frames, groundCalibration, firstLegProtocol as any, firstLegSide as any, boxHeightCm, athleteHeightCm
+        );
+        const result2 = jump2Frames.length >= 15 ? analyzeJumpFrames(
+          jump2Frames, groundCalibration, secondLegProtocol as any, secondLegSide as any, boxHeightCm, athleteHeightCm
+        ) : null;
+        
+        console.log('[JUMP_CAMERA_HOOK] SL-CMJ result1: ' + (result1.metrics ? 'OK' : 'FAIL'));
+        console.log('[JUMP_CAMERA_HOOK] SL-CMJ result2: ' + (result2?.metrics ? 'OK' : 'FAIL'));
+        
+        setAnalysisProgress(90);
+        
+        if (result1.metrics) {
+          setSlCmjLeg1({ leg: firstLegSide, metrics: result1.metrics });
+        }
+        if (result2?.metrics) {
+          setSlCmjLeg2({ leg: secondLegSide, metrics: result2.metrics });
+        }
+        
+        // Use the better result as primary metrics
+        const primaryMetrics = result2?.metrics || result1.metrics;
+        const primaryEvents = result2?.events || result1.events;
+        
+        setMetrics(primaryMetrics || null);
+        setEvents(primaryEvents || null);
+        setError(primaryMetrics ? null : 'Nao foi possivel detectar ambos os saltos');
+        setAnalysisProgress(100);
+        setSlCmjJumpNumber(2);
+        
+        console.log('[LOG_JUMP_RESULTS_SCREEN_OPENED] SL-CMJ Transitioning to REVIEW phase');
+        setPhase('review');
+        return;
+      }
+      
+      // CMJ: Single jump analysis (existing logic)
       const result = analyzeJumpFrames(
         recordingFramesRef.current,
         groundCalibration,
@@ -507,33 +604,6 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       if (result.metrics) {
         console.log('[LOG_JUMP_METRICS_CALCULATED] Metrics extracted successfully');
         
-        // Handle SL-CMJ dual jump
-        const isSlCmj = protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right';
-        
-        if (isSlCmj && slCmjJumpNumber === 1) {
-          // First leg done - store result and prepare for second
-          const leg = protocol === 'sl_cmj_left' ? 'left' : 'right';
-          setSlCmjLeg1({ leg: leg as 'left' | 'right', metrics: result.metrics });
-          
-          console.log('[JUMP_CAMERA_HOOK] SL-CMJ Leg 1 complete (' + leg + ')');
-          console.log('[JUMP_CAMERA_HOOK] Transitioning to between_jumps phase');
-          
-          setMetrics(result.metrics);
-          setEvents(result.events);
-          setError(null);
-          setAnalysisProgress(100);
-          setSlCmjJumpNumber(2);
-          setPhase('between_jumps');
-          return;
-        }
-        
-        if (isSlCmj && slCmjJumpNumber === 2) {
-          // Second leg done - store result
-          const leg = protocol === 'sl_cmj_left' ? 'right' : 'left'; // Opposite leg for jump 2
-          setSlCmjLeg2({ leg: leg as 'left' | 'right', metrics: result.metrics });
-          console.log('[JUMP_CAMERA_HOOK] SL-CMJ Leg 2 complete (' + leg + ')');
-        }
-        
         setMetrics(result.metrics);
         setEvents(result.events);
         setError(null);
@@ -546,12 +616,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
 
       setAnalysisProgress(100);
       
-      // CRITICAL: Always transition to review, regardless of whether metrics exist
-      // The UI handles both success (metrics present) and error (metrics null) states
       console.log('[LOG_JUMP_RESULTS_SCREEN_OPENED] Transitioning to REVIEW phase');
       setPhase('review');
     }, 150);
-  }, [groundCalibration, protocol, activeLeg, boxHeightCm, athleteHeightCm, slCmjJumpNumber]);
+  }, [groundCalibration, protocol, activeLeg, boxHeightCm, athleteHeightCm, isSlCmj]);
 
   /**
    * Process a single frame from pose detection
@@ -623,15 +691,93 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       recordingFramesRef.current.push(frameData);
       setFrameCount(prev => prev + 1);
       
+      // P0.2: Set recording start time from FIRST recording frame
+      // Ensures same timestamp source as frame processing
+      if (recordingStartTimeRef.current === null) {
+        recordingStartTimeRef.current = timestamp;
+        console.log('[JUMP_CAMERA_HOOK] Recording baseline set from first frame: ' + timestamp.toFixed(1));
+      }
+      
       // Update real-time metrics
       if (integrity.isValid) {
         updateLiveMetrics(frameData, timestamp);
       }
       
-      // Auto-stop after MAX_RECORDING_DURATION_MS
+      // =============================================
+      // LANDING-BASED AUTO-STOP
+      // =============================================
+      const bothFeetAbove = frameData.leftToeY < groundCalibration.groundThreshold && 
+                            frameData.rightToeY < groundCalibration.groundThreshold;
+      
+      if (takeoffTimeRef.current !== null && !bothFeetAbove) {
+        // Feet back on ground after takeoff = potential landing
+        landingFrameCountRef.current++;
+        
+        if (landingFrameCountRef.current >= MIN_LANDING_FRAMES_AUTO_STOP) {
+          // Confirmed landing!
+          if (isSlCmj) {
+            // SL-CMJ CONTINUOUS PIPELINE
+            const currentSlState = slcmjRecordingStateRef.current;
+            
+            if (currentSlState === 'waiting_first') {
+              // First jump landed
+              console.log('[JUMP_CAMERA_HOOK] SL-CMJ: First jump LANDED at frame ' + recordingFramesRef.current.length);
+              slcmjRecordingStateRef.current = 'first_detected';
+              setSlcmjRecordingState('first_detected');
+              firstJumpFrameEndRef.current = recordingFramesRef.current.length;
+              firstJumpLandingTimestampRef.current = timestamp;
+              
+              // Reset tracking for second jump
+              takeoffTimeRef.current = null;
+              countermovementStartTimeRef.current = null;
+              landingFrameCountRef.current = 0;
+            } else if (currentSlState === 'waiting_second') {
+              // Second jump landed — AUTO-STOP
+              console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Second jump LANDED — auto-stop in 300ms');
+              slcmjRecordingStateRef.current = 'completed';
+              setSlcmjRecordingState('completed');
+              if (!landingAutoStopRef.current) {
+                landingAutoStopRef.current = setTimeout(() => {
+                  console.log('[JUMP_CAMERA_HOOK] SL-CMJ auto-stop triggered');
+                  stopRecording();
+                }, 300);
+              }
+            }
+          } else {
+            // CMJ: Single jump — AUTO-STOP after landing
+            if (!landingAutoStopRef.current) {
+              console.log('[JUMP_CAMERA_HOOK] CMJ: Landing detected — auto-stop in 300ms');
+              landingAutoStopRef.current = setTimeout(() => {
+                console.log('[JUMP_CAMERA_HOOK] CMJ auto-stop triggered');
+                stopRecording();
+              }, 300);
+            }
+          }
+        }
+      } else {
+        // Reset consecutive landing frame counter
+        landingFrameCountRef.current = 0;
+      }
+      
+      // SL-CMJ: Transition from first_detected → waiting_second after interval
+      if (isSlCmj && slcmjRecordingStateRef.current === 'first_detected') {
+        const timeSinceFirstLanding = timestamp - firstJumpLandingTimestampRef.current;
+        if (timeSinceFirstLanding >= SLCMJ_MIN_JUMP_INTERVAL_MS) {
+          console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second jump');
+          slcmjRecordingStateRef.current = 'waiting_second';
+          setSlcmjRecordingState('waiting_second');
+          // Clean slate for second jump detection
+          takeoffTimeRef.current = null;
+          countermovementStartTimeRef.current = null;
+          landingFrameCountRef.current = 0;
+        }
+      }
+      
+      // FALLBACK: Auto-stop after max recording duration
+      const maxDuration = isSlCmj ? MAX_RECORDING_DURATION_SLCMJ_MS : MAX_RECORDING_DURATION_MS;
       if (recordingStartTimeRef.current && 
-          timestamp - recordingStartTimeRef.current > MAX_RECORDING_DURATION_MS) {
-        console.log('[JUMP_CAMERA_HOOK] Auto-stop: max recording duration reached (' + MAX_RECORDING_DURATION_MS + 'ms)');
+          timestamp - recordingStartTimeRef.current > maxDuration) {
+        console.log('[JUMP_CAMERA_HOOK] Fallback auto-stop: max recording duration reached (' + maxDuration + 'ms)');
         stopRecording();
       }
     }
@@ -784,6 +930,19 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       stableScoreTimerRef.current = null;
     }
     
+    // Landing auto-stop cleanup
+    if (landingAutoStopRef.current) {
+      clearTimeout(landingAutoStopRef.current);
+      landingAutoStopRef.current = null;
+    }
+    landingFrameCountRef.current = 0;
+    
+    // SL-CMJ continuous pipeline cleanup
+    slcmjRecordingStateRef.current = 'idle';
+    setSlcmjRecordingState('idle');
+    firstJumpFrameEndRef.current = 0;
+    firstJumpLandingTimestampRef.current = 0;
+    
     calibrationFramesRef.current = [];
     recordingFramesRef.current = [];
     recordingStartTimeRef.current = null;
@@ -827,6 +986,9 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     
     // Orientation
     orientationResult,
+    
+    // SL-CMJ continuous pipeline
+    slcmjRecordingState,
     
     // Progress
     calibrationProgress,

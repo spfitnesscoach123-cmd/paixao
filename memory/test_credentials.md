@@ -1,2 +1,5 @@
-User: contato@loadmanagerpro.com.br
-Password: #UAE2026
+# Test Credentials
+
+## Main Admin Account
+- Email: contato@loadmanagerpro.com.br
+- Password: #UAE2026

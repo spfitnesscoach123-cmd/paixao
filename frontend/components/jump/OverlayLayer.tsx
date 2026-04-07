@@ -239,7 +239,7 @@ export const OverlayLayer = React.memo(({
           {!orientationValid && (
             <View style={styles.orientationWarning}>
               <Text style={styles.orientationWarningText}>
-                Fique de frente para a camera
+                Posicione-se de lado para a camera
               </Text>
             </View>
           )}
