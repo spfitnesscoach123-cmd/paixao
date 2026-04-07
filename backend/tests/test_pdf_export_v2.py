@@ -20,7 +20,7 @@ import re
 
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
-    BASE_URL = 'https://jump-camera-audit.preview.emergentagent.com'
+    BASE_URL = 'https://jump-camera-fix.preview.emergentagent.com'
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"
