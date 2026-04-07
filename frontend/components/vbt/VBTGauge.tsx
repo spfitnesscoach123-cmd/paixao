@@ -30,11 +30,36 @@ interface VBTGaugeProps {
   size?: number;
 }
 
-const getColor = (drop: number, calibrating: boolean): string => {
+/**
+ * Interpolate linearly between two hex colors.
+ * Same algorithm as FatigueVisualOverlay border.
+ */
+const interpolateHex = (c1: string, c2: string, t: number): string => {
+  const f = Math.max(0, Math.min(1, t));
+  const r1 = parseInt(c1.slice(1, 3), 16);
+  const g1 = parseInt(c1.slice(3, 5), 16);
+  const b1 = parseInt(c1.slice(5, 7), 16);
+  const r2 = parseInt(c2.slice(1, 3), 16);
+  const g2 = parseInt(c2.slice(3, 5), 16);
+  const b2 = parseInt(c2.slice(5, 7), 16);
+  const r = Math.round(r1 + (r2 - r1) * f);
+  const g = Math.round(g1 + (g2 - g1) * f);
+  const b = Math.round(b1 + (b2 - b1) * f);
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};
+
+/**
+ * Continuous color interpolation — SAME scale as border overlay.
+ *   0%   → #00C853 (green)
+ *   15%  → #FF6D00 (orange)
+ *   30%+ → #D50000 (red)
+ */
+const getDropColor = (drop: number, calibrating: boolean): string => {
   if (calibrating) return '#3b82f6';
-  if (drop < 10) return '#22c55e';
-  if (drop < 20) return '#eab308';
-  return '#ef4444';
+  if (drop <= 0) return '#00C853';
+  if (drop < 15) return interpolateHex('#00C853', '#FF6D00', drop / 15);
+  if (drop < 30) return interpolateHex('#FF6D00', '#D50000', (drop - 15) / 15);
+  return '#D50000';
 };
 
 export const VBTGauge: React.FC<VBTGaugeProps> = ({
@@ -55,14 +80,13 @@ export const VBTGauge: React.FC<VBTGaugeProps> = ({
   const clampedProgress = Math.min(1, Math.max(0, progress));
   const dashOffset = arcLength * (1 - clampedProgress);
 
-  const color = getColor(dropPercent, isCalibrating);
-  const trendChar = trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : '\u2192';
+  const color = getDropColor(dropPercent, isCalibrating);
+  const trendChar = trend === 'up' ? '\u2191' : trend === 'down' ? '\u2193' : '';
 
   return (
     <View style={[styles.container, { width: size, height: size }]} data-testid="vbt-gauge">
       <Svg width={size} height={size}>
         <G rotation="-225" origin={`${size / 2}, ${size / 2}`}>
-          {/* Background arc */}
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -73,7 +97,6 @@ export const VBTGauge: React.FC<VBTGaugeProps> = ({
             strokeDasharray={`${arcLength} ${circumference}`}
             strokeLinecap="round"
           />
-          {/* Progress arc */}
           <Circle
             cx={size / 2}
             cy={size / 2}
@@ -88,7 +111,6 @@ export const VBTGauge: React.FC<VBTGaugeProps> = ({
         </G>
       </Svg>
 
-      {/* Center content */}
       <View style={styles.center}>
         <Text style={styles.repNumber}>{repCount}</Text>
         <Text style={styles.velocity}>{velocity.toFixed(2)} m/s</Text>
@@ -98,7 +120,7 @@ export const VBTGauge: React.FC<VBTGaugeProps> = ({
           </Text>
         ) : (
           <Text style={[styles.drop, { color }]}>
-            {dropPercent > 0 ? `-${dropPercent.toFixed(1)}%` : '0%'} {trendChar}
+            {dropPercent > 0 ? `-${dropPercent.toFixed(1)}%` : '0%'}{trendChar ? ` ${trendChar}` : ''}
           </Text>
         )}
       </View>

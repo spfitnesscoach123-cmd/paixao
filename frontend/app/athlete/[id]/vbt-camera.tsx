@@ -1053,6 +1053,26 @@ function VBTCameraContent() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  /**
+   * Continuous color interpolation — unified with border overlay and gauge.
+   *   0%   -> #00C853 (green)
+   *   15%  -> #FF6D00 (orange)
+   *   30%+ -> #D50000 (red)
+   */
+  const getDropInterpolatedColor = (drop: number): string => {
+    if (drop <= 0) return '#00C853';
+    const lerp = (c1: string, c2: string, t: number) => {
+      const f = Math.max(0, Math.min(1, t));
+      const r1 = parseInt(c1.slice(1, 3), 16), g1 = parseInt(c1.slice(3, 5), 16), b1 = parseInt(c1.slice(5, 7), 16);
+      const r2 = parseInt(c2.slice(1, 3), 16), g2 = parseInt(c2.slice(3, 5), 16), b2 = parseInt(c2.slice(5, 7), 16);
+      const r = Math.round(r1 + (r2 - r1) * f), g = Math.round(g1 + (g2 - g1) * f), b = Math.round(b1 + (b2 - b1) * f);
+      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+    };
+    if (drop < 15) return lerp('#00C853', '#FF6D00', drop / 15);
+    if (drop < 30) return lerp('#FF6D00', '#D50000', (drop - 15) / 15);
+    return '#D50000';
+  };
+
   const sessionSummary = {
     avgVelocity: repsData.length > 0 
       ? (repsData.reduce((sum, s) => sum + s.meanVelocity, 0) / repsData.length).toFixed(2)
@@ -1666,14 +1686,6 @@ function VBTCameraContent() {
                       </View>
                     )}
                     
-                    {/* Recording indicator */}
-                    <View style={styles.recordingIndicator}>
-                      <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
-                      <Text style={styles.recordingText}>
-                        {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
-                      </Text>
-                    </View>
-                    
                     {/* Status Message - CRITICAL INFO */}
                     <View style={[
                       styles.statusMessageContainer,
@@ -1716,17 +1728,17 @@ function VBTCameraContent() {
                     
                     {/* VBT V2: Gauge-based overlay layout */}
                     
-                    {/* Top-left: REPS */}
+                    {/* Top-left: REPS — below banner with safe margin */}
                     <View style={styles.vbtTopLeft} data-testid="vbt-reps-badge">
                       <Text style={styles.vbtTopLabel}>{labels.repCount}</Text>
                       <Text style={styles.vbtTopValue}>{repCount}</Text>
                     </View>
                     
-                    {/* Top-right: % DROP */}
+                    {/* Top-right: % DROP — same height as REPS, interpolated color */}
                     <View style={styles.vbtTopRight} data-testid="vbt-drop-badge">
                       <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
                       <Text style={[styles.vbtTopValue, {
-                        color: velocityDrop > 20 ? '#ef4444' : velocityDrop > 10 ? '#eab308' : '#22c55e',
+                        color: isCalibrating ? '#3b82f6' : getDropInterpolatedColor(velocityDrop),
                       }]}>
                         {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
                       </Text>
@@ -1783,14 +1795,6 @@ function VBTCameraContent() {
                         <Text style={styles.protectionModeText}> (Simulação)</Text>
                       </View>
                       
-                      {/* Recording indicator */}
-                      <View style={styles.recordingIndicator}>
-                        <View style={[styles.recordingDot, isTracking && styles.recordingDotActive]} />
-                        <Text style={styles.recordingText}>
-                          {isTracking ? labels.recording : ''} {formatTime(recordingTime)}
-                        </Text>
-                      </View>
-                      
                       {/* Status Message - CRITICAL INFO */}
                       <View style={[
                         styles.statusMessageContainer,
@@ -1833,7 +1837,7 @@ function VBTCameraContent() {
                       <View style={styles.vbtTopRight}>
                         <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
                         <Text style={[styles.vbtTopValue, {
-                          color: velocityDrop > 20 ? '#ef4444' : velocityDrop > 10 ? '#eab308' : '#22c55e',
+                          color: isCalibrating ? '#3b82f6' : getDropInterpolatedColor(velocityDrop),
                         }]}>
                           {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
                         </Text>
@@ -3077,8 +3081,8 @@ const styles = StyleSheet.create({
   // VBT V2 Gauge Layout
   vbtTopLeft: {
     position: 'absolute',
-    top: 8,
-    left: 8,
+    top: 56,
+    left: 12,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 8,
     paddingVertical: 4,
@@ -3088,8 +3092,8 @@ const styles = StyleSheet.create({
   },
   vbtTopRight: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 56,
+    right: 12,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 8,
     paddingVertical: 4,

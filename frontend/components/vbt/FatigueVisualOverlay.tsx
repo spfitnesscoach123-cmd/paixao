@@ -192,9 +192,6 @@ const FatigueVisualOverlay: React.FC<FatigueVisualOverlayProps> = ({
   if (!visible) return null;
   
   // PARTE 5 — Cor sincronizada para borda, seta e texto
-  const displayColor = getInterpolatedColor(velocityDropPercent);
-  const trendIndicator = getTrendIndicator(trendRef.current);
-  
   // Interpolação animada da cor da borda
   const animatedBorderColor = borderColorAnim.interpolate({
     inputRange: [0, 1],
@@ -212,7 +209,7 @@ const FatigueVisualOverlay: React.FC<FatigueVisualOverlayProps> = ({
       pointerEvents="none"
       style={styles.container}
     >
-      {/* Borda animada com transição de cor e pulso */}
+      {/* Borda animada com transição de cor e pulso — APENAS BORDA */}
       <Animated.View
         style={[
           styles.overlay,
@@ -222,27 +219,6 @@ const FatigueVisualOverlay: React.FC<FatigueVisualOverlayProps> = ({
           }
         ]}
       />
-      
-      {/* PARTE 3 & 4 — Indicador de tendência e percentual */}
-      <View style={styles.indicatorContainer}>
-        <View style={[styles.indicatorBox, { backgroundColor: 'rgba(0, 0, 0, 0.6)' }]}>
-          {/* Seta de tendência com cor sincronizada */}
-          <Text style={[styles.trendArrow, { color: displayColor }]}>
-            {trendIndicator}
-          </Text>
-          {/* Percentual com cor sincronizada - usando EXATAMENTE o valor recebido */}
-          <Text style={[styles.percentText, { color: displayColor }]}>
-            {velocityDropPercent > 0 ? `-${velocityDropPercent.toFixed(1)}%` : '0%'}
-          </Text>
-        </View>
-        
-        {/* Indicador de Modo Elite ativo */}
-        {velocityDropPercent > 25 && (
-          <View style={styles.eliteModeIndicator}>
-            <Text style={styles.eliteModeText}>FADIGA ALTA</Text>
-          </View>
-        )}
-      </View>
     </View>
   );
 };
