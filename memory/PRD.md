@@ -135,15 +135,13 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - `app/athlete/[id]/vbt-camera.tsx` — Gauge UI layout
 
 ### Session 6 (2026-04-08) — SL-CMJ State Machine Fix (P0)
-- [x] **P0 — SL-CMJ Landing Detection**: Substituicao completa da logica inline
-  - Removido `leftAbove || rightAbove` (pe inativo contaminava deteccao)
-  - Substituido por `detectSLCMJTakeoff()` e `detectSLCMJLanding()` de jumpDetector.ts
-  - Takeoff agora verifica APENAS o pe da perna ativa
-  - Landing detecta contato com o solo via funcao dedicada
-  - Toda logica isolada em `if (isSlCmj)` — zero impacto no CMJ
-- [x] **P0 — Swap de Perna Ativa**: `setActiveLeg(secondLeg)` na transicao `first_detected` → `waiting_second`
-  - Garante que segundo salto use deteccao da perna correta
-- [x] **P0 — Dependency Arrays**: `activeLeg` adicionado a `processFrame` e `updateLiveMetrics`
+- [x] **P0 — SL-CMJ Landing Detection**: `detectSLCMJLanding` corrigida
+  - Removido OR logic (pé inativo disparava landing falso durante takeoff)
+  - Agora verifica APENAS o pé ativo — simétrico com `detectSLCMJTakeoff`
+- [x] **P1 — Active Leg Priority**: Protocolo do usuário tem prioridade absoluta
+  - `detectActiveLeg` rebaixada para fallback/log
+  - `setActiveLeg(protocolLeg)` sempre usa escolha do protocolo
+- [x] **CMJ INTOCADO**: `detectCMJTakeoff`, `detectCMJLanding`, pipeline CMJ sem alterações
 - [x] **P1 — JumpGraph CMJ Visual Fix**: Grafico em tempo real corrigido
   - Causa raiz: `useMemo` nao recomputava (ref array mesmo reference) — fix: spread `[...ref]`
   - Fundo escuro removido (background transparente)

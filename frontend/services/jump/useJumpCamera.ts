@@ -289,12 +289,15 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     const calibration = calibrateGround(calibrationFramesRef.current);
     setGroundCalibration(calibration);
     
-    // Detect active leg for SL-CMJ
+    // Detect active leg for SL-CMJ — protocol choice has ABSOLUTE priority
     if (protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right') {
+      const protocolLeg: ActiveLeg = protocol === 'sl_cmj_left' ? 'left' : 'right';
       const detected = detectActiveLeg(calibrationFramesRef.current);
-      setActiveLeg(detected);
-      if (!detected) {
-        setActiveLeg(protocol === 'sl_cmj_left' ? 'left' : 'right');
+      // Use auto-detection ONLY as fallback when it agrees or when protocol is ambiguous
+      // Protocol choice always wins
+      setActiveLeg(protocolLeg);
+      if (detected && detected !== protocolLeg) {
+        console.log('[JUMP_CAMERA_HOOK] detectActiveLeg returned "' + detected + '" but protocol says "' + protocolLeg + '" — using protocol');
       }
     }
     

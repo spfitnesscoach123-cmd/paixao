@@ -279,7 +279,8 @@ export function detectSLCMJTakeoff(
 }
 
 /**
- * SL-CMJ Landing Detection
+ * SL-CMJ Landing Detection — ONLY active foot
+ * Symmetric with detectSLCMJTakeoff: checks only the jumping leg's foot
  */
 export function detectSLCMJLanding(
   frame: JumpFrameData,
@@ -287,8 +288,8 @@ export function detectSLCMJLanding(
   activeLeg: ActiveLeg
 ): boolean {
   const threshold = calibration.groundThreshold;
-  if (activeLeg === 'left') return frame.leftToeY >= threshold || frame.rightToeY >= threshold;
-  if (activeLeg === 'right') return frame.rightToeY >= threshold || frame.leftToeY >= threshold;
+  if (activeLeg === 'left') return frame.leftToeY >= threshold;
+  if (activeLeg === 'right') return frame.rightToeY >= threshold;
   return false;
 }
 
