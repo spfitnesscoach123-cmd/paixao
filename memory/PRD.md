@@ -134,6 +134,17 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - `services/vbt/useProtectedBarTracking.ts` — V2 module integration
 - `app/athlete/[id]/vbt-camera.tsx` — Gauge UI layout
 
+### Session 6 (2026-04-08) — SL-CMJ State Machine Fix (P0)
+- [x] **P0 — SL-CMJ Landing Detection**: Substituicao completa da logica inline
+  - Removido `leftAbove || rightAbove` (pe inativo contaminava deteccao)
+  - Substituido por `detectSLCMJTakeoff()` e `detectSLCMJLanding()` de jumpDetector.ts
+  - Takeoff agora verifica APENAS o pe da perna ativa
+  - Landing detecta contato com o solo via funcao dedicada
+  - Toda logica isolada em `if (isSlCmj)` — zero impacto no CMJ
+- [x] **P0 — Swap de Perna Ativa**: `setActiveLeg(secondLeg)` na transicao `first_detected` → `waiting_second`
+  - Garante que segundo salto use deteccao da perna correta
+- [x] **P0 — Dependency Arrays**: `activeLeg` adicionado a `processFrame` e `updateLiveMetrics`
+
 ## Pendente / Backlog
 
 ### P1

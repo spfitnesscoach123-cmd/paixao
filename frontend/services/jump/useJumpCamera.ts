@@ -40,6 +40,8 @@ import {
   createJumpFrameData,
   detectCMJTakeoff,
   detectCMJLanding,
+  detectSLCMJTakeoff,
+  detectSLCMJLanding,
   checkAthleteOrientation,
 } from './jumpDetector';
 import { getFrameTimestamp, getNextFrameId, resetFrameTime } from '../frameTime';
@@ -706,19 +708,20 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       // =============================================
       // LANDING-BASED AUTO-STOP
       // =============================================
-      // CMJ: BOTH feet above threshold = in air
-      // SL-CMJ: ANY foot above threshold = in air (single-leg)
-      let bothFeetAbove: boolean;
+      let inAir: boolean;
+      let landed: boolean;
       if (isSlCmj) {
-        const leftAbove = frameData.leftToeY < groundCalibration.groundThreshold;
-        const rightAbove = frameData.rightToeY < groundCalibration.groundThreshold;
-        bothFeetAbove = leftAbove || rightAbove;
+        // SL-CMJ: dedicated functions from jumpDetector.ts — only active leg
+        inAir = detectSLCMJTakeoff(frameData, groundCalibration, activeLeg);
+        landed = detectSLCMJLanding(frameData, groundCalibration, activeLeg);
       } else {
-        bothFeetAbove = frameData.leftToeY < groundCalibration.groundThreshold && 
-                        frameData.rightToeY < groundCalibration.groundThreshold;
+        // CMJ: BOTH feet above threshold = in air (unchanged)
+        inAir = frameData.leftToeY < groundCalibration.groundThreshold && 
+                frameData.rightToeY < groundCalibration.groundThreshold;
+        landed = !inAir;
       }
       
-      if (takeoffTimeRef.current !== null && !bothFeetAbove) {
+      if (takeoffTimeRef.current !== null && landed) {
         // Feet back on ground after takeoff = potential landing
         landingFrameCountRef.current++;
         
@@ -772,9 +775,12 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       if (isSlCmj && slcmjRecordingStateRef.current === 'first_detected') {
         const timeSinceFirstLanding = timestamp - firstJumpLandingTimestampRef.current;
         if (timeSinceFirstLanding >= SLCMJ_MIN_JUMP_INTERVAL_MS) {
-          console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second jump');
+          // Swap active leg for second jump detection
+          const secondLeg: ActiveLeg = activeLeg === 'left' ? 'right' : 'left';
+          console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second jump (leg: ' + secondLeg + ')');
           slcmjRecordingStateRef.current = 'waiting_second';
           setSlcmjRecordingState('waiting_second');
+          setActiveLeg(secondLeg);
           // Clean slate for second jump detection
           takeoffTimeRef.current = null;
           countermovementStartTimeRef.current = null;
@@ -801,7 +807,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         stopRecording();
       }
     }
-  }, [phase, isRecording, stopRecording, groundCalibration, evaluateCalibration]);
+  }, [phase, isRecording, stopRecording, groundCalibration, evaluateCalibration, activeLeg]);
 
   /**
    * Update real-time metrics during recording
@@ -810,12 +816,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     if (!groundCalibration.isCalibrated) return;
     
     // CMJ: BOTH feet must be above threshold
-    // SL-CMJ: ANY foot above threshold (single-leg jump)
+    // SL-CMJ: only active leg's foot (from jumpDetector.ts)
     let feetAboveGround: boolean;
     if (isSlCmj) {
-      const leftAbove = frame.leftToeY < groundCalibration.groundThreshold;
-      const rightAbove = frame.rightToeY < groundCalibration.groundThreshold;
-      feetAboveGround = leftAbove || rightAbove;
+      feetAboveGround = detectSLCMJTakeoff(frame, groundCalibration, activeLeg);
     } else {
       feetAboveGround = frame.leftToeY < groundCalibration.groundThreshold && 
                          frame.rightToeY < groundCalibration.groundThreshold;
@@ -856,7 +860,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       contactTimeMs: 0,
       jumpDetected,
     });
-  }, [groundCalibration, isSlCmj]);
+  }, [groundCalibration, isSlCmj, activeLeg]);
 
   /**
    * Start second jump for SL-CMJ sequence
