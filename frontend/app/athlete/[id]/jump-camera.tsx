@@ -1305,7 +1305,7 @@ function JumpCameraContent() {
                 {isCmjProtocol && (
                   <View style={styles.jumpGraphContainer} data-testid="jump-graph-overlay">
                     <JumpGraph
-                      points={hipYHistoryRef.current}
+                      points={[...hipYHistoryRef.current]}
                       baseline={jumpCamera.groundCalibration?.standingHipY ?? 0}
                       eccentricMs={jumpCamera.liveMetrics.eccentricTimeMs}
                       flightMs={jumpCamera.liveMetrics.flightTimeMs}

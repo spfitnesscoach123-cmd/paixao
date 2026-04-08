@@ -144,6 +144,14 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - [x] **P0 — Swap de Perna Ativa**: `setActiveLeg(secondLeg)` na transicao `first_detected` → `waiting_second`
   - Garante que segundo salto use deteccao da perna correta
 - [x] **P0 — Dependency Arrays**: `activeLeg` adicionado a `processFrame` e `updateLiveMetrics`
+- [x] **P1 — JumpGraph CMJ Visual Fix**: Grafico em tempo real corrigido
+  - Causa raiz: `useMemo` nao recomputava (ref array mesmo reference) — fix: spread `[...ref]`
+  - Fundo escuro removido (background transparente)
+  - Curva suavizada com Quadratic Bezier (nao mais Polyline linear)
+  - Efeito area chart com fill 15% opacity
+  - Smoothing 5-point moving average
+  - Buffer limitado a 120 pontos
+  - Zero alteracao em logica de deteccao/metricas/SL-CMJ
 
 ## Pendente / Backlog
 
