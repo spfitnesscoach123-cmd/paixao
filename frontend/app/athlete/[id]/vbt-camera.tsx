@@ -3081,7 +3081,7 @@ const styles = StyleSheet.create({
   // VBT V2 Gauge Layout
   vbtTopLeft: {
     position: 'absolute',
-    top: 56,
+    top: 90,
     left: 12,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 8,
@@ -3092,7 +3092,7 @@ const styles = StyleSheet.create({
   },
   vbtTopRight: {
     position: 'absolute',
-    top: 56,
+    top: 90,
     right: 12,
     backgroundColor: 'rgba(0,0,0,0.65)',
     borderRadius: 8,
