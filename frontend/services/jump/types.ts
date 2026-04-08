@@ -40,6 +40,8 @@ export interface GroundCalibration {
   poseConfidence: number;     // Average pose confidence during calibration (0-1)
   groundStability: number;    // Ground level consistency during calibration (0-1)
   lockedLandmark: 'foot_index' | 'ankle'; // Locked landmark for this jump attempt
+  cmjMode: 'BOTH_FEET' | 'LEFT_ONLY' | 'RIGHT_ONLY' | 'INVALID_CALIBRATION';
+  bestFoot: 'left' | 'right' | null;
 }
 
 /**

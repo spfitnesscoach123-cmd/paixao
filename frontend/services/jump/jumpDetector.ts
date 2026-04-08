@@ -52,6 +52,24 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 // ============================================================
+// FOOT SCORE (CMJ Perspective Fix)
+// ============================================================
+
+interface FootCalibrationMetrics {
+  avgY: number;
+  stdDev: number;
+  distToGround: number;
+  crossesThresholdDuringStance: boolean;
+}
+
+function computeFootScore(foot: FootCalibrationMetrics): number {
+  const stabilityScore = 1 - clamp(foot.stdDev / 0.02, 0, 1);
+  const proximityScore = 1 - clamp(foot.distToGround / 0.05, 0, 1);
+  const crossingScore = foot.crossesThresholdDuringStance ? 0 : 1;
+  return stabilityScore * 0.5 + proximityScore * 0.3 + crossingScore * 0.2;
+}
+
+// ============================================================
 // FRAME SMOOTHING
 // ============================================================
 
@@ -110,6 +128,8 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
     poseConfidence: 0,
     groundStability: 0,
     lockedLandmark: 'ankle',
+    cmjMode: 'BOTH_FEET',
+    bestFoot: null,
   };
 
   if (frames.length < 10) {
@@ -183,22 +203,76 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
     0, 1
   );
   
+  // === CMJ FOOT SELECTION (Perspective Fix) ===
+  const groundThreshold = groundLevel - adaptiveMargin;
+  
+  const leftFootYs = stableFrames.map(f => f.leftToeY);
+  const rightFootYs = stableFrames.map(f => f.rightToeY);
+  
+  const leftAvgY = leftFootYs.reduce((a, b) => a + b, 0) / leftFootYs.length;
+  const rightAvgY = rightFootYs.reduce((a, b) => a + b, 0) / rightFootYs.length;
+  
+  const leftFootStdDev = Math.sqrt(leftFootYs.reduce((sum, y) => sum + Math.pow(y - leftAvgY, 2), 0) / leftFootYs.length);
+  const rightFootStdDev = Math.sqrt(rightFootYs.reduce((sum, y) => sum + Math.pow(y - rightAvgY, 2), 0) / rightFootYs.length);
+  
+  const leftDistToGround = Math.abs(leftAvgY - groundLevel);
+  const rightDistToGround = Math.abs(rightAvgY - groundLevel);
+  
+  const leftCrossesThreshold = leftFootYs.some(y => y < groundThreshold);
+  const rightCrossesThreshold = rightFootYs.some(y => y < groundThreshold);
+  
+  const leftFoot: FootCalibrationMetrics = {
+    avgY: leftAvgY,
+    stdDev: leftFootStdDev,
+    distToGround: leftDistToGround,
+    crossesThresholdDuringStance: leftCrossesThreshold,
+  };
+  const rightFoot: FootCalibrationMetrics = {
+    avgY: rightAvgY,
+    stdDev: rightFootStdDev,
+    distToGround: rightDistToGround,
+    crossesThresholdDuringStance: rightCrossesThreshold,
+  };
+  
+  const leftFootScore = computeFootScore(leftFoot);
+  const rightFootScore = computeFootScore(rightFoot);
+  
+  const footScoreThreshold = 0.8;
+  let cmjMode: 'BOTH_FEET' | 'LEFT_ONLY' | 'RIGHT_ONLY' | 'INVALID_CALIBRATION';
+  let bestFoot: 'left' | 'right' | null = null;
+  
+  if (leftFootScore > footScoreThreshold && rightFootScore > footScoreThreshold) {
+    cmjMode = 'BOTH_FEET';
+  } else if (leftFootScore > rightFootScore && leftFootScore > footScoreThreshold) {
+    cmjMode = 'LEFT_ONLY';
+    bestFoot = 'left';
+  } else if (rightFootScore > footScoreThreshold) {
+    cmjMode = 'RIGHT_ONLY';
+    bestFoot = 'right';
+  } else {
+    cmjMode = 'INVALID_CALIBRATION';
+  }
+  
   console.log('[JUMP_DETECTOR] Calibration complete:');
   console.log('[JUMP_DETECTOR]   groundLevel=' + groundLevel.toFixed(4));
   console.log('[JUMP_DETECTOR]   standingHipY=' + standingHipY.toFixed(4));
   console.log('[JUMP_DETECTOR]   stdDev=' + stdDev.toFixed(4));
   console.log('[JUMP_DETECTOR]   adaptiveMargin=' + adaptiveMargin.toFixed(4) + ' (clamped)');
-  console.log('[JUMP_DETECTOR]   threshold=' + (groundLevel - adaptiveMargin).toFixed(4));
+  console.log('[JUMP_DETECTOR]   threshold=' + groundThreshold.toFixed(4));
   console.log('[JUMP_DETECTOR]   lockedLandmark=' + lockedLandmark);
   console.log('[JUMP_DETECTOR]   confidenceScore=' + confidenceScore.toFixed(3));
   console.log('[JUMP_DETECTOR]   footStability=' + footStability.toFixed(3));
   console.log('[JUMP_DETECTOR]   poseConfidence=' + poseConfidence.toFixed(3));
   console.log('[JUMP_DETECTOR]   groundStability=' + groundStability.toFixed(3));
   console.log('[JUMP_DETECTOR]   frames used=' + stableFrames.length);
+  console.log('[JUMP_DETECTOR]   cmjMode=' + cmjMode);
+  console.log('[JUMP_DETECTOR]   leftFootScore=' + leftFootScore.toFixed(3));
+  console.log('[JUMP_DETECTOR]   rightFootScore=' + rightFootScore.toFixed(3));
+  console.log('[JUMP_DETECTOR]   bestFoot=' + (bestFoot || 'none'));
   
   return {
     groundLevel,
-    groundThreshold: groundLevel - adaptiveMargin,
+    groundThreshold,
     calibrationFrames: stableFrames.length,
     isCalibrated: true,
     standingHipY,
@@ -207,6 +281,8 @@ export function calibrateGround(frames: JumpFrameData[]): GroundCalibration {
     poseConfidence,
     groundStability,
     lockedLandmark,
+    cmjMode,
+    bestFoot,
   };
 }
 
@@ -250,7 +326,16 @@ export function detectCMJTakeoff(
   calibration: GroundCalibration
 ): boolean {
   const threshold = calibration.groundThreshold;
-  return frame.leftToeY < threshold && frame.rightToeY < threshold;
+  switch (calibration.cmjMode) {
+    case 'BOTH_FEET':
+      return frame.leftToeY < threshold && frame.rightToeY < threshold;
+    case 'LEFT_ONLY':
+      return frame.leftToeY < threshold;
+    case 'RIGHT_ONLY':
+      return frame.rightToeY < threshold;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -261,7 +346,16 @@ export function detectCMJLanding(
   calibration: GroundCalibration
 ): boolean {
   const threshold = calibration.groundThreshold;
-  return frame.leftToeY >= threshold || frame.rightToeY >= threshold;
+  switch (calibration.cmjMode) {
+    case 'BOTH_FEET':
+      return frame.leftToeY >= threshold || frame.rightToeY >= threshold;
+    case 'LEFT_ONLY':
+      return frame.leftToeY >= threshold;
+    case 'RIGHT_ONLY':
+      return frame.rightToeY >= threshold;
+    default:
+      return false;
+  }
 }
 
 /**
@@ -443,7 +537,9 @@ function analyzeCMJ(
       // Also check for direct takeoff (no countermovement detected)
       let isTakeoff = false;
       if (protocol === 'cmj') {
-        isTakeoff = detectCMJTakeoff(frame, calibration);
+        const footTakeoff = detectCMJTakeoff(frame, calibration);
+        const hipAbove = frame.hipCenterY < calibration.standingHipY;
+        isTakeoff = footTakeoff && hipAbove;
       } else {
         isTakeoff = detectSLCMJTakeoff(frame, calibration, activeLeg);
       }
@@ -465,7 +561,9 @@ function analyzeCMJ(
     if (state === 'countermovement') {
       let isTakeoff = false;
       if (protocol === 'cmj') {
-        isTakeoff = detectCMJTakeoff(frame, calibration);
+        const footTakeoff = detectCMJTakeoff(frame, calibration);
+        const hipAbove = frame.hipCenterY < calibration.standingHipY;
+        isTakeoff = footTakeoff && hipAbove;
       } else {
         isTakeoff = detectSLCMJTakeoff(frame, calibration, activeLeg);
       }
@@ -494,7 +592,9 @@ function analyzeCMJ(
       
       let isLanding = false;
       if (protocol === 'cmj') {
-        isLanding = detectCMJLanding(frame, calibration);
+        const footLanding = detectCMJLanding(frame, calibration);
+        const hipBelow = frame.hipCenterY >= calibration.standingHipY;
+        isLanding = footLanding && hipBelow;
       } else {
         isLanding = detectSLCMJLanding(frame, calibration, activeLeg);
       }

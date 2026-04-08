@@ -151,7 +151,37 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
   - Buffer limitado a 120 pontos
   - Zero alteracao em logica de deteccao/metricas/SL-CMJ
 
+### Session 7 (2026-04-08) — CMJ Foot Selection + Hip Validation (P0)
+- [x] **P0 — computeFootScore()**: Formula deterministica para scoring de cada pe
+  - stabilityScore * 0.5 + proximityScore * 0.3 + crossingScore * 0.2
+  - Threshold 0.8 para selecao de modo
+- [x] **P0 — cmjMode na Calibracao**: Decisao unica na calibracao
+  - BOTH_FEET: ambos pés score > 0.8 (comportamento identico ao anterior)
+  - LEFT_ONLY / RIGHT_ONLY: apenas pe confiavel usado (fix perspectiva)
+  - INVALID_CALIBRATION: bloqueia gravacao com erro
+- [x] **P0 — detectCMJTakeoff/Landing switch**: Switch por cmjMode
+  - BOTH_FEET: AND takeoff / OR landing (original)
+  - LEFT_ONLY/RIGHT_ONLY: apenas pe selecionado
+- [x] **P1 — Hip Validation (dupla confirmacao)**:
+  - Takeoff: footTakeoff && hipCenterY < standingHipY
+  - Landing: footLanding && hipCenterY >= standingHipY
+  - Aplicado em real-time (processFrame + updateLiveMetrics) e offline (analyzeCMJ)
+- [x] **P1 — INVALID_CALIBRATION failsafe**: Bloqueia scanner se ambos pes invalidos
+- [x] **ZERO REGRESSAO SL-CMJ**: detectSLCMJ* intocado
+- [x] **ZERO REGRESSAO CMJ BOTH_FEET**: Quando ambos pes OK, logica identica + hip
+
+## New Files Created (Session 7)
+- `tests/jump/footSelection.test.ts`
+
+## Files Modified (Session 7)
+- `services/jump/types.ts` — GroundCalibration +cmjMode +bestFoot
+- `services/jump/jumpDetector.ts` — computeFootScore, calibrateGround, detectCMJ*, analyzeCMJ hip validation
+- `services/jump/useJumpCamera.ts` — INVALID_CALIBRATION failsafe, processFrame + updateLiveMetrics hip validation
+
 ## Pendente / Backlog
+
+### P0 (Resolvido)
+- [x] CMJ Foot Selection + Hip Validation (perspectiva 133cm corrigida)
 
 ### P1
 - [ ] Nova UI moderna para VBT e Jump Camera (design do usuario)

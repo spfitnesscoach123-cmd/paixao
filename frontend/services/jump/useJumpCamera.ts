@@ -151,6 +151,8 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     poseConfidence: 0,
     groundStability: 0,
     lockedLandmark: 'ankle',
+    cmjMode: 'BOTH_FEET',
+    bestFoot: null,
   });
   const [metrics, setMetrics] = useState<JumpMetrics | null>(null);
   const [events, setEvents] = useState<JumpEvents | null>(null);
@@ -288,6 +290,22 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     
     const calibration = calibrateGround(calibrationFramesRef.current);
     setGroundCalibration(calibration);
+    
+    // CMJ: Check for INVALID_CALIBRATION (foot selection failed)
+    if (!isSlCmj && calibration.cmjMode === 'INVALID_CALIBRATION') {
+      console.log('[JUMP_CAMERA_HOOK] CMJ INVALID_CALIBRATION — both feet unreliable');
+      setScannerState(prev => ({
+        ...prev,
+        phase: 'blocked',
+        confidenceScore: calibration.confidenceScore,
+        footStability: calibration.footStability,
+        poseConfidence: calibration.poseConfidence,
+        groundStability: calibration.groundStability,
+        warningMessage: 'Calibracao inconsistente. Reposicione o atleta.',
+        showContinueButton: false,
+      }));
+      return;
+    }
     
     // Detect active leg for SL-CMJ — protocol choice has ABSOLUTE priority
     if (protocol === 'sl_cmj_left' || protocol === 'sl_cmj_right') {
@@ -718,10 +736,13 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         inAir = detectSLCMJTakeoff(frameData, groundCalibration, activeLeg);
         landed = detectSLCMJLanding(frameData, groundCalibration, activeLeg);
       } else {
-        // CMJ: BOTH feet above threshold = in air (unchanged)
-        inAir = frameData.leftToeY < groundCalibration.groundThreshold && 
-                frameData.rightToeY < groundCalibration.groundThreshold;
-        landed = !inAir;
+        // CMJ: cmjMode-aware detection + hip validation
+        const footTakeoff = detectCMJTakeoff(frameData, groundCalibration);
+        const hipAbove = frameData.hipCenterY < groundCalibration.standingHipY;
+        inAir = footTakeoff && hipAbove;
+        const footLanding = detectCMJLanding(frameData, groundCalibration);
+        const hipBelow = frameData.hipCenterY >= groundCalibration.standingHipY;
+        landed = footLanding && hipBelow;
       }
       
       if (takeoffTimeRef.current !== null && landed) {
@@ -824,8 +845,9 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     if (isSlCmj) {
       feetAboveGround = detectSLCMJTakeoff(frame, groundCalibration, activeLeg);
     } else {
-      feetAboveGround = frame.leftToeY < groundCalibration.groundThreshold && 
-                         frame.rightToeY < groundCalibration.groundThreshold;
+      const footTakeoff = detectCMJTakeoff(frame, groundCalibration);
+      const hipAbove = frame.hipCenterY < groundCalibration.standingHipY;
+      feetAboveGround = footTakeoff && hipAbove;
     }
     
     const hipDelta = frame.hipCenterY - groundCalibration.standingHipY;
@@ -929,6 +951,8 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       poseConfidence: 0,
       groundStability: 0,
       lockedLandmark: 'ankle',
+      cmjMode: 'BOTH_FEET',
+      bestFoot: null,
     });
     setMetrics(null);
     setEvents(null);
