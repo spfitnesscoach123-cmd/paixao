@@ -1,22 +1,280 @@
 /**
- * Avatar3D.tsx
+ * Avatar3D.tsx — Real GLB-based 3D avatar with heatmap, raycasting, and auto-rotation.
  *
- * Renders an interactive 3D humanoid avatar using Three.js + expo-gl.
- * Supports: auto-rotation, touch → raycasting, mesh highlight, heatmap.
+ * Loads /assets/models/avatar.glb via GLTFLoader.
+ * NO procedural fallback — if GLB fails, an explicit error is shown.
  *
- * Usage:
- *   <Avatar3D onPartSelect={(part) => console.log(part)} />
- *
- * The component uses a procedural humanoid model by default.
- * When a .glb asset is available, swap createProceduralAvatar() for GLTF loading.
+ * Mesh names (PascalCase): Head, Neck, Torso, Hips,
+ *   LeftArm, RightArm, LeftForearm, RightForearm,
+ *   LeftLeg, RightLeg, LeftLowerLeg, RightLowerLeg
  */
 
-import React, { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import React, { useRef, useCallback, useEffect, useState, Component } from 'react';
+import {
+  View, Text, StyleSheet, Platform, ActivityIndicator,
+} from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer } from 'expo-three';
+import { Asset } from 'expo-asset';
 import * as THREE from 'three';
-import { useAvatarControls } from '../../hooks/useAvatarControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const SKIN_COLOR = 0xc8a07e;
+const AUTO_ROTATE_SPEED = 0.005; // radians per frame
+
+/** GLB mesh name (UPPERCASE from model) → Internal PascalCase */
+const GLB_TO_PASCAL: Record<string, string> = {
+  HEAD: 'Head',
+  NECK: 'Neck',
+  LEFT_ARM: 'LeftArm',
+  RIGHT_ARM: 'RightArm',
+  LEFT_FOREARM: 'LeftForearm',
+  RIGHT_FOREARM: 'RightForearm',
+  TORSO: 'Torso',
+  HIP: 'Hips',
+  LEFT_LEG: 'LeftLeg',
+  RIGHT_LEG: 'RightLeg',
+  LEFT_LOWERLEG: 'LeftLowerLeg',
+  RIGHT_LOWERLEG: 'RightLowerLeg',
+};
+
+const REQUIRED_MESHES = ['Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'];
+
+// Heatmap gradient stops
+const HEAT_LOW = new THREE.Color(0x22c55e);
+const HEAT_MID = new THREE.Color(0xeab308);
+const HEAT_HIGH = new THREE.Color(0xef4444);
+
+// ============================================================
+// GLB BINARY UTILITIES
+// ============================================================
+
+/**
+ * Parse the JSON chunk of a GLB to build a node-name → PascalCase mesh-name map.
+ * This lets us rename meshes after GLTFLoader (which uses node names) finishes.
+ */
+function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
+  const view = new DataView(buffer);
+  const jsonLength = view.getUint32(12, true);
+  const jsonBytes = new Uint8Array(buffer, 20, jsonLength);
+  const json = JSON.parse(new TextDecoder().decode(jsonBytes));
+
+  const mapping: Record<string, string> = {};
+  for (const node of json.nodes || []) {
+    if (node.mesh !== undefined && node.name) {
+      const meshName = json.meshes?.[node.mesh]?.name;
+      if (meshName && GLB_TO_PASCAL[meshName]) {
+        mapping[node.name] = GLB_TO_PASCAL[meshName];
+      }
+    }
+  }
+  return mapping;
+}
+
+/**
+ * Strip images/textures/samplers from a GLB ArrayBuffer so that
+ * GLTFLoader.parse() never tries to decode images (which would crash
+ * in React Native where createImageBitmap / HTMLImageElement is absent).
+ * Geometry and materials (base colors) are preserved.
+ */
+function stripGLBTextures(buffer: ArrayBuffer): ArrayBuffer {
+  const view = new DataView(buffer);
+  const jsonLength = view.getUint32(12, true);
+  const jsonBytes = new Uint8Array(buffer, 20, jsonLength);
+  const json = JSON.parse(new TextDecoder().decode(jsonBytes));
+
+  // Remove all image / texture references
+  delete json.images;
+  delete json.textures;
+  delete json.samplers;
+  for (const mat of json.materials || []) {
+    const pbr = mat.pbrMetallicRoughness;
+    if (pbr) {
+      delete pbr.baseColorTexture;
+      delete pbr.metallicRoughnessTexture;
+    }
+    delete mat.normalTexture;
+    delete mat.occlusionTexture;
+    delete mat.emissiveTexture;
+  }
+
+  // Encode new JSON
+  const newJsonBytes = new TextEncoder().encode(JSON.stringify(json));
+  const paddedLen = (newJsonBytes.length + 3) & ~3; // 4-byte align
+
+  // Binary chunk
+  const binStart = 12 + 8 + jsonLength;
+  const binLength = view.getUint32(binStart, true);
+  const binData = new Uint8Array(buffer, binStart + 8, binLength);
+
+  // Rebuild GLB
+  const totalSize = 12 + 8 + paddedLen + 8 + binLength;
+  const out = new ArrayBuffer(totalSize);
+  const ov = new DataView(out);
+  const oa = new Uint8Array(out);
+
+  // Header
+  ov.setUint32(0, 0x46546c67, true); // glTF
+  ov.setUint32(4, 2, true);          // version
+  ov.setUint32(8, totalSize, true);   // length
+
+  // JSON chunk
+  ov.setUint32(12, paddedLen, true);
+  ov.setUint32(16, 0x4e4f534a, true); // "JSON"
+  oa.set(newJsonBytes, 20);
+  for (let i = newJsonBytes.length; i < paddedLen; i++) oa[20 + i] = 0x20;
+
+  // BIN chunk
+  const bo = 20 + paddedLen;
+  ov.setUint32(bo, binLength, true);
+  ov.setUint32(bo + 4, 0x004e4942, true); // "BIN\0"
+  oa.set(binData, bo + 8);
+
+  return out;
+}
+
+// ============================================================
+// LOAD AVATAR MODEL
+// ============================================================
+
+async function loadAvatarModel(): Promise<THREE.Group> {
+  // 1. Download asset via Expo
+  const asset = Asset.fromModule(require('../../assets/models/avatar.glb'));
+  await asset.downloadAsync();
+  const uri = asset.localUri || asset.uri;
+  if (!uri) throw new Error('Avatar GLB: asset download failed');
+
+  // 2. Fetch raw bytes
+  const response = await fetch(uri);
+  const buffer = await response.arrayBuffer();
+
+  // 3. Extract name mapping BEFORE stripping textures
+  const nameMap = parseGLBNameMap(buffer);
+
+  // 4. Strip textures for RN compatibility
+  const cleanBuffer = stripGLBTextures(buffer);
+
+  // 5. Parse with GLTFLoader
+  const loader = new GLTFLoader();
+  const gltf: any = await new Promise((resolve, reject) => {
+    loader.parse(cleanBuffer, '', resolve, reject);
+  });
+
+  const model = gltf.scene as THREE.Group;
+
+  // 6. Rename meshes to PascalCase + replace materials
+  model.traverse((child) => {
+    if (!(child as THREE.Mesh).isMesh) return;
+    const mesh = child as THREE.Mesh;
+
+    // Rename
+    const pascal = nameMap[mesh.name];
+    if (pascal) mesh.name = pascal;
+
+    // Dispose original material and assign heatmap-ready material
+    if (mesh.material) {
+      if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
+      else (mesh.material as THREE.Material).dispose();
+    }
+    mesh.material = new THREE.MeshStandardMaterial({
+      color: SKIN_COLOR,
+      roughness: 0.7,
+      metalness: 0.05,
+    });
+  });
+
+  // 7. Validate required meshes
+  const found = new Set<string>();
+  model.traverse((c) => { if ((c as THREE.Mesh).isMesh) found.add(c.name); });
+  const missing = REQUIRED_MESHES.filter((n) => !found.has(n));
+  if (missing.length > 0) {
+    throw new Error(`Avatar GLB missing required meshes: ${missing.join(', ')}`);
+  }
+
+  // 8. Center at origin
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  model.position.sub(center);
+
+  // 9. Scale to fit (~1.4 scene units tall)
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim > 0) model.scale.setScalar(1.4 / maxDim);
+
+  return model;
+}
+
+// ============================================================
+// HEATMAP HELPERS
+// ============================================================
+
+function getHeatColor(value: number): THREE.Color {
+  if (value <= 0.2) return HEAT_LOW.clone();
+  if (value <= 0.5) {
+    const t = (value - 0.2) / 0.3;
+    return HEAT_LOW.clone().lerp(HEAT_MID, t);
+  }
+  if (value <= 0.8) {
+    const t = (value - 0.5) / 0.3;
+    return HEAT_MID.clone().lerp(HEAT_HIGH, t);
+  }
+  return HEAT_HIGH.clone();
+}
+
+function applyHeatmapToMeshes(
+  meshMap: Record<string, THREE.Mesh>,
+  values: Record<string, number>,
+): void {
+  for (const [name, mesh] of Object.entries(meshMap)) {
+    const mat = mesh.material as THREE.MeshStandardMaterial;
+    if (!mat) continue;
+    const v = values[name];
+    if (v !== undefined) {
+      mat.emissive.copy(getHeatColor(v));
+      mat.emissiveIntensity = 0.55;
+    } else {
+      mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
+    }
+  }
+}
+
+// ============================================================
+// ERROR BOUNDARY
+// ============================================================
+
+interface EBProps { children: React.ReactNode }
+interface EBState { error: Error | null }
+
+class Avatar3DErrorBoundary extends Component<EBProps, EBState> {
+  state: EBState = { error: null };
+  static getDerivedStateFromError(error: Error): EBState { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <View style={ebStyles.wrap} data-testid="avatar3d-error">
+          <Text style={ebStyles.title}>Erro ao carregar avatar 3D</Text>
+          <Text style={ebStyles.detail}>{this.state.error.message}</Text>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+const ebStyles = StyleSheet.create({
+  wrap: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#1a1a2e', borderRadius: 12, padding: 20 },
+  title: { color: '#ef4444', fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  detail: { color: '#9ca3af', fontSize: 12, textAlign: 'center' },
+});
+
+// ============================================================
+// PROPS
+// ============================================================
 
 interface Avatar3DProps {
   onPartSelect?: (meshName: string) => void;
@@ -27,271 +285,245 @@ interface Avatar3DProps {
 }
 
 // ============================================================
-// PROCEDURAL AVATAR (used until .glb is provided)
+// INNER COMPONENT (rendering + interaction logic)
 // ============================================================
 
-function createProceduralAvatar(): THREE.Group {
-  const group = new THREE.Group();
-
-  const skinColor = 0xc8a07e;
-  const makeMat = () => new THREE.MeshStandardMaterial({
-    color: skinColor,
-    roughness: 0.7,
-    metalness: 0.05,
-  });
-
-  // Head — sphere
-  const headGeo = new THREE.SphereGeometry(0.12, 16, 16);
-  const head = new THREE.Mesh(headGeo, makeMat());
-  head.name = 'Head';
-  head.position.set(0, 0.85, 0);
-  group.add(head);
-
-  // Neck
-  const neckGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.06, 8);
-  const neck = new THREE.Mesh(neckGeo, makeMat());
-  neck.name = 'Neck';
-  neck.position.set(0, 0.72, 0);
-  group.add(neck);
-
-  // Torso — tapered cylinder
-  const torsoGeo = new THREE.CylinderGeometry(0.14, 0.12, 0.4, 12);
-  const torso = new THREE.Mesh(torsoGeo, makeMat());
-  torso.name = 'Torso';
-  torso.position.set(0, 0.48, 0);
-  group.add(torso);
-
-  // Hips
-  const hipsGeo = new THREE.CylinderGeometry(0.12, 0.11, 0.08, 10);
-  const hips = new THREE.Mesh(hipsGeo, makeMat());
-  hips.name = 'Hips';
-  hips.position.set(0, 0.25, 0);
-  group.add(hips);
-
-  // Left Upper Arm
-  const luaGeo = new THREE.CylinderGeometry(0.035, 0.03, 0.22, 8);
-  const lua = new THREE.Mesh(luaGeo, makeMat());
-  lua.name = 'LeftArm';
-  lua.position.set(-0.2, 0.56, 0);
-  lua.rotation.z = 0.15;
-  group.add(lua);
-
-  // Left Forearm
-  const lfaGeo = new THREE.CylinderGeometry(0.03, 0.025, 0.2, 8);
-  const lfa = new THREE.Mesh(lfaGeo, makeMat());
-  lfa.name = 'LeftForearm';
-  lfa.position.set(-0.24, 0.36, 0);
-  lfa.rotation.z = 0.1;
-  group.add(lfa);
-
-  // Right Upper Arm
-  const ruaGeo = new THREE.CylinderGeometry(0.035, 0.03, 0.22, 8);
-  const rua = new THREE.Mesh(ruaGeo, makeMat());
-  rua.name = 'RightArm';
-  rua.position.set(0.2, 0.56, 0);
-  rua.rotation.z = -0.15;
-  group.add(rua);
-
-  // Right Forearm
-  const rfaGeo = new THREE.CylinderGeometry(0.03, 0.025, 0.2, 8);
-  const rfa = new THREE.Mesh(rfaGeo, makeMat());
-  rfa.name = 'RightForearm';
-  rfa.position.set(0.24, 0.36, 0);
-  rfa.rotation.z = -0.1;
-  group.add(rfa);
-
-  // Left Upper Leg
-  const lulGeo = new THREE.CylinderGeometry(0.055, 0.04, 0.3, 10);
-  const lul = new THREE.Mesh(lulGeo, makeMat());
-  lul.name = 'LeftLeg';
-  lul.position.set(-0.07, 0.06, 0);
-  group.add(lul);
-
-  // Left Lower Leg
-  const lllGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.3, 8);
-  const lll = new THREE.Mesh(lllGeo, makeMat());
-  lll.name = 'LeftLowerLeg';
-  lll.position.set(-0.07, -0.22, 0);
-  group.add(lll);
-
-  // Right Upper Leg
-  const rulGeo = new THREE.CylinderGeometry(0.055, 0.04, 0.3, 10);
-  const rul = new THREE.Mesh(rulGeo, makeMat());
-  rul.name = 'RightLeg';
-  rul.position.set(0.07, 0.06, 0);
-  group.add(rul);
-
-  // Right Lower Leg
-  const rllGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.3, 8);
-  const rll = new THREE.Mesh(rllGeo, makeMat());
-  rll.name = 'RightLowerLeg';
-  rll.position.set(0.07, -0.22, 0);
-  group.add(rll);
-
-  // Center the model
-  const box = new THREE.Box3().setFromObject(group);
-  const center = box.getCenter(new THREE.Vector3());
-  group.position.sub(center);
-
-  return group;
-}
-
-// ============================================================
-// COMPONENT
-// ============================================================
-
-export function Avatar3D({
+function Avatar3DInner({
   onPartSelect,
   highlightedPart,
   heatmapValues,
   autoRotate = true,
   style,
 }: Avatar3DProps) {
-  const controls = useAvatarControls({ autoRotateSpeed: 0.005 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // ---- Three.js refs (outside React render cycle) ----
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<any>(null);
-  const glRef = useRef<ExpoWebGLRenderingContext | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const modelRef = useRef<THREE.Group | null>(null);
+  const meshMapRef = useRef<Record<string, THREE.Mesh>>({});
   const animFrameRef = useRef<number | null>(null);
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const viewSizeRef = useRef({ width: 1, height: 1 });
+  const mountedRef = useRef(true);
 
-  // Apply external highlight
-  useEffect(() => {
-    controls.highlight(highlightedPart ?? null);
-  }, [highlightedPart, controls]);
+  // Touch
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  // Apply auto-rotate toggle
-  useEffect(() => {
-    controls.setAutoRotate(autoRotate);
-  }, [autoRotate, controls]);
+  // Prop mirrors (avoid stale closures)
+  const autoRotateRef = useRef(autoRotate);
+  const heatmapRef = useRef<Record<string, number>>({});
 
-  // Apply heatmap values
+  // Highlight restore state
+  const prevHLRef = useRef<{
+    name: string; emissive: THREE.Color; intensity: number;
+  } | null>(null);
+
+  // Raycaster (reused, zero-alloc per frame)
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const pointerRef = useRef(new THREE.Vector2());
+
+  // ---- Sync props to refs ----
+  useEffect(() => { autoRotateRef.current = autoRotate; }, [autoRotate]);
+
   useEffect(() => {
-    if (heatmapValues && Object.keys(controls.meshMapRef.current).length > 0) {
-      const { applyHeatmap } = require('../../utils/heatmap');
-      applyHeatmap(controls.meshMapRef.current, heatmapValues);
+    if (!heatmapValues) return;
+    heatmapRef.current = heatmapValues;
+    if (Object.keys(meshMapRef.current).length > 0) {
+      applyHeatmapToMeshes(meshMapRef.current, heatmapValues);
     }
-  }, [heatmapValues, controls]);
+  }, [heatmapValues]);
 
-  // Cleanup on unmount
   useEffect(() => {
+    applyHighlight(highlightedPart ?? null);
+  }, [highlightedPart]);
+
+  // ---- Cleanup ----
+  useEffect(() => {
+    mountedRef.current = true;
     return () => {
-      if (animFrameRef.current !== null) {
-        cancelAnimationFrame(animFrameRef.current);
-      }
-      // Dispose geometries and materials
-      if (sceneRef.current) {
-        sceneRef.current.traverse((obj) => {
-          if ((obj as THREE.Mesh).isMesh) {
-            const mesh = obj as THREE.Mesh;
-            mesh.geometry?.dispose();
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((m) => m.dispose());
-            } else {
-              mesh.material?.dispose();
-            }
-          }
-        });
-      }
+      mountedRef.current = false;
+      if (animFrameRef.current !== null) cancelAnimationFrame(animFrameRef.current);
+      sceneRef.current?.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh) {
+          const m = obj as THREE.Mesh;
+          m.geometry?.dispose();
+          if (Array.isArray(m.material)) m.material.forEach((mt) => mt.dispose());
+          else (m.material as THREE.Material)?.dispose();
+        }
+      });
+      rendererRef.current?.dispose?.();
     };
   }, []);
 
+  // ---- Highlight ----
+  function applyHighlight(meshName: string | null) {
+    // Restore previous
+    if (prevHLRef.current) {
+      const prev = meshMapRef.current[prevHLRef.current.name];
+      if (prev) {
+        const mat = prev.material as THREE.MeshStandardMaterial;
+        mat.emissive.copy(prevHLRef.current.emissive);
+        mat.emissiveIntensity = prevHLRef.current.intensity;
+      }
+      prevHLRef.current = null;
+    }
+    // Apply new
+    if (meshName) {
+      const mesh = meshMapRef.current[meshName];
+      if (mesh) {
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        prevHLRef.current = {
+          name: meshName,
+          emissive: mat.emissive.clone(),
+          intensity: mat.emissiveIntensity,
+        };
+        mat.emissive.set(0x3388ff);
+        mat.emissiveIntensity = 0.6;
+      }
+    }
+  }
+
+  // ---- GL Context Created ----
   const onContextCreate = useCallback(async (gl: ExpoWebGLRenderingContext) => {
-    glRef.current = gl;
+    try {
+      // Renderer
+      const renderer = new Renderer({ gl });
+      renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      renderer.setClearColor(0x1a1a2e, 1);
+      rendererRef.current = renderer;
 
-    // Renderer
-    const renderer = new Renderer({ gl });
-    renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
-    renderer.setClearColor(0x1a1a2e, 1);
-    rendererRef.current = renderer;
+      // Scene
+      const scene = new THREE.Scene();
+      sceneRef.current = scene;
 
-    // Scene
-    const scene = new THREE.Scene();
-    sceneRef.current = scene;
+      // Camera
+      const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
+      const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
+      camera.position.set(0, 0.4, 1.8);
+      camera.lookAt(0, 0.3, 0);
+      cameraRef.current = camera;
 
-    // Camera
-    const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
-    const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
-    camera.position.set(0, 0.4, 1.8);
-    camera.lookAt(0, 0.3, 0);
-    controls.cameraRef.current = camera;
+      // Lights
+      scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+      const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+      dir.position.set(2, 3, 2);
+      scene.add(dir);
+      const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
+      fill.position.set(-2, 1, -1);
+      scene.add(fill);
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambient);
+      // Load GLB model (MANDATORY — no fallback)
+      const model = await loadAvatarModel();
+      scene.add(model);
+      modelRef.current = model;
 
-    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
-    directional.position.set(2, 3, 2);
-    scene.add(directional);
+      // Index meshes by PascalCase name
+      const map: Record<string, THREE.Mesh> = {};
+      model.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          const mesh = child as THREE.Mesh;
+          // Clone material so each mesh has its own instance
+          mesh.material = (mesh.material as THREE.Material).clone();
+          map[mesh.name] = mesh;
+        }
+      });
+      meshMapRef.current = map;
 
-    const fill = new THREE.DirectionalLight(0x8888ff, 0.3);
-    fill.position.set(-2, 1, -1);
-    scene.add(fill);
+      // Apply initial heatmap if values were provided before GL was ready
+      if (heatmapRef.current && Object.keys(heatmapRef.current).length > 0) {
+        applyHeatmapToMeshes(map, heatmapRef.current);
+      }
 
-    // Avatar model (procedural for now — replace with GLTF later)
-    const avatar = createProceduralAvatar();
-    scene.add(avatar);
-    controls.registerModel(avatar);
+      viewSizeRef.current = {
+        width: gl.drawingBufferWidth,
+        height: gl.drawingBufferHeight,
+      };
 
-    // Track view size for raycasting
-    viewSizeRef.current = {
-      width: gl.drawingBufferWidth,
-      height: gl.drawingBufferHeight,
-    };
+      if (mountedRef.current) setLoading(false);
 
-    // Animation loop
-    const animate = () => {
-      animFrameRef.current = requestAnimationFrame(animate);
-      controls.onFrame();
-      renderer.render(scene, camera);
-      gl.endFrameEXP();
-    };
-    animate();
-  }, [controls]);
+      // ---- Render loop ----
+      const animate = () => {
+        animFrameRef.current = requestAnimationFrame(animate);
+        if (autoRotateRef.current && modelRef.current) {
+          modelRef.current.rotation.y += AUTO_ROTATE_SPEED;
+        }
+        renderer.render(scene, camera);
+        gl.endFrameEXP();
+      };
+      animate();
+    } catch (err: any) {
+      if (mountedRef.current) {
+        setError(err?.message || 'Failed to load GLB model');
+        setLoading(false);
+      }
+    }
+  }, []);
 
-  // Touch handlers for raycasting
+  // ---- Touch handlers (raycasting) ----
   const onTouchStart = useCallback((e: any) => {
-    const touch = e.nativeEvent;
-    touchStartRef.current = {
-      x: touch.locationX,
-      y: touch.locationY,
-      time: Date.now(),
-    };
+    const t = e.nativeEvent;
+    touchStartRef.current = { x: t.locationX, y: t.locationY, time: Date.now() };
   }, []);
 
   const onTouchEnd = useCallback((e: any) => {
-    const touch = e.nativeEvent;
+    const t = e.nativeEvent;
     const start = touchStartRef.current;
     if (!start) return;
 
-    // Only count as tap if short duration and small movement
     const dt = Date.now() - start.time;
-    const dx = Math.abs(touch.locationX - start.x);
-    const dy = Math.abs(touch.locationY - start.y);
+    const dx = Math.abs(t.locationX - start.x);
+    const dy = Math.abs(t.locationY - start.y);
 
-    if (dt < 300 && dx < 15 && dy < 15) {
-      // Scale touch coords to GL buffer size
-      const scaleX = viewSizeRef.current.width / (e.nativeEvent.target?.clientWidth || viewSizeRef.current.width);
-      const scaleY = viewSizeRef.current.height / (e.nativeEvent.target?.clientHeight || viewSizeRef.current.height);
+    // Only treat as tap if short & small movement
+    if (dt < 300 && dx < 15 && dy < 15 && cameraRef.current) {
+      const scaleX = viewSizeRef.current.width /
+        (t.target?.clientWidth || viewSizeRef.current.width);
+      const scaleY = viewSizeRef.current.height /
+        (t.target?.clientHeight || viewSizeRef.current.height);
 
-      const result = controls.raycast(
-        touch.locationX * (Platform.OS === 'web' ? 1 : scaleX),
-        touch.locationY * (Platform.OS === 'web' ? 1 : scaleY),
-        viewSizeRef.current.width,
-        viewSizeRef.current.height
-      );
+      const px = t.locationX * (Platform.OS === 'web' ? 1 : scaleX);
+      const py = t.locationY * (Platform.OS === 'web' ? 1 : scaleY);
 
-      if (result) {
-        controls.highlight(result.meshName);
-        onPartSelect?.(result.meshName);
+      // Normalized device coordinates
+      pointerRef.current.x = (px / viewSizeRef.current.width) * 2 - 1;
+      pointerRef.current.y = -(py / viewSizeRef.current.height) * 2 + 1;
+
+      raycasterRef.current.setFromCamera(pointerRef.current, cameraRef.current);
+      const meshes = Object.values(meshMapRef.current);
+      const hits = raycasterRef.current.intersectObjects(meshes, false);
+
+      if (hits.length > 0) {
+        const meshName = hits[0].object.name;
+        applyHighlight(meshName);
+        onPartSelect?.(meshName);
       }
     }
-
     touchStartRef.current = null;
-  }, [controls, onPartSelect]);
+  }, [onPartSelect]);
 
+  // ---- Error state ----
+  if (error) {
+    return (
+      <View style={[styles.container, style]} data-testid="avatar3d-load-error">
+        <View style={styles.errorWrap}>
+          <Text style={styles.errorTitle}>Erro ao carregar avatar 3D</Text>
+          <Text style={styles.errorDetail}>{error}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // ---- Render ----
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, style]} data-testid="avatar3d-container">
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#8b5cf6" />
+          <Text style={styles.loadingText}>Carregando modelo 3D...</Text>
+        </View>
+      )}
       <GLView
         style={styles.glView}
         onContextCreate={onContextCreate}
@@ -302,6 +534,22 @@ export function Avatar3D({
   );
 }
 
+// ============================================================
+// EXPORTED COMPONENT (wrapped in Error Boundary)
+// ============================================================
+
+export function Avatar3D(props: Avatar3DProps) {
+  return (
+    <Avatar3DErrorBoundary>
+      <Avatar3DInner {...props} />
+    </Avatar3DErrorBoundary>
+  );
+}
+
+// ============================================================
+// STYLES
+// ============================================================
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -311,5 +559,34 @@ const styles = StyleSheet.create({
   },
   glView: {
     flex: 1,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1a1a2e',
+    zIndex: 10,
+  },
+  loadingText: {
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 8,
+  },
+  errorWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorTitle: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  errorDetail: {
+    color: '#9ca3af',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });

@@ -33,7 +33,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 │   │   ├── symmetryEngine.ts (Analise de simetria)
 │   │   └── bodyMapping.ts (MediaPipe body mapping)
 │   ├── components/body-composition/
-│   │   ├── Avatar3D.tsx (Three.js modelo 3D)
+│   │   ├── Avatar3D.tsx (Three.js + GLB real)
 │   │   ├── MeasurementInputModal.tsx
 │   │   ├── CameraScanner.tsx
 │   │   └── ScannerOverlay.tsx
@@ -85,6 +85,30 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - **Navegacao**: Body Scan 3D → scan → "Usar Resultados" → protocol-select → measurement → report
 - **Limpeza**: Removida tela legada add-body-composition.tsx
 
+### Session 7 (Avatar3D GLB Real - Prompt 5 Fix) - 09/Abr/2026
+- **Avatar3D.tsx reescrito completamente**:
+  - Carrega /assets/models/avatar.glb via GLTFLoader real
+  - Parse binario do GLB para extrair mapeamento de nomes (UPPERCASE → PascalCase)
+  - Strip de texturas do GLB para compatibilidade React Native
+  - Validacao obrigatoria de meshes: Head, Torso, LeftArm, RightArm, LeftLeg, RightLeg
+  - Centralizacao Box3 e escala automatica
+  - Rotacao automatica no eixo Y (constante e suave)
+  - Raycasting real com coordenadas normalizadas (-1 a 1)
+  - Heatmap via emissive com intensidade visivel (0.55)
+  - Highlight de selecao com restauracao de estado
+  - Error Boundary wrapper (erro controlado, sem fallback silencioso)
+  - Loading state com ActivityIndicator
+  - Performance: dispose on unmount, sem setState por frame
+  - ZERO fallback procedural — se GLB falhar, erro explicito
+- **Heatmap keys corrigidos** (report.tsx → buildHeatmapValues):
+  - Keys mudados de lowercase (torso, arm, thigh) para PascalCase (Torso, LeftArm, RightArm, etc.)
+  - Distribuicao correta: arms → LeftArm + RightArm, legs → LeftLeg + RightLeg
+  - 10 regioes mapeadas corretamente para os 12 meshes do GLB
+- **heatmap.ts atualizado**: applyHeatmap usa emissive em vez de color
+- **metro.config.js**: Adicionado .glb/.gltf ao resolver.assetExts
+- **Removida dependencia de createProceduralAvatar** (cilindros eliminados)
+- **Removida dependencia do hook useAvatarControls** (logica internalizada)
+
 ## Fluxo Body Scan 3D (Completo)
 ```
 [Aba Assessments] → Body Scan 3D →
@@ -98,12 +122,14 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 ## Backlog Priorizado
 
 ### P0 (Critico)
-- Nenhum item critico pendente
+- Fix Durnin & Womersley NaN bug (Math.log10(0) quando soma = 0)
 
 ### P1 (Proximo)
+- Renomear "Simetria Lateral" → "Distribuicao Regional" (symmetryEngine + report)
+- Adicionar eixo Z ao bodyMapping.ts (correcao de perspectiva)
 - Vincular Body Scan (MediaPipe landmarks) ao modelo 3D do avatar
+- Refatorar body-scan.tsx (760+ linhas)
 - Nova UI para VBT e Jump Camera
-- Redesign navegacao "Activity Hub"
 
 ### P2 (Futuro)
 - Import PDF → CSV
@@ -122,4 +148,5 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 ## Integracoes
 - MediaPipeTasksVision (Native SDK)
 - Three.js / Expo-GL / Expo-Three
+- GLTFLoader (three/examples/jsm/loaders/GLTFLoader)
 - RevenueCat (subscricoes)

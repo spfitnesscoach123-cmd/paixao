@@ -64,14 +64,19 @@ function bodyPartColor(part: string, measurements: Record<string, number | undef
   return heatColor(avg);
 }
 
-/** Converte medidas de dobras para heatmap do Avatar3D (regioes normalizadas 0-1) */
+/** Converte medidas de dobras para heatmap do Avatar3D (PascalCase mesh names, normalizado 0-1) */
 function buildHeatmapValues(measurements: Record<string, number | undefined>): Record<string, number> {
   const regionMapping: Record<string, SkinfoldSite[]> = {
-    torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
-    hips: ['suprailiac', 'abdominal'],
-    arm: ['triceps', 'biceps'],
-    thigh: ['thigh'],
-    calf: ['calf'],
+    Torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
+    Hips: ['suprailiac', 'abdominal'],
+    LeftArm: ['triceps', 'biceps'],
+    RightArm: ['triceps', 'biceps'],
+    LeftForearm: ['triceps', 'biceps'],
+    RightForearm: ['triceps', 'biceps'],
+    LeftLeg: ['thigh'],
+    RightLeg: ['thigh'],
+    LeftLowerLeg: ['calf'],
+    RightLowerLeg: ['calf'],
   };
 
   const result: Record<string, number> = {};

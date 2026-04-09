@@ -37,10 +37,10 @@ export function getHeatmapColor(value: number): THREE.Color {
 }
 
 /**
- * Applies heatmap colors to named meshes in a Three.js scene.
+ * Applies heatmap colors to named meshes via emissive (visible on any base material).
  * 
- * @param meshMap - Record of mesh name → THREE.Mesh
- * @param values  - Record of mesh name → value in mm
+ * @param meshMap - Record of mesh name (PascalCase) → THREE.Mesh
+ * @param values  - Record of mesh name (PascalCase) → normalized value 0-1
  */
 export function applyHeatmap(
   meshMap: Record<string, THREE.Mesh>,
@@ -52,11 +52,13 @@ export function applyHeatmap(
 
     const value = values[meshName];
     if (value !== undefined) {
-      mat.color.copy(getHeatmapColor(value));
-      mat.emissive.set(0x000000);
+      // Scale from normalized 0-1 back to mm-equivalent for color lookup
+      const mmEquiv = value * 50;
+      mat.emissive.copy(getHeatmapColor(mmEquiv));
+      mat.emissiveIntensity = 0.55;
     } else {
-      mat.color.copy(COLOR_DEFAULT);
       mat.emissive.set(0x000000);
+      mat.emissiveIntensity = 0;
     }
   }
 }
