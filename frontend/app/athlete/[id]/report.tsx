@@ -1,40 +1,54 @@
 /**
- * report.tsx — Relatorio de composicao corporal com avatar SVG animado
+ * report.tsx — Relatorio de composicao corporal com Avatar 3D animado
  *
  * Recebe FullReport via params e exibe:
- * - Avatar SVG com heatmap de dobras
+ * - Avatar 3D com heatmap (nativo) ou SVG (web fallback)
  * - Metricas de composicao corporal
  * - Assimetrias
  * - Insights automaticos
+ * - Salva no backend via POST /api/body-composition
  */
 
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Animated as RNAnimated,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions,
+  Animated as RNAnimated, Alert, ActivityIndicator, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Circle, Rect, G, Text as SvgText, Defs, Stop, LinearGradient as SvgGrad } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { SKINFOLD_LABELS, type FullReport } from '../../../types/protocols';
+import { SKINFOLD_LABELS, type FullReport, type SkinfoldSite } from '../../../types/protocols';
+import api from '../../../services/api';
+import { useQueryClient } from '@tanstack/react-query';
 
 const { width: SW } = Dimensions.get('window');
+const IS_WEB = Platform.OS === 'web';
 
-// Heatmap color: value in mm -> hex color
+// Lazy-load Avatar3D only on native
+let Avatar3D: any = null;
+if (!IS_WEB) {
+  try {
+    Avatar3D = require('../../../components/body-composition/Avatar3D').Avatar3D;
+  } catch (e) {
+    // Avatar3D not available
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
 function heatColor(value: number): string {
   if (value <= 10) return '#22c55e';
-  if (value <= 20) {
-    const t = (value - 10) / 10;
-    return t < 0.5 ? '#84cc16' : '#eab308';
-  }
+  if (value <= 20) return value < 15 ? '#84cc16' : '#eab308';
   if (value <= 30) return '#f59e0b';
   return '#ef4444';
 }
 
-// Body part fill based on measurements
 function bodyPartColor(part: string, measurements: Record<string, number | undefined>): string {
   const mapping: Record<string, string[]> = {
     torso: ['subscapular', 'suprailiac', 'abdominal', 'chest', 'midaxillary'],
@@ -50,33 +64,109 @@ function bodyPartColor(part: string, measurements: Record<string, number | undef
   return heatColor(avg);
 }
 
+/** Converte medidas de dobras para heatmap do Avatar3D (regioes normalizadas 0-1) */
+function buildHeatmapValues(measurements: Record<string, number | undefined>): Record<string, number> {
+  const regionMapping: Record<string, SkinfoldSite[]> = {
+    torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
+    hips: ['suprailiac', 'abdominal'],
+    arm: ['triceps', 'biceps'],
+    thigh: ['thigh'],
+    calf: ['calf'],
+  };
+
+  const result: Record<string, number> = {};
+  for (const [region, sites] of Object.entries(regionMapping)) {
+    const values = sites.map((s) => measurements[s]).filter((v): v is number => v !== undefined && v > 0);
+    if (values.length > 0) {
+      const avg = values.reduce((s, v) => s + v, 0) / values.length;
+      // Normalizar: 0-50mm → 0-1
+      result[region] = Math.min(avg / 50, 1);
+    }
+  }
+  return result;
+}
+
 export default function ReportScreen() {
-  const params = useLocalSearchParams<{ report: string }>();
+  const { id: athleteId, report: reportStr } = useLocalSearchParams<{ id: string; report: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
+  const queryClient = useQueryClient();
   const pt = locale === 'pt';
+
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   const report: FullReport | null = useMemo(() => {
     try {
-      return params.report ? JSON.parse(params.report) : null;
+      return reportStr ? JSON.parse(reportStr) : null;
     } catch {
       return null;
     }
-  }, [params.report]);
+  }, [reportStr]);
 
-  // Rotation animation for avatar
+  // Rotation animation for SVG fallback
   const rotAnim = useRef(new RNAnimated.Value(0)).current;
   const [rotDeg, setRotDeg] = useState(0);
 
   useEffect(() => {
-    const anim = RNAnimated.loop(
-      RNAnimated.timing(rotAnim, { toValue: 1, duration: 8000, useNativeDriver: false })
-    );
-    anim.start();
-    const listener = rotAnim.addListener(({ value }) => setRotDeg(value * 360));
-    return () => { anim.stop(); rotAnim.removeListener(listener); };
+    if (IS_WEB || !Avatar3D) {
+      const anim = RNAnimated.loop(
+        RNAnimated.timing(rotAnim, { toValue: 1, duration: 8000, useNativeDriver: false })
+      );
+      anim.start();
+      const listener = rotAnim.addListener(({ value }) => setRotDeg(value * 360));
+      return () => { anim.stop(); rotAnim.removeListener(listener); };
+    }
   }, [rotAnim]);
+
+  // Heatmap values para Avatar3D
+  const heatmapValues = useMemo(() => {
+    if (!report) return {};
+    return buildHeatmapValues(report.measurements);
+  }, [report]);
+
+  const handleSave = useCallback(async () => {
+    if (!report || !athleteId || saving || saved) return;
+    setSaving(true);
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await api.post('/body-composition', {
+        athlete_id: athleteId,
+        date: today,
+        protocol: report.protocol.protocolId,
+        weight: report.athleteWeight,
+        height: report.athleteHeight,
+        age: report.age,
+        gender: report.gender,
+        triceps: report.measurements.triceps || null,
+        subscapular: report.measurements.subscapular || null,
+        suprailiac: report.measurements.suprailiac || null,
+        abdominal: report.measurements.abdominal || null,
+        chest: report.measurements.chest || null,
+        midaxillary: report.measurements.midaxillary || null,
+        thigh: report.measurements.thigh || null,
+        calf: report.measurements.calf || null,
+        biceps: report.measurements.biceps || null,
+      });
+
+      setSaved(true);
+      queryClient.invalidateQueries({ queryKey: ['body-composition', athleteId] });
+      queryClient.invalidateQueries({ queryKey: ['assessments', athleteId] });
+      Alert.alert(
+        pt ? 'Salvo' : 'Saved',
+        pt ? 'Avaliacao salva com sucesso!' : 'Assessment saved successfully!'
+      );
+    } catch (e: any) {
+      Alert.alert(
+        pt ? 'Erro' : 'Error',
+        pt ? 'Nao foi possivel salvar a avaliacao.' : 'Failed to save assessment.'
+      );
+    } finally {
+      setSaving(false);
+    }
+  }, [report, athleteId, saving, saved, pt, queryClient]);
 
   if (!report) {
     return (
@@ -88,7 +178,7 @@ export default function ReportScreen() {
 
   const { composition: c, protocol: p, symmetry: s, measurements: m } = report;
 
-  // Scale X based on rotation for 3D feel
+  // Scale X para pseudo-3D no SVG (fallback web)
   const scaleX = Math.cos((rotDeg * Math.PI) / 180) * 0.3 + 0.7;
 
   const metrics = [
@@ -119,7 +209,7 @@ export default function ReportScreen() {
         <View style={styles.protocolBadge}>
           <Ionicons name="document-text" size={16} color="#a78bfa" />
           <Text style={styles.protocolBadgeText}>{p.protocolName}</Text>
-          <Text style={styles.protocolBadgeSub}>{pt ? `${p.sumOfFolds}mm total` : `${p.sumOfFolds}mm total`}</Text>
+          <Text style={styles.protocolBadgeSub}>{p.sumOfFolds}mm total</Text>
         </View>
 
         {/* Classification */}
@@ -131,27 +221,35 @@ export default function ReportScreen() {
           <Text style={styles.classFat}>{c.bodyFatPercent}% {pt ? 'gordura corporal' : 'body fat'}</Text>
         </View>
 
-        {/* Animated Avatar with heatmap */}
+        {/* Avatar 3D (nativo) ou SVG animado (web fallback) */}
         <View style={styles.avatarContainer}>
-          <View style={[styles.avatarWrap, { transform: [{ scaleX }] }]}>
-            <Svg width={180} height={280} viewBox="0 0 180 280">
-              <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Rect x="82" y="43" width="16" height="12" fill={colors.dark.secondary} />
-              <Path d="M50 55 L130 55 L140 80 L145 130 L130 160 L50 160 L35 130 L40 80 Z" fill={bodyPartColor('torso', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Path d="M35 60 L15 60 L5 130 L20 130 L35 80" fill={bodyPartColor('leftArm', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Path d="M145 60 L165 60 L175 130 L160 130 L145 80" fill={bodyPartColor('rightArm', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Path d="M50 160 L130 160 L120 180 L60 180 Z" fill={bodyPartColor('torso', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Path d="M60 180 L80 180 L75 260 L55 260 Z" fill={bodyPartColor('leftLeg', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-              <Path d="M100 180 L120 180 L125 260 L105 260 Z" fill={bodyPartColor('rightLeg', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
-            </Svg>
-          </View>
-
-          {/* Color legend */}
-          <View style={styles.legend}>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} /><Text style={styles.legendText}>{pt ? 'Baixo' : 'Low'}</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#eab308' }]} /><Text style={styles.legendText}>{pt ? 'Moderado' : 'Moderate'}</Text></View>
-            <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} /><Text style={styles.legendText}>{pt ? 'Alto' : 'High'}</Text></View>
-          </View>
+          {Avatar3D && !IS_WEB ? (
+            <Avatar3D
+              autoRotate={true}
+              heatmapValues={heatmapValues}
+              style={{ height: 320 }}
+            />
+          ) : (
+            <>
+              <View style={[styles.avatarWrap, { transform: [{ scaleX }] }]}>
+                <Svg width={180} height={280} viewBox="0 0 180 280">
+                  <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Rect x="82" y="43" width="16" height="12" fill={colors.dark.secondary} />
+                  <Path d="M50 55 L130 55 L140 80 L145 130 L130 160 L50 160 L35 130 L40 80 Z" fill={bodyPartColor('torso', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Path d="M35 60 L15 60 L5 130 L20 130 L35 80" fill={bodyPartColor('leftArm', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Path d="M145 60 L165 60 L175 130 L160 130 L145 80" fill={bodyPartColor('rightArm', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Path d="M50 160 L130 160 L120 180 L60 180 Z" fill={bodyPartColor('torso', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Path d="M60 180 L80 180 L75 260 L55 260 Z" fill={bodyPartColor('leftLeg', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                  <Path d="M100 180 L120 180 L125 260 L105 260 Z" fill={bodyPartColor('rightLeg', m)} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
+                </Svg>
+              </View>
+              <View style={styles.legend}>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#22c55e' }]} /><Text style={styles.legendText}>{pt ? 'Baixo' : 'Low'}</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#eab308' }]} /><Text style={styles.legendText}>{pt ? 'Moderado' : 'Moderate'}</Text></View>
+                <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} /><Text style={styles.legendText}>{pt ? 'Alto' : 'High'}</Text></View>
+              </View>
+            </>
+          )}
         </View>
 
         {/* Metrics grid */}
@@ -217,16 +315,22 @@ export default function ReportScreen() {
             <Text style={styles.secondaryBtnText}>{pt ? 'Editar' : 'Edit'}</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.primaryBtn}
-            onPress={() => {
-              // Navigate back to athlete
-              router.push(`/athlete/${useLocalSearchParams<{ id: string }>().id}`);
-            }}
+            style={[styles.primaryBtn, saved && { opacity: 0.6 }]}
+            onPress={saved ? () => router.push(`/athlete/${athleteId}`) : handleSave}
+            disabled={saving}
             data-testid="report-done-btn"
           >
-            <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.primaryBtnGrad}>
-              <Ionicons name="checkmark" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>{pt ? 'Concluir' : 'Done'}</Text>
+            <LinearGradient colors={saved ? ['#16a34a', '#059669'] : ['#22c55e', '#16a34a']} style={styles.primaryBtnGrad}>
+              {saving ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name={saved ? 'checkmark-done' : 'save'} size={18} color="#fff" />
+                  <Text style={styles.primaryBtnText}>
+                    {saved ? (pt ? 'Concluir' : 'Done') : (pt ? 'Salvar' : 'Save')}
+                  </Text>
+                </>
+              )}
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -248,9 +352,9 @@ const styles = StyleSheet.create({
   classLabel: { fontSize: 12, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   classValue: { fontSize: 28, fontWeight: '800', marginTop: 4 },
   classFat: { fontSize: 14, color: colors.text.secondary, marginTop: 2 },
-  avatarContainer: { alignItems: 'center', marginBottom: 20, paddingVertical: 20, backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default },
-  avatarWrap: {},
-  legend: { flexDirection: 'row', gap: 16, marginTop: 12 },
+  avatarContainer: { alignItems: 'center', marginBottom: 20, backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden' },
+  avatarWrap: { paddingVertical: 20 },
+  legend: { flexDirection: 'row', gap: 16, paddingBottom: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, color: colors.text.secondary },

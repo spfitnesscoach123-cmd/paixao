@@ -1,262 +1,125 @@
-# Load Manager Pro — PRD
+# Load Manager Pro - PRD
 
-## Produto
-App de monitoramento de carga atletica com camera inteligente para avaliacao de saltos (CMJ, SL-CMJ) e VBT.
+## Problema Original
+Aplicativo de gerenciamento de carga para treinadores esportivos. React Native Expo (frontend) + FastAPI (backend) + MongoDB. Modulos: VBT (Velocity Based Training), Jump Camera (CMJ, SL-CMJ), Body Scan 3D (composicao corporal).
 
-## Stack
-- **Frontend**: React Native Expo (TypeScript)
-- **Backend**: FastAPI (Python)
-- **DB**: MongoDB
-- **Camera**: MediaPipe Pose Tasks (iOS nativo)
+## Usuarios
+- Treinadores/Preparadores fisicos
+- Atletas (visualizacao de dados)
 
-## Arquitetura do Jump Camera Pipeline
+## Funcionalidades Core
+1. **Gerenciamento de Atletas** - CRUD completo
+2. **Avaliacao de Forca & VBT** - Velocity Based Training com camera
+3. **Jump Camera** - CMJ e SL-CMJ com MediaPipe
+4. **Body Scan 3D** - Scanner corporal + Protocolos cientificos (PROMPT 3 + 4)
+5. **Wellness** - Monitoramento de bem-estar
+6. **GPS Data** - Dados de atividade
+7. **Analise Cientifica** - Graficos e metricas avancadas
+
+## Arquitetura
 ```
-Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
-→ handleMediapipeLandmark(event, nativeTimestamp)
-→ convertMediapipeLandmarks → keypoints[]
-→ processFrame(keypoints, nativeTimestamp)
-  ├─ Scanning: orientation check + calibration frames
-  ├─ Countdown: continue collecting calibration
-  ├─ Recording: jump detection frames
-  └─ Processing: analyzeJumpFrames()
-→ OverlayLayer (visual only, isolated)
+/app
+├── frontend/ (React Native Expo)
+│   ├── app/athlete/[id]/ (Telas por atleta)
+│   │   ├── body-scan.tsx (Camera + MediaPipe scanner)
+│   │   ├── protocol-select.tsx (Selecao de protocolo)
+│   │   ├── measurement.tsx (Medicoes no Avatar 3D)
+│   │   ├── report.tsx (Relatorio animado + save backend)
+│   │   ├── jump-camera.tsx
+│   │   └── vbt-camera.tsx
+│   ├── engine/body-composition/
+│   │   ├── protocolEngine.ts (5 protocolos cientificos)
+│   │   ├── bodyComposition.ts (Calculo de composicao)
+│   │   ├── symmetryEngine.ts (Analise de simetria)
+│   │   └── bodyMapping.ts (MediaPipe body mapping)
+│   ├── components/body-composition/
+│   │   ├── Avatar3D.tsx (Three.js modelo 3D)
+│   │   ├── MeasurementInputModal.tsx
+│   │   ├── CameraScanner.tsx
+│   │   └── ScannerOverlay.tsx
+│   └── types/protocols.ts
+├── backend/ (FastAPI)
+│   └── server.py (API completa)
 ```
 
-## Implementado
+## O que foi implementado
 
-### Session 1-2 (antes)
-- [x] Pipeline completo Jump Camera com MediaPipe
-- [x] Pre-Jump Scanner 3 fases (collect + analyze + decision)
-- [x] Flight time com compensacao de latencia
-- [x] MIN_LANDING_FRAMES=2 simetrico
-- [x] RSImod classificacao cientifica (CMJ thresholds)
-- [x] Backend reclassificacao on-the-fly
-- [x] ScientificAnalysisTab com tooltips
+### Session 1-4 (Anteriores)
+- VBT Camera completo
+- Jump Camera (CMJ + SL-CMJ)
+- Autenticacao JWT
+- CRUD atletas
+- Wellness tracking
+- GPS data
+- Analise cientifica
 
-### Session 3 (2026-02-XX)
-- [x] Auditoria tecnica completa do Jump Camera (7 secoes)
+### Session 5 (Body Scan + Protocolos - Prompt 3)
+- Body Scan com MediaPipe (camera + 4 estados visuais)
+- Scanner overlay com esqueleto
+- Navegacao Body Scan 3D na aba Assessments
 
-### Session 4 (2026-04-06) — P0 + P1
-- [x] **P0.1 — Validacao de Orientacao**: `checkAthleteOrientation()` em jumpDetector.ts
-  - Captura coordenadas X de ombros e quadril
-  - Threshold `ORIENTATION_MIN_WIDTH: 0.06`
-  - Tracking durante scanning (visual feedback)
-  - Bloqueio apenas no ponto de decisao (nao durante ajuste)
-  - >= 0.80 + orientacao invalida → bloqueia
-  - 0.65-0.79 + confirmContinue verifica orientacao
-- [x] **P0.2 — Timestamp Nativo**: Propagacao do timestamp do MediaPipe
-  - handleMediapipeLandmark(event, nativeTimestamp?)
-  - processFrame(keypoints, nativeTimestamp?)
-  - getFrameTimestamp(nativeTimestamp) usa nativo quando disponivel
-- [x] **P1.1 — OverlayLayer**: Componente visual isolado
-  - /components/jump/OverlayLayer.tsx
-  - pointerEvents="none", nunca altera logica
-  - onLayout para medir dimensoes do container
-- [x] **P1.2 — Scanner Visual Animado**:
-  - Scan line animada (top→bottom loop, 2s)
-  - Linha do solo com animacao pulse
-  - Pontos nos pes (12px, cor por qualidade)
-  - Skeleton leve (8 conexoes, ~45% opacidade, sem maos/face)
-  - Dots nas articulacoes (8px)
-  - Banner de orientacao invalida
-- [x] **P1.3/P1.4 — Fluxo de Confianca Controlado**:
-  - >= 80% + orientacao OK → auto-start
-  - 65-79% → fase 'ready', botao "Continuar mesmo assim" apos 500ms estavel
-  - < 65% → retry automatico (2x) ou bloqueio
-  - confirmContinue() verifica orientacao antes de prosseguir
-- [x] **Performance**: Overlay throttled a ~15fps (cada 2 frames)
+### Session 6 (Protocolos + Relatorio Animado - Prompt 4) - 09/Abr/2026
+- **Selecao de protocolo** (protocol-select.tsx): 5 protocolos cientificos
+  - Jackson & Pollock 3 Dobras
+  - Jackson & Pollock 7 Dobras
+  - Durnin & Womersley (4 sites)
+  - Faulkner (4 sites)
+  - Guedes 1985 (3 sites)
+- **Tela de medicoes** (measurement.tsx): Avatar interativo com pontos por protocolo
+  - Avatar3D (Three.js) no mobile, SVG fallback no web
+  - Modal de input por site (mm)
+  - Validacao: so permite calculo com todos os sites preenchidos
+  - Mapeamento mesh 3D → sites de dobras cutaneas
+- **Motor de calculos** (protocolEngine.ts): Formulas cientificas reais
+  - Densidade corporal (Siri equation)
+  - Body fat %, massa gorda, massa magra, agua, osso, IMC
+  - Classificacao (Essential/Athletic/Fitness/Average/Obese)
+- **Analise de simetria** (symmetryEngine.ts): Lateral e vertical + insights
+- **Relatorio animado** (report.tsx):
+  - Avatar SVG com heatmap (verde/amarelo/vermelho)
+  - Avatar3D com autoRotate + heatmap no mobile
+  - Grid de metricas (6 cards)
+  - Simetria e insights automaticos em PT/EN
+  - Save no backend (POST /api/body-composition)
+- **Backend**: Adicionados JP3 e D&W ao enum + funcoes de calculo
+- **Navegacao**: Body Scan 3D → scan → "Usar Resultados" → protocol-select → measurement → report
+- **Limpeza**: Removida tela legada add-body-composition.tsx
 
-### Session 5 (2026-04-07) — Bug Fixes + SL-CMJ Continuous Pipeline
-- [x] **P0.1 — Auto-stop baseado em Landing**: Landing detection no processFrame
-  - CMJ: 3 frames consecutivos no solo apos takeoff → auto-stop 300ms
-  - Timeout fallback mantido (6s CMJ, 15s SL-CMJ)
-- [x] **P0.2 — Consistencia de Timestamp**: normalizeTimestamp() em frameTime.ts
-  - Converte timestamps nativos de segundos para ms quando necessario
-  - recordingStartTimeRef agora usa timestamp do primeiro frame (mesma fonte)
-- [x] **P0.3 — Orientacao Lateral Obrigatoria**: Inversao da logica
-  - Lateral (ombros/quadril < 0.05) = VALIDO
-  - Frontal (ombros/quadril >= 0.05) = INVALIDO → bloqueia
-  - Mensagem: "Posicione-se de lado para a camera"
-- [x] **P1.4 — Confidence Score Sempre Visivel**: Badge durante countdown e recording
-- [x] **P1.5 — Frame Count Removido**: Removido da UI, apenas interno
-- [x] **P1.6 — Botao "Ver Detalhes Cientificos"**: Na tela de resultados
-- [x] **P1.5 — SL-CMJ Continuous Pipeline**: Gravacao unica com 2 saltos
-  - State machine: WAITING_FIRST → FIRST_DETECTED → WAITING_SECOND → COMPLETED
-  - Intervalo minimo 500ms entre saltos (ignora ruido)
-  - Split de frames para analise independente de cada salto
-  - Reset limpo de refs de deteccao entre saltos
-- [x] **P1.5.8 — Selecao de Perna**: UI para escolher qual perna primeiro (SL-CMJ)
-  - Exibe ordem: "1o salto: PERNA DIREITA / 2o salto: PERNA ESQUERDA"
-- [x] **P1.5.10 — Feedback em Tempo Real**: Mensagens durante gravacao SL-CMJ
-  - "Aguardando salto 1..."
-  - "Salto 1 detectado (Perna Direita) / Prepare-se..."
-  - "Aguardando salto 2..."
-  - "Salto 2 detectado / Processando..."
+## Fluxo Body Scan 3D (Completo)
+```
+[Aba Assessments] → Body Scan 3D →
+  [body-scan.tsx] Config (altura/peso) → Iniciar Scanner → Scan camera → Resultados →
+  "Usar Resultados" →
+  [protocol-select.tsx] Selecionar protocolo + dados atleta →
+  [measurement.tsx] Tocar avatar → inserir dobras (mm) → Calcular →
+  [report.tsx] Classificacao + Heatmap + Metricas + Simetria + Insights → Salvar
+```
 
-### Session 5b (2026-04-07) — VBT V2 Implementation
-- [x] **MovementDetector** (NEW): Displacement-based movement detection
-  - Direction detection via deltaY with 3-frame confirmation
-  - Min displacement threshold: 8% of screen (0.08)
-  - Direction threshold: 0.5% (0.005)
-  - Phase displacement tracking with reset between reps
-- [x] **RepDetectorV2** (NEW): Displacement-driven rep state machine
-  - Transitions driven by displacement, NOT velocity
-  - Velocity collected for metrics only, not for gating
-  - Supports eccentric-first (Squat/Bench) and concentric-first (Deadlift)
-  - Min phase displacement: 3% (0.03)
-  - Same timing guards: 150ms min phase, 300ms lockout, 10s max
-- [x] **VBTAnalyzer** (NEW): Performance analysis brain
-  - Baseline = max(first 3 reps mean velocities)
-  - Optional baseline update when faster rep detected
-  - Rep classification: FAST (>=75% baseline), NORMAL, FATIGUED (<50%)
-  - Calibration phase: first 3 reps show "CALIBRANDO..."
-  - Drop % clamped to 0 (no negative drops)
-- [x] **VelocityCalculator** (MODIFIED): Lower noise + adaptive smoothing
-  - noiseThreshold: 0.02 -> 0.005 m/s
-  - Adaptive window: 3 frames for slow (<0.1 m/s), 5 frames for fast
-- [x] **VBTGauge** (NEW): SVG circular gauge component
-  - 270-degree arc with progress (velocity/baseline)
-  - Center: rep count (large), velocity (small), drop % with trend arrow
-  - Color: green (<10%), yellow (10-20%), red (>20%), blue (calibrating)
-- [x] **UI Layout V2**: Gauge-based overlay
-  - Top-left: REPS badge, Top-right: DROP % badge
-  - Center: VBTGauge, Bottom: phase indicator
-  - Applied to both native and web/simulation camera views
+## Backlog Priorizado
 
-## New Files Created (Session 5b)
-- `services/vbt/MovementDetector.ts`
-- `services/vbt/RepDetectorV2.ts`
-- `services/vbt/VBTAnalyzer.ts`
-- `components/vbt/VBTGauge.tsx`
+### P0 (Critico)
+- Nenhum item critico pendente
 
-## Files Modified (Session 5b)
-- `services/vbt/VelocityCalculator.ts` — noise threshold + adaptive smoothing
-- `services/vbt/useProtectedBarTracking.ts` — V2 module integration
-- `app/athlete/[id]/vbt-camera.tsx` — Gauge UI layout
+### P1 (Proximo)
+- Vincular Body Scan (MediaPipe landmarks) ao modelo 3D do avatar
+- Nova UI para VBT e Jump Camera
+- Redesign navegacao "Activity Hub"
 
-### Session 6 (2026-04-08) — SL-CMJ State Machine Fix (P0)
-- [x] **P0 — SL-CMJ Landing Detection**: `detectSLCMJLanding` corrigida
-  - Removido OR logic (pé inativo disparava landing falso durante takeoff)
-  - Agora verifica APENAS o pé ativo — simétrico com `detectSLCMJTakeoff`
-- [x] **P1 — Active Leg Priority**: Protocolo do usuário tem prioridade absoluta
-  - `detectActiveLeg` rebaixada para fallback/log
-  - `setActiveLeg(protocolLeg)` sempre usa escolha do protocolo
-- [x] **CMJ INTOCADO**: `detectCMJTakeoff`, `detectCMJLanding`, pipeline CMJ sem alterações
-- [x] **P1 — JumpGraph CMJ Visual Fix**: Grafico em tempo real corrigido
-  - Causa raiz: `useMemo` nao recomputava (ref array mesmo reference) — fix: spread `[...ref]`
-  - Fundo escuro removido (background transparente)
-  - Curva suavizada com Quadratic Bezier (nao mais Polyline linear)
-  - Efeito area chart com fill 15% opacity
-  - Smoothing 5-point moving average
-  - Buffer limitado a 120 pontos
-  - Zero alteracao em logica de deteccao/metricas/SL-CMJ
+### P2 (Futuro)
+- Import PDF → CSV
+- Export CSV
+- CMJ perspective bug fix (foot selection + hip validation) - PARKED
 
-### Session 7 (2026-04-08) — CMJ Foot Selection + Hip Validation (P0)
-- [x] **P0 — computeFootScore()**: Formula deterministica para scoring de cada pe
-  - stabilityScore * 0.5 + proximityScore * 0.3 + crossingScore * 0.2
-  - Threshold 0.8 para selecao de modo
-- [x] **P0 — cmjMode na Calibracao**: Decisao unica na calibracao
-  - BOTH_FEET: ambos pés score > 0.8 (comportamento identico ao anterior)
-  - LEFT_ONLY / RIGHT_ONLY: apenas pe confiavel usado (fix perspectiva)
-  - INVALID_CALIBRATION: bloqueia gravacao com erro
-- [x] **P0 — detectCMJTakeoff/Landing switch**: Switch por cmjMode
-  - BOTH_FEET: AND takeoff / OR landing (original)
-  - LEFT_ONLY/RIGHT_ONLY: apenas pe selecionado
-- [x] **P1 — Hip Validation (dupla confirmacao)**:
-  - Takeoff: footTakeoff && hipCenterY < standingHipY
-  - Landing: footLanding && hipCenterY >= standingHipY
-  - Aplicado em real-time (processFrame + updateLiveMetrics) e offline (analyzeCMJ)
-- [x] **P1 — INVALID_CALIBRATION failsafe**: Bloqueia scanner se ambos pes invalidos
-- [x] **ZERO REGRESSAO SL-CMJ**: detectSLCMJ* intocado
-- [x] **ZERO REGRESSAO CMJ BOTH_FEET**: Quando ambos pes OK, logica identica + hip
+### P3 (Backlog)
+- Merge de perfis duplicados
+- i18n completa (ScientificAnalysisTab, Assessments)
+- Refactoring trackingProtection.ts (legacy VBT)
 
-### Session 8 (2026-04-09) — SL-CMJ Root Cause Fix + Confidence Badge
-- [x] **P0 — SL-CMJ `waiting_second_grounded`**: Root cause identificado — apos troca de perna,
-  pe levantado era interpretado como "em voo" e pouso ao chao como "aterrissagem".
-  Adicionado sub-estado `waiting_second_grounded` que exige segundo pe NO CHAO por 3 frames
-  consecutivos antes de habilitar deteccao de takeoff. Corrige definitivamente o auto-stop prematuro.
-- [x] **P1 — Confidence badge removido do recording overlay**: Badge sobrepunha "JUMP NOW" no jump-camera.
-  Removido durante fase de gravacao (ainda visivel durante scanning/countdown).
-- [x] **ZERO REGRESSAO CMJ**: Bloco `waiting_second_grounded` gated por `isSlCmj`, CMJ nunca entra nesse estado.
-- [x] **ZERO REGRESSAO BUILD**: Metro bundle sem erros. 5/5 testes unitarios passando.
-
-### Session 9 (2026-04-09) — Body Scan Pipeline (Camera + MediaPipe + Body Mapping)
-- [x] **P0 — Body Mapping Engine** (`engine/body-composition/bodyMapping.ts`):
-  - `validatePose()`: Valida corpo inteiro visivel, distancia adequada, centralizacao
-  - `evaluateStability()`: Calcula stdDev de landmarks criticos em buffer de frames
-  - `averageLandmarks()`: Media de N frames com descarte de baixa confianca
-  - `mapBody()`: Converte landmarks medios em proporcoes corporais (cm) usando scaleFactor
-  - 14/14 testes unitarios passando
-- [x] **P0 — useBodyScan Hook** (`hooks/useBodyScan.ts`):
-  - State machine: IDLE -> POSITIONING -> CAPTURING -> PROCESSING -> COMPLETE / ERROR
-  - Auto-start captura apos 15 frames consecutivos com pose valida
-  - Buffer de 75 frames (~2.5s @ 30fps), descarte de frames ruins
-  - Processamento assincrono via queueMicrotask
-  - Interface Avatar3D: `bodyParams`, `loading`, `confidence` derivados
-  - `stateLabel`: 4 labels visuais (BUSCANDO CORPO / AJUSTANDO POSICAO / ESCANEANDO / PROCESSANDO)
-- [x] **P0 — CameraScanner** (`components/body-composition/CameraScanner.tsx`):
-  - Reutiliza MediaPipeCamera existente (back camera, 30fps)
-  - Pipeline 3 estagios (Camera -> MediaPipe -> Engine) como jump-camera
-  - Converte RawLandmark[] para Landmark[] do bodyMapping
-- [x] **P0 — ScannerOverlay V2** (`components/body-composition/ScannerOverlay.tsx`):
-  - 3 scan lines paralelas com glow (Reanimated withDelay staggered)
-  - Skeleton com conexoes (bones) + dots com glow por visibility
-  - Corner brackets enquadrando corpo com pulse animado
-  - Silhueta guia com pulse (positioning sem corpo detectado)
-  - 4 estados visuais: BUSCANDO CORPO / AJUSTANDO POSICAO / ESCANEANDO / PROCESSANDO
-  - Badge de estado com icone + cor dinamica
-  - Feedback card com checks individuais + barra de confianca
-  - Progress bar com glow durante captura
-  - Processing overlay com card e icone pulse
-- [x] **P0 — BodyScanScreen** (`app/athlete/[id]/body-scan.tsx`):
-  - Tela Config: inputs de altura/peso, dicas, botao Start
-  - Tela Scanning: camera + overlay premium (posicionamento automatico + captura)
-  - Tela Results: grid de proporcoes corporais em cm, qualidade, acoes
-  - Transicao automatica entre fases
-
-## Files Modified (Session 8)
-- `services/jump/useJumpCamera.ts` — SlCmjRecordingState type + waiting_second_grounded logic + groundedFrameCountRef
-- `app/athlete/[id]/jump-camera.tsx` — Confidence badge removido de recording + UI feedback para waiting_second_grounded
-
-## New Files Created (Session 9 — Body Scan)
-- `engine/body-composition/bodyMapping.ts` — Body Mapping Engine (validatePose, mapBody, averageLandmarks, evaluateStability)
-- `hooks/useBodyScan.ts` — State machine hook (IDLE→POSITIONING→CAPTURING→PROCESSING→COMPLETE)
-- `components/body-composition/CameraScanner.tsx` — Camera com MediaPipe (3-stage pipeline)
-- `components/body-composition/ScannerOverlay.tsx` — Overlay visual (scan line, skeleton, feedback, progresso)
-- `app/athlete/[id]/body-scan.tsx` — Tela principal (config, scanning, results)
-- `tests/body-composition/bodyMapping.test.ts` — 14 testes unitarios
-
-## New Files Created (Session 7)
-- `tests/jump/footSelection.test.ts`
-
-## Files Modified (Session 7)
-- `services/jump/types.ts` — GroundCalibration +cmjMode +bestFoot
-- `services/jump/jumpDetector.ts` — computeFootScore, calibrateGround, detectCMJ*, analyzeCMJ hip validation
-- `services/jump/useJumpCamera.ts` — INVALID_CALIBRATION failsafe, processFrame + updateLiveMetrics hip validation
-
-## Pendente / Backlog
-
-### P0 (Resolvido)
-- [x] CMJ Foot Selection + Hip Validation (perspectiva 133cm corrigida)
-
-### P1
-- [ ] Nova UI moderna para VBT e Jump Camera (design do usuario)
-- [ ] Skeleton completo no VBT camera
-- [ ] Redesign navegacao "Activity Hub" (Atividade → Atleta)
-- [ ] identifyJumpLeg() — validar perna detectada vs perna esperada no SL-CMJ
-
-### P2
-- [ ] Importacao de dados via PDF (PDF → CSV)
-- [ ] Exportacao de dados para CSV
-- [ ] UI para merge de perfis duplicados
-- [ ] Detalhe no PDF Export
-
-### P3
-- [ ] i18n de ScientificAnalysisTab e Avaliacoes
-- [ ] Refatoracao trackingProtection.ts (codigo legacy VBT)
-- [ ] Gate de logs com __DEV__
-- [ ] Remover codigo morto (between_jumps, startSecondJump)
-
-## Credenciais
-- User: contato@loadmanagerpro.com.br
+## Credenciais de Teste
+- Email: contato@loadmanagerpro.com.br
 - Password: #UAE2026
+
+## Integracoes
+- MediaPipeTasksVision (Native SDK)
+- Three.js / Expo-GL / Expo-Three
+- RevenueCat (subscricoes)

@@ -339,9 +339,14 @@ class PhysicalAssessment(BaseModel):
 
 class BodyCompositionProtocol(str, Enum):
     GUEDES = "guedes"
+    GUEDES_1985 = "guedes_1985"
     POLLOCK_JACKSON_7 = "pollock_jackson_7"
-    POLLOCK_JACKSON_9 = "pollock_jackson_9"  # 9 skinfolds
+    JACKSON_POLLOCK_7 = "jackson_pollock_7"
+    JACKSON_POLLOCK_3 = "jackson_pollock_3"
+    POLLOCK_JACKSON_9 = "pollock_jackson_9"
     FAULKNER_4 = "faulkner_4"
+    FAULKNER = "faulkner"
+    DURNIN_WOMERSLEY = "durnin_womersley"
 
 class BodyCompositionCreate(BaseModel):
     athlete_id: str
@@ -3241,6 +3246,35 @@ def calculate_body_density_pollock_jackson_9(gender: str, age: int, skinfolds: d
     
     return density
 
+
+def calculate_body_density_jackson_pollock_3(gender: str, age: int, skinfolds: dict) -> float:
+    """Jackson & Pollock 3 Skinfold Protocol. Males: chest, abdominal, thigh. Females: triceps, suprailiac, thigh."""
+    if gender.lower() == 'male':
+        s = skinfolds.get('chest', 0) + skinfolds.get('abdominal', 0) + skinfolds.get('thigh', 0)
+        return 1.10938 - 0.0008267 * s + 0.0000016 * s**2 - 0.0002574 * age
+    else:
+        s = skinfolds.get('triceps', 0) + skinfolds.get('suprailiac', 0) + skinfolds.get('thigh', 0)
+        return 1.0994921 - 0.0009929 * s + 0.0000023 * s**2 - 0.0001392 * age
+
+def calculate_body_density_durnin_womersley(gender: str, age: int, skinfolds: dict) -> float:
+    """Durnin & Womersley 4 Skinfold Protocol (1974). Sites: biceps, triceps, subscapular, suprailiac."""
+    import math
+    s = skinfolds.get('biceps', 0) + skinfolds.get('triceps', 0) + skinfolds.get('subscapular', 0) + skinfolds.get('suprailiac', 0)
+    log_s = math.log10(max(s, 1))
+    if gender.lower() == 'male':
+        if age < 20: return 1.1620 - 0.0630 * log_s
+        elif age < 30: return 1.1631 - 0.0632 * log_s
+        elif age < 40: return 1.1422 - 0.0544 * log_s
+        elif age < 50: return 1.1620 - 0.0700 * log_s
+        else: return 1.1715 - 0.0779 * log_s
+    else:
+        if age < 20: return 1.1549 - 0.0678 * log_s
+        elif age < 30: return 1.1599 - 0.0717 * log_s
+        elif age < 40: return 1.1423 - 0.0632 * log_s
+        elif age < 50: return 1.1333 - 0.0612 * log_s
+        else: return 1.1339 - 0.0645 * log_s
+
+
 def calculate_body_density_guedes(gender: str, skinfolds: dict) -> float:
     """
     Guedes Protocol (1985) - Brazilian validated protocol
@@ -3447,16 +3481,22 @@ async def create_body_composition(
     body_density = None
     body_fat_percentage = None
     
-    if protocol == "guedes":
+    if protocol in ("guedes", "guedes_1985"):
         body_density = calculate_body_density_guedes(data.gender, skinfolds)
         body_fat_percentage = siri_equation(body_density)
-    elif protocol == "pollock_jackson_7":
+    elif protocol in ("pollock_jackson_7", "jackson_pollock_7"):
         body_density = calculate_body_density_pollock_jackson_7(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol == "jackson_pollock_3":
+        body_density = calculate_body_density_jackson_pollock_3(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol == "durnin_womersley":
+        body_density = calculate_body_density_durnin_womersley(data.gender, data.age, skinfolds)
         body_fat_percentage = siri_equation(body_density)
     elif protocol == "pollock_jackson_9":
         body_density = calculate_body_density_pollock_jackson_9(data.gender, data.age, skinfolds)
         body_fat_percentage = siri_equation(body_density)
-    elif protocol == "faulkner_4":
+    elif protocol in ("faulkner_4", "faulkner"):
         body_fat_percentage = calculate_body_fat_faulkner(skinfolds)
         body_density = None  # Faulkner calculates %BF directly
     

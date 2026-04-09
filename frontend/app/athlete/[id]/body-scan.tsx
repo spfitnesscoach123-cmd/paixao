@@ -18,7 +18,6 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
-  Alert,
   Dimensions,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -121,18 +120,17 @@ export default function BodyScanScreen() {
     setUiPhase('config');
   }, [bodyScan]);
 
-  // Usar resultados (navegar para proxima tela ou salvar)
+  // Usar resultados → navegar para selecao de protocolo
   const handleUseResults = useCallback(() => {
     if (!bodyScan.result) return;
-    // Navegar de volta com os dados (via params ou state manager)
-    Alert.alert(
-      locale === 'pt' ? 'Dados Prontos' : 'Data Ready',
-      locale === 'pt'
-        ? 'Proporcoes corporais calculadas. Pronto para o Avatar 3D.'
-        : 'Body proportions calculated. Ready for 3D Avatar.',
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
-  }, [bodyScan.result, locale, router]);
+    router.push({
+      pathname: `/athlete/${athleteId}/protocol-select`,
+      params: {
+        scanWeight: athleteWeight,
+        scanHeight: athleteHeight,
+      },
+    });
+  }, [bodyScan.result, athleteId, athleteWeight, athleteHeight, router]);
 
   // ============================================================
   // RENDER: CONFIG

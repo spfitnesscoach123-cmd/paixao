@@ -18,7 +18,9 @@ import { PROTOCOLS, getProtocolSites } from '../../../engine/body-composition/pr
 import { SKINFOLD_LABELS, type Gender } from '../../../types/protocols';
 
 export default function ProtocolSelectScreen() {
-  const { id: athleteId } = useLocalSearchParams<{ id: string }>();
+  const { id: athleteId, scanWeight, scanHeight } = useLocalSearchParams<{
+    id: string; scanWeight?: string; scanHeight?: string;
+  }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
@@ -26,8 +28,8 @@ export default function ProtocolSelectScreen() {
   const [selectedProtocol, setSelectedProtocol] = useState<string | null>(null);
   const [gender, setGender] = useState<Gender>('male');
   const [age, setAge] = useState('25');
-  const [weight, setWeight] = useState('75');
-  const [height, setHeight] = useState('175');
+  const [weight, setWeight] = useState(scanWeight || '75');
+  const [height, setHeight] = useState(scanHeight || '175');
 
   const protocol = PROTOCOLS.find((p) => p.id === selectedProtocol);
   const sites = protocol ? getProtocolSites(protocol, gender) : [];

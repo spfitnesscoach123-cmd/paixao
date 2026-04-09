@@ -696,7 +696,7 @@ export default function AthleteDetails() {
       case 'assessments':
         return (
           <View style={styles.tabContent}>
-            {/* Action buttons - Força (com VBT integrado), Composição Corporal */}
+            {/* Action buttons - Forca (com VBT integrado), Body Scan 3D */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
                 style={styles.actionButtonLarge}
@@ -708,48 +708,32 @@ export default function AthleteDetails() {
                     <Ionicons name="speedometer" size={20} color="rgba(255,255,255,0.8)" />
                   </View>
                   <Text style={styles.actionButtonLargeText}>
-                    {locale === 'pt' ? 'Força & VBT' : 'Strength & VBT'}
+                    {locale === 'pt' ? 'Forca & VBT' : 'Strength & VBT'}
                   </Text>
                   <Text style={styles.actionButtonSubtext}>
-                    {locale === 'pt' ? 'Avaliação de força + Velocity Based Training' : 'Strength assessment + Velocity Based Training'}
+                    {locale === 'pt' ? 'Avaliacao de forca + Velocity Based Training' : 'Strength assessment + Velocity Based Training'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.actionButtonLarge}
-                onPress={() => router.push(`/athlete/${id}/add-body-composition`)}
+                onPress={() => router.push(`/athlete/${id}/body-scan`)}
+                data-testid="body-scan-3d-nav-btn"
               >
                 <LinearGradient colors={['#10b981', '#059669']} style={styles.actionButtonGradient}>
-                  <Ionicons name="body" size={24} color="#ffffff" />
+                  <View style={styles.actionButtonIconRow}>
+                    <Ionicons name="scan" size={24} color="#ffffff" />
+                    <Ionicons name="body" size={20} color="rgba(255,255,255,0.8)" />
+                  </View>
                   <Text style={styles.actionButtonLargeText}>
-                    {locale === 'pt' ? 'Composição Corporal' : 'Body Composition'}
+                    {locale === 'pt' ? 'Body Scan 3D' : 'Body Scan 3D'}
                   </Text>
                   <Text style={styles.actionButtonSubtext}>
-                    {locale === 'pt' ? 'Protocolos científicos de dobras cutâneas' : 'Scientific skinfold protocols'}
+                    {locale === 'pt' ? 'Scanner corporal + Protocolos cientificos' : 'Body scanner + Scientific protocols'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
-
-            {/* Body Scan 3D */}
-            <TouchableOpacity
-              style={styles.actionButtonLarge}
-              onPress={() => router.push(`/athlete/${id}/body-scan`)}
-              data-testid="body-scan-nav-btn"
-            >
-              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.actionButtonGradient}>
-                <View style={styles.actionButtonIconRow}>
-                  <Ionicons name="scan" size={24} color="#ffffff" />
-                  <Ionicons name="body" size={20} color="rgba(255,255,255,0.8)" />
-                </View>
-                <Text style={styles.actionButtonLargeText}>
-                  {locale === 'pt' ? 'Body Scan 3D' : 'Body Scan 3D'}
-                </Text>
-                <Text style={styles.actionButtonSubtext}>
-                  {locale === 'pt' ? 'Scanner corporal com câmera e MediaPipe' : 'Body scanner with camera and MediaPipe'}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
 
             {/* Jump charts moved to Scientific Analysis tab — rendering disabled here */}
             {/* <View style={styles.strengthAnalysisSection}>

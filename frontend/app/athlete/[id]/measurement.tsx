@@ -1,13 +1,13 @@
 /**
- * measurement.tsx — Tela de medicoes com SVG body model
+ * measurement.tsx — Tela de medicoes com Avatar 3D interativo
  *
- * Fluxo: Tap no corpo -> Modal de input -> Salvar valor -> Calcular
- * Usa SVG body model (como add-body-composition) com highlight de pontos do protocolo
+ * Fluxo: Tap no avatar 3D -> Mapeamento mesh->site -> Modal de input -> Calcular
+ * Usa Avatar3D (Three.js) com raycasting para selecao de partes do corpo
  */
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,8 +27,24 @@ import {
 } from '../../../types/protocols';
 
 const { width: SW } = Dimensions.get('window');
+const IS_WEB = Platform.OS === 'web';
 
-// SVG body site positions
+// ============================================================
+// MAPEAMENTO: Mesh 3D → Sites de dobras cutaneas
+// ============================================================
+
+const MESH_TO_SITES: Record<string, SkinfoldSite[]> = {
+  Torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
+  Hips: ['suprailiac', 'abdominal'],
+  LeftArm: ['triceps', 'biceps'],
+  RightArm: ['triceps', 'biceps'],
+  LeftLeg: ['thigh'],
+  RightLeg: ['thigh'],
+  LeftLowerLeg: ['calf'],
+  RightLowerLeg: ['calf'],
+};
+
+// SVG body site positions (fallback para web)
 const SITE_POS: Record<SkinfoldSite, { x: number; y: number }> = {
   triceps: { x: 28, y: 100 },
   biceps: { x: 152, y: 100 },
@@ -40,6 +56,16 @@ const SITE_POS: Record<SkinfoldSite, { x: number; y: number }> = {
   thigh: { x: 78, y: 200 },
   calf: { x: 78, y: 252 },
 };
+
+// Lazy-load Avatar3D only on native (Three.js doesn't work well on web)
+let Avatar3D: any = null;
+if (!IS_WEB) {
+  try {
+    Avatar3D = require('../../../components/body-composition/Avatar3D').Avatar3D;
+  } catch (e) {
+    // Avatar3D not available, will use SVG fallback
+  }
+}
 
 export default function MeasurementScreen() {
   const params = useLocalSearchParams<{
@@ -60,6 +86,8 @@ export default function MeasurementScreen() {
 
   const [measurements, setMeasurements] = useState<Measurements>({});
   const [modalSite, setModalSite] = useState<SkinfoldSite | null>(null);
+  const [sitePickerOptions, setSitePickerOptions] = useState<SkinfoldSite[]>([]);
+  const [highlightedMesh, setHighlightedMesh] = useState<string | null>(null);
 
   const validation = useMemo(() => {
     if (!protocol) return { valid: false, missing: [] as SkinfoldSite[] };
@@ -71,6 +99,26 @@ export default function MeasurementScreen() {
   const handleSaveMeasurement = useCallback((site: SkinfoldSite, value: number) => {
     setMeasurements((prev) => ({ ...prev, [site]: value }));
   }, []);
+
+  // Quando usuario toca em um mesh 3D do avatar
+  const handleMeshSelect = useCallback((meshName: string) => {
+    const possibleSites = MESH_TO_SITES[meshName] || [];
+    // Filtrar apenas sites que fazem parte do protocolo atual
+    const protocolSites = possibleSites.filter((s) => sites.includes(s));
+
+    if (protocolSites.length === 0) return; // Mesh nao faz parte do protocolo
+
+    setHighlightedMesh(meshName);
+
+    if (protocolSites.length === 1) {
+      // Unico site - abrir modal direto
+      setModalSite(protocolSites[0]);
+      setSitePickerOptions([]);
+    } else {
+      // Multiplos sites mapeados a este mesh - mostrar picker
+      setSitePickerOptions(protocolSites);
+    }
+  }, [sites]);
 
   const handleCalculate = useCallback(() => {
     if (!protocol || !validation.valid) return;
@@ -107,6 +155,17 @@ export default function MeasurementScreen() {
     );
   }
 
+  // Determinar quais meshes devem ser destacados (protocol-specific)
+  const highlightedMeshNames = useMemo(() => {
+    const meshes = new Set<string>();
+    for (const site of sites) {
+      for (const [mesh, sitesForMesh] of Object.entries(MESH_TO_SITES)) {
+        if (sitesForMesh.includes(site)) meshes.add(mesh);
+      }
+    }
+    return Array.from(meshes);
+  }, [sites]);
+
   return (
     <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
       <ScrollView
@@ -125,48 +184,98 @@ export default function MeasurementScreen() {
           <View style={{ width: 40 }} />
         </View>
 
-        {/* SVG Body Model */}
-        <View style={styles.bodyContainer}>
-          <Svg width={180} height={280} viewBox="0 0 180 280">
-            {/* Head */}
-            <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Neck */}
-            <Rect x="82" y="43" width="16" height="12" fill={colors.dark.secondary} />
-            {/* Torso */}
-            <Path d="M50 55 L130 55 L140 80 L145 130 L130 160 L50 160 L35 130 L40 80 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Left Arm */}
-            <Path d="M35 60 L15 60 L5 130 L20 130 L35 80" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Right Arm */}
-            <Path d="M145 60 L165 60 L175 130 L160 130 L145 80" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Pelvis */}
-            <Path d="M50 160 L130 160 L120 180 L60 180 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Left Leg */}
-            <Path d="M60 180 L80 180 L75 260 L55 260 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
-            {/* Right Leg */}
-            <Path d="M100 180 L120 180 L125 260 L105 260 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+        {/* Instrucao */}
+        <View style={styles.instructionBadge}>
+          <Ionicons name="hand-left" size={16} color="#a78bfa" />
+          <Text style={styles.instructionText}>
+            {pt
+              ? 'Toque nas regioes destacadas do avatar para inserir as medidas'
+              : 'Tap highlighted regions on the avatar to enter measurements'}
+          </Text>
+        </View>
 
-            {/* Measurement points */}
-            {sites.map((site) => {
-              const pos = SITE_POS[site];
+        {/* Avatar 3D ou SVG fallback */}
+        <View style={styles.avatarContainer}>
+          {Avatar3D && !IS_WEB ? (
+            <Avatar3D
+              onPartSelect={handleMeshSelect}
+              highlightedPart={highlightedMesh}
+              autoRotate={false}
+              style={{ height: 350 }}
+            />
+          ) : (
+            /* SVG Body Model fallback (web) */
+            <View style={styles.svgContainer}>
+              <Svg width={180} height={280} viewBox="0 0 180 280">
+                <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Rect x="82" y="43" width="16" height="12" fill={colors.dark.secondary} />
+                <Path d="M50 55 L130 55 L140 80 L145 130 L130 160 L50 160 L35 130 L40 80 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Path d="M35 60 L15 60 L5 130 L20 130 L35 80" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Path d="M145 60 L165 60 L175 130 L160 130 L145 80" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Path d="M50 160 L130 160 L120 180 L60 180 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Path d="M60 180 L80 180 L75 260 L55 260 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                <Path d="M100 180 L120 180 L125 260 L105 260 Z" fill={colors.dark.secondary} stroke={colors.border.default} strokeWidth="1" />
+                {sites.map((site) => {
+                  const pos = SITE_POS[site];
+                  if (!pos) return null;
+                  const filled = (measurements[site] ?? 0) > 0;
+                  return (
+                    <G key={site}>
+                      <Circle
+                        cx={pos.x} cy={pos.y} r={filled ? 8 : 6}
+                        fill={filled ? '#22c55e' : '#8b5cf6'}
+                        opacity={0.9}
+                        onPress={() => setModalSite(site)}
+                      />
+                      {filled && (
+                        <SvgText x={pos.x} y={pos.y + 3} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold">
+                          {measurements[site]}
+                        </SvgText>
+                      )}
+                    </G>
+                  );
+                })}
+              </Svg>
+            </View>
+          )}
+        </View>
+
+        {/* Site Picker (quando mesh mapeia para multiplos sites) */}
+        {sitePickerOptions.length > 0 && (
+          <View style={styles.pickerOverlay}>
+            <Text style={styles.pickerTitle}>{pt ? 'Qual dobra?' : 'Which skinfold?'}</Text>
+            {sitePickerOptions.map((site) => {
               const filled = (measurements[site] ?? 0) > 0;
               return (
-                <G key={site}>
-                  <Circle
-                    cx={pos.x} cy={pos.y} r={filled ? 8 : 6}
-                    fill={filled ? '#22c55e' : '#8b5cf6'}
-                    opacity={0.9}
-                    onPress={() => setModalSite(site)}
+                <TouchableOpacity
+                  key={site}
+                  style={styles.pickerOption}
+                  onPress={() => {
+                    setModalSite(site);
+                    setSitePickerOptions([]);
+                  }}
+                  data-testid={`picker-${site}`}
+                >
+                  <Ionicons
+                    name={filled ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={18}
+                    color={filled ? '#22c55e' : '#8b5cf6'}
                   />
-                  {filled && (
-                    <SvgText x={pos.x} y={pos.y + 3} textAnchor="middle" fontSize="7" fill="#fff" fontWeight="bold">
-                      {measurements[site]}
-                    </SvgText>
-                  )}
-                </G>
+                  <Text style={styles.pickerOptionText}>
+                    {pt ? SKINFOLD_LABELS[site].pt : SKINFOLD_LABELS[site].en}
+                  </Text>
+                  {filled && <Text style={styles.pickerValue}>{measurements[site]} mm</Text>}
+                </TouchableOpacity>
               );
             })}
-          </Svg>
-        </View>
+            <TouchableOpacity
+              style={styles.pickerCancel}
+              onPress={() => setSitePickerOptions([])}
+            >
+              <Text style={styles.pickerCancelText}>{pt ? 'Cancelar' : 'Cancel'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Sites list */}
         <View style={styles.sitesList}>
@@ -203,23 +312,24 @@ export default function MeasurementScreen() {
         >
           <LinearGradient
             colors={validation.valid ? ['#22c55e', '#16a34a'] : ['#374151', '#1f2937']}
-            style={styles.calcBtnGradient}
+            style={styles.calcBtnGrad}
           >
-            <Ionicons name="calculator" size={22} color="#fff" />
-            <Text style={styles.calcBtnText}>
-              {pt ? 'Calcular Composicao Corporal' : 'Calculate Body Composition'}
+            <Ionicons name="calculator" size={20} color={validation.valid ? '#fff' : '#6b7280'} />
+            <Text style={[styles.calcBtnText, !validation.valid && { color: '#6b7280' }]}>
+              {pt ? 'Calcular Composicao' : 'Calculate Composition'}
             </Text>
           </LinearGradient>
         </TouchableOpacity>
 
         {!validation.valid && validation.missing.length > 0 && (
           <Text style={styles.missingText}>
-            {pt ? `Faltam: ${validation.missing.map((s) => SKINFOLD_LABELS[s].pt).join(', ')}` : `Missing: ${validation.missing.map((s) => SKINFOLD_LABELS[s].en).join(', ')}`}
+            {pt ? `Faltam: ${validation.missing.map(s => SKINFOLD_LABELS[s].pt).join(', ')}` :
+              `Missing: ${validation.missing.map(s => SKINFOLD_LABELS[s].en).join(', ')}`}
           </Text>
         )}
       </ScrollView>
 
-      {/* Input Modal */}
+      {/* Modal de input */}
       <MeasurementInputModal
         visible={modalSite !== null}
         site={modalSite}
@@ -235,20 +345,30 @@ export default function MeasurementScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
-  header: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '700', color: colors.text.primary },
-  subtitle: { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
-  bodyContainer: { alignItems: 'center', marginBottom: 20, paddingVertical: 16, backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default },
-  sitesList: { gap: 6, marginBottom: 20 },
-  siteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.dark.card, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.border.default },
+  subtitle: { fontSize: 13, color: colors.accent.primary, fontWeight: '600' },
+  instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(139,92,246,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  instructionText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 16 },
+  avatarContainer: { backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', marginBottom: 16, minHeight: 350 },
+  svgContainer: { alignItems: 'center', paddingVertical: 30 },
+  pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#8b5cf6', gap: 6 },
+  pickerTitle: { fontSize: 13, fontWeight: '600', color: '#a78bfa', marginBottom: 4 },
+  pickerOption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
+  pickerOptionText: { flex: 1, fontSize: 14, color: colors.text.primary },
+  pickerValue: { fontSize: 13, color: '#22c55e', fontWeight: '600' },
+  pickerCancel: { alignItems: 'center', paddingTop: 6 },
+  pickerCancelText: { fontSize: 13, color: colors.text.tertiary },
+  sitesList: { gap: 4, marginBottom: 16 },
+  siteRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.dark.card, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border.default },
   siteRowFilled: { borderColor: 'rgba(34,197,94,0.3)' },
-  siteLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: colors.text.secondary },
-  siteLabelFilled: { color: colors.text.primary },
-  siteValue: { fontSize: 14, fontWeight: '700', color: colors.text.tertiary },
-  calcBtn: { borderRadius: 14, overflow: 'hidden', marginBottom: 8 },
-  calcBtnDisabled: { opacity: 0.5 },
-  calcBtnGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
+  siteLabel: { flex: 1, fontSize: 14, color: colors.text.secondary },
+  siteLabelFilled: { color: colors.text.primary, fontWeight: '500' },
+  siteValue: { fontSize: 14, fontWeight: '700', color: colors.text.secondary },
+  calcBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 4 },
+  calcBtnDisabled: { opacity: 0.7 },
+  calcBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
   calcBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  missingText: { fontSize: 12, color: '#f59e0b', textAlign: 'center' },
+  missingText: { textAlign: 'center', fontSize: 12, color: colors.text.tertiary, marginTop: 8 },
 });
