@@ -180,9 +180,45 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - [x] **ZERO REGRESSAO CMJ**: Bloco `waiting_second_grounded` gated por `isSlCmj`, CMJ nunca entra nesse estado.
 - [x] **ZERO REGRESSAO BUILD**: Metro bundle sem erros. 5/5 testes unitarios passando.
 
+### Session 9 (2026-04-09) — Body Scan Pipeline (Camera + MediaPipe + Body Mapping)
+- [x] **P0 — Body Mapping Engine** (`engine/body-composition/bodyMapping.ts`):
+  - `validatePose()`: Valida corpo inteiro visivel, distancia adequada, centralizacao
+  - `evaluateStability()`: Calcula stdDev de landmarks criticos em buffer de frames
+  - `averageLandmarks()`: Media de N frames com descarte de baixa confianca
+  - `mapBody()`: Converte landmarks medios em proporcoes corporais (cm) usando scaleFactor
+  - 14/14 testes unitarios passando
+- [x] **P0 — useBodyScan Hook** (`hooks/useBodyScan.ts`):
+  - State machine: IDLE -> POSITIONING -> CAPTURING -> PROCESSING -> COMPLETE / ERROR
+  - Auto-start captura apos 15 frames consecutivos com pose valida
+  - Buffer de 75 frames (~2.5s @ 30fps), descarte de frames ruins
+  - Processamento assincrono via queueMicrotask
+- [x] **P0 — CameraScanner** (`components/body-composition/CameraScanner.tsx`):
+  - Reutiliza MediaPipeCamera existente (back camera, 30fps)
+  - Pipeline 3 estagios (Camera -> MediaPipe -> Engine) como jump-camera
+  - Converte RawLandmark[] para Landmark[] do bodyMapping
+- [x] **P0 — ScannerOverlay** (`components/body-composition/ScannerOverlay.tsx`):
+  - Silhueta guia semi-transparente para posicionamento
+  - Scan line animada com Reanimated (withRepeat + withTiming)
+  - Skeleton com pontos coloridos por visibilidade
+  - Feedback de posicionamento (checks visuais)
+  - Barra de progresso durante captura
+- [x] **P0 — BodyScanScreen** (`app/athlete/[id]/body-scan.tsx`):
+  - Tela Config: inputs de altura/peso, dicas, botao Start
+  - Tela Scanning: camera + overlay (posicionamento automatico + captura)
+  - Tela Results: grid de proporcoes corporais em cm, qualidade, acoes
+  - Transicao automatica entre fases
+
 ## Files Modified (Session 8)
 - `services/jump/useJumpCamera.ts` — SlCmjRecordingState type + waiting_second_grounded logic + groundedFrameCountRef
 - `app/athlete/[id]/jump-camera.tsx` — Confidence badge removido de recording + UI feedback para waiting_second_grounded
+
+## New Files Created (Session 9 — Body Scan)
+- `engine/body-composition/bodyMapping.ts` — Body Mapping Engine (validatePose, mapBody, averageLandmarks, evaluateStability)
+- `hooks/useBodyScan.ts` — State machine hook (IDLE→POSITIONING→CAPTURING→PROCESSING→COMPLETE)
+- `components/body-composition/CameraScanner.tsx` — Camera com MediaPipe (3-stage pipeline)
+- `components/body-composition/ScannerOverlay.tsx` — Overlay visual (scan line, skeleton, feedback, progresso)
+- `app/athlete/[id]/body-scan.tsx` — Tela principal (config, scanning, results)
+- `tests/body-composition/bodyMapping.test.ts` — 14 testes unitarios
 
 ## New Files Created (Session 7)
 - `tests/jump/footSelection.test.ts`
