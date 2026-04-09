@@ -731,6 +731,26 @@ export default function AthleteDetails() {
               </TouchableOpacity>
             </View>
 
+            {/* Body Scan 3D */}
+            <TouchableOpacity
+              style={styles.actionButtonLarge}
+              onPress={() => router.push(`/athlete/${id}/body-scan`)}
+              data-testid="body-scan-nav-btn"
+            >
+              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.actionButtonGradient}>
+                <View style={styles.actionButtonIconRow}>
+                  <Ionicons name="scan" size={24} color="#ffffff" />
+                  <Ionicons name="body" size={20} color="rgba(255,255,255,0.8)" />
+                </View>
+                <Text style={styles.actionButtonLargeText}>
+                  {locale === 'pt' ? 'Body Scan 3D' : 'Body Scan 3D'}
+                </Text>
+                <Text style={styles.actionButtonSubtext}>
+                  {locale === 'pt' ? 'Scanner corporal com câmera e MediaPipe' : 'Body scanner with camera and MediaPipe'}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
             {/* Jump charts moved to Scientific Analysis tab — rendering disabled here */}
             {/* <View style={styles.strengthAnalysisSection}>
               <JumpAnalysisCharts athleteId={id} />
