@@ -6,6 +6,9 @@
  *
  * Gerencia buffer de frames, validacao de pose, e processamento final.
  * Usa refs internamente para evitar re-renders durante captura.
+ *
+ * Retorna interface compativel com Avatar3D:
+ *   { bodyParams, loading, confidence }
  */
 
 import { useRef, useCallback, useState } from 'react';
@@ -46,6 +49,7 @@ export interface BodyScanResult {
 }
 
 export interface UseBodyScanReturn {
+  // State
   phase: BodyScanPhase;
   poseValidation: PoseValidation;
   progress: number;              // 0-100 durante captura
@@ -53,6 +57,12 @@ export interface UseBodyScanReturn {
   result: BodyScanResult | null;
   error: string | null;
   currentLandmarks: Landmark[];
+  stateLabel: string;            // Label legivel: "Buscando corpo", "Ajustando posicao", etc.
+
+  // Avatar3D compatible interface
+  bodyParams: BodyParams | null;
+  loading: boolean;
+  confidence: number;
 
   // Actions
   startPositioning: () => void;
@@ -68,6 +78,17 @@ const DEFAULT_TARGET_FRAMES = 75;    // ~2.5s @ 30fps
 const DEFAULT_MIN_VALID = 45;
 const POSITIONING_AUTO_START_FRAMES = 15; // 15 frames validos consecutivos -> auto-start captura
 const MIN_CONFIDENCE_FOR_FRAME = 0.6;
+
+// Labels para os 4 estados visuais
+const STATE_LABELS: Record<string, string> = {
+  idle: '',
+  positioning_searching: 'BUSCANDO CORPO',
+  positioning_adjusting: 'AJUSTANDO POSICAO',
+  capturing: 'ESCANEANDO',
+  processing: 'PROCESSANDO',
+  complete: 'COMPLETO',
+  error: 'ERRO',
+};
 
 // ============================================================
 // HOOK
@@ -91,6 +112,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
   const [result, setResult] = useState<BodyScanResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [currentLandmarks, setCurrentLandmarks] = useState<Landmark[]>([]);
+  const [stateLabel, setStateLabel] = useState('');
 
   // Refs (performance — nao dispara re-renders)
   const phaseRef = useRef<BodyScanPhase>('idle');
@@ -98,6 +120,15 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
   const validConsecutiveRef = useRef(0);
   const frameCountRef = useRef(0);
   const isProcessingRef = useRef(false);
+  const hasBodyRef = useRef(false);
+
+  // ============================================================
+  // DERIVED (Avatar3D interface)
+  // ============================================================
+
+  const bodyParams = result?.bodyParams ?? null;
+  const loading = phase === 'positioning' || phase === 'capturing' || phase === 'processing';
+  const confidence = result ? result.captureQuality : poseValidation.confidence;
 
   // ============================================================
   // ACTIONS
@@ -105,7 +136,9 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
 
   const startPositioning = useCallback(() => {
     phaseRef.current = 'positioning';
+    hasBodyRef.current = false;
     setPhase('positioning');
+    setStateLabel(STATE_LABELS.positioning_searching);
     frameBufferRef.current = [];
     validConsecutiveRef.current = 0;
     frameCountRef.current = 0;
@@ -117,7 +150,9 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
 
   const reset = useCallback(() => {
     phaseRef.current = 'idle';
+    hasBodyRef.current = false;
     setPhase('idle');
+    setStateLabel('');
     frameBufferRef.current = [];
     validConsecutiveRef.current = 0;
     frameCountRef.current = 0;
@@ -140,6 +175,9 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
   /**
    * Processa um frame de landmarks do MediaPipe.
    * Chamado a cada frame (~30fps).
+   *
+   * Performance: usa refs para leitura, setState throttled.
+   * Nao faz log por frame.
    */
   const processFrame = useCallback((landmarks: Landmark[]) => {
     // Guard: re-entrant
@@ -151,18 +189,37 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
 
     try {
       frameCountRef.current++;
+      const fc = frameCountRef.current;
 
-      // Atualiza landmarks para overlay visual (throttled ~15fps)
-      if (frameCountRef.current % 2 === 0) {
+      // Atualiza landmarks para overlay visual (throttled ~10fps)
+      if (fc % 3 === 0) {
         setCurrentLandmarks(landmarks);
       }
 
       // Valida pose
       const validation = validatePose(landmarks);
 
-      // Atualiza validacao UI (throttled)
-      if (frameCountRef.current % 3 === 0) {
+      // Track se tem corpo detectado
+      const bodyDetected = validation.isFullBodyVisible;
+      if (bodyDetected && !hasBodyRef.current) {
+        hasBodyRef.current = true;
+      }
+
+      // Atualiza validacao UI + stateLabel (throttled ~10fps)
+      if (fc % 3 === 0) {
         setPoseValidation(validation);
+
+        // Determinar label do estado visual
+        if (currentPhase === 'positioning') {
+          const allOk = validation.isFullBodyVisible && validation.isGoodDistance && validation.isCentered;
+          if (!hasBodyRef.current) {
+            setStateLabel(STATE_LABELS.positioning_searching);
+          } else if (!allOk) {
+            setStateLabel(STATE_LABELS.positioning_adjusting);
+          } else {
+            setStateLabel(STATE_LABELS.positioning_adjusting); // prestes a capturar
+          }
+        }
       }
 
       const poseOk = validation.isFullBodyVisible && validation.isGoodDistance && validation.isCentered;
@@ -179,6 +236,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         if (validConsecutiveRef.current >= POSITIONING_AUTO_START_FRAMES) {
           phaseRef.current = 'capturing';
           setPhase('capturing');
+          setStateLabel(STATE_LABELS.capturing);
           frameBufferRef.current = [];
           setProgress(0);
           setFramesCollected(0);
@@ -212,8 +270,8 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         const collected = frameBufferRef.current.length;
         const pct = Math.min(100, Math.round((collected / targetFrames) * 100));
 
-        // Atualiza progress (throttled)
-        if (frameCountRef.current % 2 === 0) {
+        // Atualiza progress (throttled ~15fps)
+        if (fc % 2 === 0) {
           setProgress(pct);
           setFramesCollected(collected);
         }
@@ -222,6 +280,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         if (collected >= targetFrames) {
           phaseRef.current = 'processing';
           setPhase('processing');
+          setStateLabel(STATE_LABELS.processing);
 
           // Processar em "background" (microtask)
           queueMicrotask(() => processCapturedFrames());
@@ -244,6 +303,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         setError(`Frames insuficientes: ${frames.length}/${minValidFrames}`);
         phaseRef.current = 'error';
         setPhase('error');
+        setStateLabel(STATE_LABELS.error);
         return;
       }
 
@@ -253,6 +313,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         setError('Movimento detectado durante captura. Tente novamente ficando mais parado.');
         phaseRef.current = 'error';
         setPhase('error');
+        setStateLabel(STATE_LABELS.error);
         return;
       }
 
@@ -262,15 +323,17 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
         setError('Landmarks insuficientes na media');
         phaseRef.current = 'error';
         setPhase('error');
+        setStateLabel(STATE_LABELS.error);
         return;
       }
 
       // Body Mapping
-      const bodyParams = mapBody(averaged, athleteHeightCm);
-      if (!bodyParams) {
+      const params = mapBody(averaged, athleteHeightCm);
+      if (!params) {
         setError('Falha ao calcular proporcoes corporais');
         phaseRef.current = 'error';
         setPhase('error');
+        setStateLabel(STATE_LABELS.error);
         return;
       }
 
@@ -278,7 +341,7 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
       const captureQuality = frames.length / targetFrames;
 
       const scanResult: BodyScanResult = {
-        bodyParams,
+        bodyParams: params,
         averagedLandmarks: averaged,
         framesUsed: frames.length,
         captureQuality: Math.min(1, captureQuality),
@@ -287,14 +350,17 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
       setResult(scanResult);
       phaseRef.current = 'complete';
       setPhase('complete');
+      setStateLabel(STATE_LABELS.complete);
     } catch (e) {
       setError(`Erro no processamento: ${e}`);
       phaseRef.current = 'error';
       setPhase('error');
+      setStateLabel(STATE_LABELS.error);
     }
   }, [athleteHeightCm, minValidFrames, targetFrames]);
 
   return {
+    // State
     phase,
     poseValidation,
     progress,
@@ -302,6 +368,14 @@ export function useBodyScan(config: BodyScanConfig): UseBodyScanReturn {
     result,
     error,
     currentLandmarks,
+    stateLabel,
+
+    // Avatar3D compatible
+    bodyParams,
+    loading,
+    confidence,
+
+    // Actions
     startPositioning,
     processFrame,
     reset,

@@ -265,6 +265,7 @@ export default function BodyScanScreen() {
             progress={bodyScan.progress}
             framesCollected={bodyScan.framesCollected}
             landmarks={bodyScan.currentLandmarks}
+            stateLabel={bodyScan.stateLabel}
           />
         )}
 

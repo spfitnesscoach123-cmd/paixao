@@ -192,19 +192,25 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
   - Auto-start captura apos 15 frames consecutivos com pose valida
   - Buffer de 75 frames (~2.5s @ 30fps), descarte de frames ruins
   - Processamento assincrono via queueMicrotask
+  - Interface Avatar3D: `bodyParams`, `loading`, `confidence` derivados
+  - `stateLabel`: 4 labels visuais (BUSCANDO CORPO / AJUSTANDO POSICAO / ESCANEANDO / PROCESSANDO)
 - [x] **P0 — CameraScanner** (`components/body-composition/CameraScanner.tsx`):
   - Reutiliza MediaPipeCamera existente (back camera, 30fps)
   - Pipeline 3 estagios (Camera -> MediaPipe -> Engine) como jump-camera
   - Converte RawLandmark[] para Landmark[] do bodyMapping
-- [x] **P0 — ScannerOverlay** (`components/body-composition/ScannerOverlay.tsx`):
-  - Silhueta guia semi-transparente para posicionamento
-  - Scan line animada com Reanimated (withRepeat + withTiming)
-  - Skeleton com pontos coloridos por visibilidade
-  - Feedback de posicionamento (checks visuais)
-  - Barra de progresso durante captura
+- [x] **P0 — ScannerOverlay V2** (`components/body-composition/ScannerOverlay.tsx`):
+  - 3 scan lines paralelas com glow (Reanimated withDelay staggered)
+  - Skeleton com conexoes (bones) + dots com glow por visibility
+  - Corner brackets enquadrando corpo com pulse animado
+  - Silhueta guia com pulse (positioning sem corpo detectado)
+  - 4 estados visuais: BUSCANDO CORPO / AJUSTANDO POSICAO / ESCANEANDO / PROCESSANDO
+  - Badge de estado com icone + cor dinamica
+  - Feedback card com checks individuais + barra de confianca
+  - Progress bar com glow durante captura
+  - Processing overlay com card e icone pulse
 - [x] **P0 — BodyScanScreen** (`app/athlete/[id]/body-scan.tsx`):
   - Tela Config: inputs de altura/peso, dicas, botao Start
-  - Tela Scanning: camera + overlay (posicionamento automatico + captura)
+  - Tela Scanning: camera + overlay premium (posicionamento automatico + captura)
   - Tela Results: grid de proporcoes corporais em cm, qualidade, acoes
   - Transicao automatica entre fases
 
