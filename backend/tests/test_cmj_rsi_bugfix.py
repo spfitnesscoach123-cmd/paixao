@@ -13,7 +13,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://jump-height-audit.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://fat-heatmap-3d.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"
