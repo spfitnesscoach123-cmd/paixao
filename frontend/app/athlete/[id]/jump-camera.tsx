@@ -1283,18 +1283,6 @@ function JumpCameraContent() {
             {/* Recording - clean overlay with graph (CMJ) or feedback (SL-CMJ) */}
             {jumpCamera.phase === 'recording' && (
               <View style={styles.recordingOverlay}>
-                {/* Confidence badge — top center, discrete */}
-                {jumpCamera.scannerState.confidenceScore > 0 && (
-                  <View style={styles.confidenceBadgeTopCenter} data-testid="confidence-badge-recording">
-                    <Text style={[styles.confidenceBadgeTopText, {
-                      color: jumpCamera.scannerState.confidenceScore >= 0.80 ? '#22c55e' 
-                        : jumpCamera.scannerState.confidenceScore >= 0.65 ? '#eab308' : '#ef4444',
-                    }]}>
-                      {t.scannerConfidence}: {Math.round(jumpCamera.scannerState.confidenceScore * 100)}%
-                    </Text>
-                  </View>
-                )}
-                
                 {/* Recording badge */}
                 <View style={styles.recordingBadge}>
                   <View style={styles.recordingDot} />
@@ -1327,6 +1315,13 @@ function JumpCameraContent() {
                       <Text style={[styles.slcmjFeedbackText, { color: '#22c55e' }]}>
                         {t.slcmjJump1Detected} ({firstLeg === 'right' ? t.right : t.left})
                         {'\n'}{t.slcmjPrepareSecond} ({firstLeg === 'right' ? t.left : t.right})
+                      </Text>
+                    )}
+                    {jumpCamera.slcmjRecordingState === 'waiting_second_grounded' && (
+                      <Text style={[styles.slcmjFeedbackText, { color: '#eab308' }]}>
+                        {locale === 'pt' ? 'Posicione a perna ' : 'Position leg '}
+                        ({firstLeg === 'right' ? t.left : t.right})
+                        {locale === 'pt' ? ' no chao...' : ' on ground...'}
                       </Text>
                     )}
                     {jumpCamera.slcmjRecordingState === 'waiting_second' && (

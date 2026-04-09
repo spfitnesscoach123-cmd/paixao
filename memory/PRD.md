@@ -170,6 +170,20 @@ Camera Frame → MediaPipe → onLandmark(landmarks, timestamp)
 - [x] **ZERO REGRESSAO SL-CMJ**: detectSLCMJ* intocado
 - [x] **ZERO REGRESSAO CMJ BOTH_FEET**: Quando ambos pes OK, logica identica + hip
 
+### Session 8 (2026-04-09) — SL-CMJ Root Cause Fix + Confidence Badge
+- [x] **P0 — SL-CMJ `waiting_second_grounded`**: Root cause identificado — apos troca de perna,
+  pe levantado era interpretado como "em voo" e pouso ao chao como "aterrissagem".
+  Adicionado sub-estado `waiting_second_grounded` que exige segundo pe NO CHAO por 3 frames
+  consecutivos antes de habilitar deteccao de takeoff. Corrige definitivamente o auto-stop prematuro.
+- [x] **P1 — Confidence badge removido do recording overlay**: Badge sobrepunha "JUMP NOW" no jump-camera.
+  Removido durante fase de gravacao (ainda visivel durante scanning/countdown).
+- [x] **ZERO REGRESSAO CMJ**: Bloco `waiting_second_grounded` gated por `isSlCmj`, CMJ nunca entra nesse estado.
+- [x] **ZERO REGRESSAO BUILD**: Metro bundle sem erros. 5/5 testes unitarios passando.
+
+## Files Modified (Session 8)
+- `services/jump/useJumpCamera.ts` — SlCmjRecordingState type + waiting_second_grounded logic + groundedFrameCountRef
+- `app/athlete/[id]/jump-camera.tsx` — Confidence badge removido de recording + UI feedback para waiting_second_grounded
+
 ## New Files Created (Session 7)
 - `tests/jump/footSelection.test.ts`
 

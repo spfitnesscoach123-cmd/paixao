@@ -59,7 +59,7 @@ const {
 /**
  * SL-CMJ continuous recording sub-state
  */
-export type SlCmjRecordingState = 'idle' | 'waiting_first' | 'first_detected' | 'waiting_second' | 'completed';
+export type SlCmjRecordingState = 'idle' | 'waiting_first' | 'first_detected' | 'waiting_second_grounded' | 'waiting_second' | 'completed';
 
 /**
  * Scanner phase for calibration UI
@@ -224,6 +224,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const slcmjRecordingStateRef = useRef<SlCmjRecordingState>('idle');
   const firstJumpFrameEndRef = useRef<number>(0);
   const firstJumpLandingTimestampRef = useRef<number>(0);
+  const groundedFrameCountRef = useRef<number>(0);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -801,14 +802,34 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         if (timeSinceFirstLanding >= SLCMJ_MIN_JUMP_INTERVAL_MS) {
           // Swap active leg for second jump detection
           const secondLeg: ActiveLeg = activeLeg === 'left' ? 'right' : 'left';
-          console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second jump (leg: ' + secondLeg + ')');
-          slcmjRecordingStateRef.current = 'waiting_second';
-          setSlcmjRecordingState('waiting_second');
+          console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second foot to ground (leg: ' + secondLeg + ')');
+          slcmjRecordingStateRef.current = 'waiting_second_grounded';
+          setSlcmjRecordingState('waiting_second_grounded');
           setActiveLeg(secondLeg);
           // Clean slate for second jump detection
           takeoffTimeRef.current = null;
           countermovementStartTimeRef.current = null;
           landingFrameCountRef.current = 0;
+          groundedFrameCountRef.current = 0;
+        }
+      }
+      
+      // SL-CMJ: In waiting_second_grounded, wait for second foot to establish stance
+      if (isSlCmj && slcmjRecordingStateRef.current === 'waiting_second_grounded') {
+        const secondFootOnGround = detectSLCMJLanding(frameData, groundCalibration, activeLeg);
+        if (secondFootOnGround) {
+          groundedFrameCountRef.current++;
+          if (groundedFrameCountRef.current >= MIN_LANDING_FRAMES_AUTO_STOP) {
+            console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Second foot grounded — ready for second jump');
+            slcmjRecordingStateRef.current = 'waiting_second';
+            setSlcmjRecordingState('waiting_second');
+            // Clean slate for actual second jump detection
+            takeoffTimeRef.current = null;
+            countermovementStartTimeRef.current = null;
+            landingFrameCountRef.current = 0;
+          }
+        } else {
+          groundedFrameCountRef.current = 0;
         }
       }
       
@@ -822,7 +843,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
           if (currentSlState === 'waiting_first') {
             console.log('[JUMP_CAMERA_HOOK] SL-CMJ fallback: first jump never detected');
             setError('Salto nao detectado. Ajuste a posicao e tente novamente.');
-          } else if (currentSlState === 'first_detected' || currentSlState === 'waiting_second') {
+          } else if (currentSlState === 'first_detected' || currentSlState === 'waiting_second_grounded' || currentSlState === 'waiting_second') {
             console.log('[JUMP_CAMERA_HOOK] SL-CMJ fallback: second jump never detected');
             setError('Segundo salto nao detectado. Tente novamente.');
           }
@@ -1002,6 +1023,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     setSlcmjRecordingState('idle');
     firstJumpFrameEndRef.current = 0;
     firstJumpLandingTimestampRef.current = 0;
+    groundedFrameCountRef.current = 0;
     
     calibrationFramesRef.current = [];
     recordingFramesRef.current = [];
