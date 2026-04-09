@@ -65,7 +65,8 @@
           "photosPermission": "Escolha fotos dos atletas",
           "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT."
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true
