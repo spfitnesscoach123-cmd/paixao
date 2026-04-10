@@ -9,9 +9,9 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native (Expo CNG — regenerados pelo EAS build)
-ios/
-android/
+# Native (Expo CNG — regenerados pelo EAS build, apenas top-level)
+/ios/
+/android/
 .kotlin/
 *.orig.*
 *.jks
