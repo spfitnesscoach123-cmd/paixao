@@ -1,8 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, Animated, Platform } from 'react-native';
 import Svg, { Path, Circle, G, Text as SvgText, Rect, Ellipse, Defs, LinearGradient, RadialGradient, Stop, Filter, FeGaussianBlur, FeOffset, FeMerge, FeMergeNode } from 'react-native-svg';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+
+const IS_WEB = Platform.OS === 'web';
+
+// Lazy-load Avatar3D only on native
+let Avatar3DComponent: any = null;
+if (!IS_WEB) {
+  try {
+    Avatar3DComponent = require('./body-composition/Avatar3D').Avatar3D;
+  } catch (e) {
+    console.error('[BodyCompositionCharts] Avatar3D import failed:', e);
+  }
+}
 
 interface BodyCompositionChartsProps {
   data: {
@@ -86,7 +98,6 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
   
   // Body 3D Model Component with Enhanced Visual Effects
   const BodyModel = () => {
-    const [viewAngle, setViewAngle] = useState<'front' | 'side'>('front');
     const distribution = data.fat_distribution || {};
     
     // Calculate intensity for each region (0-1)
@@ -97,24 +108,6 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       if (intensity < 0.3) return '#10b981'; // Green - low
       if (intensity < 0.5) return '#f59e0b'; // Yellow - moderate
       return '#ef4444'; // Red - high
-    };
-    
-    const getColorLight = (value: number = 0) => {
-      const intensity = getIntensity(value);
-      if (intensity < 0.3) return '#34d399'; // Light green
-      if (intensity < 0.5) return '#fbbf24'; // Light yellow
-      return '#f87171'; // Light red
-    };
-    
-    const getColorDark = (value: number = 0) => {
-      const intensity = getIntensity(value);
-      if (intensity < 0.3) return '#059669'; // Dark green
-      if (intensity < 0.5) return '#d97706'; // Dark yellow
-      return '#dc2626'; // Dark red
-    };
-    
-    const getOpacity = (value: number = 0) => {
-      return 0.6 + (getIntensity(value) * 0.35);
     };
     
     // Region percentage values - ensure they are valid numbers
@@ -135,252 +128,67 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
       if (isNaN(val) || val === null || val === undefined) return '0.0';
       return val.toFixed(1);
     };
+
+    // Build heatmap values for Avatar3D from fat_distribution
+    const heatmapValues = useMemo(() => {
+      const normalize = (val: number) => Math.min(val / 40, 1);
+      return {
+        BICEPS: normalize(regionValues.upperArm),
+        TRICEPS: normalize(regionValues.upperArm),
+        PEITORAL: normalize(regionValues.trunkFront),
+        ABDOMINAL: normalize(regionValues.trunkFront),
+        SUBESCAPULAR: normalize(regionValues.trunkFront),
+        AXILAR_MEDIA: normalize(regionValues.hipWaist),
+        SUPRA_ILIACA: normalize(regionValues.hipWaist),
+        COXA: normalize(regionValues.lowerBody),
+        PANTURILHA: normalize(regionValues.lowerBody),
+      };
+    }, [regionValues.upperArm, regionValues.trunkFront, regionValues.hipWaist, regionValues.lowerBody]);
     
     return (
       <View style={styles.bodyModelContainer}>
-        {/* View Toggle */}
-        <View style={styles.viewToggle}>
-          <TouchableOpacity
-            style={[styles.viewButton, viewAngle === 'front' && styles.viewButtonActive]}
-            onPress={() => setViewAngle('front')}
-          >
-            <Text style={[styles.viewButtonText, viewAngle === 'front' && styles.viewButtonTextActive]}>
-              {locale === 'pt' ? 'Frontal' : 'Front'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.viewButton, viewAngle === 'side' && styles.viewButtonActive]}
-            onPress={() => setViewAngle('side')}
-          >
-            <Text style={[styles.viewButtonText, viewAngle === 'side' && styles.viewButtonTextActive]}>
-              {locale === 'pt' ? 'Lateral' : 'Side'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {viewAngle === 'front' ? (
+        {/* Avatar 3D (native) or SVG fallback (web) */}
+        {Avatar3DComponent && !IS_WEB ? (
+          <Avatar3DComponent
+            autoRotate={true}
+            heatmapValues={heatmapValues}
+            style={{ height: 260 }}
+          />
+        ) : (
           <Svg width={200} height={300} viewBox="0 0 200 300">
             <Defs>
-              {/* Skin gradient */}
               <LinearGradient id="skinGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <Stop offset="0%" stopColor="#2d3748" stopOpacity="1" />
                 <Stop offset="100%" stopColor="#1a202c" stopOpacity="1" />
               </LinearGradient>
-              
-              {/* Fat region gradients */}
-              <RadialGradient id="armsFat" cx="50%" cy="30%" r="70%">
-                <Stop offset="0%" stopColor={getColorLight(regionValues.upperArm)} stopOpacity={getOpacity(regionValues.upperArm)} />
-                <Stop offset="100%" stopColor={getColorDark(regionValues.upperArm)} stopOpacity={getOpacity(regionValues.upperArm) - 0.2} />
-              </RadialGradient>
-              <RadialGradient id="torsoFat" cx="50%" cy="40%" r="70%">
-                <Stop offset="0%" stopColor={getColorLight(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront)} />
-                <Stop offset="100%" stopColor={getColorDark(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront) - 0.2} />
-              </RadialGradient>
-              <RadialGradient id="hipFat" cx="50%" cy="40%" r="70%">
-                <Stop offset="0%" stopColor={getColorLight(regionValues.hipWaist)} stopOpacity={getOpacity(regionValues.hipWaist)} />
-                <Stop offset="100%" stopColor={getColorDark(regionValues.hipWaist)} stopOpacity={getOpacity(regionValues.hipWaist) - 0.2} />
-              </RadialGradient>
-              <RadialGradient id="legsFat" cx="50%" cy="30%" r="70%">
-                <Stop offset="0%" stopColor={getColorLight(regionValues.lowerBody)} stopOpacity={getOpacity(regionValues.lowerBody)} />
-                <Stop offset="100%" stopColor={getColorDark(regionValues.lowerBody)} stopOpacity={getOpacity(regionValues.lowerBody) - 0.2} />
-              </RadialGradient>
-              
-              {/* Highlight gradient for 3D effect */}
               <LinearGradient id="bodyHighlight" x1="30%" y1="0%" x2="70%" y2="100%">
                 <Stop offset="0%" stopColor="#ffffff" stopOpacity="0.15" />
                 <Stop offset="50%" stopColor="#ffffff" stopOpacity="0" />
                 <Stop offset="100%" stopColor="#000000" stopOpacity="0.1" />
               </LinearGradient>
             </Defs>
-            
-            {/* Body outline/silhouette */}
             <G>
-              {/* Head with 3D effect */}
               <Ellipse cx="100" cy="32" rx="24" ry="26" fill="url(#skinGradient)" />
-              <Ellipse cx="100" cy="32" rx="24" ry="26" fill="url(#bodyHighlight)" />
-              <Circle cx="93" cy="28" r="2" fill="#374151" opacity="0.5" />
-              <Circle cx="107" cy="28" r="2" fill="#374151" opacity="0.5" />
-              
-              {/* Neck */}
               <Rect x="90" y="55" width="20" height="18" rx="4" fill="url(#skinGradient)" />
-              
-              {/* Shoulders and upper torso */}
-              <Path
-                d="M48 75 Q65 70 100 70 Q135 70 152 75 L160 95 Q145 100 100 100 Q55 100 40 95 Z"
-                fill="url(#torsoFat)"
-              />
-              <Path
-                d="M48 75 Q65 70 100 70 Q135 70 152 75 L160 95 Q145 100 100 100 Q55 100 40 95 Z"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Main torso */}
-              <Path
-                d="M40 95 L160 95 Q165 140 155 175 Q145 190 100 190 Q55 190 45 175 Q35 140 40 95 Z"
-                fill="url(#torsoFat)"
-              />
-              <Path
-                d="M40 95 L160 95 Q165 140 155 175 Q145 190 100 190 Q55 190 45 175 Q35 140 40 95 Z"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Left arm */}
-              <Path
-                d="M48 75 L28 80 Q15 95 12 130 Q10 155 15 160 L25 160 Q35 155 40 120 L40 95"
-                fill="url(#armsFat)"
-              />
-              <Path
-                d="M48 75 L28 80 Q15 95 12 130 Q10 155 15 160 L25 160 Q35 155 40 120 L40 95"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Right arm */}
-              <Path
-                d="M152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95"
-                fill="url(#armsFat)"
-              />
-              <Path
-                d="M152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Hip/Waist area */}
-              <Path
-                d="M45 175 Q35 195 55 215 L85 215 L85 190 Q55 190 45 175"
-                fill="url(#hipFat)"
-              />
-              <Path
-                d="M155 175 Q165 195 145 215 L115 215 L115 190 Q145 190 155 175"
-                fill="url(#hipFat)"
-              />
-              
-              {/* Left thigh */}
-              <Path
-                d="M55 215 L85 215 L85 270 Q75 280 65 280 Q50 280 50 270 Q45 240 55 215"
-                fill="url(#legsFat)"
-              />
-              <Path
-                d="M55 215 L85 215 L85 270 Q75 280 65 280 Q50 280 50 270 Q45 240 55 215"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Right thigh */}
-              <Path
-                d="M145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 Q155 240 145 215"
-                fill="url(#legsFat)"
-              />
-              <Path
-                d="M145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 Q155 240 145 215"
-                fill="url(#bodyHighlight)"
-              />
-              
-              {/* Body outline for definition */}
-              <Path
-                d="M48 75 Q65 70 100 70 Q135 70 152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95 Q165 140 155 175 Q165 195 145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 L150 280 Q140 290 100 290 Q60 290 50 280 L50 270 Q50 280 65 280 Q75 280 85 270 L85 215 L55 215 Q35 195 45 175 Q35 140 40 95 L40 120 Q35 155 25 160 L15 160 Q10 155 12 130 Q15 95 28 80 L48 75 Z"
-                fill="none"
-                stroke={colors.accent.primary}
-                strokeWidth="1.5"
-                opacity="0.6"
-              />
+              <Path d="M48 75 Q65 70 100 70 Q135 70 152 75 L160 95 Q145 100 100 100 Q55 100 40 95 Z" fill={getColor(regionValues.trunkFront)} opacity="0.8" />
+              <Path d="M40 95 L160 95 Q165 140 155 175 Q145 190 100 190 Q55 190 45 175 Q35 140 40 95 Z" fill={getColor(regionValues.trunkFront)} opacity="0.8" />
+              <Path d="M48 75 L28 80 Q15 95 12 130 Q10 155 15 160 L25 160 Q35 155 40 120 L40 95" fill={getColor(regionValues.upperArm)} opacity="0.8" />
+              <Path d="M152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95" fill={getColor(regionValues.upperArm)} opacity="0.8" />
+              <Path d="M45 175 Q35 195 55 215 L85 215 L85 190 Q55 190 45 175" fill={getColor(regionValues.hipWaist)} opacity="0.8" />
+              <Path d="M155 175 Q165 195 145 215 L115 215 L115 190 Q145 190 155 175" fill={getColor(regionValues.hipWaist)} opacity="0.8" />
+              <Path d="M55 215 L85 215 L85 270 Q75 280 65 280 Q50 280 50 270 Q45 240 55 215" fill={getColor(regionValues.lowerBody)} opacity="0.8" />
+              <Path d="M145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 Q155 240 145 215" fill={getColor(regionValues.lowerBody)} opacity="0.8" />
+              <Path d="M48 75 Q65 70 100 70 Q135 70 152 75 L172 80 Q185 95 188 130 Q190 155 185 160 L175 160 Q165 155 160 120 L160 95 Q165 140 155 175 Q165 195 145 215 L115 215 L115 270 Q125 280 135 280 Q150 280 150 270 L150 280 Q140 290 100 290 Q60 290 50 280 L50 270 Q50 280 65 280 Q75 280 85 270 L85 215 L55 215 Q35 195 45 175 Q35 140 40 95 L40 120 Q35 155 25 160 L15 160 Q10 155 12 130 Q15 95 28 80 L48 75 Z" fill="none" stroke={colors.accent.primary} strokeWidth="1.5" opacity="0.6" />
             </G>
-            
-            {/* Fat percentage labels with background for better visibility */}
             <G>
-              {/* Arms label */}
               <Rect x="2" y="130" width="26" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
-              <SvgText x="15" y="142" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.upperArm)}%
-              </SvgText>
-              
-              {/* Trunk label */}
+              <SvgText x="15" y="142" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">{Math.round(regionValues.upperArm)}%</SvgText>
               <Rect x="78" y="135" width="44" height="18" rx="4" fill="rgba(0,0,0,0.8)" />
-              <SvgText x="100" y="148" fontSize="11" fill="#ffffff" fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.trunkFront)}%
-              </SvgText>
-              
-              {/* Hip label */}
+              <SvgText x="100" y="148" fontSize="11" fill="#ffffff" fontWeight="bold" textAnchor="middle">{Math.round(regionValues.trunkFront)}%</SvgText>
               <Rect x="78" y="195" width="44" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
-              <SvgText x="100" y="207" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.hipWaist)}%
-              </SvgText>
-              
-              {/* Legs label */}
+              <SvgText x="100" y="207" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">{Math.round(regionValues.hipWaist)}%</SvgText>
               <Rect x="78" y="250" width="44" height="16" rx="4" fill="rgba(0,0,0,0.8)" />
-              <SvgText x="100" y="262" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.lowerBody)}%
-              </SvgText>
-            </G>
-          </Svg>
-        ) : (
-          /* Side View */
-          <Svg width={200} height={300} viewBox="0 0 200 300">
-            <Defs>
-              <LinearGradient id="skinGradientSide" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor="#2d3748" stopOpacity="1" />
-                <Stop offset="100%" stopColor="#1a202c" stopOpacity="1" />
-              </LinearGradient>
-              <RadialGradient id="backFat" cx="30%" cy="40%" r="70%">
-                <Stop offset="0%" stopColor={getColorLight(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront)} />
-                <Stop offset="100%" stopColor={getColorDark(regionValues.trunkFront)} stopOpacity={getOpacity(regionValues.trunkFront) - 0.2} />
-              </RadialGradient>
-            </Defs>
-            
-            {/* Side view body */}
-            <G>
-              {/* Head */}
-              <Ellipse cx="100" cy="32" rx="20" ry="26" fill="url(#skinGradientSide)" />
-              
-              {/* Neck */}
-              <Rect x="92" y="55" width="16" height="18" rx="3" fill="url(#skinGradientSide)" />
-              
-              {/* Back profile with fat distribution visualization */}
-              <Path
-                d="M80 75 Q70 80 65 100 Q55 120 55 160 Q55 190 65 210 L65 270 Q65 280 75 285 L85 285 Q90 280 90 270 L90 210 Q100 190 100 160 Q100 120 95 100 Q92 80 80 75"
-                fill="url(#backFat)"
-              />
-              
-              {/* Front profile */}
-              <Path
-                d="M120 75 Q130 80 135 100 Q145 120 145 160 Q145 190 135 210 L135 270 Q135 280 125 285 L115 285 Q110 280 110 270 L110 210 Q100 190 100 160 Q100 120 105 100 Q108 80 120 75"
-                fill="url(#backFat)"
-              />
-              
-              {/* Arm (side view) */}
-              <Path
-                d="M130 80 Q145 85 150 110 Q155 145 150 160 L145 160 Q140 145 140 110 Q140 90 130 80"
-                fill="url(#skinGradientSide)"
-              />
-              
-              {/* Body outline */}
-              <Path
-                d="M80 75 Q70 80 65 100 Q55 120 55 160 Q55 190 65 210 L65 270 Q65 280 75 285 L125 285 Q135 280 135 270 L135 210 Q145 190 145 160 Q145 120 135 100 Q130 80 120 75"
-                fill="none"
-                stroke={colors.accent.primary}
-                strokeWidth="1.5"
-                opacity="0.6"
-              />
-              
-              {/* Belly protrusion indicator based on fat % */}
-              {regionValues.trunkFront > 15 && (
-                <Path
-                  d={`M135 130 Q${145 + regionValues.trunkFront * 0.5} 150 135 170`}
-                  fill="none"
-                  stroke={getColor(regionValues.trunkFront)}
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  opacity="0.8"
-                />
-              )}
-            </G>
-            
-            {/* Labels for side view */}
-            <G>
-              <SvgText x="100" y="145" fontSize="10" fill={getColor(regionValues.trunkFront)} fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.trunkFront)}%
-              </SvgText>
-              <SvgText x="75" y="250" fontSize="9" fill={getColor(regionValues.lowerBody)} fontWeight="bold" textAnchor="middle">
-                {Math.round(regionValues.lowerBody)}%
-              </SvgText>
+              <SvgText x="100" y="262" fontSize="10" fill="#ffffff" fontWeight="bold" textAnchor="middle">{Math.round(regionValues.lowerBody)}%</SvgText>
             </G>
           </Svg>
         )}

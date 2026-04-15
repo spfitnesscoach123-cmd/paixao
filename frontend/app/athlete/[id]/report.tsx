@@ -231,10 +231,10 @@ export default function ReportScreen() {
             <Avatar3D
               autoRotate={true}
               heatmapValues={heatmapValues}
-              style={{ height: 320 }}
+              style={{ height: 350, alignSelf: 'stretch' }}
             />
           ) : (
-            <>
+            <View style={{ alignItems: 'center' }}>
               <View style={[styles.avatarWrap, { transform: [{ scaleX }] }]}>
                 <Svg width={180} height={280} viewBox="0 0 180 280">
                   <Circle cx="90" cy="25" r="20" fill={colors.dark.secondary} stroke="rgba(255,255,255,0.1)" strokeWidth="1" />
@@ -252,7 +252,7 @@ export default function ReportScreen() {
                 <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#eab308' }]} /><Text style={styles.legendText}>{pt ? 'Moderado' : 'Moderate'}</Text></View>
                 <View style={styles.legendItem}><View style={[styles.legendDot, { backgroundColor: '#ef4444' }]} /><Text style={styles.legendText}>{pt ? 'Alto' : 'High'}</Text></View>
               </View>
-            </>
+            </View>
           )}
         </View>
 
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   classLabel: { fontSize: 12, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },
   classValue: { fontSize: 28, fontWeight: '800', marginTop: 4 },
   classFat: { fontSize: 14, color: colors.text.secondary, marginTop: 2 },
-  avatarContainer: { alignItems: 'center', marginBottom: 20, backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden' },
+  avatarContainer: { marginBottom: 20, backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', minHeight: 350 },
   avatarWrap: { paddingVertical: 20 },
   legend: { flexDirection: 'row', gap: 16, paddingBottom: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },

@@ -202,8 +202,8 @@ export default function MeasurementScreen() {
             <Avatar3D
               onPartSelect={handleMeshSelect}
               highlightedPart={highlightedMesh}
-              autoRotate={false}
-              style={{ height: 350 }}
+              autoRotate={true}
+              style={{ height: 380 }}
             />
           ) : (
             /* SVG Body Model fallback (web) */
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: colors.accent.primary, fontWeight: '600' },
   instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(139,92,246,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
   instructionText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 16 },
-  avatarContainer: { backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', marginBottom: 16, minHeight: 350 },
+  avatarContainer: { backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', marginBottom: 16, minHeight: 380 },
   svgContainer: { alignItems: 'center', paddingVertical: 30 },
   pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#8b5cf6', gap: 6 },
   pickerTitle: { fontSize: 13, fontWeight: '600', color: '#a78bfa', marginBottom: 4 },

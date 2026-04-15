@@ -1,5 +1,6 @@
 /**
- * Avatar3D.tsx — Real GLB-based 3D avatar with heatmap, raycasting, and auto-rotation.
+ * Avatar3D.tsx — Real GLB-based 3D avatar with heatmap, raycasting,
+ * drag rotation, auto-rotation with inertia, and adaptive camera.
  *
  * Loads /assets/models/avatar.glb (AVATAR DC ULTIMATE) via GLTFLoader.
  * NO procedural fallback — if GLB fails, an explicit error is shown.
@@ -11,9 +12,10 @@
  * Each anatomical mesh maps 1:1 to a SkinfoldSite.
  */
 
-import React, { useRef, useCallback, useEffect, useState, Component } from 'react';
+import React, { useRef, useCallback, useEffect, useState, useMemo, Component } from 'react';
 import {
-  View, Text, StyleSheet, Platform, ActivityIndicator,
+  View, Text, StyleSheet, Platform, ActivityIndicator, PanResponder,
+  type GestureResponderEvent, type PanResponderGestureState,
 } from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
 import { Renderer } from 'expo-three';
@@ -27,9 +29,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 const SKIN_COLOR = 0xc8a07e;
 const AUTO_ROTATE_SPEED = 0.005; // radians per frame
+const DRAG_SENSITIVITY = 0.008;
+const INERTIA_DAMPING = 0.95;
+const INERTIA_THRESHOLD = 0.0001;
+const MAX_INERTIA_VELOCITY = 0.1;
+const TAP_MAX_DURATION = 300; // ms
+const TAP_MAX_DISTANCE = 12; // px
 
 /**
- * GLB mesh name → SkinfoldSite (protocol engine key).
+ * GLB mesh name -> SkinfoldSite (protocol engine key).
  * The AVATAR DC ULTIMATE model has meshes named after anatomical sites.
  */
 export const GLB_MESH_TO_SITE: Record<string, string> = {
@@ -72,9 +80,7 @@ const HEAT_HIGH = new THREE.Color(0xef4444);
 // ============================================================
 
 /**
- * Parse the JSON chunk of a GLB to build a node-name → mesh-name map.
- * GLTFLoader assigns node names to Three.js objects, not mesh names.
- * This lets us rename meshes after loading.
+ * Parse the JSON chunk of a GLB to build a node-name -> mesh-name map.
  */
 function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
   const view = new DataView(buffer);
@@ -87,7 +93,6 @@ function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
     if (node.mesh !== undefined && node.name) {
       const meshName = json.meshes?.[node.mesh]?.name;
       if (meshName) {
-        // Map node name to mesh name (BICEPS, TRICEPS, etc.)
         mapping[node.name] = meshName;
       }
     }
@@ -99,7 +104,6 @@ function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
  * Strip images/textures/samplers from a GLB ArrayBuffer so that
  * GLTFLoader.parse() never tries to decode images (which would crash
  * in React Native where createImageBitmap / HTMLImageElement is absent).
- * Geometry and materials (base colors) are preserved.
  */
 function stripGLBTextures(buffer: ArrayBuffer): ArrayBuffer {
   const view = new DataView(buffer);
@@ -107,7 +111,6 @@ function stripGLBTextures(buffer: ArrayBuffer): ArrayBuffer {
   const jsonBytes = new Uint8Array(buffer, 20, jsonLength);
   const json = JSON.parse(new TextDecoder().decode(jsonBytes));
 
-  // Remove all image / texture references
   delete json.images;
   delete json.textures;
   delete json.samplers;
@@ -122,36 +125,30 @@ function stripGLBTextures(buffer: ArrayBuffer): ArrayBuffer {
     delete mat.emissiveTexture;
   }
 
-  // Encode new JSON
   const newJsonBytes = new TextEncoder().encode(JSON.stringify(json));
-  const paddedLen = (newJsonBytes.length + 3) & ~3; // 4-byte align
+  const paddedLen = (newJsonBytes.length + 3) & ~3;
 
-  // Binary chunk
   const binStart = 12 + 8 + jsonLength;
   const binLength = view.getUint32(binStart, true);
   const binData = new Uint8Array(buffer, binStart + 8, binLength);
 
-  // Rebuild GLB
   const totalSize = 12 + 8 + paddedLen + 8 + binLength;
   const out = new ArrayBuffer(totalSize);
   const ov = new DataView(out);
   const oa = new Uint8Array(out);
 
-  // Header
-  ov.setUint32(0, 0x46546c67, true); // glTF
-  ov.setUint32(4, 2, true);          // version
-  ov.setUint32(8, totalSize, true);   // length
+  ov.setUint32(0, 0x46546c67, true);
+  ov.setUint32(4, 2, true);
+  ov.setUint32(8, totalSize, true);
 
-  // JSON chunk
   ov.setUint32(12, paddedLen, true);
-  ov.setUint32(16, 0x4e4f534a, true); // "JSON"
+  ov.setUint32(16, 0x4e4f534a, true);
   oa.set(newJsonBytes, 20);
   for (let i = newJsonBytes.length; i < paddedLen; i++) oa[20 + i] = 0x20;
 
-  // BIN chunk
   const bo = 20 + paddedLen;
   ov.setUint32(bo, binLength, true);
-  ov.setUint32(bo + 4, 0x004e4942, true); // "BIN\0"
+  ov.setUint32(bo + 4, 0x004e4942, true);
   oa.set(binData, bo + 8);
 
   return out;
@@ -162,26 +159,19 @@ function stripGLBTextures(buffer: ArrayBuffer): ArrayBuffer {
 // ============================================================
 
 async function loadAvatarModel(): Promise<THREE.Group> {
-  // 1. Download asset via Expo
   const asset = Asset.fromModule(require('../../assets/models/avatar.glb'));
   await asset.downloadAsync();
   const uri = asset.localUri || asset.uri;
   if (!uri) throw new Error('Avatar GLB: asset download failed');
 
-  // 2. Fetch raw bytes
   const response = await fetch(uri);
   const buffer = await response.arrayBuffer();
 
-  // 3. Extract name mapping BEFORE stripping textures
   const nameMap = parseGLBNameMap(buffer);
-
-  // Log mesh mapping for debugging
   console.log('[Avatar3D] GLB name map:', JSON.stringify(nameMap));
 
-  // 4. Strip textures for RN compatibility
   const cleanBuffer = stripGLBTextures(buffer);
 
-  // 5. Parse with GLTFLoader
   const loader = new GLTFLoader();
   const gltf: any = await new Promise((resolve, reject) => {
     loader.parse(cleanBuffer, '', resolve, reject);
@@ -189,25 +179,21 @@ async function loadAvatarModel(): Promise<THREE.Group> {
 
   const model = gltf.scene as THREE.Group;
 
-  // 6. Rename meshes using GLB name map + apply skin-colored material
   const identifiedMeshes: string[] = [];
   model.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const mesh = child as THREE.Mesh;
 
-    // Rename from node name to mesh name
     const meshName = nameMap[mesh.name];
     if (meshName) mesh.name = meshName;
 
     identifiedMeshes.push(mesh.name);
 
-    // Dispose original material and assign heatmap-ready material
     if (mesh.material) {
       if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
       else (mesh.material as THREE.Material).dispose();
     }
 
-    // Anatomical meshes get highlighted skin color, base body gets darker tone
     const isAnatomical = GLB_MESH_TO_SITE[mesh.name] !== undefined;
     mesh.material = new THREE.MeshStandardMaterial({
       color: isAnatomical ? SKIN_COLOR : 0xb0956e,
@@ -216,23 +202,20 @@ async function loadAvatarModel(): Promise<THREE.Group> {
     });
   });
 
-  // Log identified meshes
   console.log('[Avatar3D] Identified meshes:', identifiedMeshes);
 
-  // 7. Validate required meshes
   const found = new Set(identifiedMeshes);
   const missing = REQUIRED_MESHES.filter((n) => !found.has(n));
   if (missing.length > 0) {
     console.warn('[Avatar3D] Missing required meshes:', missing);
-    // Don't throw - render what we have, but log the warning
   }
 
-  // 8. Center at origin
+  // Center at origin
   const box = new THREE.Box3().setFromObject(model);
   const center = box.getCenter(new THREE.Vector3());
   model.position.sub(center);
 
-  // 9. Scale to fit (~1.4 scene units tall)
+  // Scale to fit (~1.4 scene units tall)
   const size = box.getSize(new THREE.Vector3());
   const maxDim = Math.max(size.x, size.y, size.z);
   if (maxDim > 0) model.scale.setScalar(1.4 / maxDim);
@@ -330,34 +313,39 @@ function Avatar3DInner({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ---- Three.js refs (outside React render cycle) ----
+  // ---- Three.js refs ----
   const sceneRef = useRef<THREE.Scene | null>(null);
   const rendererRef = useRef<any>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const modelRef = useRef<THREE.Group | null>(null);
   const meshMapRef = useRef<Record<string, THREE.Mesh>>({});
   const animFrameRef = useRef<number | null>(null);
-  const viewSizeRef = useRef({ width: 1, height: 1 });
   const mountedRef = useRef(true);
 
-  // Touch
+  // ---- Layout & Interaction refs ----
+  const layoutSizeRef = useRef({ width: 1, height: 1 });
+  const isInteractingRef = useRef(false);
+  const lastPanXRef = useRef(0);
+  const rotationVelocityRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-  // Prop mirrors (avoid stale closures)
+  // ---- Prop mirrors (avoid stale closures) ----
   const autoRotateRef = useRef(autoRotate);
   const heatmapRef = useRef<Record<string, number>>({});
+  const onPartSelectRef = useRef(onPartSelect);
 
-  // Highlight restore state
+  // ---- Highlight state ----
   const prevHLRef = useRef<{
     name: string; emissive: THREE.Color; intensity: number;
   } | null>(null);
 
-  // Raycaster (reused, zero-alloc per frame)
+  // ---- Raycaster ----
   const raycasterRef = useRef(new THREE.Raycaster());
   const pointerRef = useRef(new THREE.Vector2());
 
   // ---- Sync props to refs ----
   useEffect(() => { autoRotateRef.current = autoRotate; }, [autoRotate]);
+  useEffect(() => { onPartSelectRef.current = onPartSelect; }, [onPartSelect]);
 
   useEffect(() => {
     if (!heatmapValues) return;
@@ -391,7 +379,6 @@ function Avatar3DInner({
 
   // ---- Highlight ----
   function applyHighlight(meshName: string | null) {
-    // Restore previous
     if (prevHLRef.current) {
       const prev = meshMapRef.current[prevHLRef.current.name];
       if (prev) {
@@ -401,7 +388,6 @@ function Avatar3DInner({
       }
       prevHLRef.current = null;
     }
-    // Apply new
     if (meshName) {
       const mesh = meshMapRef.current[meshName];
       if (mesh) {
@@ -416,6 +402,85 @@ function Avatar3DInner({
       }
     }
   }
+
+  // ---- Layout handler (captures view dimensions for raycasting) ----
+  const onLayout = useCallback((e: any) => {
+    const { width, height } = e.nativeEvent.layout;
+    if (width > 0 && height > 0) {
+      layoutSizeRef.current = { width, height };
+    }
+  }, []);
+
+  // ---- Handle tap (raycasting) ----
+  const handleTap = useCallback((touchX: number, touchY: number) => {
+    if (!cameraRef.current || Object.keys(meshMapRef.current).length === 0) return;
+
+    const { width, height } = layoutSizeRef.current;
+    if (width <= 1 || height <= 1) return;
+
+    // Convert touch coords (layout points) to NDC (-1 to +1)
+    pointerRef.current.x = (touchX / width) * 2 - 1;
+    pointerRef.current.y = -(touchY / height) * 2 + 1;
+
+    raycasterRef.current.setFromCamera(pointerRef.current, cameraRef.current);
+    const meshes = Object.values(meshMapRef.current);
+    const hits = raycasterRef.current.intersectObjects(meshes, false);
+
+    if (hits.length > 0) {
+      const meshName = hits[0].object.name;
+      console.log('[Avatar3D] Mesh tapped:', meshName, '-> site:', GLB_MESH_TO_SITE[meshName]);
+      applyHighlight(meshName);
+      onPartSelectRef.current?.(meshName);
+    }
+  }, []);
+
+  // ---- PanResponder (drag rotation + tap detection) ----
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+
+    onPanResponderGrant: (e: GestureResponderEvent) => {
+      isInteractingRef.current = true;
+      rotationVelocityRef.current = 0;
+      lastPanXRef.current = 0;
+      touchStartRef.current = {
+        x: e.nativeEvent.locationX,
+        y: e.nativeEvent.locationY,
+        time: Date.now(),
+      };
+    },
+
+    onPanResponderMove: (_: GestureResponderEvent, gs: PanResponderGestureState) => {
+      if (modelRef.current) {
+        const deltaDx = gs.dx - lastPanXRef.current;
+        lastPanXRef.current = gs.dx;
+        modelRef.current.rotation.y += deltaDx * DRAG_SENSITIVITY;
+      }
+    },
+
+    onPanResponderRelease: (_: GestureResponderEvent, gs: PanResponderGestureState) => {
+      isInteractingRef.current = false;
+
+      // Inertia from release velocity (capped)
+      const vel = gs.vx * 0.003;
+      rotationVelocityRef.current = Math.min(Math.max(vel, -MAX_INERTIA_VELOCITY), MAX_INERTIA_VELOCITY);
+
+      // Detect tap (short time, small movement)
+      const start = touchStartRef.current;
+      if (start) {
+        const dt = Date.now() - start.time;
+        if (dt < TAP_MAX_DURATION && Math.abs(gs.dx) < TAP_MAX_DISTANCE && Math.abs(gs.dy) < TAP_MAX_DISTANCE) {
+          handleTap(start.x, start.y);
+        }
+      }
+      touchStartRef.current = null;
+    },
+
+    onPanResponderTerminate: () => {
+      isInteractingRef.current = false;
+      touchStartRef.current = null;
+    },
+  }), [handleTap]);
 
   // ---- GL Context Created ----
   const onContextCreate = useCallback(async (gl: ExpoWebGLRenderingContext) => {
@@ -432,11 +497,9 @@ function Avatar3DInner({
       const scene = new THREE.Scene();
       sceneRef.current = scene;
 
-      // Camera
+      // Camera (will be repositioned after model load)
       const aspect = gl.drawingBufferWidth / gl.drawingBufferHeight;
       const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 100);
-      camera.position.set(0, 0.4, 1.8);
-      camera.lookAt(0, 0.3, 0);
       cameraRef.current = camera;
 
       // Lights
@@ -448,21 +511,41 @@ function Avatar3DInner({
       fill.position.set(-2, 1, -1);
       scene.add(fill);
 
-      // Load GLB model (MANDATORY — no fallback)
+      // Load GLB model
       console.log('[Avatar3D] Loading GLB model...');
       const model = await loadAvatarModel();
       scene.add(model);
       modelRef.current = model;
       console.log('[Avatar3D] Model loaded and added to scene');
 
-      // Index meshes by name (only anatomical meshes for interaction)
+      // ---- AUTO-FIT CAMERA to model bounding box ----
+      const finalBox = new THREE.Box3().setFromObject(model);
+      const finalSize = finalBox.getSize(new THREE.Vector3());
+      const finalCenter = finalBox.getCenter(new THREE.Vector3());
+
+      const halfFov = (camera.fov / 2) * (Math.PI / 180);
+
+      // Distance to fit model height
+      let fitDistance = (finalSize.y / 2) / Math.tan(halfFov);
+
+      // Also check if model width needs more distance (narrow viewports)
+      const hHalfFov = Math.atan(Math.tan(halfFov) * aspect);
+      const widthFitDist = (finalSize.x / 2) / Math.tan(hHalfFov);
+      fitDistance = Math.max(fitDistance, widthFitDist);
+
+      // Add 25% padding so the model doesn't touch the edges
+      fitDistance *= 1.25;
+
+      camera.position.set(0, finalCenter.y, fitDistance);
+      camera.lookAt(finalCenter.x, finalCenter.y, finalCenter.z);
+      console.log('[Avatar3D] Camera auto-fit: distance=', fitDistance.toFixed(2), 'centerY=', finalCenter.y.toFixed(2));
+
+      // Index anatomical meshes
       const map: Record<string, THREE.Mesh> = {};
       model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
-          // Clone material so each mesh has its own instance
           mesh.material = (mesh.material as THREE.Material).clone();
-          // Only index anatomical meshes (not the base body)
           if (GLB_MESH_TO_SITE[mesh.name]) {
             map[mesh.name] = mesh;
           }
@@ -477,19 +560,23 @@ function Avatar3DInner({
         applyHeatmapToMeshes(map, heatmapRef.current);
       }
 
-      viewSizeRef.current = {
-        width: gl.drawingBufferWidth,
-        height: gl.drawingBufferHeight,
-      };
-
       if (mountedRef.current) setLoading(false);
 
-      // ---- Render loop ----
+      // ---- Render loop with inertia ----
       const animate = () => {
         animFrameRef.current = requestAnimationFrame(animate);
-        if (autoRotateRef.current && modelRef.current) {
-          modelRef.current.rotation.y += AUTO_ROTATE_SPEED;
+
+        if (!isInteractingRef.current && modelRef.current) {
+          // Apply drag inertia
+          if (Math.abs(rotationVelocityRef.current) > INERTIA_THRESHOLD) {
+            modelRef.current.rotation.y += rotationVelocityRef.current;
+            rotationVelocityRef.current *= INERTIA_DAMPING;
+          } else if (autoRotateRef.current) {
+            // Auto-rotate when idle (no drag inertia)
+            modelRef.current.rotation.y += AUTO_ROTATE_SPEED;
+          }
         }
+
         renderer.render(scene, camera);
         gl.endFrameEXP();
       };
@@ -502,49 +589,6 @@ function Avatar3DInner({
       }
     }
   }, []);
-
-  // ---- Touch handlers (raycasting) ----
-  const onTouchStart = useCallback((e: any) => {
-    const t = e.nativeEvent;
-    touchStartRef.current = { x: t.locationX, y: t.locationY, time: Date.now() };
-  }, []);
-
-  const onTouchEnd = useCallback((e: any) => {
-    const t = e.nativeEvent;
-    const start = touchStartRef.current;
-    if (!start) return;
-
-    const dt = Date.now() - start.time;
-    const dx = Math.abs(t.locationX - start.x);
-    const dy = Math.abs(t.locationY - start.y);
-
-    // Only treat as tap if short & small movement
-    if (dt < 300 && dx < 15 && dy < 15 && cameraRef.current) {
-      const scaleX = viewSizeRef.current.width /
-        (t.target?.clientWidth || viewSizeRef.current.width);
-      const scaleY = viewSizeRef.current.height /
-        (t.target?.clientHeight || viewSizeRef.current.height);
-
-      const px = t.locationX * (Platform.OS === 'web' ? 1 : scaleX);
-      const py = t.locationY * (Platform.OS === 'web' ? 1 : scaleY);
-
-      // Normalized device coordinates
-      pointerRef.current.x = (px / viewSizeRef.current.width) * 2 - 1;
-      pointerRef.current.y = -(py / viewSizeRef.current.height) * 2 + 1;
-
-      raycasterRef.current.setFromCamera(pointerRef.current, cameraRef.current);
-      const meshes = Object.values(meshMapRef.current);
-      const hits = raycasterRef.current.intersectObjects(meshes, false);
-
-      if (hits.length > 0) {
-        const meshName = hits[0].object.name;
-        console.log('[Avatar3D] Mesh tapped:', meshName, '→ site:', GLB_MESH_TO_SITE[meshName]);
-        applyHighlight(meshName);
-        onPartSelect?.(meshName);
-      }
-    }
-    touchStartRef.current = null;
-  }, [onPartSelect]);
 
   // ---- Error state ----
   if (error) {
@@ -560,7 +604,12 @@ function Avatar3DInner({
 
   // ---- Render ----
   return (
-    <View style={[styles.container, style]} data-testid="avatar3d-container">
+    <View
+      style={[styles.container, style]}
+      onLayout={onLayout}
+      {...panResponder.panHandlers}
+      data-testid="avatar3d-container"
+    >
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#8b5cf6" />
@@ -570,8 +619,6 @@ function Avatar3DInner({
       <GLView
         style={styles.glView}
         onContextCreate={onContextCreate}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
       />
     </View>
   );
