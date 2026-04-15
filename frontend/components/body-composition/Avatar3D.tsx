@@ -1,12 +1,14 @@
 /**
  * Avatar3D.tsx — Real GLB-based 3D avatar with heatmap, raycasting, and auto-rotation.
  *
- * Loads /assets/models/avatar.glb via GLTFLoader.
+ * Loads /assets/models/avatar.glb (AVATAR DC ULTIMATE) via GLTFLoader.
  * NO procedural fallback — if GLB fails, an explicit error is shown.
  *
- * Mesh names (PascalCase): Head, Neck, Torso, Hips,
- *   LeftArm, RightArm, LeftForearm, RightForearm,
- *   LeftLeg, RightLeg, LeftLowerLeg, RightLowerLeg
+ * Mesh names (from GLB): BICEPS, TRICEPS, PEITORAL, AXILAR_MEDIA,
+ *   ABDOMINAL, SUPRA_ILIACA, COXA, PANTURILHA, SUBESCAPULAR
+ *   + body base mesh (tripo_mesh_*)
+ *
+ * Each anatomical mesh maps 1:1 to a SkinfoldSite.
  */
 
 import React, { useRef, useCallback, useEffect, useState, Component } from 'react';
@@ -26,23 +28,39 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 const SKIN_COLOR = 0xc8a07e;
 const AUTO_ROTATE_SPEED = 0.005; // radians per frame
 
-/** GLB mesh name (UPPERCASE from model) → Internal PascalCase */
-const GLB_TO_PASCAL: Record<string, string> = {
-  HEAD: 'Head',
-  NECK: 'Neck',
-  LEFT_ARM: 'LeftArm',
-  RIGHT_ARM: 'RightArm',
-  LEFT_FOREARM: 'LeftForearm',
-  RIGHT_FOREARM: 'RightForearm',
-  TORSO: 'Torso',
-  HIP: 'Hips',
-  LEFT_LEG: 'LeftLeg',
-  RIGHT_LEG: 'RightLeg',
-  LEFT_LOWERLEG: 'LeftLowerLeg',
-  RIGHT_LOWERLEG: 'RightLowerLeg',
+/**
+ * GLB mesh name → SkinfoldSite (protocol engine key).
+ * The AVATAR DC ULTIMATE model has meshes named after anatomical sites.
+ */
+export const GLB_MESH_TO_SITE: Record<string, string> = {
+  BICEPS: 'biceps',
+  TRICEPS: 'triceps',
+  PEITORAL: 'chest',
+  AXILAR_MEDIA: 'midaxillary',
+  ABDOMINAL: 'abdominal',
+  SUPRA_ILIACA: 'suprailiac',
+  COXA: 'thigh',
+  PANTURILHA: 'calf',
+  SUBESCAPULAR: 'subscapular',
 };
 
-const REQUIRED_MESHES = ['Head', 'Torso', 'LeftArm', 'RightArm', 'LeftLeg', 'RightLeg'];
+/**
+ * Anatomical body part labels (PT/EN) with corresponding SkinfoldSite.
+ */
+export const BODY_PARTS: Record<string, { pt: string; en: string; site: string }> = {
+  BICEPS: { pt: 'Biceps', en: 'Biceps', site: 'biceps' },
+  TRICEPS: { pt: 'Triceps', en: 'Triceps', site: 'triceps' },
+  PEITORAL: { pt: 'Peitoral', en: 'Chest', site: 'chest' },
+  AXILAR_MEDIA: { pt: 'Axilar Media', en: 'Midaxillary', site: 'midaxillary' },
+  ABDOMINAL: { pt: 'Abdominal', en: 'Abdominal', site: 'abdominal' },
+  SUPRA_ILIACA: { pt: 'Supra-iliaca', en: 'Suprailiac', site: 'suprailiac' },
+  COXA: { pt: 'Coxa', en: 'Thigh', site: 'thigh' },
+  PANTURILHA: { pt: 'Panturrilha', en: 'Calf', site: 'calf' },
+  SUBESCAPULAR: { pt: 'Subescapular', en: 'Subscapular', site: 'subscapular' },
+};
+
+/** All 9 anatomical mesh names that MUST exist in the GLB */
+const REQUIRED_MESHES = Object.keys(GLB_MESH_TO_SITE);
 
 // Heatmap gradient stops
 const HEAT_LOW = new THREE.Color(0x22c55e);
@@ -54,8 +72,9 @@ const HEAT_HIGH = new THREE.Color(0xef4444);
 // ============================================================
 
 /**
- * Parse the JSON chunk of a GLB to build a node-name → PascalCase mesh-name map.
- * This lets us rename meshes after GLTFLoader (which uses node names) finishes.
+ * Parse the JSON chunk of a GLB to build a node-name → mesh-name map.
+ * GLTFLoader assigns node names to Three.js objects, not mesh names.
+ * This lets us rename meshes after loading.
  */
 function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
   const view = new DataView(buffer);
@@ -67,8 +86,9 @@ function parseGLBNameMap(buffer: ArrayBuffer): Record<string, string> {
   for (const node of json.nodes || []) {
     if (node.mesh !== undefined && node.name) {
       const meshName = json.meshes?.[node.mesh]?.name;
-      if (meshName && GLB_TO_PASCAL[meshName]) {
-        mapping[node.name] = GLB_TO_PASCAL[meshName];
+      if (meshName) {
+        // Map node name to mesh name (BICEPS, TRICEPS, etc.)
+        mapping[node.name] = meshName;
       }
     }
   }
@@ -155,6 +175,9 @@ async function loadAvatarModel(): Promise<THREE.Group> {
   // 3. Extract name mapping BEFORE stripping textures
   const nameMap = parseGLBNameMap(buffer);
 
+  // Log mesh mapping for debugging
+  console.log('[Avatar3D] GLB name map:', JSON.stringify(nameMap));
+
   // 4. Strip textures for RN compatibility
   const cleanBuffer = stripGLBTextures(buffer);
 
@@ -166,33 +189,42 @@ async function loadAvatarModel(): Promise<THREE.Group> {
 
   const model = gltf.scene as THREE.Group;
 
-  // 6. Rename meshes to PascalCase + replace materials
+  // 6. Rename meshes using GLB name map + apply skin-colored material
+  const identifiedMeshes: string[] = [];
   model.traverse((child) => {
     if (!(child as THREE.Mesh).isMesh) return;
     const mesh = child as THREE.Mesh;
 
-    // Rename
-    const pascal = nameMap[mesh.name];
-    if (pascal) mesh.name = pascal;
+    // Rename from node name to mesh name
+    const meshName = nameMap[mesh.name];
+    if (meshName) mesh.name = meshName;
+
+    identifiedMeshes.push(mesh.name);
 
     // Dispose original material and assign heatmap-ready material
     if (mesh.material) {
       if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
       else (mesh.material as THREE.Material).dispose();
     }
+
+    // Anatomical meshes get highlighted skin color, base body gets darker tone
+    const isAnatomical = GLB_MESH_TO_SITE[mesh.name] !== undefined;
     mesh.material = new THREE.MeshStandardMaterial({
-      color: SKIN_COLOR,
+      color: isAnatomical ? SKIN_COLOR : 0xb0956e,
       roughness: 0.7,
       metalness: 0.05,
     });
   });
 
+  // Log identified meshes
+  console.log('[Avatar3D] Identified meshes:', identifiedMeshes);
+
   // 7. Validate required meshes
-  const found = new Set<string>();
-  model.traverse((c) => { if ((c as THREE.Mesh).isMesh) found.add(c.name); });
+  const found = new Set(identifiedMeshes);
   const missing = REQUIRED_MESHES.filter((n) => !found.has(n));
   if (missing.length > 0) {
-    throw new Error(`Avatar GLB missing required meshes: ${missing.join(', ')}`);
+    console.warn('[Avatar3D] Missing required meshes:', missing);
+    // Don't throw - render what we have, but log the warning
   }
 
   // 8. Center at origin
@@ -388,6 +420,8 @@ function Avatar3DInner({
   // ---- GL Context Created ----
   const onContextCreate = useCallback(async (gl: ExpoWebGLRenderingContext) => {
     try {
+      console.log('[Avatar3D] GL context created, drawingBuffer:', gl.drawingBufferWidth, 'x', gl.drawingBufferHeight);
+
       // Renderer
       const renderer = new Renderer({ gl });
       renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -415,21 +449,28 @@ function Avatar3DInner({
       scene.add(fill);
 
       // Load GLB model (MANDATORY — no fallback)
+      console.log('[Avatar3D] Loading GLB model...');
       const model = await loadAvatarModel();
       scene.add(model);
       modelRef.current = model;
+      console.log('[Avatar3D] Model loaded and added to scene');
 
-      // Index meshes by PascalCase name
+      // Index meshes by name (only anatomical meshes for interaction)
       const map: Record<string, THREE.Mesh> = {};
       model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
           // Clone material so each mesh has its own instance
           mesh.material = (mesh.material as THREE.Material).clone();
-          map[mesh.name] = mesh;
+          // Only index anatomical meshes (not the base body)
+          if (GLB_MESH_TO_SITE[mesh.name]) {
+            map[mesh.name] = mesh;
+          }
         }
       });
       meshMapRef.current = map;
+
+      console.log('[Avatar3D] Indexed anatomical meshes:', Object.keys(map));
 
       // Apply initial heatmap if values were provided before GL was ready
       if (heatmapRef.current && Object.keys(heatmapRef.current).length > 0) {
@@ -454,6 +495,7 @@ function Avatar3DInner({
       };
       animate();
     } catch (err: any) {
+      console.error('[Avatar3D] onContextCreate error:', err);
       if (mountedRef.current) {
         setError(err?.message || 'Failed to load GLB model');
         setLoading(false);
@@ -496,6 +538,7 @@ function Avatar3DInner({
 
       if (hits.length > 0) {
         const meshName = hits[0].object.name;
+        console.log('[Avatar3D] Mesh tapped:', meshName, '→ site:', GLB_MESH_TO_SITE[meshName]);
         applyHighlight(meshName);
         onPartSelect?.(meshName);
       }

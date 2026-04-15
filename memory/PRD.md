@@ -33,10 +33,12 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 │   │   ├── symmetryEngine.ts (Analise de simetria)
 │   │   └── bodyMapping.ts (MediaPipe body mapping)
 │   ├── components/body-composition/
-│   │   ├── Avatar3D.tsx (Three.js + GLB real)
+│   │   ├── Avatar3D.tsx (Three.js + GLB AVATAR DC ULTIMATE)
 │   │   ├── MeasurementInputModal.tsx
 │   │   ├── CameraScanner.tsx
 │   │   └── ScannerOverlay.tsx
+│   ├── assets/models/
+│   │   └── avatar.glb (AVATAR DC ULTIMATE - 1.3MB, 10 meshes anatomicas)
 │   └── types/protocols.ts
 ├── backend/ (FastAPI)
 │   └── server.py (API completa)
@@ -59,55 +61,37 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Navegacao Body Scan 3D na aba Assessments
 
 ### Session 6 (Protocolos + Relatorio Animado - Prompt 4) - 09/Abr/2026
-- **Selecao de protocolo** (protocol-select.tsx): 5 protocolos cientificos
-  - Jackson & Pollock 3 Dobras
-  - Jackson & Pollock 7 Dobras
-  - Durnin & Womersley (4 sites)
-  - Faulkner (4 sites)
-  - Guedes 1985 (3 sites)
-- **Tela de medicoes** (measurement.tsx): Avatar interativo com pontos por protocolo
-  - Avatar3D (Three.js) no mobile, SVG fallback no web
-  - Modal de input por site (mm)
-  - Validacao: so permite calculo com todos os sites preenchidos
-  - Mapeamento mesh 3D → sites de dobras cutaneas
-- **Motor de calculos** (protocolEngine.ts): Formulas cientificas reais
-  - Densidade corporal (Siri equation)
-  - Body fat %, massa gorda, massa magra, agua, osso, IMC
-  - Classificacao (Essential/Athletic/Fitness/Average/Obese)
-- **Analise de simetria** (symmetryEngine.ts): Lateral e vertical + insights
-- **Relatorio animado** (report.tsx):
-  - Avatar SVG com heatmap (verde/amarelo/vermelho)
-  - Avatar3D com autoRotate + heatmap no mobile
-  - Grid de metricas (6 cards)
-  - Simetria e insights automaticos em PT/EN
-  - Save no backend (POST /api/body-composition)
-- **Backend**: Adicionados JP3 e D&W ao enum + funcoes de calculo
-- **Navegacao**: Body Scan 3D → scan → "Usar Resultados" → protocol-select → measurement → report
-- **Limpeza**: Removida tela legada add-body-composition.tsx
+- Selecao de protocolo (5 protocolos cientificos)
+- Tela de medicoes com Avatar 3D interativo
+- Motor de calculos (formulas cientificas reais)
+- Analise de simetria
+- Relatorio animado com heatmap + metricas + insights
+- Backend save (POST /api/body-composition)
 
 ### Session 7 (Avatar3D GLB Real - Prompt 5 Fix) - 09/Abr/2026
-- **Avatar3D.tsx reescrito completamente**:
-  - Carrega /assets/models/avatar.glb via GLTFLoader real
-  - Parse binario do GLB para extrair mapeamento de nomes (UPPERCASE → PascalCase)
-  - Strip de texturas do GLB para compatibilidade React Native
-  - Validacao obrigatoria de meshes: Head, Torso, LeftArm, RightArm, LeftLeg, RightLeg
-  - Centralizacao Box3 e escala automatica
-  - Rotacao automatica no eixo Y (constante e suave)
-  - Raycasting real com coordenadas normalizadas (-1 a 1)
-  - Heatmap via emissive com intensidade visivel (0.55)
-  - Highlight de selecao com restauracao de estado
-  - Error Boundary wrapper (erro controlado, sem fallback silencioso)
-  - Loading state com ActivityIndicator
-  - Performance: dispose on unmount, sem setState por frame
-  - ZERO fallback procedural — se GLB falhar, erro explicito
-- **Heatmap keys corrigidos** (report.tsx → buildHeatmapValues):
-  - Keys mudados de lowercase (torso, arm, thigh) para PascalCase (Torso, LeftArm, RightArm, etc.)
-  - Distribuicao correta: arms → LeftArm + RightArm, legs → LeftLeg + RightLeg
-  - 10 regioes mapeadas corretamente para os 12 meshes do GLB
-- **heatmap.ts atualizado**: applyHeatmap usa emissive em vez de color
-- **metro.config.js**: Adicionado .glb/.gltf ao resolver.assetExts
-- **Removida dependencia de createProceduralAvatar** (cilindros eliminados)
-- **Removida dependencia do hook useAvatarControls** (logica internalizada)
+- Avatar3D.tsx reescrito para GLB real
+- Heatmap keys corrigidos para PascalCase
+
+### Session 8 (Auditoria + Fix Avatar3D - Prompt 6) - 15/Abr/2026
+- **AUDITORIA DIAGNOSTICA COMPLETA** do pipeline de renderizacao 3D
+  - Identificada causa raiz: incompatibilidade three@0.183 vs expo-three@8.0.0 (peer dep ^0.166)
+  - Identificado erro silencioso: catch(e){} no require() do Avatar3D
+  - Identificado @expo/browser-polyfill como NO-OP
+  - Camera, iluminacao, centering, GLB validados como corretos
+- **FIX DE DEPENDENCIAS**:
+  - Downgrade three: 0.183 → 0.166.1 (alinhado com expo-three peer dep)
+  - Downgrade @types/three: 0.183 → 0.166.0
+- **SUBSTITUICAO DO GLB**:
+  - Antigo: avatar.glb (2.9MB, 12 meshes genericas: HEAD, NECK, TORSO, etc.)
+  - Novo: AVATAR DC ULTIMATE.glb (1.3MB, 10 meshes anatomicas diretas)
+  - Meshes do novo modelo: BICEPS, TRICEPS, PEITORAL, AXILAR_MEDIA, ABDOMINAL, SUPRA_ILIACA, COXA, PANTURILHA, SUBESCAPULAR + corpo base
+- **NOVO MAPEAMENTO 1:1**: Cada mesh mapeia diretamente a um SkinfoldSite
+  - Elimina ambiguidade do modelo anterior (onde "Torso" mapeava 4 sites)
+  - BODY_PARTS exportado com labels PT/EN
+  - GLB_MESH_TO_SITE exportado para uso em outras telas
+- **ERROR LOGGING**: console.error no catch do require() em measurement.tsx e report.tsx
+- **FIX LAYOUT RESPONSIVO**: metricsGrid no report.tsx (justifyContent + width corrigidos)
+- **LOGGING COMPLETO no Avatar3D**: GL context, GLB loading, mesh identification, tap events
 
 ## Fluxo Body Scan 3D (Completo)
 ```
@@ -125,6 +109,8 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Fix Durnin & Womersley NaN bug (Math.log10(0) quando soma = 0)
 
 ### P1 (Proximo)
+- Testar renderizacao 3D em dispositivo nativo (EAS Build)
+- Implementar interacao completa por partes anatomicas no Avatar3D
 - Renomear "Simetria Lateral" → "Distribuicao Regional" (symmetryEngine + report)
 - Adicionar eixo Z ao bodyMapping.ts (correcao de perspectiva)
 - Vincular Body Scan (MediaPipe landmarks) ao modelo 3D do avatar
@@ -140,6 +126,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Merge de perfis duplicados
 - i18n completa (ScientificAnalysisTab, Assessments)
 - Refactoring trackingProtection.ts (legacy VBT)
+- GitHub account linking (spfitnesscoach123-cmd vs paixaosf)
 
 ## Credenciais de Teste
 - Email: contato@loadmanagerpro.com.br
@@ -147,6 +134,19 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 
 ## Integracoes
 - MediaPipeTasksVision (Native SDK)
-- Three.js / Expo-GL / Expo-Three
+- Three.js@0.166.1 / Expo-GL@16.0.10 / Expo-Three@8.0.0
 - GLTFLoader (three/examples/jsm/loaders/GLTFLoader)
 - RevenueCat (subscricoes)
+
+## Meshes do AVATAR DC ULTIMATE (avatar.glb)
+| Mesh GLB | SkinfoldSite | Label PT | Label EN |
+|----------|-------------|----------|----------|
+| BICEPS | biceps | Biceps | Biceps |
+| TRICEPS | triceps | Triceps | Triceps |
+| PEITORAL | chest | Peitoral | Chest |
+| AXILAR_MEDIA | midaxillary | Axilar Media | Midaxillary |
+| ABDOMINAL | abdominal | Abdominal | Abdominal |
+| SUPRA_ILIACA | suprailiac | Supra-iliaca | Suprailiac |
+| COXA | thigh | Coxa | Thigh |
+| PANTURILHA | calf | Panturrilha | Calf |
+| SUBESCAPULAR | subscapular | Subescapular | Subscapular |

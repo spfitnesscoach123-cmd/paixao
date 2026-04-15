@@ -30,18 +30,20 @@ const { width: SW } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
 
 // ============================================================
-// MAPEAMENTO: Mesh 3D → Sites de dobras cutaneas
+// MAPEAMENTO: Mesh 3D (AVATAR DC ULTIMATE) → Sites de dobras cutaneas
+// Cada mesh mapeia 1:1 para um site de dobra cutanea
 // ============================================================
 
 const MESH_TO_SITES: Record<string, SkinfoldSite[]> = {
-  Torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
-  Hips: ['suprailiac', 'abdominal'],
-  LeftArm: ['triceps', 'biceps'],
-  RightArm: ['triceps', 'biceps'],
-  LeftLeg: ['thigh'],
-  RightLeg: ['thigh'],
-  LeftLowerLeg: ['calf'],
-  RightLowerLeg: ['calf'],
+  PEITORAL: ['chest'],
+  SUBESCAPULAR: ['subscapular'],
+  AXILAR_MEDIA: ['midaxillary'],
+  ABDOMINAL: ['abdominal'],
+  SUPRA_ILIACA: ['suprailiac'],
+  BICEPS: ['biceps'],
+  TRICEPS: ['triceps'],
+  COXA: ['thigh'],
+  PANTURILHA: ['calf'],
 };
 
 // SVG body site positions (fallback para web)
@@ -63,7 +65,7 @@ if (!IS_WEB) {
   try {
     Avatar3D = require('../../../components/body-composition/Avatar3D').Avatar3D;
   } catch (e) {
-    // Avatar3D not available, will use SVG fallback
+    console.error('[measurement] Avatar3D import failed:', e);
   }
 }
 

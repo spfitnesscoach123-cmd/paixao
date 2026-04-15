@@ -34,7 +34,7 @@ if (!IS_WEB) {
   try {
     Avatar3D = require('../../../components/body-composition/Avatar3D').Avatar3D;
   } catch (e) {
-    // Avatar3D not available
+    console.error('[report] Avatar3D import failed:', e);
   }
 }
 
@@ -64,28 +64,27 @@ function bodyPartColor(part: string, measurements: Record<string, number | undef
   return heatColor(avg);
 }
 
-/** Converte medidas de dobras para heatmap do Avatar3D (PascalCase mesh names, normalizado 0-1) */
+/** Converte medidas de dobras para heatmap do Avatar3D (mesh names do AVATAR DC ULTIMATE, normalizado 0-1) */
 function buildHeatmapValues(measurements: Record<string, number | undefined>): Record<string, number> {
-  const regionMapping: Record<string, SkinfoldSite[]> = {
-    Torso: ['chest', 'subscapular', 'midaxillary', 'abdominal'],
-    Hips: ['suprailiac', 'abdominal'],
-    LeftArm: ['triceps', 'biceps'],
-    RightArm: ['triceps', 'biceps'],
-    LeftForearm: ['triceps', 'biceps'],
-    RightForearm: ['triceps', 'biceps'],
-    LeftLeg: ['thigh'],
-    RightLeg: ['thigh'],
-    LeftLowerLeg: ['calf'],
-    RightLowerLeg: ['calf'],
+  // Mapeamento 1:1: mesh name → skinfold site
+  const meshToSite: Record<string, SkinfoldSite> = {
+    PEITORAL: 'chest',
+    SUBESCAPULAR: 'subscapular',
+    AXILAR_MEDIA: 'midaxillary',
+    ABDOMINAL: 'abdominal',
+    SUPRA_ILIACA: 'suprailiac',
+    BICEPS: 'biceps',
+    TRICEPS: 'triceps',
+    COXA: 'thigh',
+    PANTURILHA: 'calf',
   };
 
   const result: Record<string, number> = {};
-  for (const [region, sites] of Object.entries(regionMapping)) {
-    const values = sites.map((s) => measurements[s]).filter((v): v is number => v !== undefined && v > 0);
-    if (values.length > 0) {
-      const avg = values.reduce((s, v) => s + v, 0) / values.length;
+  for (const [meshName, site] of Object.entries(meshToSite)) {
+    const value = measurements[site];
+    if (value !== undefined && value > 0) {
       // Normalizar: 0-50mm → 0-1
-      result[region] = Math.min(avg / 50, 1);
+      result[meshName] = Math.min(value / 50, 1);
     }
   }
   return result;
@@ -364,8 +363,8 @@ const styles = StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, color: colors.text.secondary },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.text.secondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
-  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  metricCard: { width: (SW - 48) / 3, backgroundColor: colors.dark.card, borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border.default },
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 20 },
+  metricCard: { width: Math.floor((SW - 32 - 16) / 3), backgroundColor: colors.dark.card, borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border.default, marginBottom: 8 },
   metricValue: { fontSize: 18, fontWeight: '800', marginTop: 4 },
   metricLabel: { fontSize: 10, color: colors.text.secondary, marginTop: 2, textAlign: 'center' },
   symmetryCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 20, borderWidth: 1, borderColor: colors.border.default },
