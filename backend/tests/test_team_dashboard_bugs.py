@@ -11,7 +11,7 @@ import os
 from datetime import datetime, timedelta
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://fat-heatmap-3d.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://expo-gl-verify.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "testuser@test.com"
