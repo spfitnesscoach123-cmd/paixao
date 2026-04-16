@@ -585,14 +585,20 @@ function Avatar3DInner({
       console.log('[Avatar3D] Camera state: pos=', camera.position.toArray().map(v => v.toFixed(2)), 'aspect=', aspect.toFixed(3), 'fov=', camera.fov);
       console.log('[Avatar3D] Model bounds: size=', finalSize.toArray().map(v => v.toFixed(2)), 'center=', finalCenter.toArray().map(v => v.toFixed(2)));
 
-      // Index anatomical meshes
+      // Index anatomical meshes — use geometry check instead of isMesh
+      // (expo-three/Three.js 0.166.1 may not set isMesh on all renderable objects)
       const map: Record<string, THREE.Mesh> = {};
-      const allMeshNames: string[] = [];
-      model.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
+      const allChildren: string[] = [];
+      model.traverse((child: any) => {
+        const hasGeo = !!(child.geometry);
+        const name = child.name || '(unnamed)';
+        const type = child.type || child.constructor?.name || '?';
+        allChildren.push(name + ':' + type + (hasGeo ? '*' : ''));
+        
+        // Accept ANY object with geometry as a potential mesh
+        if (hasGeo) {
           const mesh = child as THREE.Mesh;
           mesh.material = (mesh.material as THREE.Material).clone();
-          allMeshNames.push(mesh.name);
           if (GLB_MESH_TO_SITE[mesh.name]) {
             map[mesh.name] = mesh;
           }
@@ -601,11 +607,12 @@ function Avatar3DInner({
       meshMapRef.current = map;
 
       const indexedNames = Object.keys(map);
-      console.log('[Avatar3D] Indexed anatomical meshes:', indexedNames);
 
-      // ON-SCREEN DEBUG: show mesh count so user can verify on device
+      // ON-SCREEN DEBUG: show ALL children so we can see what names GLTFLoader assigned
       if (mountedRef.current) {
-        setDebugInfo(indexedNames.length + '/9 meshes: ' + indexedNames.join(', '));
+        setDebugInfo(
+          indexedNames.length + '/9 indexed | ALL: ' + allChildren.join(' | ')
+        );
       }
 
       // Apply initial heatmap if values were provided before GL was ready
