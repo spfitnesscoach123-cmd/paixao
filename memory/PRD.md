@@ -84,7 +84,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
   - Toggle Frontal/Lateral removido (3D permite rotacao livre)
 - **ROTACAO AUTOMATICA**: Habilitada em todas as telas (measurement + report + assessments)
 
-### Session 10 (Fix SL-CMJ State Machine) - 16/Abr/2026
+### Session 10 (Fix SL-CMJ State Machine + Avatar3D Integration) - 16/Abr/2026
 - **AUDITORIA DIAGNOSTICA SL-CMJ**: Identificou causa raiz — `activeLeg` (useState) assincrono dentro do loop de processamento de frames
 - **FIX activeLegRef**: Adicionado `useRef<ActiveLeg>` para acesso sincrono
   - `activeLegRef.current` atualizado IMEDIATAMENTE antes de `setActiveLeg()` em TODOS os pontos
@@ -94,6 +94,16 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
   - `reset`: ref limpo junto com state
 - **ZERO REGRESSAO CMJ**: Nenhuma alteracao em `jumpDetector.ts`, nenhuma alteracao no path CMJ
 - **PROTECAO DE SAVE**: Ja existente — bloqueia save com dados incompletos (1 perna so)
+- **AUDITORIA AVATAR3D INTEGRACAO**: Pipeline TOUCH→RAYCAST→CALLBACK→MODAL diagnosticado
+- **FIX TAP_MAX_DISTANCE**: 12px → 25px (tremor natural do dedo em tela touch causava rejeicao do tap)
+- **FIX HEATMAP**: Substituido `mat.emissive` (invisivel) por `mat.color` direto (visivel)
+  - Valores > 0: gradiente heatmap (verde/amarelo/vermelho)
+  - Valores < 0: indicador purple "toque aqui" (meshes do protocolo sem dados)
+  - undefined: skin color (nao faz parte do protocolo)
+- **INDICADORES VISUAIS measurement.tsx**: heatmapValues agora passado ao Avatar3D
+  - Meshes do protocolo sem dados = purple (indicador visual de interacao)
+  - Meshes preenchidas = cor do heatmap (feedback progressivo)
+- **DEBUG LOGGING**: console.log criticos → console.warn (aparece no Mac Console/NSLog)
 
 ## Fluxo Body Scan 3D (Completo)
 ```

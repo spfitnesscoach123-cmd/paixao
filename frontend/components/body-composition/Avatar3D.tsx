@@ -34,7 +34,7 @@ const INERTIA_DAMPING = 0.95;
 const INERTIA_THRESHOLD = 0.0001;
 const MAX_INERTIA_VELOCITY = 0.1;
 const TAP_MAX_DURATION = 300; // ms
-const TAP_MAX_DISTANCE = 12; // px
+const TAP_MAX_DISTANCE = 25; // px (generous for touch screens — finger tremor causes 15-20px)
 
 /**
  * GLB mesh name -> SkinfoldSite (protocol engine key).
@@ -74,6 +74,7 @@ const REQUIRED_MESHES = Object.keys(GLB_MESH_TO_SITE);
 const HEAT_LOW = new THREE.Color(0x22c55e);
 const HEAT_MID = new THREE.Color(0xeab308);
 const HEAT_HIGH = new THREE.Color(0xef4444);
+const INDICATOR_COLOR = new THREE.Color(0x7c3aed); // purple — "tap here" for unfilled protocol sites
 
 // ============================================================
 // GLB BINARY UTILITIES
@@ -240,6 +241,12 @@ function getHeatColor(value: number): THREE.Color {
   return HEAT_HIGH.clone();
 }
 
+/**
+ * Apply heatmap colors DIRECTLY to mat.color (not emissive — emissive is too subtle).
+ * Values:  > 0  → heatmap gradient (green/yellow/red based on magnitude)
+ *          < 0  → protocol indicator (purple "tap here")
+ *          undefined → skin color (not part of protocol/data)
+ */
 function applyHeatmapToMeshes(
   meshMap: Record<string, THREE.Mesh>,
   values: Record<string, number>,
@@ -248,12 +255,12 @@ function applyHeatmapToMeshes(
     const mat = mesh.material as THREE.MeshStandardMaterial;
     if (!mat) continue;
     const v = values[name];
-    if (v !== undefined) {
-      mat.emissive.copy(getHeatColor(v));
-      mat.emissiveIntensity = 0.55;
+    if (v !== undefined && v < 0) {
+      mat.color.copy(INDICATOR_COLOR);
+    } else if (v !== undefined && v > 0) {
+      mat.color.copy(getHeatColor(v));
     } else {
-      mat.emissive.set(0x000000);
-      mat.emissiveIntensity = 0;
+      mat.color.set(SKIN_COLOR);
     }
   }
 }
@@ -436,10 +443,8 @@ function Avatar3DInner({
 
     pointerRef.current.set(ndcX, ndcY);
 
-    // DEBUG LOGS (temporary — remove after validation on device)
-    console.log('[Avatar3D] TOUCH:', touchX.toFixed(1), touchY.toFixed(1));
-    console.log('[Avatar3D] LAYOUT:', width.toFixed(1), height.toFixed(1));
-    console.log('[Avatar3D] NDC:', ndcX.toFixed(3), ndcY.toFixed(3));
+    // DEBUG LOGS — console.warn so they appear in Mac Console (NSLog bridge)
+    console.warn('[Avatar3D] TOUCH:' + touchX.toFixed(1) + ',' + touchY.toFixed(1) + ' LAYOUT:' + width.toFixed(1) + ',' + height.toFixed(1) + ' NDC:' + ndcX.toFixed(3) + ',' + ndcY.toFixed(3));
 
     // Cast ray from camera through NDC point
     raycasterRef.current.setFromCamera(pointerRef.current, camera);
@@ -488,7 +493,7 @@ function Avatar3DInner({
         y: e.nativeEvent.locationY,
         time: Date.now(),
       };
-      console.log('[Avatar3D] PanGrant: locationX=', e.nativeEvent.locationX.toFixed(1), 'locationY=', e.nativeEvent.locationY.toFixed(1));
+      console.warn('[Avatar3D] PanGrant: locationX=' + e.nativeEvent.locationX.toFixed(1) + ' locationY=' + e.nativeEvent.locationY.toFixed(1));
     },
 
     onPanResponderMove: (_: GestureResponderEvent, gs: PanResponderGestureState) => {

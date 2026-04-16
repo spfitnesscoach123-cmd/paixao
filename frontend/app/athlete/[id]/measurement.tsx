@@ -98,6 +98,22 @@ export default function MeasurementScreen() {
 
   const filledCount = sites.filter((s) => (measurements[s] ?? 0) > 0).length;
 
+  // Heatmap values for Avatar3D: purple indicator for unfilled protocol sites, color gradient for filled
+  const heatmapValues = useMemo(() => {
+    const values: Record<string, number> = {};
+    for (const [meshName, sitesForMesh] of Object.entries(MESH_TO_SITES)) {
+      const protocolSites = sitesForMesh.filter((s) => sites.includes(s));
+      if (protocolSites.length === 0) continue;
+      const filledSite = protocolSites.find((s) => (measurements[s] ?? 0) > 0);
+      if (filledSite) {
+        values[meshName] = Math.min((measurements[filledSite] ?? 0) / 50, 1);
+      } else {
+        values[meshName] = -1; // indicator: purple "tap here"
+      }
+    }
+    return values;
+  }, [sites, measurements]);
+
   const handleSaveMeasurement = useCallback((site: SkinfoldSite, value: number) => {
     setMeasurements((prev) => ({ ...prev, [site]: value }));
   }, []);
@@ -202,6 +218,7 @@ export default function MeasurementScreen() {
             <Avatar3D
               onPartSelect={handleMeshSelect}
               highlightedPart={highlightedMesh}
+              heatmapValues={heatmapValues}
               autoRotate={true}
               style={{ height: 380 }}
             />
