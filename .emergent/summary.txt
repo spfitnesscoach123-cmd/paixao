@@ -1,137 +1,143 @@
 <analysis>**original_problem_statement**: 
-The user requested corrections to the Jump Camera's flight time calculation due to underestimation. After a detailed audit, the user provided strict mathematical and logical constraints to fix the timing (latency compensation, symmetrical frame detection) and added a pre-jump scanner/calibration flow. Subsequently, the user requested a full correction of the  classification thresholds across the frontend and backend to align with scientific CMJ literature (replacing standard Drop Jump RSI thresholds), while strictly avoiding any changes to the general dashboard or metric calculations.
-*PRODUCT REQUIREMENTS*: 
-1. Fix jump flight time via latency compensation (, ) and symmetrical frame validation ().
-2. Add a pre-jump scanner phase (0-5s) to assess stability and confidence score before allowing a jump.
-3. Correct RSImod classification to scientifically accurate ranges (0.25 to 1.00+) with specific color mappings.
-4. Apply on-the-fly reclassification for older database records in both backend APIs and frontend UI components.
+The user requested a strict diagnostic audit of the 3D Avatar rendering pipeline, followed by a complete implementation of interactive features (auto-rotation, drag, raycasting, adaptive camera) and UI unification across screens. Subsequently, the user reported deployment errors due to conflicting lockfiles and native module duplication. Finally, the user requested a critical diagnostic audit of the SL-CMJ (Single Leg Countermovement Jump) state machine, as the second jump is not being detected and the app gets stuck.
 
-**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in the user's preferred language only. All interactions, comments, and docs must be in Portuguese).
+**PRODUCT REQUIREMENTS**:
+1. 3D Avatar must be fully interactive (auto-rotation, drag to rotate, clickable body parts via raycasting).
+2. Avatar must have an adaptive camera (fit-to-model) to prevent clipping.
+3. Avatar must be consistently used across all relevant screens (measurement, report, profile assessments), replacing the old 2D SVG model.
+4. SL-CMJ jump assessment must correctly detect two consecutive jumps (one for each leg) and transition states properly.
+
+**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in **Portuguese** only).
 
 **what currently exists?** 
-A React Native Expo app with a FastAPI backend. The Jump Camera accurately calculates flight time and jump height using a refined, symmetrical frame-detection logic and a pre-jump stability scanner. RSImod classification uses scientifically accurate CMJ thresholds across the app (excluding the dashboard, per user request), retroactively applying the correct labels and colors to historical data via on-the-fly backend adjustments and a new reusable frontend module.
+A React Native Expo app + FastAPI backend. The 3D Avatar has been fully upgraded with PanResponder for drag interaction, raycasting fixed to use layout coordinates, and an adaptive camera. Deployment issues related to  and duplicated  have been permanently fixed via  and yarn . The jump assessment feature (SL-CMJ) has a bug where the state machine fails to detect the second jump.
 
 **Last working item**:
-    - Last item agent was working: Fixing the RSImod classification thresholds in the backend () and frontend (, ), including tooltips with scientific citations (McMahon et al., Comfort et al.).
-    - Status: USER VERIFICATION PENDING
-    - Agent Testing Done: Y
-    - Which testing method agent to use? Manual testing by curl / python -c (for backend endpoints) and  for frontend. Testing agent can be used for UI validation.
+    - Last item agent was working: Performing a strict diagnostic audit of the SL-CMJ (Single Leg Countermovement Jump) state machine in  and  to identify why the second jump is not detected.
+    - Status: IN PROGRESS
+    - Agent Testing Done: N/A (Auditing only)
+    - Which testing method agent to use? N/A (Diagnostic analysis)
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  Issue 1: VBT Skeleton rendering incomplete (P1)
-     - Attempted fixes: None in this session.
-     - Next debug checklist: Review the SVG/Canvas rendering logic in the VBT UI overlay. The camera currently only displays green dots for tracking points; full skeletal lines are missing.
-     - Why fix this issue and what will be achieved with the fix?: Visual feedback for the athlete during VBT.
-     - Status: NOT STARTED
+  Issue 1: SL-CMJ State Machine Failure (P0)
+     - Attempted fixes: None yet (User explicitly forbade code changes during the audit phase). Agent reviewed , , and .
+     - Next debug checklist: Deliver the diagnostic audit as requested by the user. Analyze the state transitions (, ), takeoff detection logic, landing frame accumulation, and frame splitting logic to pinpoint the exact failure point.
+     - Why fix this issue and what will be achieved?: Allows athletes to successfully complete the Single Leg Countermovement Jump assessment (which requires two jumps).
+     - Status: IN PROGRESS
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: Frontend
      - Blocked on other issue: None
 
-  Issue 2: PDF Export detail fix (P2)
-     - Attempted fixes: None.
-     - Next debug checklist: Wait for the user to specify what exact detail is wrong in the PDF generation.
-     - Why fix this issue and what will be achieved with the fix?: Ensures data exports are accurate for coaches.
-     - Status: NOT STARTED
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix?: Backend
-     - Blocked on other issue: None
-
 **In progress Task List**:
-  *(None)*
+  Task 1: Deliver SL-CMJ Diagnostic Audit (P0)
+     - Where to resume: The agent has gathered context from the jump detection files and is ready to send the diagnostic report to the user via the  tool.
+     - What will be achieved with this?: Provides the user with a precise understanding of the SL-CMJ failure before any code changes are authorized.
+     - Status: IN PROGRESS
+     - Should Test frontend/backend/both after fix?: N/A
+     - Blocked on something: Waiting to output the audit to the user.
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P1) Implement new, modern UI for VBT and Jump Camera recording screens (User has a ready design).
-    - (P1) Render full skeleton (lines + points) in VBT camera.
-    - (P1) Redesign Navigation to an Activity Hub: Change flow so the user selects Activity first -> Athlete second.
+    - (P0) Implement the fix for the SL-CMJ state machine based on the audit results (once authorized by the user).
+    - (P0) Fix Durnin & Womersley NaN bug (mentioned in previous PRD updates).
+    - (P1) Test Avatar3D on a physical device after the recent deploy to verify raycasting, rotation, and camera fixes.
     
     Future Tasks:
-    - (P2) Data Import via PDF (Convert PDF to CSV internally).
-    - (P2) Export App Data to CSV.
-    - (P3) UI for merging duplicated athlete profiles.
-    - (P3) Full internationalization (i18n) of  and Assessments.
+    - Implement new, modern UI for VBT and Jump Camera recording screens.
+    - Data Import via PDF (Convert PDF to CSV internally).
+    - Export App Data to CSV.
+    - Link Body Scan (MediaPipe) to the 3D model.
 
 **Completed work in this session**
-- Jump Camera Audit: Full end-to-end analysis of MediaPipe landmarks, frame smoothing, and timestamp jitter (DONE).
-- Flight Time Fix: Applied latency compensation, , dynamic clamped threshold, and landmark lock ( vs ) (DONE).
-- Pre-Jump Scanner: Added a 3-phase calibration scanner with visual UI overlay, confidence score calculation, and auto-retry blocking (DONE).
-- Backend RSImod Fix: Updated  in  to scientific CMJ thresholds and implemented on-the-fly reclassification for GET endpoints (DONE).
-- Frontend RSImod Fix: Created , updated  and  with new UI labels, colors, and scientific tooltips (DONE).
+- Delivered Diagnostic Audit for 3D Avatar (DONE)
+- Implemented Avatar3D full interactivity (drag, auto-rotation, adaptive camera) (DONE)
+- Replaced old SVG avatar with Avatar3D in  (DONE)
+- Fixed Avatar3D raycasting coordinate system to use  instead of GL drawing buffer (DONE)
+- Fixed EAS deployment issues: removed , added , updated , and changed  to use  protocol (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-   - Issue 1: VBT Skeleton rendering incomplete. (Recorded in Pending Issues).
-   - Issue 2: PDF Export detail fix. (Recorded in Pending Issues).
+   - Issue 1: JSI Worklets vs JS Bridge
+     - Debug checklist: MediaPipe pipeline uses the JS bridge instead of actual JSI worklets, causing frame drops.
+     - Why to solve this issue and what will be achieved with this?: Improves performance of the body scan camera view.
+     - Should Test frontend/backend/both after fix: Frontend
+     - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: None.
-  - Recurrence count: 0
+  - Expo native GL rendering and Three.js peer dependencies. (Fixed in previous forks by locking  to 0.166.1).
+  - Recurrence count: 3+
   - Status: RESOLVED
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **MediaPipe Pose Tracking**: Real-time extraction of keypoints (foot_index, ankle).
-- **Time-Series Smoothing & Detection**: Use of moving averages combined with precise latency compensation to determine exact takeoff/landing frames.
-- **Data Normalization vs Display**: Historical DB records hold legacy RSI classifications (poor, good). The system now parses these on-the-fly in GET endpoints and frontend components using a unified mapping function.
+- React Native Expo, Three.js, Raycasting (Normalized Device Coordinates), Expo EAS Build, Kubernetes Deployments, State Machines (Jump Detection).
 
 **key DB schema**
-  - : Stores , , , etc. (Legacy  strings in the DB are now dynamically overwritten by the backend/frontend during reads).
+  - N/A
 
 **changes in tech stack**
-  - None.
+  - Added  to prevent  generation.
+  - Switched local module dependency from  to  to prevent duplicate native modules in EAS build.
 
 **All files of reference** 
+-  (Rewritten for drag, auto-rotate, fit-camera, and fixed raycasting)
+-  (Updated to use Avatar3D)
 - 
 - 
--  (Created)
+-  (Target of current audit)
+-  (Target of current audit)
 - 
 - 
 - 
 - 
 
 **Areas that need refactoring**: 
--  (Legacy VBT logic).
-- UI navigation flow (Needs inversion to Activity -> Athlete).
+- MediaPipe pipeline to use JSI worklets instead of JS bridge.
 
 **key api endpoints**
--  (POST)
--  (GET - now dynamically reclassifies old RSImod records)
--  (GET - now dynamically reclassifies old RSImod records)
+- N/A
 
 **Critical Info for New Agent** 
-- **CRITICAL DIRECTIVE**: The user provides VERY specific instructions (e.g., NÃO alterar cálculo, NÃO usar detecção por velocidade). ALWAYS follow these explicit bounds exactly. Do not refactor code or apply best practices that contradict the user's explicit rules.
-- **Language**: Portuguese ONLY.
-- **RSImod vs RSI**: RSImod (CMJ) ranges from 0.25 to >1.00. Standard RSI (Drop Jump) ranges from 1.0 to >2.8. Ensure these logic paths remain separated. The Dashboard (Visão Geral) explicitly ignores these classifications and relies purely on normalized numeric values. DO NOT modify the Dashboard RSI displays.
-- App Store Connect build delays (Processing) were encountered; this is an Apple-side issue and not a codebase failure.
+- **LANGUAGE REQUIREMENT:** You MUST reply exclusively in **Portuguese**.
+- **CURRENT DIRECTIVE:** The user has requested a STRICT DIAGNOSTIC AUDIT of the SL-CMJ jump detection logic. You are **PROHIBITED** from suggesting code changes or fixing the issue right now. You must provide a frame-by-frame analysis of variables (, , , etc.) and identify exactly where the state machine fails. The previous agent read the files and was about to send this audit via .
+- **DEPENDENCY STRICTNESS:** Do NOT run . The project uses yarn install v1.22.22
+[1/4] Resolving packages...
+success Already up-to-date.
+$ npx patch-package
+patch-package 8.0.1
+Applying patches...
+No patch files found
+Done in 0.95s.. Ensure  is never generated.
 
 **documents and test reports created in this job** 
-  -  (Updated with Session 3 progress)
+  - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Asks what ECC and Flight mean on the camera overlay. (Resolved)
-- **Assistant**: Explains Eccentric Time and Flight Time. (Resolved)
-- **User**: Asks how to fix the flight time underestimation without changing code yet. (Resolved)
-- **Assistant**: Proposes 3 technical solutions (velocity detection, smoothing reduction, native timestamps). (Resolved)
-- **User**: Rejects proposals completely. Tells agent to wait for explicit instructions. (Resolved)
-- **User**: Provides a very strict set of 5 rules to fix timing (latency compensation, symmetrical detection) and add a pre-jump scanner. (Resolved)
-- **Assistant**: Confirms plan via ask_human. (Resolved)
-- **User**: Adds constraints (clamp function, render-only UI thread for scanner, 2 retry limit). (Resolved)
-- **User**: Reports App Store Connect build is stuck at processing. (Resolved - Noted as Apple issue).
-- **User**: Requests correction of the RSImod classification thresholds (Scientific ranges) in the Frontend (Gauge, Profiles) and Backend, adding tooltips, but strictly ignoring the Dashboard overview. (Resolved)
-- *Pending*: None. Await the user's command for the next backlog item (Likely UI design or VBT skeleton).
+- **User**: Requests definitive fix for raycasting using layout coordinates.
+- **Agent**: Implements fix in  and tests.
+- **User**: Shares deployment error logs ( failing due to native module duplication).
+- **Agent**: Removes , runs yarn install.
+- **User**: Asks about deployment flow.
+- **Agent**: Explains GitHub to EAS Build flow.
+- **User**: Shares identical deployment errors from the cloud.
+- **Agent**: Realizes runtime fixes didn't persist. Adds , updates , changes  to  for .
+- **User**: Shares more logs (warnings only).
+- **Agent**: Confirms it's clean and safe to deploy.
+- **User**: Asks how to find Avatar3D console logs on Mac.
+- **Agent**: Explains Mac Console filtering.
+- **User (PENDING)**: Requests CRITICAL AUDIT of SL-CMJ state machine. Forbids code suggestions. Demands exact diagnostic of variables and frames to find why the second jump fails.
 
 **Project Health Check:**
-- Broken: None
+- Broken: SL-CMJ jump detection (fails to detect second jump).
 - Mocked: None
 
 **3rd Party Integrations** 
-- Expo Application Services (EAS) (Native Build required for Camera testing)
-- MediaPipeTasksVision (Native iOS SDK)
+- MediaPipeTasksVision (Native SDK)
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Self-tested via backend  validation and  for TS errors).
+  - Testing agent used after significant changes: NO (Used screenshot testing for UI verification).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -141,11 +147,11 @@ User:
 Password: 
 
 **What agent forgot to execute**
-Nothing. The agent successfully implemented the complex math and logic constraints exactly as requested by the user.
+The agent read the jump detection files but hasn't yet compiled and sent the diagnostic audit back to the user.
 
 **Debugging checklist for current issue**
-    Issue: Wait for User Input
-    Frontend files to check: N/A
-    Backend files to check: N/A
-    Database to check: N/A
-    Note: Do not start coding. Review the Pending Issue list and wait for the user to initiate the next piece of work (likely the VBT Skeleton rendering or UI overhaul).</analysis>
+    Issue: SL-CMJ State Machine Failure
+    Files to check: 
+    - 
+    - 
+    Action: Deliver the requested diagnostic audit. Analyze how  transitions. Check if  is being set incorrectly. Check  and  returns. Deliver findings to the user WITHOUT proposing a fix.</analysis>
