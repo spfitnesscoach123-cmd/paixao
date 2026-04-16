@@ -60,7 +60,7 @@
     "expo-three": "^8.0.0",
     "expo-web-browser": "~15.0.10",
     "i18n-js": "^4.5.2",
-    "mediapipe-pose": "./modules/mediapipe-pose",
+    "mediapipe-pose": "link:./modules/mediapipe-pose",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-hook-form": "^7.71.1",
