@@ -14,7 +14,7 @@
 
 import React, { useRef, useCallback, useEffect, useState, useMemo, Component } from 'react';
 import {
-  View, Text, StyleSheet, Platform, ActivityIndicator, PanResponder, PixelRatio,
+  View, Text, StyleSheet, Platform, ActivityIndicator, PanResponder, PixelRatio, Alert,
   type GestureResponderEvent, type PanResponderGestureState,
 } from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
@@ -242,26 +242,37 @@ function getHeatColor(value: number): THREE.Color {
 }
 
 /**
- * Apply heatmap colors DIRECTLY to mat.color (not emissive — emissive is too subtle).
- * Values:  > 0  → heatmap gradient (green/yellow/red based on magnitude)
+ * Apply heatmap by REPLACING the entire material (not just changing color property).
+ * expo-gl (WebGL 1.0) may not properly update material properties in-place.
+ * Creating a new material forces the renderer to use the new color.
+ *
+ * Values:  > 0  → heatmap gradient (green/yellow/red)
  *          < 0  → protocol indicator (purple "tap here")
- *          undefined → skin color (not part of protocol/data)
+ *          undefined → skin color
  */
 function applyHeatmapToMeshes(
   meshMap: Record<string, THREE.Mesh>,
   values: Record<string, number>,
 ): void {
   for (const [name, mesh] of Object.entries(meshMap)) {
-    const mat = mesh.material as THREE.MeshStandardMaterial;
-    if (!mat) continue;
     const v = values[name];
+    let color: THREE.Color;
     if (v !== undefined && v < 0) {
-      mat.color.copy(INDICATOR_COLOR);
+      color = INDICATOR_COLOR.clone();
     } else if (v !== undefined && v > 0) {
-      mat.color.copy(getHeatColor(v));
+      color = getHeatColor(v);
     } else {
-      mat.color.set(SKIN_COLOR);
+      color = new THREE.Color(SKIN_COLOR);
     }
+    // REPLACE entire material — guaranteed to work in expo-gl
+    if (mesh.material) {
+      (mesh.material as THREE.Material).dispose();
+    }
+    mesh.material = new THREE.MeshStandardMaterial({
+      color,
+      roughness: 0.7,
+      metalness: 0.05,
+    });
   }
 }
 
@@ -319,6 +330,7 @@ function Avatar3DInner({
 }: Avatar3DProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   // ---- Three.js refs ----
   const sceneRef = useRef<THREE.Scene | null>(null);
@@ -340,11 +352,6 @@ function Avatar3DInner({
   const autoRotateRef = useRef(autoRotate);
   const heatmapRef = useRef<Record<string, number>>({});
   const onPartSelectRef = useRef(onPartSelect);
-
-  // ---- Highlight state ----
-  const prevHLRef = useRef<{
-    name: string; emissive: THREE.Color; intensity: number;
-  } | null>(null);
 
   // ---- Raycaster ----
   const raycasterRef = useRef(new THREE.Raycaster());
@@ -384,28 +391,34 @@ function Avatar3DInner({
     };
   }, []);
 
-  // ---- Highlight ----
+  // ---- Highlight (replace material for guaranteed visibility in expo-gl) ----
+  const prevHLMaterialRef = useRef<{ name: string; material: THREE.Material } | null>(null);
+  
   function applyHighlight(meshName: string | null) {
-    if (prevHLRef.current) {
-      const prev = meshMapRef.current[prevHLRef.current.name];
+    // Restore previous highlighted mesh
+    if (prevHLMaterialRef.current) {
+      const prev = meshMapRef.current[prevHLMaterialRef.current.name];
       if (prev) {
-        const mat = prev.material as THREE.MeshStandardMaterial;
-        mat.emissive.copy(prevHLRef.current.emissive);
-        mat.emissiveIntensity = prevHLRef.current.intensity;
+        prev.material = prevHLMaterialRef.current.material;
       }
-      prevHLRef.current = null;
+      prevHLMaterialRef.current = null;
     }
     if (meshName) {
       const mesh = meshMapRef.current[meshName];
       if (mesh) {
-        const mat = mesh.material as THREE.MeshStandardMaterial;
-        prevHLRef.current = {
+        // Save current material for restoration
+        prevHLMaterialRef.current = {
           name: meshName,
-          emissive: mat.emissive.clone(),
-          intensity: mat.emissiveIntensity,
+          material: mesh.material as THREE.Material,
         };
-        mat.emissive.set(0x3388ff);
-        mat.emissiveIntensity = 0.6;
+        // Replace with bright highlight material
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: 0x3388ff,
+          roughness: 0.4,
+          metalness: 0.1,
+          emissive: new THREE.Color(0x3388ff),
+          emissiveIntensity: 0.3,
+        });
       }
     }
   }
@@ -423,59 +436,43 @@ function Avatar3DInner({
   const handleTap = useCallback((touchX: number, touchY: number) => {
     const camera = cameraRef.current;
     const meshMap = meshMapRef.current;
+    const meshCount = Object.keys(meshMap).length;
 
-    if (!camera || Object.keys(meshMap).length === 0) {
-      console.log('[Avatar3D] handleTap SKIP: camera=', !!camera, 'meshes=', Object.keys(meshMap).length);
+    if (!camera || meshCount === 0) {
+      Alert.alert('[Avatar3D] TAP', 'SKIP: camera=' + !!camera + ' meshes=' + meshCount);
       return;
     }
 
     const { width, height } = layoutSizeRef.current;
     if (width <= 1 || height <= 1) {
-      console.log('[Avatar3D] handleTap SKIP: layout not ready, w=', width, 'h=', height);
+      Alert.alert('[Avatar3D] TAP', 'SKIP: layout ' + width.toFixed(0) + 'x' + height.toFixed(0));
       return;
     }
 
-    // === CORE FIX: Convert touch coords (layout POINTS) to NDC (-1 to +1) ===
-    // locationX/Y are in layout points (same coordinate system as onLayout)
-    // NO PixelRatio multiplication needed — both systems use points
     const ndcX = (touchX / width) * 2 - 1;
     const ndcY = -(touchY / height) * 2 + 1;
-
     pointerRef.current.set(ndcX, ndcY);
-
-    // DEBUG LOGS — console.warn so they appear in Mac Console (NSLog bridge)
-    console.warn('[Avatar3D] TOUCH:' + touchX.toFixed(1) + ',' + touchY.toFixed(1) + ' LAYOUT:' + width.toFixed(1) + ',' + height.toFixed(1) + ' NDC:' + ndcX.toFixed(3) + ',' + ndcY.toFixed(3));
-
-    // Cast ray from camera through NDC point
     raycasterRef.current.setFromCamera(pointerRef.current, camera);
 
-    // Intersect with ALL anatomical meshes (recursive = true for safety)
     const meshes = Object.values(meshMap);
     const hits = raycasterRef.current.intersectObjects(meshes, true);
 
-    console.log('[Avatar3D] INTERSECTS:', hits.length, 'out of', meshes.length, 'meshes');
-
     if (hits.length > 0) {
-      // Walk up to find the named anatomical mesh
       let hitObj = hits[0].object;
       let meshName = hitObj.name;
-
-      // If the hit object isn't a known mesh, check parent chain
       while (hitObj && !GLB_MESH_TO_SITE[meshName]) {
         hitObj = hitObj.parent as THREE.Object3D;
         if (hitObj) meshName = hitObj.name;
         else break;
       }
-
       if (GLB_MESH_TO_SITE[meshName]) {
-        console.log('[Avatar3D] HIT:', meshName, '-> site:', GLB_MESH_TO_SITE[meshName]);
         applyHighlight(meshName);
         onPartSelectRef.current?.(meshName);
       } else {
-        console.log('[Avatar3D] HIT object not anatomical:', hits[0].object.name, 'distance:', hits[0].distance.toFixed(3));
+        Alert.alert('[Avatar3D]', 'HIT non-anatomical: ' + hits[0].object.name);
       }
     } else {
-      console.log('[Avatar3D] MISS: no intersections at NDC(', ndcX.toFixed(3), ',', ndcY.toFixed(3), ')');
+      Alert.alert('[Avatar3D] MISS', meshCount + ' meshes, NDC(' + ndcX.toFixed(2) + ',' + ndcY.toFixed(2) + ')');
     }
   }, []);
 
@@ -590,10 +587,12 @@ function Avatar3DInner({
 
       // Index anatomical meshes
       const map: Record<string, THREE.Mesh> = {};
+      const allMeshNames: string[] = [];
       model.traverse((child) => {
         if ((child as THREE.Mesh).isMesh) {
           const mesh = child as THREE.Mesh;
           mesh.material = (mesh.material as THREE.Material).clone();
+          allMeshNames.push(mesh.name);
           if (GLB_MESH_TO_SITE[mesh.name]) {
             map[mesh.name] = mesh;
           }
@@ -601,7 +600,13 @@ function Avatar3DInner({
       });
       meshMapRef.current = map;
 
-      console.log('[Avatar3D] Indexed anatomical meshes:', Object.keys(map));
+      const indexedNames = Object.keys(map);
+      console.log('[Avatar3D] Indexed anatomical meshes:', indexedNames);
+
+      // ON-SCREEN DEBUG: show mesh count so user can verify on device
+      if (mountedRef.current) {
+        setDebugInfo(indexedNames.length + '/9 meshes: ' + indexedNames.join(', '));
+      }
 
       // Apply initial heatmap if values were provided before GL was ready
       if (heatmapRef.current && Object.keys(heatmapRef.current).length > 0) {
@@ -668,6 +673,12 @@ function Avatar3DInner({
         style={styles.glView}
         onContextCreate={onContextCreate}
       />
+      {/* ON-SCREEN DEBUG: mesh index count — remove after verification */}
+      {debugInfo !== '' && (
+        <View style={styles.debugOverlay}>
+          <Text style={styles.debugText}>{debugInfo}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -726,5 +737,19 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     fontSize: 12,
     textAlign: 'center',
+  },
+  debugOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    right: 4,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 4,
+    padding: 4,
+  },
+  debugText: {
+    color: '#22c55e',
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
 });
