@@ -84,6 +84,17 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
   - Toggle Frontal/Lateral removido (3D permite rotacao livre)
 - **ROTACAO AUTOMATICA**: Habilitada em todas as telas (measurement + report + assessments)
 
+### Session 10 (Fix SL-CMJ State Machine) - 16/Abr/2026
+- **AUDITORIA DIAGNOSTICA SL-CMJ**: Identificou causa raiz — `activeLeg` (useState) assincrono dentro do loop de processamento de frames
+- **FIX activeLegRef**: Adicionado `useRef<ActiveLeg>` para acesso sincrono
+  - `activeLegRef.current` atualizado IMEDIATAMENTE antes de `setActiveLeg()` em TODOS os pontos
+  - `processFrame`: todas deteccoes SL-CMJ (takeoff, landing, grounding) usam `activeLegRef.current`
+  - `updateLiveMetrics`: deteccao SL-CMJ usa `activeLegRef.current`
+  - `startSecondJump`: ref atualizado antes de state
+  - `reset`: ref limpo junto com state
+- **ZERO REGRESSAO CMJ**: Nenhuma alteracao em `jumpDetector.ts`, nenhuma alteracao no path CMJ
+- **PROTECAO DE SAVE**: Ja existente — bloqueia save com dados incompletos (1 perna so)
+
 ## Fluxo Body Scan 3D (Completo)
 ```
 [Aba Assessments] -> Body Scan 3D ->
@@ -97,6 +108,7 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 ## Backlog Priorizado
 
 ### P0 (Critico)
+- ~~Fix SL-CMJ state machine: segundo salto nao detectado~~ DONE (Session 10 - 16/Abr/2026)
 - Fix Durnin & Womersley NaN bug (Math.log10(0) quando soma = 0)
 
 ### P1 (Proximo)

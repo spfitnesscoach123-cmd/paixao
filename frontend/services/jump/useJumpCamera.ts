@@ -226,6 +226,11 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const firstJumpLandingTimestampRef = useRef<number>(0);
   const groundedFrameCountRef = useRef<number>(0);
 
+  // SL-CMJ: Synchronous active leg ref — CRITICAL for frame-by-frame detection
+  // useState is async (batched by React), so activeLeg state is STALE inside processFrame.
+  // activeLegRef.current is updated IMMEDIATELY and used in ALL real-time detection.
+  const activeLegRef = useRef<ActiveLeg>(null);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -314,6 +319,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       const detected = detectActiveLeg(calibrationFramesRef.current);
       // Use auto-detection ONLY as fallback when it agrees or when protocol is ambiguous
       // Protocol choice always wins
+      activeLegRef.current = protocolLeg;
       setActiveLeg(protocolLeg);
       if (detected && detected !== protocolLeg) {
         console.log('[JUMP_CAMERA_HOOK] detectActiveLeg returned "' + detected + '" but protocol says "' + protocolLeg + '" — using protocol');
@@ -734,8 +740,8 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       let landed: boolean;
       if (isSlCmj) {
         // SL-CMJ: dedicated functions from jumpDetector.ts — only active leg
-        inAir = detectSLCMJTakeoff(frameData, groundCalibration, activeLeg);
-        landed = detectSLCMJLanding(frameData, groundCalibration, activeLeg);
+        inAir = detectSLCMJTakeoff(frameData, groundCalibration, activeLegRef.current);
+        landed = detectSLCMJLanding(frameData, groundCalibration, activeLegRef.current);
       } else {
         // CMJ: cmjMode-aware detection + hip validation
         const footTakeoff = detectCMJTakeoff(frameData, groundCalibration);
@@ -801,10 +807,11 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
         const timeSinceFirstLanding = timestamp - firstJumpLandingTimestampRef.current;
         if (timeSinceFirstLanding >= SLCMJ_MIN_JUMP_INTERVAL_MS) {
           // Swap active leg for second jump detection
-          const secondLeg: ActiveLeg = activeLeg === 'left' ? 'right' : 'left';
+          const secondLeg: ActiveLeg = activeLegRef.current === 'left' ? 'right' : 'left';
           console.log('[JUMP_CAMERA_HOOK] SL-CMJ: Interval elapsed (' + timeSinceFirstLanding.toFixed(0) + 'ms) — waiting for second foot to ground (leg: ' + secondLeg + ')');
           slcmjRecordingStateRef.current = 'waiting_second_grounded';
           setSlcmjRecordingState('waiting_second_grounded');
+          activeLegRef.current = secondLeg;
           setActiveLeg(secondLeg);
           // Clean slate for second jump detection
           takeoffTimeRef.current = null;
@@ -816,7 +823,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       
       // SL-CMJ: In waiting_second_grounded, wait for second foot to establish stance
       if (isSlCmj && slcmjRecordingStateRef.current === 'waiting_second_grounded') {
-        const secondFootOnGround = detectSLCMJLanding(frameData, groundCalibration, activeLeg);
+        const secondFootOnGround = detectSLCMJLanding(frameData, groundCalibration, activeLegRef.current);
         if (secondFootOnGround) {
           groundedFrameCountRef.current++;
           if (groundedFrameCountRef.current >= MIN_LANDING_FRAMES_AUTO_STOP) {
@@ -864,7 +871,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     // SL-CMJ: only active leg's foot (from jumpDetector.ts)
     let feetAboveGround: boolean;
     if (isSlCmj) {
-      feetAboveGround = detectSLCMJTakeoff(frame, groundCalibration, activeLeg);
+      feetAboveGround = detectSLCMJTakeoff(frame, groundCalibration, activeLegRef.current);
     } else {
       const footTakeoff = detectCMJTakeoff(frame, groundCalibration);
       const hipAbove = frame.hipCenterY < groundCalibration.standingHipY;
@@ -928,8 +935,10 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     
     // Swap active leg for second jump
     if (protocol === 'sl_cmj_left') {
+      activeLegRef.current = 'right';
       setActiveLeg('right');
     } else if (protocol === 'sl_cmj_right') {
+      activeLegRef.current = 'left';
       setActiveLeg('left');
     }
     
@@ -960,6 +969,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     setCountdown(COUNTDOWN_SECONDS);
     setIsRecording(false);
     setFrameCount(0);
+    activeLegRef.current = null;
     setActiveLeg(null);
     setGroundCalibration({
       groundLevel: 0,
