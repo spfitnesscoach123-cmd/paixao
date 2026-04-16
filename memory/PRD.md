@@ -68,9 +68,13 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
   - Sensibilidade: 0.008 rad/px
   - Inercia: damping 0.95 com velocidade maxima limitada
   - Auto-rotate pausa durante interacao e retoma suavemente
-- **RAYCASTING CORRIGIDO**: Usa onLayout para dimensoes reais do view
-  - Coordenadas de toque (layout pts) -> NDC (-1 a +1) correto
-  - Eliminada dependencia de clientWidth (propriedade DOM web inexistente no RN)
+- **RAYCASTING CORRIGIDO v2**: Pipeline TOUCH -> NDC -> RAY -> INTERSECT
+  - onLayout captura dimensoes em LAYOUT POINTS (nao GL pixels)
+  - locationX/Y -> NDC via (touch/layout)*2-1 (sem PixelRatio)
+  - Removido clientWidth/drawingBuffer (web DOM incompativel com RN)
+  - intersectObjects com recursive=true
+  - Parent chain walk para encontrar mesh anatomica nomeada
+  - Debug logs completos: TOUCH, LAYOUT, NDC, INTERSECTS, HIT/MISS
 - **FIX LAYOUT REPORT.TSX**: Removido alignItems:'center' que causava largura 0
   - Adicionado minHeight:350 + alignSelf:'stretch'
   - Avatar agora visivel no relatorio

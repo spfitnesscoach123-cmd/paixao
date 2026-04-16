@@ -14,7 +14,7 @@
 
 import React, { useRef, useCallback, useEffect, useState, useMemo, Component } from 'react';
 import {
-  View, Text, StyleSheet, Platform, ActivityIndicator, PanResponder,
+  View, Text, StyleSheet, Platform, ActivityIndicator, PanResponder, PixelRatio,
   type GestureResponderEvent, type PanResponderGestureState,
 } from 'react-native';
 import { GLView, ExpoWebGLRenderingContext } from 'expo-gl';
@@ -403,34 +403,74 @@ function Avatar3DInner({
     }
   }
 
-  // ---- Layout handler (captures view dimensions for raycasting) ----
+  // ---- Layout handler (captures view dimensions in LAYOUT POINTS for raycasting) ----
   const onLayout = useCallback((e: any) => {
     const { width, height } = e.nativeEvent.layout;
     if (width > 0 && height > 0) {
       layoutSizeRef.current = { width, height };
+      console.log('[Avatar3D] onLayout: width=', width, 'height=', height, 'pixelRatio=', PixelRatio.get());
     }
   }, []);
 
-  // ---- Handle tap (raycasting) ----
+  // ---- Handle tap (raycasting with LAYOUT-BASED coordinates) ----
   const handleTap = useCallback((touchX: number, touchY: number) => {
-    if (!cameraRef.current || Object.keys(meshMapRef.current).length === 0) return;
+    const camera = cameraRef.current;
+    const meshMap = meshMapRef.current;
+
+    if (!camera || Object.keys(meshMap).length === 0) {
+      console.log('[Avatar3D] handleTap SKIP: camera=', !!camera, 'meshes=', Object.keys(meshMap).length);
+      return;
+    }
 
     const { width, height } = layoutSizeRef.current;
-    if (width <= 1 || height <= 1) return;
+    if (width <= 1 || height <= 1) {
+      console.log('[Avatar3D] handleTap SKIP: layout not ready, w=', width, 'h=', height);
+      return;
+    }
 
-    // Convert touch coords (layout points) to NDC (-1 to +1)
-    pointerRef.current.x = (touchX / width) * 2 - 1;
-    pointerRef.current.y = -(touchY / height) * 2 + 1;
+    // === CORE FIX: Convert touch coords (layout POINTS) to NDC (-1 to +1) ===
+    // locationX/Y are in layout points (same coordinate system as onLayout)
+    // NO PixelRatio multiplication needed — both systems use points
+    const ndcX = (touchX / width) * 2 - 1;
+    const ndcY = -(touchY / height) * 2 + 1;
 
-    raycasterRef.current.setFromCamera(pointerRef.current, cameraRef.current);
-    const meshes = Object.values(meshMapRef.current);
-    const hits = raycasterRef.current.intersectObjects(meshes, false);
+    pointerRef.current.set(ndcX, ndcY);
+
+    // DEBUG LOGS (temporary — remove after validation on device)
+    console.log('[Avatar3D] TOUCH:', touchX.toFixed(1), touchY.toFixed(1));
+    console.log('[Avatar3D] LAYOUT:', width.toFixed(1), height.toFixed(1));
+    console.log('[Avatar3D] NDC:', ndcX.toFixed(3), ndcY.toFixed(3));
+
+    // Cast ray from camera through NDC point
+    raycasterRef.current.setFromCamera(pointerRef.current, camera);
+
+    // Intersect with ALL anatomical meshes (recursive = true for safety)
+    const meshes = Object.values(meshMap);
+    const hits = raycasterRef.current.intersectObjects(meshes, true);
+
+    console.log('[Avatar3D] INTERSECTS:', hits.length, 'out of', meshes.length, 'meshes');
 
     if (hits.length > 0) {
-      const meshName = hits[0].object.name;
-      console.log('[Avatar3D] Mesh tapped:', meshName, '-> site:', GLB_MESH_TO_SITE[meshName]);
-      applyHighlight(meshName);
-      onPartSelectRef.current?.(meshName);
+      // Walk up to find the named anatomical mesh
+      let hitObj = hits[0].object;
+      let meshName = hitObj.name;
+
+      // If the hit object isn't a known mesh, check parent chain
+      while (hitObj && !GLB_MESH_TO_SITE[meshName]) {
+        hitObj = hitObj.parent as THREE.Object3D;
+        if (hitObj) meshName = hitObj.name;
+        else break;
+      }
+
+      if (GLB_MESH_TO_SITE[meshName]) {
+        console.log('[Avatar3D] HIT:', meshName, '-> site:', GLB_MESH_TO_SITE[meshName]);
+        applyHighlight(meshName);
+        onPartSelectRef.current?.(meshName);
+      } else {
+        console.log('[Avatar3D] HIT object not anatomical:', hits[0].object.name, 'distance:', hits[0].distance.toFixed(3));
+      }
+    } else {
+      console.log('[Avatar3D] MISS: no intersections at NDC(', ndcX.toFixed(3), ',', ndcY.toFixed(3), ')');
     }
   }, []);
 
@@ -448,6 +488,7 @@ function Avatar3DInner({
         y: e.nativeEvent.locationY,
         time: Date.now(),
       };
+      console.log('[Avatar3D] PanGrant: locationX=', e.nativeEvent.locationX.toFixed(1), 'locationY=', e.nativeEvent.locationY.toFixed(1));
     },
 
     onPanResponderMove: (_: GestureResponderEvent, gs: PanResponderGestureState) => {
@@ -539,6 +580,8 @@ function Avatar3DInner({
       camera.position.set(0, finalCenter.y, fitDistance);
       camera.lookAt(finalCenter.x, finalCenter.y, finalCenter.z);
       console.log('[Avatar3D] Camera auto-fit: distance=', fitDistance.toFixed(2), 'centerY=', finalCenter.y.toFixed(2));
+      console.log('[Avatar3D] Camera state: pos=', camera.position.toArray().map(v => v.toFixed(2)), 'aspect=', aspect.toFixed(3), 'fov=', camera.fov);
+      console.log('[Avatar3D] Model bounds: size=', finalSize.toArray().map(v => v.toFixed(2)), 'center=', finalCenter.toArray().map(v => v.toFixed(2)));
 
       // Index anatomical meshes
       const map: Record<string, THREE.Mesh> = {};
