@@ -8474,7 +8474,9 @@ class TeamTableRow(BaseModel):
     acc_dec: int = 0
     rsimod: Optional[float] = None
     rsimod_delta: Optional[float] = None
+    rsimod_baseline_28d: Optional[float] = None
     fatigue_index: Optional[float] = None
+    fatigue_baseline_28d: Optional[float] = None
     fatigue_status: str = "UNKNOWN"
     readiness_status: str = "UNKNOWN"
     weight: Optional[float] = None
@@ -8623,6 +8625,7 @@ async def get_team_table(
         # --- RSImod ---
         rsimod_val = None
         rsimod_delta_val = None
+        rsimod_baseline_val = None
         cmj_jumps = [j for j in jump_by_athlete.get(aid, []) if j.get("protocol") == "cmj"]
         if cmj_jumps:
             latest_rsi = cmj_jumps[0].get("rsi")
@@ -8632,6 +8635,19 @@ async def get_team_table(
                     prev_rsi = cmj_jumps[1].get("rsi")
                     if prev_rsi and prev_rsi > 0:
                         rsimod_delta_val = round(((latest_rsi - prev_rsi) / prev_rsi) * 100, 1)
+            # Baseline 28d: average of all CMJ RSI values (already sorted desc by date)
+            rsi_vals_28d = []
+            for j in cmj_jumps:
+                jd = j.get("date", "")
+                try:
+                    if jd and (today - datetime.strptime(jd[:10], "%Y-%m-%d")).days <= 28:
+                        rv = j.get("rsi")
+                        if rv and rv > 0:
+                            rsi_vals_28d.append(rv)
+                except:
+                    pass
+            if rsi_vals_28d:
+                rsimod_baseline_val = round(sum(rsi_vals_28d) / len(rsi_vals_28d), 2)
         
         # --- Body Composition ---
         weight_val = None
@@ -8651,6 +8667,7 @@ async def get_team_table(
         
         # --- Wellness / Fatigue / Readiness ---
         fatigue_idx = None
+        fatigue_baseline_val = None
         fatigue_st = "UNKNOWN"
         readiness_st = "UNKNOWN"
         
@@ -8678,6 +8695,20 @@ async def get_team_table(
                     readiness_st = "NOT_READY"
             elif fatigue_st != "UNKNOWN":
                 readiness_st = fatigue_st
+            
+            # Fatigue baseline 28d: average of last 28d wellness fatigue values
+            fatigue_vals_28d = []
+            for w in w_list:
+                wd = w.get("date", "")
+                try:
+                    if wd and (today - datetime.strptime(wd[:10], "%Y-%m-%d")).days <= 28:
+                        fv = w.get("fatigue")
+                        if fv is not None:
+                            fatigue_vals_28d.append(float(fv) * 10)
+                except:
+                    pass
+            if fatigue_vals_28d:
+                fatigue_baseline_val = round(sum(fatigue_vals_28d) / len(fatigue_vals_28d), 1)
         
         rows.append(TeamTableRow(
             athlete_id=aid,
@@ -8691,7 +8722,9 @@ async def get_team_table(
             acc_dec=acc_dec_total,
             rsimod=rsimod_val,
             rsimod_delta=rsimod_delta_val,
+            rsimod_baseline_28d=rsimod_baseline_val,
             fatigue_index=fatigue_idx,
+            fatigue_baseline_28d=fatigue_baseline_val,
             fatigue_status=fatigue_st,
             readiness_status=readiness_st,
             weight=weight_val,

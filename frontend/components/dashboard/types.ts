@@ -10,7 +10,9 @@ export interface TeamTableRowData {
   acc_dec: number;
   rsimod: number | null;
   rsimod_delta: number | null;
+  rsimod_baseline_28d: number | null;
   fatigue_index: number | null;
+  fatigue_baseline_28d: number | null;
   fatigue_status: string;
   readiness_status: string;
   weight: number | null;

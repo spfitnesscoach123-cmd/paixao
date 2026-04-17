@@ -83,8 +83,19 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Legenda de status
 - React.memo + useMemo + useCallback
 
+### Etapa 5: Grafico neuromuscular (Combo Chart RSImod + Fadiga) - CONCLUIDA
+- NeuromuscularChart.tsx com SVG nativo - combo chart
+- Barras violeta = RSImod por atleta
+- Linha vermelha com pontos = Fatigue Index (0-100%)
+- Toggles: [RSI baseline 28d] e [Fadiga baseline 28d]
+  - Ativam linhas tracejadas de baseline (media 28 dias)
+- Backend estendido: novos campos `rsimod_baseline_28d` e `fatigue_baseline_28d`
+  - Leitura pura de medias historicas, sem recalculo de metricas
+- Eixo Y duplo: RSI (esquerda implicita) + Fadiga % (direita)
+- Labels com iniciais, legenda de barras vs linha
+- Scroll horizontal, React.memo + useMemo
+
 ### Proximas etapas previstas:
-- Etapa 5: Grafico neuromuscular (RSImod + fadiga)
 - Etapa 6: Refinamentos visuais e integracao final
 
 ## Restricoes absolutas
