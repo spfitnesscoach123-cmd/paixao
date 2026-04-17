@@ -181,12 +181,16 @@ async function loadAvatarModel(): Promise<THREE.Group> {
   const model = gltf.scene as THREE.Group;
 
   const identifiedMeshes: string[] = [];
-  model.traverse((child) => {
-    if (!(child as THREE.Mesh).isMesh) return;
+  model.traverse((child: any) => {
+    if (!child.geometry) return;
     const mesh = child as THREE.Mesh;
 
-    const meshName = nameMap[mesh.name];
-    if (meshName) mesh.name = meshName;
+    // Strategy: 1) Direct match (new GLB with correct node names)
+    //           2) Fallback via nameMap (handles sanitized names + typos)
+    if (!GLB_MESH_TO_SITE[mesh.name]) {
+      const mapped = nameMap[mesh.name];
+      if (mapped) mesh.name = mapped;
+    }
 
     identifiedMeshes.push(mesh.name);
 
