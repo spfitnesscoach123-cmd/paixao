@@ -247,6 +247,19 @@ export default function AthletesScreen() {
                 <Text style={styles.hubCardDesc}>
                   {locale === 'pt' ? 'CMJ, SL-CMJ, RSI e fadiga' : 'CMJ, SL-CMJ, RSI & fatigue'}
                 </Text>
+                {/* Station Mode button */}
+                <TouchableOpacity
+                  style={[styles.stationModeButton, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    session.setMode('hub');
+                    router.push('/station/jump' as any);
+                  }}
+                  data-testid="hub-station-jump"
+                >
+                  <Ionicons name="repeat" size={14} color="#f59e0b" />
+                  <Text style={[styles.stationModeText, { color: '#f59e0b' }]}>Station Mode</Text>
+                </TouchableOpacity>
               </View>
               <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
             </LinearGradient>

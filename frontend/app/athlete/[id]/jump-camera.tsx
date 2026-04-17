@@ -87,8 +87,23 @@ export default function JumpCameraPage() {
   );
 }
 
-function JumpCameraContent() {
-  const { id: athleteId, returnPath } = useLocalSearchParams<{ id: string; returnPath?: string }>();
+/**
+ * JumpCameraContent - Core jump camera component
+ * 
+ * PHASE 3: Accepts optional stationAthleteId for Station Mode.
+ * When provided, athleteId comes from prop (SessionContext) instead of URL.
+ * Camera stays mounted when athleteId changes — no remount.
+ */
+interface JumpCameraContentProps {
+  stationAthleteId?: string;
+  onSaveComplete?: () => void;
+}
+
+export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCameraContentProps = {}) {
+  const params = useLocalSearchParams<{ id: string; returnPath?: string }>();
+  // PHASE 3: Station Mode uses injected athleteId; Profile/Hub uses URL param
+  const athleteId = stationAthleteId || params.id;
+  const returnPath = stationAthleteId ? 'station' : params.returnPath;
   const router = useRouter();
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
@@ -97,8 +112,12 @@ function JumpCameraContent() {
   // PHASE 1A SAFETY: Freeze athleteId at recording start to prevent cross-athlete save
   const recordingAthleteIdRef = useRef<string | null>(null);
   
-  // PHASE 1B: Navigate back (respects returnPath from HUB)
+  // PHASE 1B/3: Navigate back (respects returnPath from HUB or Station)
   const navigateBack = () => {
+    if (returnPath === 'station') {
+      if (onSaveComplete) onSaveComplete();
+      return;
+    }
     if (returnPath === 'hub') {
       router.replace('/(tabs)/athletes' as any);
     } else {

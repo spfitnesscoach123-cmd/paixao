@@ -119,6 +119,13 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - Botao X para sair → volta ao HUB
 - Profile Mode e Fluxo A preservados via fallback (useLocalSearchParams quando stationAthleteId ausente)
 
+### FASE 3B — Station Mode Jump (CONCLUIDA)
+- `JumpCameraContent` exportada com `stationAthleteId` + `onSaveComplete` props
+- Nova rota `/station/jump.tsx` — wrapper identico ao VBT (picker laranja #f59e0b)
+- Botao "Station Mode" no card Jump Assessment (submenu Avaliacoes Fisicas)
+- useJumpCamera hook INTACTO (0 modificacoes internas)
+- 10/10 integrity checks PASS
+
 ### FASE 4 — Regression Completa (CONCLUIDA — 47/47 PASS)
 - Backend: 18/18 endpoints OK
 - HUB UI: 5/5 elementos OK
