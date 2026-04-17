@@ -111,7 +111,13 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Avatar3D na Assessment: container `bodyModelContainer` corrigido (removido `alignItems: 'center'`, adicionado `width: 100%` + `minHeight: 280`). Avatar3D style atualizado para `height: 280, width: '100%'`
 - Navegacao empilhando: `router.push` → `router.replace` no botao "Concluir" do report.tsx, evitando stack duplicado
 ### Proximas etapas previstas:
-- Etapa 6: Refinamentos visuais e integracao final
+- Refinamentos visuais pos-validacao TestFlight
+
+## Backlog
+- Importacao de dados via PDF (converter PDF para CSV)
+- Exportacao de dados do app para CSV
+- Link Body Scan (MediaPipe) ao modelo 3D
+- Refatoracao MediaPipe para JSI Worklets (performance)
 
 ## Restricoes absolutas
 - NAO alterar botao IMPORTAR CSV
