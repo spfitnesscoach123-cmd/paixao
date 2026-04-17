@@ -94,6 +94,9 @@ function JumpCameraContent() {
   const { locale } = useLanguage();
   const insets = useSafeAreaInsets();
   
+  // PHASE 1A SAFETY: Freeze athleteId at recording start to prevent cross-athlete save
+  const recordingAthleteIdRef = useRef<string | null>(null);
+  
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
   
@@ -484,6 +487,9 @@ function JumpCameraContent() {
   const handleSaveAssessment = useCallback(async () => {
     if (!jumpCamera.metrics) return;
     
+    // PHASE 1A SAFETY: Use frozen athleteId, fallback to current
+    const ownerAthleteId = recordingAthleteIdRef.current || athleteId;
+    
     const isSlCmj = selectedProtocol === 'sl_cmj' || selectedProtocol === 'sl_cmj_left' || selectedProtocol === 'sl_cmj_right';
     const today = format(new Date(), 'yyyy-MM-dd');
     const assessmentDate = selectedDate || today;
@@ -508,7 +514,7 @@ function JumpCameraContent() {
         
         const [res1, res2] = await Promise.all([
           api.post('/jump/assessment', {
-            athlete_id: athleteId,
+            athlete_id: ownerAthleteId,
             date: assessmentDate,
             protocol: leg1Protocol,
             flight_time_ms: jumpCamera.slCmjLeg1.metrics.flightTimeMs,
@@ -518,7 +524,7 @@ function JumpCameraContent() {
             notes: 'data_source: camera',
           }),
           api.post('/jump/assessment', {
-            athlete_id: athleteId,
+            athlete_id: ownerAthleteId,
             date: assessmentDate,
             protocol: leg2Protocol,
             flight_time_ms: jumpCamera.slCmjLeg2.metrics.flightTimeMs,
@@ -554,7 +560,7 @@ function JumpCameraContent() {
     
     // CMJ: Save single assessment with time_to_takeoff_ms
     submitMutation.mutate({
-      athlete_id: athleteId,
+      athlete_id: ownerAthleteId,
       date: assessmentDate,
       protocol: selectedProtocol,
       flight_time_ms: jumpCamera.metrics.flightTimeMs,
@@ -630,6 +636,10 @@ function JumpCameraContent() {
     console.log('[JUMP_CAMERA] All pipeline stages confirmed ready');
     console.log('[JUMP_CAMERA] Starting recording phase');
     console.log('[JUMP_CAMERA] ========================================');
+    
+    // PHASE 1A SAFETY: Freeze athleteId at recording start
+    recordingAthleteIdRef.current = athleteId;
+    console.log('[JUMP_CAMERA] FREEZE athleteId:', athleteId);
     
     setUiPhase('recording');
     jumpCamera.startCountdown();

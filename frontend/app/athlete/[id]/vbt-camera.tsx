@@ -98,6 +98,9 @@ function VBTCameraContent() {
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
   
+  // PHASE 1A SAFETY: Freeze athleteId at recording start to prevent cross-athlete save
+  const recordingAthleteIdRef = useRef<string | null>(null);
+  
   // Permission state
   const [permission, requestPermission] = useCameraPermissions();
   
@@ -918,6 +921,10 @@ function VBTCameraContent() {
     
     console.log('[VBT_CAMERA] Starting recording...');
     
+    // PHASE 1A SAFETY: Freeze athleteId at recording start
+    recordingAthleteIdRef.current = athleteId;
+    console.log('[VBT_CAMERA] FREEZE athleteId:', athleteId);
+    
     // Reset recording time
     setRecordingTime(0);
     
@@ -997,12 +1004,14 @@ function VBTCameraContent() {
       const response = await api.post('/vbt/data', data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vbt-analysis', athleteId] });
+    onSuccess: (_data, variables) => {
+      // PHASE 1A SAFETY: Use frozen athleteId from payload, not current athleteId
+      const savedAthleteId = variables.athlete_id;
+      queryClient.invalidateQueries({ queryKey: ['vbt-analysis', savedAthleteId] });
       queryClient.invalidateQueries({ queryKey: ['vbt-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['scientific-analysis', athleteId] });
+      queryClient.invalidateQueries({ queryKey: ['scientific-analysis', savedAthleteId] });
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
-      queryClient.invalidateQueries({ queryKey: ['strength-analysis', athleteId] });
+      queryClient.invalidateQueries({ queryKey: ['strength-analysis', savedAthleteId] });
       
       Alert.alert(
         locale === 'pt' ? 'Sucesso' : 'Success',
@@ -1024,8 +1033,11 @@ function VBTCameraContent() {
       return;
     }
     
+    // PHASE 1A SAFETY: Use frozen athleteId, fallback to current
+    const ownerAthleteId = recordingAthleteIdRef.current || athleteId;
+    
     const vbtData = {
-      athlete_id: athleteId,
+      athlete_id: ownerAthleteId,
       date: new Date().toISOString().split('T')[0],
       provider: 'camera',
       exercise: selectedExercise,

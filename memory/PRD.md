@@ -70,6 +70,7 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - **ACWR**: SEMPRE usar load_engine (EWMA), nunca calcular manualmente
 
 ## Backlog Futuro
+- (P0) Session HUB / Station Mode (em progresso - ver abaixo)
 - (P1) Data Import via PDF (converter para CSV)
 - (P1) Export App Data to CSV
 - (P2) Link Body Scan (MediaPipe) ao modelo 3D
@@ -81,3 +82,17 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - 17/17 endpoints testados com sucesso
 - 100% compatibilidade com API original
 - Zero mudancas funcionais
+
+## Session HUB / Station Mode — Progresso
+### FASE 1A — Safety Layer (CONCLUIDA)
+- `recordingAthleteIdRef` introduzido em `vbt-camera.tsx`, `jump-camera.tsx`, `body-scan.tsx`
+- Freeze do athleteId no momento do "Start Recording/Scanning"
+- Save usa `recordingAthleteIdRef.current` (frozen) com fallback para `athleteId` atual
+- `onSuccess` do VBT usa `variables.athlete_id` (payload) para cache invalidation
+- ZERO mudancas em logica interna, hooks, pipelines ou endpoints
+- Rollback: remover 3 refs + reverter 3 payloads (~15 linhas)
+
+### PROXIMA: FASE 1B — Navigation Layer (PENDENTE APROVACAO)
+- SessionContext, HUB shell, returnPath
+
+### FUTURO: FASE 2 → FASE 3 → FASE 4

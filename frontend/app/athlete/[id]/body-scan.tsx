@@ -9,7 +9,7 @@
  * State machine controlada por useBodyScan.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -39,6 +39,9 @@ export default function BodyScanScreen() {
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
   const [permission, requestPermission] = useCameraPermissions();
+
+  // PHASE 1A SAFETY: Freeze athleteId at scan start to prevent cross-athlete navigation
+  const recordingAthleteIdRef = useRef<string | null>(null);
 
   // Config
   const [athleteHeight, setAthleteHeight] = useState('175');
@@ -101,10 +104,12 @@ export default function BodyScanScreen() {
       requestPermission();
       return;
     }
+    // PHASE 1A SAFETY: Freeze athleteId at scan start
+    recordingAthleteIdRef.current = athleteId;
     setCameraActive(true);
     setScannerReady(false);
     setUiPhase('scanning');
-  }, [permission, requestPermission]);
+  }, [permission, requestPermission, athleteId]);
 
   // Camera pronta -> iniciar posicionamento
   const handleCameraReady = useCallback(() => {
@@ -123,8 +128,10 @@ export default function BodyScanScreen() {
   // Usar resultados → navegar para selecao de protocolo
   const handleUseResults = useCallback(() => {
     if (!bodyScan.result) return;
+    // PHASE 1A SAFETY: Use frozen athleteId, fallback to current
+    const ownerAthleteId = recordingAthleteIdRef.current || athleteId;
     router.push({
-      pathname: `/athlete/${athleteId}/protocol-select`,
+      pathname: `/athlete/${ownerAthleteId}/protocol-select`,
       params: {
         scanWeight: athleteWeight,
         scanHeight: athleteHeight,
