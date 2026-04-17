@@ -34,7 +34,7 @@ import { ScannerOverlay } from '../../../components/body-composition/ScannerOver
 const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function BodyScanScreen() {
-  const { id: athleteId } = useLocalSearchParams<{ id: string }>();
+  const { id: athleteId, returnPath } = useLocalSearchParams<{ id: string; returnPath?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
@@ -42,6 +42,15 @@ export default function BodyScanScreen() {
 
   // PHASE 1A SAFETY: Freeze athleteId at scan start to prevent cross-athlete navigation
   const recordingAthleteIdRef = useRef<string | null>(null);
+
+  // PHASE 1B: Navigate back (respects returnPath from HUB)
+  const navigateBack = () => {
+    if (returnPath === 'hub') {
+      router.replace('/(tabs)/athletes' as any);
+    } else {
+      router.back();
+    }
+  };
 
   // Config
   const [athleteHeight, setAthleteHeight] = useState('175');
@@ -152,7 +161,7 @@ export default function BodyScanScreen() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity
-              onPress={() => router.back()}
+              onPress={() => navigateBack()}
               style={styles.backButton}
               data-testid="body-scan-back-btn"
             >

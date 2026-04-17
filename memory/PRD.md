@@ -89,10 +89,18 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - Freeze do athleteId no momento do "Start Recording/Scanning"
 - Save usa `recordingAthleteIdRef.current` (frozen) com fallback para `athleteId` atual
 - `onSuccess` do VBT usa `variables.athlete_id` (payload) para cache invalidation
-- ZERO mudancas em logica interna, hooks, pipelines ou endpoints
-- Rollback: remover 3 refs + reverter 3 payloads (~15 linhas)
 
-### PROXIMA: FASE 1B — Navigation Layer (PENDENTE APROVACAO)
-- SessionContext, HUB shell, returnPath
+### FASE 1B — Navigation Layer (CONCLUIDA)
+- `SessionContext` criado em `/contexts/SessionContext.tsx` (mode, activeAthleteId, returnPath)
+- `SessionProvider` integrado no root `_layout.tsx`
+- Tab "Athletes" agora abre o HUB com 3 cards: Atletas, VBT, Avaliacoes Fisicas
+- Submenu de Avaliacoes Fisicas: Body Scan + Jump Assessment
+- Card "Atletas" navega para lista de perfis (fluxo legacy preservado)
+- Cards VBT/Body Scan/Jump navegam para selecao de atleta → modulo com `?returnPath=hub`
+- `navigateBack()` function nos 3 modulos: respeita `returnPath=hub` para voltar ao HUB
+- Fluxo A funcional: HUB → selecionar atleta → modulo → save → volta ao HUB
+
+### PROXIMA: FASE 2 — Integration Points (PENDENTE APROVACAO)
+- resetForNextAthlete, lock, switch sequencing
 
 ### FUTURO: FASE 2 → FASE 3 → FASE 4

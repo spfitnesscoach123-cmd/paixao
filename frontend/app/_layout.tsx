@@ -4,6 +4,7 @@ import { AuthProvider } from '../contexts/AuthContext';
 import { LanguageProvider } from '../contexts/LanguageContext';
 import { ThemeProvider } from '../contexts/ThemeContext';
 import { RevenueCatProvider } from '../contexts/RevenueCatContext';
+import { SessionProvider } from '../contexts/SessionContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import SubscriptionGuard from '../components/SubscriptionGuard';
 
@@ -27,21 +28,23 @@ export default function RootLayout() {
         <LanguageProvider>
           <AuthProvider>
             <RevenueCatProvider>
-              <SubscriptionGuard>
-                <Stack screenOptions={{ headerShown: false }}>
-                  <Stack.Screen name="index" />
-                  <Stack.Screen name="role-select" />
-                  <Stack.Screen name="athlete-token" />
-                  <Stack.Screen name="athlete-wellness" />
-                  <Stack.Screen name="generate-wellness-token" />
-                  <Stack.Screen name="login" />
-                  <Stack.Screen name="register" />
-                  <Stack.Screen name="forgot-password" />
-                  <Stack.Screen name="(tabs)" />
-                  <Stack.Screen name="athlete/[id]/vbt-camera" />
-                  <Stack.Screen name="subscription" />
-                </Stack>
-              </SubscriptionGuard>
+              <SessionProvider>
+                <SubscriptionGuard>
+                  <Stack screenOptions={{ headerShown: false }}>
+                    <Stack.Screen name="index" />
+                    <Stack.Screen name="role-select" />
+                    <Stack.Screen name="athlete-token" />
+                    <Stack.Screen name="athlete-wellness" />
+                    <Stack.Screen name="generate-wellness-token" />
+                    <Stack.Screen name="login" />
+                    <Stack.Screen name="register" />
+                    <Stack.Screen name="forgot-password" />
+                    <Stack.Screen name="(tabs)" />
+                    <Stack.Screen name="athlete/[id]/vbt-camera" />
+                    <Stack.Screen name="subscription" />
+                  </Stack>
+                </SubscriptionGuard>
+              </SessionProvider>
             </RevenueCatProvider>
           </AuthProvider>
         </LanguageProvider>

@@ -88,7 +88,7 @@ export default function JumpCameraPage() {
 }
 
 function JumpCameraContent() {
-  const { id: athleteId } = useLocalSearchParams<{ id: string }>();
+  const { id: athleteId, returnPath } = useLocalSearchParams<{ id: string; returnPath?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
@@ -96,6 +96,15 @@ function JumpCameraContent() {
   
   // PHASE 1A SAFETY: Freeze athleteId at recording start to prevent cross-athlete save
   const recordingAthleteIdRef = useRef<string | null>(null);
+  
+  // PHASE 1B: Navigate back (respects returnPath from HUB)
+  const navigateBack = () => {
+    if (returnPath === 'hub') {
+      router.replace('/(tabs)/athletes' as any);
+    } else {
+      router.back();
+    }
+  };
   
   // Camera permissions
   const [permission, requestPermission] = useCameraPermissions();
@@ -472,7 +481,7 @@ function JumpCameraContent() {
         locale === 'pt' 
           ? `RSI: ${data.calculations.rsi}\nPotencia: ${data.calculations.peak_power_w}W`
           : `RSI: ${data.calculations.rsi}\nPower: ${data.calculations.peak_power_w}W`,
-        [{ text: 'OK', onPress: () => router.back() }]
+        [{ text: 'OK', onPress: () => navigateBack() }]
       );
     },
     onError: (error: any) => {
@@ -547,7 +556,7 @@ function JumpCameraContent() {
           locale === 'pt'
             ? `${jumpCamera.slCmjLeg1.leg === 'left' ? 'Esq' : 'Dir'}: ${r1?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r1?.rsi?.toFixed(2)}\n${jumpCamera.slCmjLeg2.leg === 'left' ? 'Esq' : 'Dir'}: ${r2?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r2?.rsi?.toFixed(2)}`
             : `${jumpCamera.slCmjLeg1.leg === 'left' ? 'L' : 'R'}: ${r1?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r1?.rsi?.toFixed(2)}\n${jumpCamera.slCmjLeg2.leg === 'left' ? 'L' : 'R'}: ${r2?.jump_height_cm?.toFixed(1)} cm | RSImod: ${r2?.rsi?.toFixed(2)}`,
-          [{ text: 'OK', onPress: () => router.back() }]
+          [{ text: 'OK', onPress: () => navigateBack() }]
         );
       } catch (error: any) {
         Alert.alert(
@@ -757,7 +766,7 @@ function JumpCameraContent() {
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity 
-              onPress={() => router.back()} 
+              onPress={() => navigateBack()} 
               style={styles.backButton}
               data-testid="back-button"
             >

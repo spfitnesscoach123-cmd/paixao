@@ -93,13 +93,22 @@ export default function VBTCameraPage() {
  * para permitir o gate de acesso premium.
  */
 function VBTCameraContent() {
-  const { id: athleteId } = useLocalSearchParams<{ id: string }>();
+  const { id: athleteId, returnPath } = useLocalSearchParams<{ id: string; returnPath?: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { locale } = useLanguage();
   
   // PHASE 1A SAFETY: Freeze athleteId at recording start to prevent cross-athlete save
   const recordingAthleteIdRef = useRef<string | null>(null);
+  
+  // PHASE 1B: Navigate back (respects returnPath from HUB)
+  const navigateBack = () => {
+    if (returnPath === 'hub') {
+      router.replace('/(tabs)/athletes' as any);
+    } else {
+      router.back();
+    }
+  };
   
   // Permission state
   const [permission, requestPermission] = useCameraPermissions();
@@ -1016,7 +1025,7 @@ function VBTCameraContent() {
       Alert.alert(
         locale === 'pt' ? 'Sucesso' : 'Success',
         locale === 'pt' ? 'Dados VBT salvos com sucesso!' : 'VBT data saved successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
+        [{ text: 'OK', onPress: () => navigateBack() }]
       );
     },
     onError: (error: any) => {
@@ -1150,7 +1159,7 @@ function VBTCameraContent() {
       <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity 
-            onPress={() => router.back()} 
+            onPress={() => navigateBack()} 
             style={styles.backButton}
             data-testid="vbt-camera-back-btn"
           >
@@ -1186,7 +1195,7 @@ function VBTCameraContent() {
               if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
               setShouldMountCamera(false);
             }
-            router.back();
+            navigateBack();
           }} 
           style={styles.backButton}
           data-testid="vbt-camera-back-btn"
