@@ -908,7 +908,7 @@ function JumpCameraContent() {
                 </TouchableOpacity>
               </View>
               <ScrollView>
-                {(['cmj', 'sl_cmj'] as JumpProtocol[]).map((protocol) => {
+                {(['cmj'] as JumpProtocol[]).map((protocol) => {
                   const info = JUMP_PROTOCOL_INFO[protocol];
                   return (
                     <TouchableOpacity

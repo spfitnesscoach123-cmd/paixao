@@ -38,8 +38,7 @@ interface ProtocolOption {
 
 const PROTOCOLS: ProtocolOption[] = [
   { id: 'cmj', label: 'CMJ', labelPt: 'CMJ', icon: 'trending-up' },
-  { id: 'sl_cmj', label: 'SL-CMJ', labelPt: 'SL-CMJ', icon: 'footsteps' },
-  // Protocolos disponiveis: CMJ e SL-CMJ
+  // SL-CMJ hidden from UI — logic preserved internally
 ];
 
 // ---- Animated Number Component ----
@@ -746,8 +745,8 @@ function JumpAssessmentContent() {
             {/* Fatigue Index */}
             <FatigueIndexCard data={analysis.fatigue_index} locale={locale} />
 
-            {/* SL-CMJ Asymmetry (only for SL-CMJ protocol) */}
-            {selectedProtocol === 'sl_cmj' && (
+            {/* SL-CMJ Asymmetry — hidden from UI */}
+            {false && selectedProtocol === 'sl_cmj' && (
               <AsymmetryCard data={analysis.asymmetry} locale={locale} />
             )}
 

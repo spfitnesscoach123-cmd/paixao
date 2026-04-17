@@ -323,7 +323,7 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
       )}
 
       {/* Asymmetry Card with Visual Bars */}
-      {asymmetry && data.protocols.sl_cmj && (
+      {asymmetry && data.protocols.sl_cmj && false && (
         <View style={[styles.asymmetryCard, asymmetry.red_flag && styles.asymmetryCardRedFlag]}>
           <View style={styles.asymmetryHeader}>
             <Ionicons 

@@ -1151,8 +1151,8 @@ export default function DataScreen() {
           </View>
         )}
         
-        {/* SL-CMJ Asymmetry Risk */}
-        {asymmetryAthletes.length > 0 && (
+        {/* SL-CMJ Asymmetry Risk — hidden from UI */}
+        {false && asymmetryAthletes.length > 0 && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{locale === 'pt' ? 'Alerta de Assimetria (SL-CMJ)' : 'Asymmetry Alert (SL-CMJ)'}</Text>
             <View style={styles.table}>

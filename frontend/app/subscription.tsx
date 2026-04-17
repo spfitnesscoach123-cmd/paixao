@@ -85,7 +85,7 @@ const FEATURE_SECTIONS: FeatureSection[] = [
     },
     icon: "fitness-outline",
     features: [
-      { pt: "Analise de CMJ e SL-CMJ", en: "Analysis of CMJ and SL-CMJ" },
+      { pt: "Analise de CMJ", en: "CMJ Analysis" },
       { pt: "Cálculo automático de RSI (Reactive Strength Index)", en: "Automatic calculation of RSI (Reactive Strength Index)" },
       { pt: "Índice de fadiga individualizado", en: "Individualized fatigue index" },
       { pt: "Identificação de assimetrias de membros inferiores", en: "Identification of lower limb asymmetries" },

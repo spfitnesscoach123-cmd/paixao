@@ -469,7 +469,7 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
 // ===== JUMP PROTOCOL SECTION (Scientific Analysis Hub) =====
 const PROTO_OPTS = [
   { id: 'cmj', label: 'CMJ' },
-  { id: 'sl_cmj', label: 'SL-CMJ' },
+  // SL-CMJ hidden from UI
 ];
 
 const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale: string }) => {
@@ -694,8 +694,8 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
             </View>
           )}
 
-          {/* Asymmetry (SL-CMJ) */}
-          {asym && proto === 'sl_cmj' && (
+          {/* Asymmetry — hidden from UI */}
+          {false && asym && proto === 'sl_cmj' && (
             <View style={{ padding: 10, borderRadius: 8, backgroundColor: asym.red_flag ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', borderLeftWidth: 3, borderLeftColor: asym.red_flag ? '#ef4444' : '#22c55e', marginBottom: 10 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text.primary }}>
