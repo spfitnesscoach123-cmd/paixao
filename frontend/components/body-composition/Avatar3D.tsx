@@ -442,16 +442,10 @@ function Avatar3DInner({
     const meshMap = meshMapRef.current;
     const meshCount = Object.keys(meshMap).length;
 
-    if (!camera || meshCount === 0) {
-      Alert.alert('[Avatar3D] TAP', 'SKIP: camera=' + !!camera + ' meshes=' + meshCount);
-      return;
-    }
+    if (!camera || meshCount === 0) return;
 
     const { width, height } = layoutSizeRef.current;
-    if (width <= 1 || height <= 1) {
-      Alert.alert('[Avatar3D] TAP', 'SKIP: layout ' + width.toFixed(0) + 'x' + height.toFixed(0));
-      return;
-    }
+    if (width <= 1 || height <= 1) return;
 
     const ndcX = (touchX / width) * 2 - 1;
     const ndcY = -(touchY / height) * 2 + 1;
@@ -472,11 +466,7 @@ function Avatar3DInner({
       if (GLB_MESH_TO_SITE[meshName]) {
         applyHighlight(meshName);
         onPartSelectRef.current?.(meshName);
-      } else {
-        Alert.alert('[Avatar3D]', 'HIT non-anatomical: ' + hits[0].object.name);
       }
-    } else {
-      Alert.alert('[Avatar3D] MISS', meshCount + ' meshes, NDC(' + ndcX.toFixed(2) + ',' + ndcY.toFixed(2) + ')');
     }
   }, []);
 
@@ -684,12 +674,7 @@ function Avatar3DInner({
         style={styles.glView}
         onContextCreate={onContextCreate}
       />
-      {/* ON-SCREEN DEBUG: mesh index count — remove after verification */}
-      {debugInfo !== '' && (
-        <View style={styles.debugOverlay}>
-          <Text style={styles.debugText}>{debugInfo}</Text>
-        </View>
-      )}
+      {/* ON-SCREEN DEBUG removed — verified 9/9 meshes on device */}
     </View>
   );
 }

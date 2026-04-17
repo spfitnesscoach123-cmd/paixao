@@ -472,17 +472,16 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
   
   return (
     <View style={styles.container}>
-      {/* Main Composition Section */}
-      <View style={styles.mainSection}>
-        <View style={styles.leftColumn}>
-          <Text style={styles.sectionTitle}>{t2.fatDistribution}</Text>
-          <BodyModel />
-        </View>
-        
-        <View style={styles.rightColumn}>
-          <Text style={styles.sectionTitle}>{t2.bodyComposition}</Text>
-          <CompositionDonut />
-        </View>
+      {/* Avatar / Body Model — full width on top */}
+      <View style={styles.avatarSection}>
+        <Text style={styles.sectionTitle}>{t2.fatDistribution}</Text>
+        <BodyModel />
+      </View>
+
+      {/* Composition Donut — full width below avatar */}
+      <View style={styles.donutSection}>
+        <Text style={styles.sectionTitle}>{t2.bodyComposition}</Text>
+        <CompositionDonut />
       </View>
       
       {/* BMI Section */}
@@ -521,12 +520,26 @@ const styles = StyleSheet.create({
     padding: isSmallScreen ? 4 : 8,
   },
   mainSection: {
-    flexDirection: isSmallScreen ? 'column' : 'row',
+    flexDirection: 'column',
     marginBottom: 12,
-    gap: isSmallScreen ? 12 : 0,
+    gap: 12,
+  },
+  avatarSection: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: isSmallScreen ? 10 : 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  donutSection: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    padding: isSmallScreen ? 10 : 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
   },
   leftColumn: {
-    flex: isSmallScreen ? undefined : 1,
+    flex: 1,
     backgroundColor: colors.dark.card,
     borderRadius: 12,
     padding: isSmallScreen ? 10 : 12,
@@ -610,9 +623,11 @@ const styles = StyleSheet.create({
   },
   bodyLegend: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
     marginTop: 6,
+    paddingHorizontal: 4,
   },
   legendItem: {
     flexDirection: 'row',
