@@ -1,0 +1,12547 @@
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, File, UploadFile, Header, Form
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse, HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from dotenv import load_dotenv
+from starlette.middleware.cors import CORSMiddleware
+from motor.motor_asyncio import AsyncIOMotorClient
+import os
+import logging
+from pathlib import Path
+from pydantic import BaseModel, Field, EmailStr
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+import bcrypt
+import jwt
+from bson import ObjectId
+import uuid
+from io import BytesIO
+import io
+import asyncio
+import httpx
+
+from gps_import import (
+    GPSCSVParser,
+    parse_gps_csv,
+    GPSDataNormalizer,
+    normalize_gps_data,
+    consolidate_session,
+    Manufacturer,
+    CANONICAL_METRICS,
+    METRIC_CATEGORIES,
+)
+
+from jump_import import (
+    JumpCSVParser,
+    JumpValidator,
+    JumpCalculator,
+    JumpRecord,
+    JumpValidationError,
+    JumpPreviewResult,
+    process_jump_csv,
+)
+from jump_import.mappers import list_supported_manufacturers as list_jump_manufacturers
+
+from jump_analysis import generate_report, compare_athletes
+
+from identity_resolver import (
+    IdentityResolver,
+    normalize_name,
+    normalize_for_comparison,
+    ResolutionStatus,
+    UnresolvedAthlete,
+    ConfirmAliasRequest,
+    AliasCreate,
+)
+
+from load_engine import (
+    RollingLoadEngine,
+    create_load_engine,
+    AthleteLoadMetrics,
+    ACWRZone,
+    SpikeStatus,
+)
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / '.env')
+
+# MongoDB connection
+mongo_url = os.environ['MONGO_URL']
+client = AsyncIOMotorClient(mongo_url)
+db = client[os.environ['DB_NAME']]
+
+# Initialize Rolling Load Engine
+load_engine = create_load_engine(db)
+
+# Mapping: dashboard acwr_metric parameter → load_engine field name
+ACWR_METRIC_TO_ENGINE_FIELD = {
+    "total_distance": "distance",
+    "high_intensity_distance": "high_intensity_distance",
+    "high_speed_running": "hsr",
+    "sprint_distance": "sprint_distance",
+    "number_of_sprints": "number_of_sprints",
+    "acc_dec": "acc_dec_load",
+}
+
+# ACWR STANDARDIZATION:
+# ACWR MUST always come from load_engine (EWMA)
+# DO NOT implement rolling average manually
+
+# Mapping: analysis metric keys → load_engine field names
+ANALYSIS_METRIC_TO_ENGINE = {
+    "total_distance": "distance",
+    "hid": "high_intensity_distance",
+    "hid_z3": "high_intensity_distance",
+    "high_intensity_distance": "high_intensity_distance",
+    "hsr": "hsr",
+    "hsr_z4": "hsr",
+    "high_speed_running": "hsr",
+    "sprint": "sprint_distance",
+    "sprint_z5": "sprint_distance",
+    "sprint_distance": "sprint_distance",
+    "sprints_count": "number_of_sprints",
+    "number_of_sprints": "number_of_sprints",
+    "acc_dec": "acc_dec_load",
+    "acc_dec_total": "acc_dec_load",
+    "acc_dec_load": "acc_dec_load",
+}
+
+def classify_acwr_risk(acwr: float) -> str:
+    """Classify ACWR into risk level."""
+    if acwr is None or acwr == 0:
+        return "unknown"
+    if acwr < 0.8:
+        return "low"
+    elif acwr <= 1.3:
+        return "optimal"
+    elif acwr <= 1.5:
+        return "moderate"
+    return "high"
+
+# JWT Configuration
+SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'your-secret-key-change-in-production')
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
+
+# Create the main app
+app = FastAPI()
+api_router = APIRouter(prefix="/api")
+security = HTTPBearer()
+
+# ============= MODELS =============
+
+class PyObjectId(str):
+    @classmethod
+    def __get_validators__(cls):
+        yield cls.validate
+    
+    @classmethod
+    def validate(cls, v):
+        if not ObjectId.is_valid(v):
+            raise ValueError("Invalid ObjectId")
+        return str(v)
+
+class UserRegister(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+    device_id: Optional[str] = None
+    device_name: Optional[str] = None
+    platform: Optional[str] = None
+
+class RegisteredDevice(BaseModel):
+    device_id: str
+    device_name: str
+    platform: str
+    last_login: datetime
+
+MAX_DEVICES_PER_USER = 3
+
+# ============= ACCOUNT DELETION STATUS =============
+
+class AccountDeletionStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    PENDING = "PENDING"
+    DELETED = "DELETED"
+
+class User(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    email: EmailStr
+    name: str
+    hashed_password: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    role: str = "coach"  # Padrão é coach (quem faz login no app)
+    pro_access_override: bool = False  # Override permanente de acesso PRO
+    account_deletion_status: str = "ACTIVE"  # Status de exclusão da conta
+    deletion_scheduled_for: Optional[str] = None  # Data agendada para exclusão
+    created_at: datetime
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    user: UserResponse
+
+class AthleteCreate(BaseModel):
+    name: str
+    birth_date: str
+    position: str
+    height: Optional[float] = None  # in cm
+    weight: Optional[float] = None  # in kg
+    photo_base64: Optional[str] = None
+
+class AthleteUpdate(BaseModel):
+    name: Optional[str] = None
+    birth_date: Optional[str] = None
+    position: Optional[str] = None
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    photo_base64: Optional[str] = None
+
+class Athlete(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    coach_id: str
+    name: str
+    birth_date: str
+    position: str
+    height: Optional[float] = None
+    weight: Optional[float] = None
+    photo_base64: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class GPSDataCreate(BaseModel):
+    athlete_id: str
+    date: str
+    session_id: Optional[str] = None  # Unique ID for each CSV upload/session
+    session_name: Optional[str] = None  # Name of the session (e.g., "Match vs Team X")
+    period_name: Optional[str] = None  # Period within session (1st Half, 2nd Half, Session)
+    activity_type: Optional[str] = None  # "game" or "training"
+    total_distance: float  # meters
+    high_intensity_distance: float  # HID 14.4-19.8 km/h in meters
+    high_speed_running: Optional[float] = None  # HSR 19.8-25.2 km/h in meters  
+    sprint_distance: float  # 25.3+ km/h in meters
+    number_of_sprints: int
+    number_of_accelerations: int
+    number_of_decelerations: int
+    max_speed: Optional[float] = None  # km/h
+    max_acceleration: Optional[float] = None
+    max_deceleration: Optional[float] = None
+    notes: Optional[str] = None
+
+class GPSData(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    session_id: Optional[str] = None
+    session_name: Optional[str] = None
+    period_name: Optional[str] = None
+    activity_type: Optional[str] = None  # "game" or "training"
+    total_distance: float
+    high_intensity_distance: float = 0
+    high_speed_running: Optional[float] = None
+    sprint_distance: Optional[float] = 0
+    number_of_sprints: int = 0
+    number_of_accelerations: Optional[int] = 0
+    number_of_decelerations: Optional[int] = 0
+    max_speed: Optional[float] = None
+    max_acceleration: Optional[float] = None
+    max_deceleration: Optional[float] = None
+    player_load: Optional[float] = None
+    duration_minutes: Optional[float] = None
+    distance_per_min: Optional[float] = None
+    source: Optional[str] = None
+    device: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class WellnessQuestionnaireCreate(BaseModel):
+    athlete_id: str
+    date: str
+    fatigue: int  # 1-10 scale
+    stress: int  # 1-10 scale
+    mood: int  # 1-10 scale
+    sleep_quality: int  # 1-10 scale
+    sleep_hours: float
+    muscle_soreness: int  # 1-10 scale
+    hydration: int  # 1-10 scale
+    notes: Optional[str] = None
+
+class WellnessQuestionnaire(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    fatigue: int
+    stress: int
+    mood: int
+    sleep_quality: int
+    sleep_hours: float
+    muscle_soreness: int
+    hydration: Optional[int] = 5  # Default to 5 if missing
+    wellness_score: Optional[float] = None  # Calculated score
+    readiness_score: Optional[float] = None  # Calculated score
+    notes: Optional[str] = None
+    submitted_via: Optional[str] = None  # Track submission source
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class PhysicalAssessmentCreate(BaseModel):
+    athlete_id: str
+    date: str
+    assessment_type: str  # "strength", "aerobic", "body_composition"
+    metrics: Dict[str, Any]  # Flexible structure for different assessment types
+    notes: Optional[str] = None
+
+class PhysicalAssessment(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    assessment_type: str
+    metrics: Dict[str, Any]
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+# ============= BODY COMPOSITION MODELS =============
+
+class BodyCompositionProtocol(str, Enum):
+    GUEDES = "guedes"
+    GUEDES_1985 = "guedes_1985"
+    POLLOCK_JACKSON_7 = "pollock_jackson_7"
+    JACKSON_POLLOCK_7 = "jackson_pollock_7"
+    JACKSON_POLLOCK_3 = "jackson_pollock_3"
+    POLLOCK_JACKSON_9 = "pollock_jackson_9"
+    FAULKNER_4 = "faulkner_4"
+    FAULKNER = "faulkner"
+    DURNIN_WOMERSLEY = "durnin_womersley"
+
+class BodyCompositionCreate(BaseModel):
+    athlete_id: str
+    date: str
+    protocol: BodyCompositionProtocol
+    weight: float  # kg
+    height: float  # cm
+    age: int
+    gender: str  # "male" or "female"
+    # Skinfold measurements in mm
+    triceps: Optional[float] = None
+    subscapular: Optional[float] = None
+    suprailiac: Optional[float] = None
+    abdominal: Optional[float] = None
+    chest: Optional[float] = None
+    midaxillary: Optional[float] = None
+    thigh: Optional[float] = None
+    calf: Optional[float] = None
+    biceps: Optional[float] = None
+    notes: Optional[str] = None
+
+class BodyComposition(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    protocol: str
+    weight: float
+    height: float
+    age: int
+    gender: str
+    # Skinfold measurements
+    triceps: Optional[float] = None
+    subscapular: Optional[float] = None
+    suprailiac: Optional[float] = None
+    abdominal: Optional[float] = None
+    chest: Optional[float] = None
+    midaxillary: Optional[float] = None
+    thigh: Optional[float] = None
+    calf: Optional[float] = None
+    biceps: Optional[float] = None
+    # Calculated values
+    body_fat_percentage: float
+    lean_mass_kg: float  # Massa Isenta de Gordura
+    fat_mass_kg: float  # Massa de Gordura
+    bone_mass_kg: float  # Massa Óssea (estimated)
+    bmi: float  # Body Mass Index
+    bmi_classification: str
+    body_density: Optional[float] = None
+    fat_distribution: Optional[Dict[str, float]] = None  # For 3D visualization
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+# ============= SUBSCRIPTION MODELS =============
+
+class SubscriptionPlan(str, Enum):
+    FREE_TRIAL = "free_trial"
+    PRO = "pro"
+
+class SubscriptionStatus(str, Enum):
+    ACTIVE = "active"
+    TRIAL = "trial"
+    EXPIRED = "expired"
+    CANCELLED = "cancelled"
+
+# Plan limits configuration with regional pricing
+PLAN_LIMITS = {
+    "free_trial": {
+        "name": "Trial Grátis",
+        "name_en": "Free Trial",
+        "price_brl": 0,
+        "price_usd": 0,
+        "max_athletes": 999,  # Unlimited during trial
+        "history_months": -1,  # Unlimited
+        "features": ["all"],  # All features during trial
+        "trial_days": 7,
+        "advanced_analytics": True,
+        "ai_insights": True,
+        "fatigue_alerts": True,
+        "vbt_analysis": True,
+        "body_composition": True,
+        "body_3d_model": True,
+        "multi_user": True,
+        "max_users": 5,
+        "description_pt": "Experimente todas as funcionalidades por 7 dias grátis",
+        "description_en": "Try all features free for 7 days",
+    },
+    "pro": {
+        "name": "Pro",
+        "name_en": "Pro",
+        "price_brl": 199.00,
+        "price_usd": 39.99,
+        "max_athletes": -1,  # Unlimited
+        "history_months": -1,  # Unlimited
+        "features": ["all"],
+        "trial_days": 7,
+        "billing_period_days": 30,  # Monthly auto-renewal
+        "auto_renew": True,
+        "advanced_analytics": True,
+        "ai_insights": True,
+        "fatigue_alerts": True,
+        "vbt_analysis": True,
+        "body_composition": True,
+        "body_3d_model": True,
+        "multi_user": True,
+        "max_users": 5,
+        "priority_support": True,
+        "popular": True,
+        "description_pt": "Acesso completo a todas as funcionalidades do Load Manager. Renovação automática mensal.",
+        "description_en": "Full access to all Load Manager features. Auto-renews monthly.",
+        "features_list_pt": [
+            "Atletas ilimitados",
+            "Histórico ilimitado",
+            "VBT - Velocity Based Training",
+            "Composição Corporal completa",
+            "Modelo 3D do corpo humano",
+            "Insights gerados por IA",
+            "ACWR detalhado por métrica",
+            "Comparação entre atletas",
+            "Alertas de fadiga inteligentes",
+            "Exportação PDF e CSV",
+            "Até 5 usuários simultâneos",
+            "Suporte prioritário",
+            "Integração GPS - Catapult* (Playertek / Statsport) Em breve"
+        ],
+        "features_list_en": [
+            "Unlimited athletes",
+            "Unlimited history",
+            "VBT - Velocity Based Training",
+            "Full Body Composition",
+            "3D human body model",
+            "AI-generated insights",
+            "Detailed ACWR by metric",
+            "Athlete comparison",
+            "Smart fatigue alerts",
+            "PDF and CSV export",
+            "Up to 5 simultaneous users",
+            "Priority support",
+            "GPS Integration - Catapult* (Playertek / Statsport) Coming soon"
+        ],
+        "limitations_pt": [],
+        "limitations_en": []
+    },
+}
+
+class SubscriptionCreate(BaseModel):
+    plan: SubscriptionPlan
+    payment_method: Optional[str] = None
+
+class Subscription(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    user_id: str
+    plan: str
+    status: str
+    start_date: datetime
+    trial_end_date: Optional[datetime] = None
+    current_period_end: Optional[datetime] = None
+    cancelled_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class SubscriptionResponse(BaseModel):
+    plan: str
+    plan_name: str
+    status: str
+    price: float
+    max_athletes: int
+    current_athletes: int
+    history_months: int
+    days_remaining: Optional[int] = None
+    trial_end_date: Optional[str] = None
+    features: dict
+    limits_reached: dict
+
+# ============= AUTH HELPERS =============
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
+def create_access_token(data: dict) -> str:
+    to_encode = data.copy()
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    try:
+        token = credentials.credentials
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: str = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials"
+            )
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        if user is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found"
+            )
+        user["_id"] = str(user["_id"])
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired"
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials"
+        )
+
+# ============= AUTH ROUTES =============
+
+@api_router.post("/auth/register", response_model=TokenResponse)
+async def register(user_data: UserRegister):
+    # Check if user exists
+    existing_user = await db.users.find_one({"email": user_data.email})
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Create new user with device info
+    user_doc = {
+        "email": user_data.email,
+        "name": user_data.name,
+        "hashed_password": hash_password(user_data.password),
+        "created_at": datetime.utcnow(),
+        "registered_devices": []
+    }
+    
+    # Add first device if provided
+    if user_data.device_id:
+        user_doc["registered_devices"].append({
+            "device_id": user_data.device_id,
+            "device_name": user_data.device_name or "Unknown Device",
+            "platform": user_data.platform or "Unknown",
+            "last_login": datetime.utcnow()
+        })
+    
+    result = await db.users.insert_one(user_doc)
+    user_id = str(result.inserted_id)
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user_id})
+    
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse(
+            id=user_id,
+            email=user_data.email,
+            name=user_data.name,
+            role="coach",  # Novos usuários são sempre coach
+            pro_access_override=False,  # Novos usuários não têm override
+            created_at=user_doc["created_at"]
+        )
+    )
+
+@api_router.post("/auth/login", response_model=TokenResponse)
+async def login(credentials: UserLogin):
+    # Find user
+    user = await db.users.find_one({"email": credentials.email})
+    if not user or not verify_password(credentials.password, user["hashed_password"]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password"
+        )
+    
+    # Check if account is deleted
+    if user.get("account_deletion_status") == AccountDeletionStatus.DELETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="ACCOUNT_DELETED"
+        )
+    
+    user_id = str(user["_id"])
+    
+    # Device limit enforcement
+    if credentials.device_id:
+        registered_devices = user.get("registered_devices", [])
+        device_exists = False
+        
+        # Check if device already exists
+        for i, device in enumerate(registered_devices):
+            if device.get("device_id") == credentials.device_id:
+                device_exists = True
+                # Update last_login timestamp
+                registered_devices[i]["last_login"] = datetime.utcnow()
+                await db.users.update_one(
+                    {"_id": user["_id"]},
+                    {"$set": {"registered_devices": registered_devices}}
+                )
+                break
+        
+        if not device_exists:
+            # Check device limit (bypass for demo account)
+            if user.get("email") == "contato@loadmanagerpro.com.br":
+                # Demo account: bypass device limit completely
+                pass
+            elif len(registered_devices) >= MAX_DEVICES_PER_USER:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="DEVICE_LIMIT_REACHED"
+                )
+            
+            # Add new device
+            new_device = {
+                "device_id": credentials.device_id,
+                "device_name": credentials.device_name or "Unknown Device",
+                "platform": credentials.platform or "Unknown",
+                "last_login": datetime.utcnow()
+            }
+            await db.users.update_one(
+                {"_id": user["_id"]},
+                {"$push": {"registered_devices": new_device}}
+            )
+    
+    access_token = create_access_token(data={"sub": user_id})
+    
+    # Format deletion_scheduled_for if exists
+    deletion_scheduled = user.get("deletion_scheduled_for")
+    deletion_scheduled_str = deletion_scheduled.isoformat() if deletion_scheduled else None
+    
+    return TokenResponse(
+        access_token=access_token,
+        user=UserResponse(
+            id=user_id,
+            email=user["email"],
+            name=user["name"],
+            role=user.get("role", "coach"),
+            pro_access_override=user.get("pro_access_override", False),
+            account_deletion_status=user.get("account_deletion_status", "ACTIVE"),
+            deletion_scheduled_for=deletion_scheduled_str,
+            created_at=user["created_at"]
+        )
+    )
+
+@api_router.get("/auth/me", response_model=UserResponse)
+async def get_me(current_user: dict = Depends(get_current_user)):
+    deletion_scheduled = current_user.get("deletion_scheduled_for")
+    deletion_scheduled_str = deletion_scheduled.isoformat() if deletion_scheduled else None
+    
+    return UserResponse(
+        id=current_user["_id"],
+        email=current_user["email"],
+        name=current_user["name"],
+        role=current_user.get("role", "coach"),
+        pro_access_override=current_user.get("pro_access_override", False),
+        account_deletion_status=current_user.get("account_deletion_status", "ACTIVE"),
+        deletion_scheduled_for=deletion_scheduled_str,
+        created_at=current_user["created_at"]
+    )
+
+# ============= DEVICE MANAGEMENT =============
+
+@api_router.get("/auth/devices")
+async def get_registered_devices(current_user: dict = Depends(get_current_user)):
+    """Get list of registered devices for current user"""
+    devices = current_user.get("registered_devices", [])
+    return {
+        "devices": [
+            {
+                "device_id": d.get("device_id"),
+                "device_name": d.get("device_name"),
+                "platform": d.get("platform"),
+                "last_login": d.get("last_login").isoformat() if d.get("last_login") else None
+            }
+            for d in devices
+        ],
+        "count": len(devices),
+        "max_devices": MAX_DEVICES_PER_USER
+    }
+
+@api_router.delete("/auth/devices/{device_id}")
+async def remove_device(device_id: str, current_user: dict = Depends(get_current_user)):
+    """Remove a registered device from current user"""
+    devices = current_user.get("registered_devices", [])
+    
+    # Find device
+    device_exists = False
+    for d in devices:
+        if d.get("device_id") == device_id:
+            device_exists = True
+            break
+    
+    if not device_exists:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Remove device
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["_id"])},
+        {"$pull": {"registered_devices": {"device_id": device_id}}}
+    )
+    
+    return {"message": "Device removed successfully", "device_id": device_id}
+
+class UpdateProfileRequest(BaseModel):
+    name: str
+
+@api_router.put("/auth/profile", response_model=UserResponse)
+async def update_profile(request: UpdateProfileRequest, current_user: dict = Depends(get_current_user)):
+    """Update user profile"""
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["_id"])},
+        {"$set": {"name": request.name}}
+    )
+    
+    updated_user = await db.users.find_one({"_id": ObjectId(current_user["_id"])})
+    return UserResponse(
+        id=str(updated_user["_id"]),
+        email=updated_user["email"],
+        name=updated_user["name"],
+        created_at=updated_user["created_at"]
+    )
+
+# ============= PASSWORD RECOVERY =============
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    new_password: str
+
+@api_router.post("/auth/verify-email")
+async def verify_email(request: VerifyEmailRequest):
+    """Check if email exists in the system"""
+    user = await db.users.find_one({"email": request.email})
+    return {"exists": user is not None}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset user password"""
+    user = await db.users.find_one({"email": request.email})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Email not found"
+        )
+    
+    # Update password
+    new_hashed_password = hash_password(request.new_password)
+    await db.users.update_one(
+        {"email": request.email},
+        {"$set": {"hashed_password": new_hashed_password}}
+    )
+    
+    return {"message": "Password reset successfully"}
+
+# ============= ATHLETE ROUTES =============
+
+@api_router.post("/athletes", response_model=Athlete)
+async def create_athlete(
+    athlete_data: AthleteCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    athlete = Athlete(
+        coach_id=current_user["_id"],
+        **athlete_data.model_dump()
+    )
+    
+    result = await db.athletes.insert_one(athlete.model_dump(by_alias=True, exclude=["id"]))
+    athlete.id = str(result.inserted_id)
+    return athlete
+
+@api_router.get("/athletes", response_model=List[Athlete])
+async def get_athletes(current_user: dict = Depends(get_current_user)):
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(1000)
+    for athlete in athletes:
+        athlete["_id"] = str(athlete["_id"])
+    return [Athlete(**athlete) for athlete in athletes]
+
+@api_router.get("/athletes/{athlete_id}", response_model=Athlete)
+async def get_athlete(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    athlete["_id"] = str(athlete["_id"])
+    return Athlete(**athlete)
+
+@api_router.put("/athletes/{athlete_id}", response_model=Athlete)
+async def update_athlete(
+    athlete_id: str,
+    athlete_data: AthleteUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    # Check if athlete exists and belongs to current user
+    existing_athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not existing_athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Update only provided fields
+    update_data = {k: v for k, v in athlete_data.model_dump().items() if v is not None}
+    update_data["updated_at"] = datetime.utcnow()
+    
+    await db.athletes.update_one(
+        {"_id": ObjectId(athlete_id)},
+        {"$set": update_data}
+    )
+    
+    updated_athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id)})
+    updated_athlete["_id"] = str(updated_athlete["_id"])
+    return Athlete(**updated_athlete)
+
+@api_router.delete("/athletes/{athlete_id}")
+async def delete_athlete(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    result = await db.athletes.delete_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Cascade cleanup: remove derived/related data for the deleted athlete
+    coach_id_str = str(current_user["_id"])
+    cleanup = {}
+    r = await db.athlete_load_metrics.delete_many({"athlete_id": athlete_id})
+    cleanup["athlete_load_metrics"] = r.deleted_count
+    r = await db.gps_data.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+    cleanup["gps_data"] = r.deleted_count
+    r = await db.wellness.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+    cleanup["wellness"] = r.deleted_count
+    r = await db.jump_assessments.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+    cleanup["jump_assessments"] = r.deleted_count
+    r = await db.body_compositions.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+    cleanup["body_compositions"] = r.deleted_count
+    try:
+        r = await db.vbt_data.delete_many({"athlete_id": athlete_id, "coach_id": coach_id_str})
+        cleanup["vbt_data"] = r.deleted_count
+    except Exception:
+        pass
+    try:
+        r = await db.assessments.delete_many({"athlete_id": athlete_id, "coach_id": current_user["_id"]})
+        cleanup["assessments"] = r.deleted_count
+    except Exception:
+        pass
+    
+    return {"message": "Athlete deleted successfully", "related_data_cleaned": cleanup}
+
+
+# ============= ATHLETE IDENTITY RESOLUTION =============
+
+@api_router.post("/athletes/resolve-name")
+async def resolve_athlete_name_endpoint(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Resolve a name to an athlete_id.
+    
+    Request body:
+    - name: The name to resolve (required)
+    - source_system: Origin system, e.g., "gps", "jump_data" (optional)
+    
+    Returns:
+    - status: resolved, needs_confirmation, not_found, error
+    - athlete_id: If resolved
+    - candidates: If needs confirmation
+    """
+    name = request.get("name", "").strip()
+    source_system = request.get("source_system", "manual")
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Nome é obrigatório")
+    
+    # Get coach's athletes
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(1000)
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find({"coach_id": current_user["_id"]}).to_list(1000)
+    
+    # Create resolver
+    resolver = IdentityResolver()
+    resolved, unresolved = await resolver.resolve_names(
+        names=[name],
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system=source_system,
+    )
+    
+    if name in resolved:
+        athlete = await db.athletes.find_one({"_id": ObjectId(resolved[name])})
+        return {
+            "status": "resolved",
+            "original_name": name,
+            "normalized_name": normalize_for_comparison(name),
+            "athlete_id": resolved[name],
+            "athlete_name": athlete.get("name", "") if athlete else "",
+            "message": "Resolvido com sucesso",
+        }
+    
+    if unresolved:
+        u = unresolved[0]
+        return {
+            "status": "needs_confirmation",
+            "original_name": u.original_name,
+            "normalized_name": u.normalized_name,
+            "candidates": [
+                {
+                    "athlete_id": c.athlete_id,
+                    "athlete_name": c.athlete_name,
+                    "similarity_score": c.similarity_score,
+                    "match_reason": c.match_reason,
+                    "existing_aliases": c.existing_aliases,
+                }
+                for c in u.candidates
+            ],
+            "suggested_action": u.suggested_action,
+            "message": "Confirmação necessária",
+        }
+    
+    return {
+        "status": "not_found",
+        "original_name": name,
+        "normalized_name": normalize_for_comparison(name),
+        "candidates": [],
+        "message": "Nenhum atleta encontrado. Deseja criar um novo?",
+    }
+
+
+@api_router.post("/athletes/resolve-bulk")
+async def resolve_athlete_names_bulk(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Resolve multiple names at once.
+    
+    Request body:
+    - names: List of names to resolve (required)
+    - source_system: Origin system (optional)
+    
+    Returns:
+    - resolved: Dict of name -> athlete_id for resolved names
+    - unresolved: List of names needing confirmation with candidates
+    - can_import: False if any names are unresolved
+    """
+    names = request.get("names", [])
+    source_system = request.get("source_system", "csv")
+    
+    if not names:
+        raise HTTPException(status_code=400, detail="Lista de nomes é obrigatória")
+    
+    # Get coach's athletes
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(1000)
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find({"coach_id": current_user["_id"]}).to_list(1000)
+    
+    # Create resolver
+    resolver = IdentityResolver()
+    resolved, unresolved = await resolver.resolve_names(
+        names=names,
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system=source_system,
+    )
+    
+    return {
+        "resolved": resolved,
+        "resolved_count": len(resolved),
+        "unresolved": [u.to_dict() for u in unresolved],
+        "unresolved_count": len(unresolved),
+        "total_names": len(set(names)),
+        "can_import": len(unresolved) == 0,
+        "message": "Todos os nomes resolvidos" if not unresolved else f"{len(unresolved)} nome(s) pendente(s) de confirmação",
+    }
+
+
+@api_router.post("/athletes/confirm-alias")
+async def confirm_athlete_alias(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Confirm a name -> athlete mapping and persist the alias.
+    
+    Request body:
+    - original_name: Name as found in CSV (required)
+    - athlete_id: Confirmed athlete ID (required)
+    - source_system: Origin system (optional)
+    
+    Returns the created alias document.
+    """
+    original_name = request.get("original_name", "").strip()
+    athlete_id = request.get("athlete_id", "").strip()
+    source_system = request.get("source_system", "manual")
+    
+    if not original_name:
+        raise HTTPException(status_code=400, detail="Nome original é obrigatório")
+    if not athlete_id:
+        raise HTTPException(status_code=400, detail="ID do atleta é obrigatório")
+    
+    # Verify athlete exists and belongs to coach
+    try:
+        athlete = await db.athletes.find_one({
+            "_id": ObjectId(athlete_id),
+            "coach_id": current_user["_id"]
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID de atleta inválido")
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    normalized = normalize_for_comparison(original_name)
+    
+    # Check if alias already exists
+    existing = await db.athlete_aliases.find_one({
+        "coach_id": current_user["_id"],
+        "alias_normalized": normalized,
+    })
+    
+    if existing:
+        # Update last_used_at if same athlete
+        if existing.get("athlete_id") == athlete_id:
+            await db.athlete_aliases.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"last_used_at": datetime.utcnow()}}
+            )
+            return {
+                "message": "Alias já existe e foi atualizado",
+                "alias_id": str(existing["_id"]),
+                "athlete_id": athlete_id,
+                "athlete_name": athlete.get("name", ""),
+                "original_name": original_name,
+                "normalized_name": normalized,
+            }
+        else:
+            # Conflict! Different athlete
+            conflicting_athlete = await db.athletes.find_one({"_id": ObjectId(existing.get("athlete_id"))})
+            raise HTTPException(
+                status_code=409,
+                detail=f"Este nome já está associado ao atleta '{conflicting_athlete.get('name', '')}'. "
+                       f"Não é possível sobrescrever associações existentes."
+            )
+    
+    # Create new alias
+    alias_doc = {
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "alias_normalized": normalized,
+        "alias_original": original_name,
+        "source_system": source_system,
+        "created_at": datetime.utcnow(),
+        "last_used_at": datetime.utcnow(),
+        "created_by": current_user["_id"],
+    }
+    
+    result = await db.athlete_aliases.insert_one(alias_doc)
+    
+    return {
+        "message": "Alias criado com sucesso",
+        "alias_id": str(result.inserted_id),
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "original_name": original_name,
+        "normalized_name": normalized,
+        "source_system": source_system,
+    }
+
+
+@api_router.get("/athletes/{athlete_id}/aliases")
+async def get_athlete_aliases(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all aliases for an athlete."""
+    # Verify athlete exists
+    try:
+        athlete = await db.athletes.find_one({
+            "_id": ObjectId(athlete_id),
+            "coach_id": current_user["_id"]
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID de atleta inválido")
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    aliases = await db.athlete_aliases.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).to_list(100)
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "aliases": [
+            {
+                "id": str(a["_id"]),
+                "original_name": a.get("alias_original", ""),
+                "normalized_name": a.get("alias_normalized", ""),
+                "source_system": a.get("source_system", ""),
+                "created_at": a.get("created_at"),
+                "last_used_at": a.get("last_used_at"),
+            }
+            for a in aliases
+        ],
+        "alias_count": len(aliases),
+    }
+
+
+@api_router.delete("/athletes/aliases/{alias_id}")
+async def delete_athlete_alias(
+    alias_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete an athlete alias."""
+    try:
+        result = await db.athlete_aliases.delete_one({
+            "_id": ObjectId(alias_id),
+            "coach_id": current_user["_id"]
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="ID de alias inválido")
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Alias não encontrado")
+    
+    return {"message": "Alias removido com sucesso"}
+
+
+# ============= GPS DATA ROUTES =============
+
+@api_router.post("/gps-data", response_model=GPSData)
+async def create_gps_data(
+    gps_data: GPSDataCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create GPS data entry.
+    
+    IMPORTANT: If activity_type is 'game', this will also update the athlete's
+    peak values for periodization calculations.
+    """
+    coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)
+    
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(gps_data.athlete_id),
+        "coach_id": coach_id
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Prepare GPS data dict
+    gps_dict = gps_data.model_dump()
+    
+    # Generate session_id for manual entries if not provided
+    if not gps_dict.get("session_id"):
+        gps_dict["session_id"] = f"manual_{gps_data.date}_{gps_data.athlete_id}"
+    
+    gps = GPSData(
+        coach_id=coach_id,
+        **gps_dict
+    )
+    
+    result = await db.gps_data.insert_one(gps.model_dump(by_alias=True, exclude=["id"]))
+    gps.id = str(result.inserted_id)
+    
+    # CRITICAL: Update peak values if this is a GAME session
+    # This ensures manual entries are considered in periodization calculations
+    if gps_data.activity_type == "game":
+        session_metrics = {
+            "total_distance": gps_data.total_distance or 0,
+            "hid_z3": gps_data.high_intensity_distance or 0,
+            "hsr_z4": gps_data.high_speed_running or 0,
+            "sprint_z5": gps_data.sprint_distance or 0,
+            "sprints_count": gps_data.number_of_sprints or 0,
+            "acc_dec_total": (gps_data.number_of_accelerations or 0) + (gps_data.number_of_decelerations or 0)
+        }
+        
+        await update_athlete_peak_values(
+            athlete_id=gps_data.athlete_id,
+            coach_id=coach_id_str,
+            session_metrics=session_metrics,
+            session_date=gps_data.date,
+            athlete_name=athlete.get("name", "")
+        )
+    
+    # UPDATE ROLLING LOAD METRICS (EWMA, ACWR, etc.)
+    try:
+        await load_engine.update_athlete_metrics(
+            athlete_id=gps_data.athlete_id,
+            coach_id=coach_id_str,
+            date=gps_data.date
+        )
+    except Exception as e:
+        logging.warning(f"[LoadEngine] Failed to update metrics for {gps_data.athlete_id}: {e}")
+    
+    return gps
+
+@api_router.get("/gps-data/athlete/{athlete_id}", response_model=List[GPSData])
+async def get_athlete_gps_data(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    for record in gps_records:
+        record["_id"] = str(record["_id"])
+    return [GPSData(**record) for record in gps_records]
+
+class GPSDeleteRequest(BaseModel):
+    session_ids: List[str]
+
+@api_router.post("/gps-data/delete-activities")
+async def delete_gps_activities(
+    data: GPSDeleteRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete GPS activities by session_ids. Removes all period records for each session
+    and recalculates athlete_load_metrics for affected athletes from the earliest affected date."""
+    if not data.session_ids or len(data.session_ids) == 0:
+        raise HTTPException(status_code=400, detail="No session_ids provided")
+    
+    coach_id_str = str(current_user["_id"])
+    
+    # PHASE 1: Collect affected athletes and dates BEFORE deleting
+    affected: dict = {}  # {athlete_id: set(dates)}
+    for session_id in data.session_ids:
+        query = {"session_id": session_id, "coach_id": current_user["_id"]}
+        records = await db.gps_data.find(query, {"athlete_id": 1, "date": 1, "_id": 0}).to_list(500)
+        for r in records:
+            aid = r.get("athlete_id")
+            dt = r.get("date")
+            if aid and dt:
+                affected.setdefault(aid, set()).add(dt)
+        if session_id.startswith("legacy_"):
+            date_str = session_id.replace("legacy_", "")
+            query2 = {"date": date_str, "coach_id": current_user["_id"], "session_id": {"$exists": False}}
+            records2 = await db.gps_data.find(query2, {"athlete_id": 1, "date": 1, "_id": 0}).to_list(500)
+            for r in records2:
+                aid = r.get("athlete_id")
+                if aid:
+                    affected.setdefault(aid, set()).add(date_str)
+    
+    # PHASE 2: Delete the GPS records
+    total_deleted = 0
+    for session_id in data.session_ids:
+        result = await db.gps_data.delete_many({
+            "session_id": session_id,
+            "coach_id": current_user["_id"]
+        })
+        total_deleted += result.deleted_count
+        if session_id.startswith("legacy_"):
+            date_str = session_id.replace("legacy_", "")
+            result2 = await db.gps_data.delete_many({
+                "date": date_str,
+                "coach_id": current_user["_id"],
+                "session_id": {"$exists": False}
+            })
+            total_deleted += result2.deleted_count
+    
+    if total_deleted == 0:
+        raise HTTPException(status_code=404, detail="No activities found to delete")
+    
+    # PHASE 3: Recalculate athlete_load_metrics from earliest affected date
+    recalc_results = []
+    for athlete_id, dates in affected.items():
+        earliest_date = min(dates)
+        try:
+            # Delete stale metrics from the affected dates forward
+            await db.athlete_load_metrics.delete_many({
+                "athlete_id": athlete_id,
+                "date": {"$gte": earliest_date}
+            })
+            
+            # Find the earliest remaining GPS date >= earliest affected date
+            next_gps = await db.gps_data.find_one(
+                {"athlete_id": athlete_id, "coach_id": coach_id_str, "date": {"$gte": earliest_date}},
+                sort=[("date", 1)],
+                projection={"date": 1, "_id": 0}
+            )
+            
+            if next_gps and next_gps.get("date"):
+                results = await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id_str,
+                    start_date=next_gps["date"]
+                )
+                recalc_results.append({"athlete_id": athlete_id, "dates_recalculated": len(results)})
+            else:
+                recalc_results.append({"athlete_id": athlete_id, "stale_metrics_cleaned": True})
+        except Exception as e:
+            logging.warning(f"[LoadEngine] Failed to recalculate after GPS delete for {athlete_id}: {e}")
+            recalc_results.append({"athlete_id": athlete_id, "error": str(e)})
+    
+    return {
+        "message": f"Deleted {total_deleted} records",
+        "deleted_count": total_deleted,
+        "metrics_recalculated": recalc_results
+    }
+
+@api_router.get("/gps-data/athlete/{athlete_id}/sessions")
+async def get_athlete_sessions(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get GPS data grouped by sessions (aggregated from periods)"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    # Group by session_id or by date if no session_id
+    sessions = {}
+    for record in gps_records:
+        session_key = record.get("session_id") or record.get("date", "unknown")
+        
+        if session_key not in sessions:
+            sessions[session_key] = {
+                "session_id": session_key,
+                "session_name": record.get("session_name", f"Sessão {record.get('date', 'N/A')}"),
+                "date": record.get("date"),
+                "activity_type": record.get("activity_type"),  # "game" or "training"
+                "periods": [],
+                "totals": {
+                    "total_distance": 0,
+                    "high_intensity_distance": 0,
+                    "high_speed_running": 0,
+                    "sprint_distance": 0,
+                    "number_of_sprints": 0,
+                    "number_of_accelerations": 0,
+                    "number_of_decelerations": 0,
+                },
+                "max_speed": 0,
+                "max_acceleration": 0,
+                "max_deceleration": 0,
+            }
+        
+        period_name = record.get("period_name") or (record.get("notes") or "").replace("Período: ", "") or "Full Session"
+        sessions[session_key]["periods"].append({
+            "period_name": period_name,
+            "total_distance": record.get("total_distance", 0),
+            "high_intensity_distance": record.get("high_intensity_distance", 0),
+            "high_speed_running": record.get("high_speed_running", 0),
+            "sprint_distance": record.get("sprint_distance", 0),
+            "number_of_sprints": record.get("number_of_sprints", 0),
+            "number_of_accelerations": record.get("number_of_accelerations", 0),
+            "number_of_decelerations": record.get("number_of_decelerations", 0),
+            "max_speed": record.get("max_speed", 0),
+        })
+        
+        # Sum totals (for periods that are not "Session" to avoid double counting)
+        period_lower = period_name.lower()
+        if "session" not in period_lower and "total" not in period_lower:
+            sessions[session_key]["totals"]["total_distance"] += record.get("total_distance", 0)
+            sessions[session_key]["totals"]["high_intensity_distance"] += record.get("high_intensity_distance", 0)
+            sessions[session_key]["totals"]["high_speed_running"] += record.get("high_speed_running", 0) or 0
+            sessions[session_key]["totals"]["sprint_distance"] += record.get("sprint_distance", 0)
+            sessions[session_key]["totals"]["number_of_sprints"] += record.get("number_of_sprints", 0)
+            sessions[session_key]["totals"]["number_of_accelerations"] += record.get("number_of_accelerations", 0)
+            sessions[session_key]["totals"]["number_of_decelerations"] += record.get("number_of_decelerations", 0)
+        elif len(sessions[session_key]["periods"]) == 1:
+            # If this is the only period (Session/Total), use its values
+            sessions[session_key]["totals"]["total_distance"] = record.get("total_distance", 0)
+            sessions[session_key]["totals"]["high_intensity_distance"] = record.get("high_intensity_distance", 0)
+            sessions[session_key]["totals"]["high_speed_running"] = record.get("high_speed_running", 0) or 0
+            sessions[session_key]["totals"]["sprint_distance"] = record.get("sprint_distance", 0)
+            sessions[session_key]["totals"]["number_of_sprints"] = record.get("number_of_sprints", 0)
+            sessions[session_key]["totals"]["number_of_accelerations"] = record.get("number_of_accelerations", 0)
+            sessions[session_key]["totals"]["number_of_decelerations"] = record.get("number_of_decelerations", 0)
+        
+        # Track max values
+        if (record.get("max_speed") or 0) > sessions[session_key]["max_speed"]:
+            sessions[session_key]["max_speed"] = record.get("max_speed") or 0
+        if (record.get("max_acceleration") or 0) > sessions[session_key]["max_acceleration"]:
+            sessions[session_key]["max_acceleration"] = record.get("max_acceleration") or 0
+        if (record.get("max_deceleration") or 0) > sessions[session_key]["max_deceleration"]:
+            sessions[session_key]["max_deceleration"] = record.get("max_deceleration") or 0
+    
+    return list(sessions.values())
+
+
+class ActivityTypeUpdate(BaseModel):
+    activity_type: str  # "game" or "training"
+    athlete_id: str  # Required to update only for specific athlete
+
+
+@api_router.put("/gps-data/session/{session_id}/activity-type")
+async def update_session_activity_type(
+    session_id: str,
+    data: ActivityTypeUpdate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update the activity type (game/training) for a specific athlete's session"""
+    if data.activity_type not in ["game", "training"]:
+        raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
+    
+    if not data.athlete_id:
+        raise HTTPException(status_code=400, detail="athlete_id is required")
+    
+    coach_id_str = str(current_user["_id"])
+    
+    # Get the session records for this specific athlete
+    session_records = await db.gps_data.find({
+        "session_id": session_id,
+        "athlete_id": data.athlete_id,
+        "coach_id": coach_id_str
+    }).to_list(100)
+    
+    if not session_records:
+        raise HTTPException(status_code=404, detail="Session not found for this athlete")
+    
+    # Update GPS records only for this specific athlete's session
+    result = await db.gps_data.update_many(
+        {
+            "session_id": session_id,
+            "athlete_id": data.athlete_id,
+            "coach_id": coach_id_str
+        },
+        {"$set": {"activity_type": data.activity_type}}
+    )
+    
+    # If marked as GAME, update peak values for the athlete
+    peak_updated = False
+    if data.activity_type == "game" and session_records:
+        athlete_id = str(session_records[0].get("athlete_id"))
+        session_date = session_records[0].get("date", "")
+        
+        # Get athlete name for notifications
+        athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id)})
+        athlete_name = athlete.get("name", "") if athlete else ""
+        
+        # Extract metrics from session
+        session_metrics = extract_gps_metrics_from_session(session_records)
+        
+        # Update peak values
+        peak_updated = await update_athlete_peak_values(
+            athlete_id=athlete_id,
+            coach_id=coach_id_str,
+            session_metrics=session_metrics,
+            session_date=session_date,
+            athlete_name=athlete_name
+        )
+    
+    # Recalculate load metrics for the affected athlete/date
+    try:
+        session_date = session_records[0].get("date")
+        if session_date:
+            await load_engine.recalculate_from_date(
+                athlete_id=data.athlete_id,
+                coach_id=coach_id_str,
+                start_date=session_date
+            )
+    except Exception as e:
+        logging.warning(f"[LoadEngine] Failed to recalculate after activity-type update: {e}")
+    
+    return {
+        "message": "Activity type updated successfully",
+        "session_id": session_id,
+        "activity_type": data.activity_type,
+        "records_updated": result.modified_count,
+        "peak_values_updated": peak_updated,
+        "metrics_recalculated": True
+    }
+
+
+# Endpoint to get all GPS sessions grouped by session_id (for centralized classification)
+@api_router.get("/gps-data/sessions/all")
+async def get_all_gps_sessions(
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all GPS sessions grouped by session_id for centralized classification"""
+    coach_id = str(current_user["_id"])
+    
+    # Aggregate to group by session_id
+    pipeline = [
+        {"$match": {"coach_id": coach_id, "session_id": {"$ne": None}}},
+        {"$group": {
+            "_id": "$session_id",
+            "date": {"$first": "$date"},
+            "activity_type": {"$first": "$activity_type"},
+            "athlete_ids": {"$addToSet": "$athlete_id"},
+            "total_records": {"$sum": 1},
+            "avg_distance": {"$avg": "$total_distance"},
+            "avg_hsr": {"$avg": "$high_speed_running"},
+            "total_distance_sum": {"$sum": "$total_distance"},
+        }},
+        {"$sort": {"date": -1}},
+        {"$limit": 100}
+    ]
+    
+    sessions = await db.gps_data.aggregate(pipeline).to_list(100)
+    
+    result = []
+    for s in sessions:
+        result.append({
+            "session_id": s["_id"],
+            "date": s.get("date"),
+            "activity_type": s.get("activity_type", "training"),
+            "athlete_count": len(s.get("athlete_ids", [])),
+            "total_records": s.get("total_records", 0),
+            "avg_distance": s.get("avg_distance", 0),
+            "avg_hsr": s.get("avg_hsr", 0),
+        })
+    
+    return result
+
+
+# Model for classifying all athletes at once
+class ClassifyAllRequest(BaseModel):
+    activity_type: str  # "game" or "training"
+
+
+@api_router.put("/gps-data/session/{session_id}/classify-all")
+async def classify_session_for_all_athletes(
+    session_id: str,
+    data: ClassifyAllRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Classify a session as game/training for ALL athletes and recalculate peaks"""
+    if data.activity_type not in ["game", "training"]:
+        raise HTTPException(status_code=400, detail="activity_type must be 'game' or 'training'")
+    
+    coach_id = str(current_user["_id"])
+    
+    # Get all records for this session
+    session_records = await db.gps_data.find({
+        "session_id": session_id,
+        "coach_id": coach_id
+    }).to_list(1000)
+    
+    if not session_records:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Update all GPS records for this session (all athletes)
+    result = await db.gps_data.update_many(
+        {"session_id": session_id, "coach_id": coach_id},
+        {"$set": {"activity_type": data.activity_type}}
+    )
+    
+    # Get unique athlete IDs from this session
+    athlete_ids = list(set([str(r.get("athlete_id")) for r in session_records]))
+    
+    # Recalculate peak values for each athlete if marked as GAME
+    peaks_updated = []
+    if data.activity_type == "game":
+        for athlete_id in athlete_ids:
+            try:
+                # Get this athlete's records from the session
+                athlete_records = [r for r in session_records if str(r.get("athlete_id")) == athlete_id]
+                if not athlete_records:
+                    continue
+                
+                session_date = athlete_records[0].get("date", "")
+                
+                # Get athlete name
+                athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id)})
+                athlete_name = athlete.get("name", "") if athlete else ""
+                
+                # Extract metrics from session
+                session_metrics = extract_gps_metrics_from_session(athlete_records)
+                
+                # Update peak values
+                peak_updated = await update_athlete_peak_values(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    session_metrics=session_metrics,
+                    session_date=session_date,
+                    athlete_name=athlete_name
+                )
+                if peak_updated:
+                    peaks_updated.append(athlete_id)
+            except Exception as e:
+                print(f"Error updating peaks for athlete {athlete_id}: {e}")
+    
+    # Recalculate load metrics for ALL affected athletes
+    recalc_count = 0
+    session_date = session_records[0].get("date") if session_records else None
+    if session_date:
+        for athlete_id in athlete_ids:
+            try:
+                await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    start_date=session_date
+                )
+                recalc_count += 1
+            except Exception as e:
+                logging.warning(f"[LoadEngine] Failed to recalculate after classify-all for {athlete_id}: {e}")
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "activity_type": data.activity_type,
+        "records_updated": result.modified_count,
+        "athletes_affected": len(athlete_ids),
+        "peaks_updated": len(peaks_updated),
+        "metrics_recalculated": recalc_count
+    }
+
+
+# ============= PERIODIZATION MODELS =============
+
+class DayClassification(str, Enum):
+    MD = "MD"      # Match Day
+    MD_1 = "MD-1"  # Match Day minus 1
+    MD_2 = "MD-2"  # Match Day minus 2
+    MD_3 = "MD-3"  # Match Day minus 3
+    MD_4 = "MD-4"  # Match Day minus 4
+    MD_5 = "MD-5"  # Match Day minus 5
+    DO = "D.O"     # Day Off
+
+class GPSMetricType(str, Enum):
+    TOTAL_DISTANCE = "total_distance"
+    HID_Z3 = "hid_z3"           # 15-20 km/h
+    HSR_Z4 = "hsr_z4"           # 20-25 km/h
+    SPRINT_Z5 = "sprint_z5"     # >25 km/h
+    SPRINTS_COUNT = "sprints_count"
+    ACC_DEC_TOTAL = "acc_dec_total"  # ACC + DECC sum
+
+# Peak values for each athlete (updated when new higher value from GAME)
+class AthletePeakValues(BaseModel):
+    athlete_id: str
+    coach_id: str
+    total_distance: float = 0
+    hid_z3: float = 0           # High Intensity Distance 15-20 km/h
+    hsr_z4: float = 0           # High Speed Running 20-25 km/h
+    sprint_z5: float = 0        # Sprint >25 km/h
+    sprints_count: int = 0
+    acc_dec_total: int = 0      # Accelerations + Decelerations
+    last_updated: Optional[datetime] = None
+    update_history: List[Dict] = []  # Track updates for notifications
+
+class WeeklyPrescription(BaseModel):
+    total_distance_multiplier: float = 1.0
+    hid_z3_multiplier: float = 1.0
+    hsr_z4_multiplier: float = 1.0
+    sprint_z5_multiplier: float = 1.0
+    sprints_count_multiplier: float = 1.0
+    acc_dec_total_multiplier: float = 1.0
+
+class DailyPrescription(BaseModel):
+    day_classification: str  # MD, MD-1, etc.
+    date: str
+    total_distance_percent: float = 0
+    hid_z3_percent: float = 0
+    hsr_z4_percent: float = 0
+    sprint_z5_percent: float = 0
+    sprints_count_percent: float = 0
+    acc_dec_total_percent: float = 0
+
+class AthleteOverride(BaseModel):
+    athlete_id: str
+    metric: str  # which metric to override
+    value: float  # overridden value (percentage or multiplier)
+    reason: Optional[str] = None  # e.g., "wellness concern", "RSI low"
+
+class PeriodizationWeekCreate(BaseModel):
+    name: str  # e.g., "Semana 1 - Pré-temporada"
+    start_date: str  # YYYY-MM-DD
+    end_date: str    # YYYY-MM-DD
+    days: List[DailyPrescription]
+    weekly_prescription: WeeklyPrescription
+    athlete_overrides: List[AthleteOverride] = []
+
+class PeriodizationWeek(BaseModel):
+    id: Optional[str] = None
+    coach_id: str
+    name: str
+    start_date: str
+    end_date: str
+    days: List[DailyPrescription]
+    weekly_prescription: WeeklyPrescription
+    athlete_overrides: List[AthleteOverride] = []
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class PeakValueNotification(BaseModel):
+    id: Optional[str] = None
+    coach_id: str
+    athlete_id: str
+    athlete_name: str
+    metric: str
+    old_value: float
+    new_value: float
+    session_date: str
+    created_at: Optional[datetime] = None
+    read: bool = False
+
+
+# ============= PERIODIZATION HELPER FUNCTIONS =============
+
+def extract_gps_metrics_from_session(gps_records: List[dict]) -> dict:
+    """
+    Extract and calculate GPS metrics from a session's records.
+    
+    Defense-in-depth: applies session_total vs period logic for legacy data
+    that was stored before the consolidator was introduced.
+    New imports produce a single consolidated document, so this function
+    simply reads its fields. For legacy multi-record sessions, it applies
+    the same prioritization rules as the consolidator.
+    """
+    if not gps_records:
+        return {
+            "total_distance": 0, "hid_z3": 0, "hsr_z4": 0,
+            "sprint_z5": 0, "sprints_count": 0, "acc_dec_total": 0,
+        }
+
+    # If the document is already consolidated (has_session_total flag), use it directly
+    if len(gps_records) == 1 and "has_session_total" in gps_records[0]:
+        r = gps_records[0]
+        return {
+            "total_distance": r.get("total_distance", 0),
+            "hid_z3": r.get("high_intensity_distance", 0),
+            "hsr_z4": r.get("high_speed_running", 0),
+            "sprint_z5": r.get("sprint_distance", 0),
+            "sprints_count": r.get("number_of_sprints", 0),
+            "acc_dec_total": (
+                r.get("number_of_accelerations", 0) +
+                r.get("number_of_decelerations", 0)
+            ),
+        }
+
+    # Legacy path: multiple records per session — apply session/period logic
+    _SESSION_KEYWORDS = {"session", "total", "full", "complete", "summary", "sessão"}
+    _PERIOD_KEYWORDS = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+
+    session_total_record = None
+    period_records = []
+
+    for record in gps_records:
+        pname = (record.get("period_name") or "").lower()
+        is_session_total = any(kw in pname for kw in _SESSION_KEYWORDS)
+        is_period = any(kw in pname for kw in _PERIOD_KEYWORDS)
+
+        if is_session_total and not is_period:
+            if session_total_record is None:
+                session_total_record = record
+        else:
+            period_records.append(record)
+
+    # Choose source: session total OR sum of periods
+    if session_total_record:
+        source = [session_total_record]
+    elif period_records:
+        source = period_records
+    else:
+        source = gps_records  # Fallback: use everything
+
+    metrics = {
+        "total_distance": 0, "hid_z3": 0, "hsr_z4": 0,
+        "sprint_z5": 0, "sprints_count": 0, "acc_dec_total": 0,
+    }
+
+    for record in source:
+        metrics["total_distance"] += record.get("total_distance", 0)
+        metrics["hid_z3"] += record.get("high_intensity_distance", 0)
+        metrics["hsr_z4"] += record.get("high_speed_running", 0)
+        metrics["sprint_z5"] += record.get("sprint_distance", 0)
+        metrics["sprints_count"] += record.get("number_of_sprints", 0)
+        metrics["acc_dec_total"] += (
+            record.get("number_of_accelerations", 0) +
+            record.get("number_of_decelerations", 0)
+        )
+
+    return metrics
+
+
+async def update_athlete_peak_values(
+    athlete_id: str, 
+    coach_id: str, 
+    session_metrics: dict,
+    session_date: str,
+    athlete_name: str = ""
+):
+    """Update peak values if new metrics from GAME are higher"""
+    # Get current peak values
+    peak_doc = await db.athlete_peak_values.find_one({
+        "athlete_id": athlete_id,
+        "coach_id": coach_id
+    })
+    
+    if not peak_doc:
+        # Create new peak values document
+        peak_doc = {
+            "athlete_id": athlete_id,
+            "coach_id": coach_id,
+            "total_distance": 0,
+            "hid_z3": 0,
+            "hsr_z4": 0,
+            "sprint_z5": 0,
+            "sprints_count": 0,
+            "acc_dec_total": 0,
+            "last_updated": None,
+            "update_history": []
+        }
+    
+    updates = {}
+    notifications = []
+    
+    metric_names = {
+        "total_distance": "Distância Total",
+        "hid_z3": "HID Z3 (15-20 km/h)",
+        "hsr_z4": "HSR Z4 (20-25 km/h)",
+        "sprint_z5": "Sprint Z5 (>25 km/h)",
+        "sprints_count": "Sprints",
+        "acc_dec_total": "ACC + DECC"
+    }
+    
+    for metric, new_value in session_metrics.items():
+        current_value = peak_doc.get(metric, 0)
+        if new_value > current_value:
+            updates[metric] = new_value
+            # Create notification
+            notifications.append({
+                "coach_id": coach_id,
+                "athlete_id": athlete_id,
+                "athlete_name": athlete_name,
+                "metric": metric_names.get(metric, metric),
+                "old_value": current_value,
+                "new_value": new_value,
+                "session_date": session_date,
+                "created_at": datetime.utcnow(),
+                "read": False
+            })
+    
+    if updates:
+        updates["last_updated"] = datetime.utcnow()
+        
+        # Add to update history
+        history_entry = {
+            "date": session_date,
+            "updated_at": datetime.utcnow().isoformat(),
+            "metrics_updated": list(updates.keys())
+        }
+        
+        await db.athlete_peak_values.update_one(
+            {"athlete_id": athlete_id, "coach_id": coach_id},
+            {
+                "$set": updates,
+                "$push": {"update_history": history_entry}
+            },
+            upsert=True
+        )
+        
+        # Insert notifications
+        if notifications:
+            await db.peak_value_notifications.insert_many(notifications)
+    
+    return len(updates) > 0
+
+
+@api_router.post("/periodization/recalculate-peaks")
+async def recalculate_all_peak_values(current_user: dict = Depends(get_current_user)):
+    """Recalculate peak values for all athletes based on existing GAME sessions.
+    This fixes missing peak values when GPS data was imported but peaks weren't calculated.
+    IMPORTANT: This will RESET all peak values first and then recalculate from scratch.
+    
+    The calculation uses only the TOTAL SESSION value from each CSV (ignoring sub-periods like 1st half, 2nd half).
+    For each athlete, the highest value per metric across all GAME sessions is stored as their peak.
+    """
+    
+    coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)  # Normalize to string for consistent queries
+    
+    # STEP 1: Delete all existing peak values for this coach (to fix corrupted data)
+    delete_result = await db.athlete_peak_values.delete_many({"coach_id": coach_id_str})
+    print(f"Deleted {delete_result.deleted_count} old peak values")
+    
+    # Get all GPS sessions marked as GAME
+    game_sessions = await db.gps_data.find({
+        "coach_id": coach_id_str,
+        "activity_type": "game"
+    }).to_list(5000)
+    
+    if not game_sessions:
+        return {"message": "No GAME sessions found", "athletes_updated": 0, "peaks_deleted": delete_result.deleted_count}
+    
+    # Group by athlete_id and session_id
+    sessions_by_athlete = {}
+    for record in game_sessions:
+        athlete_id = str(record.get("athlete_id", ""))
+        session_id = record.get("session_id", "")
+        if not athlete_id or not session_id:
+            continue
+        
+        key = f"{athlete_id}_{session_id}"
+        if key not in sessions_by_athlete:
+            sessions_by_athlete[key] = {
+                "athlete_id": athlete_id,
+                "session_id": session_id,
+                "date": record.get("date", ""),
+                "records": []
+            }
+        sessions_by_athlete[key]["records"].append(record)
+    
+    # Process each session and update peak values
+    athletes_updated = set()
+    athletes_processed = set()
+    sessions_processed = 0
+    
+    for session_data in sessions_by_athlete.values():
+        athlete_id = session_data["athlete_id"]
+        
+        # Verify athlete exists - use str for coach_id comparison since athletes.coach_id is stored as str
+        try:
+            athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id_str})
+            if not athlete:
+                # Try with ObjectId coach_id as fallback for legacy data
+                athlete = await db.athletes.find_one({"_id": ObjectId(athlete_id), "coach_id": coach_id})
+                if not athlete:
+                    continue
+        except Exception as e:
+            print(f"Error finding athlete {athlete_id}: {e}")
+            continue
+        
+        athletes_processed.add(athlete_id)
+        
+        # Extract metrics from session - this function correctly uses only session total, not sum of periods
+        session_metrics = extract_gps_metrics_from_session(session_data["records"])
+        
+        # Update peak values (only if higher than current peak)
+        updated = await update_athlete_peak_values(
+            athlete_id=athlete_id,
+            coach_id=coach_id_str,  # Always pass as string for consistency
+            session_metrics=session_metrics,
+            session_date=session_data["date"],
+            athlete_name=athlete.get("name", "")
+        )
+        
+        sessions_processed += 1
+        if updated:
+            athletes_updated.add(athlete_id)
+    
+    return {
+        "message": f"Peak values recalculated from {sessions_processed} GAME sessions",
+        "peaks_deleted": delete_result.deleted_count,
+        "athletes_processed": len(athletes_processed),
+        "athletes_updated": len(athletes_updated),
+        "athlete_ids": list(athletes_updated)
+    }
+
+
+# ============= PERIODIZATION ROUTES =============
+
+@api_router.get("/periodization/weeks")
+async def get_periodization_weeks(current_user: dict = Depends(get_current_user)):
+    """Get all periodization weeks for the coach"""
+    coach_id_str = str(current_user["_id"])
+    weeks = await db.periodization_weeks.find({
+        "coach_id": coach_id_str
+    }).sort("start_date", -1).to_list(100)
+    
+    # Fallback for legacy data with ObjectId
+    if not weeks:
+        weeks = await db.periodization_weeks.find({
+            "coach_id": current_user["_id"]
+        }).sort("start_date", -1).to_list(100)
+    
+    for week in weeks:
+        week["id"] = str(week.pop("_id"))
+    
+    return weeks
+
+
+@api_router.get("/periodization/weeks/{week_id}")
+async def get_periodization_week(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific periodization week"""
+    coach_id_str = str(current_user["_id"])
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": coach_id_str
+    })
+    # Fallback for legacy
+    if not week:
+        week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    week["id"] = str(week.pop("_id"))
+    return week
+
+
+@api_router.post("/periodization/weeks")
+async def create_periodization_week(
+    week_data: PeriodizationWeekCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new periodization week"""
+    coach_id_str = str(current_user["_id"])
+    week_doc = {
+        "coach_id": coach_id_str,  # Store as string for consistency
+        "name": week_data.name,
+        "start_date": week_data.start_date,
+        "end_date": week_data.end_date,
+        "days": [day.dict() for day in week_data.days],
+        "weekly_prescription": week_data.weekly_prescription.dict(),
+        "athlete_overrides": [override.dict() for override in week_data.athlete_overrides],
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    result = await db.periodization_weeks.insert_one(week_doc)
+    week_doc["id"] = str(result.inserted_id)
+    del week_doc["_id"]
+    
+    return week_doc
+
+
+@api_router.put("/periodization/weeks/{week_id}")
+async def update_periodization_week(
+    week_id: str,
+    week_data: PeriodizationWeekCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Update a periodization week (only if not past)"""
+    coach_id_str = str(current_user["_id"])
+    # Check if week exists and is editable
+    existing_week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": coach_id_str
+    })
+    # Fallback for legacy
+    if not existing_week:
+        existing_week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
+    
+    if not existing_week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Check if week is in the past
+    end_date = datetime.strptime(existing_week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot edit past weeks")
+    
+    update_doc = {
+        "name": week_data.name,
+        "start_date": week_data.start_date,
+        "end_date": week_data.end_date,
+        "days": [day.dict() for day in week_data.days],
+        "weekly_prescription": week_data.weekly_prescription.dict(),
+        "athlete_overrides": [override.dict() for override in week_data.athlete_overrides],
+        "updated_at": datetime.utcnow()
+    }
+    
+    await db.periodization_weeks.update_one(
+        {"_id": ObjectId(week_id)},
+        {"$set": update_doc}
+    )
+    
+    return {"message": "Week updated successfully", "id": week_id}
+
+
+@api_router.delete("/periodization/weeks/{week_id}")
+async def delete_periodization_week(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a periodization week (only if not past)"""
+    coach_id_str = str(current_user["_id"])
+    existing_week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": coach_id_str
+    })
+    # Fallback for legacy
+    if not existing_week:
+        existing_week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": current_user["_id"]
+        })
+    
+    if not existing_week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    end_date = datetime.strptime(existing_week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot delete past weeks")
+    
+    await db.periodization_weeks.delete_one({"_id": ObjectId(week_id)})
+    
+    return {"message": "Week deleted successfully"}
+
+
+@api_router.get("/periodization/peak-values")
+async def get_all_peak_values(current_user: dict = Depends(get_current_user)):
+    """Get peak values for all athletes"""
+    coach_id_str = str(current_user["_id"])
+    peak_values = await db.athlete_peak_values.find({
+        "coach_id": coach_id_str
+    }).to_list(500)
+    
+    for pv in peak_values:
+        pv["id"] = str(pv.pop("_id"))
+    
+    return peak_values
+
+
+@api_router.get("/periodization/peak-values/{athlete_id}")
+async def get_athlete_peak_values(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get peak values for a specific athlete"""
+    coach_id_str = str(current_user["_id"])
+    peak_values = await db.athlete_peak_values.find_one({
+        "athlete_id": athlete_id,
+        "coach_id": coach_id_str
+    })
+    
+    if not peak_values:
+        # Return default values if none exist
+        return {
+            "athlete_id": athlete_id,
+            "total_distance": 0,
+            "hid_z3": 0,
+            "hsr_z4": 0,
+            "sprint_z5": 0,
+            "sprints_count": 0,
+            "acc_dec_total": 0,
+            "last_updated": None
+        }
+    
+    peak_values["id"] = str(peak_values.pop("_id"))
+    return peak_values
+
+
+@api_router.get("/periodization/calculated/{week_id}")
+async def get_calculated_prescriptions(
+    week_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get calculated prescriptions for all athletes based on peak values and multipliers.
+    
+    Each athlete's daily and weekly prescription is calculated as:
+    - Peak value (max from all GAME sessions) × multiplier/percentage
+    
+    Peak values use only the TOTAL SESSION value from CSVs (not sum of sub-periods).
+    """
+    coach_id = current_user["_id"]
+    coach_id_str = str(coach_id)
+    
+    # Get the week - try str first (standard), then ObjectId for legacy
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": coach_id_str
+    })
+    if not week:
+        week = await db.periodization_weeks.find_one({
+            "_id": ObjectId(week_id),
+            "coach_id": coach_id
+        })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Get all athletes - coach_id stored as str
+    athletes = await db.athletes.find({
+        "coach_id": coach_id_str
+    }).to_list(500)
+    if not athletes:
+        # Fallback for legacy data with ObjectId
+        athletes = await db.athletes.find({
+            "coach_id": coach_id
+        }).to_list(500)
+    
+    # Get all peak values - coach_id stored as str
+    peak_values = await db.athlete_peak_values.find({
+        "coach_id": coach_id_str
+    }).to_list(500)
+    
+    peak_values_map = {str(pv["athlete_id"]): pv for pv in peak_values}
+    
+    # Get athlete overrides map
+    overrides_map = {}
+    for override in week.get("athlete_overrides", []):
+        key = f"{override['athlete_id']}_{override['metric']}"
+        overrides_map[key] = override
+    
+    weekly_prescription = week["weekly_prescription"]
+    
+    results = []
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        peak = peak_values_map.get(athlete_id, {})
+        
+        # Calculate weekly targets
+        weekly_targets = {
+            "total_distance": peak.get("total_distance", 0) * weekly_prescription.get("total_distance_multiplier", 1.0),
+            "hid_z3": peak.get("hid_z3", 0) * weekly_prescription.get("hid_z3_multiplier", 1.0),
+            "hsr_z4": peak.get("hsr_z4", 0) * weekly_prescription.get("hsr_z4_multiplier", 1.0),
+            "sprint_z5": peak.get("sprint_z5", 0) * weekly_prescription.get("sprint_z5_multiplier", 1.0),
+            "sprints_count": peak.get("sprints_count", 0) * weekly_prescription.get("sprints_count_multiplier", 1.0),
+            "acc_dec_total": peak.get("acc_dec_total", 0) * weekly_prescription.get("acc_dec_total_multiplier", 1.0)
+        }
+        
+        # Calculate daily targets
+        daily_targets = []
+        for day in week["days"]:
+            day_target = {
+                "date": day["date"],
+                "day_classification": day["day_classification"],
+                "total_distance": peak.get("total_distance", 0) * (day.get("total_distance_percent", 0) / 100),
+                "hid_z3": peak.get("hid_z3", 0) * (day.get("hid_z3_percent", 0) / 100),
+                "hsr_z4": peak.get("hsr_z4", 0) * (day.get("hsr_z4_percent", 0) / 100),
+                "sprint_z5": peak.get("sprint_z5", 0) * (day.get("sprint_z5_percent", 0) / 100),
+                "sprints_count": peak.get("sprints_count", 0) * (day.get("sprints_count_percent", 0) / 100),
+                "acc_dec_total": peak.get("acc_dec_total", 0) * (day.get("acc_dec_total_percent", 0) / 100)
+            }
+            
+            # Apply athlete-specific overrides
+            for metric in ["total_distance", "hid_z3", "hsr_z4", "sprint_z5", "sprints_count", "acc_dec_total"]:
+                override_key = f"{athlete_id}_{metric}_{day['date']}"
+                if override_key in overrides_map:
+                    override = overrides_map[override_key]
+                    day_target[metric] = peak.get(metric, 0) * (override["value"] / 100)
+            
+            daily_targets.append(day_target)
+        
+        results.append({
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name", ""),
+            "peak_values": {
+                "total_distance": peak.get("total_distance", 0),
+                "hid_z3": peak.get("hid_z3", 0),
+                "hsr_z4": peak.get("hsr_z4", 0),
+                "sprint_z5": peak.get("sprint_z5", 0),
+                "sprints_count": peak.get("sprints_count", 0),
+                "acc_dec_total": peak.get("acc_dec_total", 0)
+            },
+            "weekly_targets": weekly_targets,
+            "daily_targets": daily_targets
+        })
+    
+    return {
+        "week_id": week_id,
+        "week_name": week["name"],
+        "start_date": week["start_date"],
+        "end_date": week["end_date"],
+        "weekly_prescription": weekly_prescription,
+        "days_config": week["days"],
+        "athletes": results
+    }
+
+
+@api_router.put("/periodization/athlete-override/{week_id}")
+async def update_athlete_override(
+    week_id: str,
+    override: AthleteOverride,
+    current_user: dict = Depends(get_current_user)
+):
+    """Add or update an athlete-specific override"""
+    week = await db.periodization_weeks.find_one({
+        "_id": ObjectId(week_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not week:
+        raise HTTPException(status_code=404, detail="Week not found")
+    
+    # Check if week is editable
+    end_date = datetime.strptime(week["end_date"], "%Y-%m-%d")
+    if end_date < datetime.now().replace(hour=0, minute=0, second=0, microsecond=0):
+        raise HTTPException(status_code=400, detail="Cannot edit past weeks")
+    
+    # Update or add override
+    overrides = week.get("athlete_overrides", [])
+    found = False
+    for i, existing in enumerate(overrides):
+        if existing["athlete_id"] == override.athlete_id and existing["metric"] == override.metric:
+            overrides[i] = override.dict()
+            found = True
+            break
+    
+    if not found:
+        overrides.append(override.dict())
+    
+    await db.periodization_weeks.update_one(
+        {"_id": ObjectId(week_id)},
+        {"$set": {"athlete_overrides": overrides, "updated_at": datetime.utcnow()}}
+    )
+    
+    return {"message": "Override updated successfully"}
+
+
+@api_router.get("/periodization/notifications")
+async def get_peak_value_notifications(
+    unread_only: bool = False,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get notifications about peak value updates"""
+    query = {"coach_id": current_user["_id"]}
+    if unread_only:
+        query["read"] = False
+    
+    notifications = await db.peak_value_notifications.find(query).sort("created_at", -1).to_list(100)
+    
+    for n in notifications:
+        n["id"] = str(n.pop("_id"))
+    
+    return notifications
+
+
+@api_router.put("/periodization/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Mark a notification as read"""
+    await db.peak_value_notifications.update_one(
+        {"_id": ObjectId(notification_id), "coach_id": current_user["_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Notification marked as read"}
+
+
+@api_router.put("/periodization/notifications/read-all")
+async def mark_all_notifications_read(current_user: dict = Depends(get_current_user)):
+    """Mark all notifications as read"""
+    await db.peak_value_notifications.update_many(
+        {"coach_id": current_user["_id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "All notifications marked as read"}
+
+
+# ============= WELLNESS ROUTES =============
+
+def calculate_wellness_scores(data: WellnessQuestionnaireCreate) -> tuple:
+    # Wellness Score: Higher is better
+    # Invert fatigue, stress, muscle_soreness (lower is better)
+    wellness_score = (
+        (10 - data.fatigue) * 0.2 +
+        (10 - data.stress) * 0.15 +
+        data.mood * 0.15 +
+        data.sleep_quality * 0.2 +
+        (10 - data.muscle_soreness) * 0.15 +
+        data.hydration * 0.15
+    )
+    
+    # Readiness Score: Consider sleep hours as well
+    sleep_score = min(data.sleep_hours / 8.0 * 10, 10)  # Normalize to 10
+    readiness_score = (
+        (10 - data.fatigue) * 0.3 +
+        sleep_score * 0.3 +
+        (10 - data.muscle_soreness) * 0.2 +
+        data.mood * 0.2
+    )
+    
+    return round(wellness_score, 2), round(readiness_score, 2)
+
+@api_router.post("/wellness", response_model=WellnessQuestionnaire)
+async def create_wellness_questionnaire(
+    wellness_data: WellnessQuestionnaireCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(wellness_data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    wellness_score, readiness_score = calculate_wellness_scores(wellness_data)
+    
+    wellness = WellnessQuestionnaire(
+        coach_id=current_user["_id"],
+        wellness_score=wellness_score,
+        readiness_score=readiness_score,
+        **wellness_data.model_dump()
+    )
+    
+    result = await db.wellness.insert_one(wellness.model_dump(by_alias=True, exclude=["id"]))
+    wellness.id = str(result.inserted_id)
+    return wellness
+
+@api_router.get("/wellness/athlete/{athlete_id}", response_model=List[WellnessQuestionnaire])
+async def get_athlete_wellness(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    result = []
+    for record in wellness_records:
+        record["_id"] = str(record["_id"])
+        # Handle legacy data with missing fields
+        if record.get("hydration") is None:
+            record["hydration"] = 5
+        if "wellness_score" not in record or record.get("wellness_score") is None:
+            # Calculate wellness score if missing
+            record["wellness_score"] = (
+                (10 - record.get("fatigue", 5)) * 0.2 +
+                record.get("sleep_quality", 5) * 0.2 +
+                (record.get("sleep_hours", 7) / 8) * 10 * 0.15 +
+                record.get("mood", 5) * 0.15 +
+                (10 - record.get("muscle_soreness", 5)) * 0.15 +
+                (10 - record.get("stress", 5)) * 0.15
+            )
+        if "readiness_score" not in record or record.get("readiness_score") is None:
+            record["readiness_score"] = record.get("wellness_score", 5) * 0.8 + (10 - record.get("fatigue", 5)) * 0.2
+        result.append(WellnessQuestionnaire(**record))
+    return result
+
+# ============= WELLNESS TOKEN SYSTEM (NEW - replaces link system) =============
+
+class WellnessTokenExpiry(str, Enum):
+    THIRTY_MIN = "30min"
+    ONE_HOUR = "1h"
+    TWO_HOURS = "2h"
+    EIGHT_HOURS = "8h"
+    TWENTY_FOUR_HOURS = "24h"
+
+EXPIRY_TO_MINUTES = {
+    "30min": 30,
+    "1h": 60,
+    "2h": 120,
+    "8h": 480,
+    "24h": 1440,
+}
+
+class WellnessTokenCreate(BaseModel):
+    max_uses: int = Field(ge=1, le=100, default=30)
+    expires_in: str = "24h"  # 30min, 1h, 2h, 8h, 24h
+
+class WellnessTokenStatus(str, Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    EXPIRED = "expired"
+
+class WellnessToken(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    token_id: str  # Alphanumeric token to share
+    coach_id: str
+    max_uses: int
+    current_uses: int = 0
+    expires_at: datetime
+    status: str = "active"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class TokenUsage(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    token_id: str
+    athlete_id: str
+    used_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class TokenValidateRequest(BaseModel):
+    token: str
+
+class TokenWellnessSubmit(BaseModel):
+    token: str
+    athlete_id: str
+    date: str
+    sleep_hours: float
+    sleep_quality: int  # 1-10
+    fatigue: int  # 1-10
+    muscle_soreness: int  # 1-10
+    stress: int  # 1-10
+    mood: int  # 1-10
+    hydration: Optional[int] = None  # 1-10
+    notes: Optional[str] = None
+
+def generate_token_code() -> str:
+    """Generate a 6-character alphanumeric token (uppercase letters + digits)"""
+    import random
+    import string
+    chars = string.ascii_uppercase + string.digits
+    # Avoid confusing characters: O, 0, I, 1, L
+    chars = chars.replace('O', '').replace('0', '').replace('I', '').replace('1', '').replace('L', '')
+    return ''.join(random.choice(chars) for _ in range(6))
+
+@api_router.post("/wellness/token")
+async def create_wellness_token(
+    data: WellnessTokenCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a new wellness token for coach to share with athletes"""
+    # Validate expiry
+    if data.expires_in not in EXPIRY_TO_MINUTES:
+        raise HTTPException(status_code=400, detail="Tempo de expiração inválido")
+    
+    # Generate unique token
+    token_code = generate_token_code()
+    
+    # Ensure uniqueness
+    while await db.wellness_tokens.find_one({"token_id": token_code, "status": "active"}):
+        token_code = generate_token_code()
+    
+    expires_minutes = EXPIRY_TO_MINUTES[data.expires_in]
+    expires_at = datetime.utcnow() + timedelta(minutes=expires_minutes)
+    
+    token_doc = {
+        "token_id": token_code,
+        "coach_id": str(current_user["_id"]),
+        "max_uses": data.max_uses,
+        "current_uses": 0,
+        "expires_at": expires_at,
+        "status": "active",
+        "created_at": datetime.utcnow(),
+    }
+    
+    result = await db.wellness_tokens.insert_one(token_doc)
+    
+    return {
+        "token_id": token_code,
+        "max_uses": data.max_uses,
+        "current_uses": 0,
+        "expires_at": expires_at.isoformat(),
+        "status": "active",
+    }
+
+@api_router.post("/wellness/token/validate")
+async def validate_wellness_token(data: TokenValidateRequest):
+    """Validate a token entered by an athlete (public, no auth required)"""
+    token_code = data.token.upper().strip()
+    
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    if token_code == "APPS26":
+        # Buscar coach demo pelo email fixo
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            return {
+                "valid": True,
+                "token_id": token_code,
+                "coach_id": str(demo_coach["_id"]),
+            }
+    # === FIM APPLE REVIEW TOKEN ===
+    
+    # Find token
+    token = await db.wellness_tokens.find_one({"token_id": token_code})
+    
+    if not token:
+        raise HTTPException(status_code=404, detail="Token não encontrado")
+    
+    # Check status
+    if token.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Token inativo")
+    
+    # Check expiration
+    if datetime.utcnow() > token.get("expires_at"):
+        # Auto-update status to expired
+        await db.wellness_tokens.update_one(
+            {"_id": token["_id"]},
+            {"$set": {"status": "expired"}}
+        )
+        raise HTTPException(status_code=400, detail="Token expirado")
+    
+    # Check max uses
+    if token.get("current_uses", 0) >= token.get("max_uses", 1):
+        # Auto-update status to inactive
+        await db.wellness_tokens.update_one(
+            {"_id": token["_id"]},
+            {"$set": {"status": "inactive"}}
+        )
+        raise HTTPException(status_code=400, detail="Token atingiu limite de uso")
+    
+    return {
+        "valid": True,
+        "token_id": token_code,
+        "coach_id": token["coach_id"],
+    }
+
+@api_router.get("/wellness/token/{token_id}/athletes")
+async def get_athletes_for_token(token_id: str):
+    """Get list of athletes for a valid token (public, no auth required)"""
+    token_code = token_id.upper().strip()
+    
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    if token_code == "APPS26":
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            athletes = await db.athletes.find({
+                "coach_id": str(demo_coach["_id"])
+            }).to_list(1000)
+            return [{"id": str(a["_id"]), "name": a["name"]} for a in athletes]
+    # === FIM APPLE REVIEW TOKEN ===
+    
+    # Find and validate token
+    token = await db.wellness_tokens.find_one({"token_id": token_code})
+    
+    if not token:
+        raise HTTPException(status_code=404, detail="Token não encontrado")
+    
+    if token.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Token inativo")
+    
+    if datetime.utcnow() > token.get("expires_at"):
+        raise HTTPException(status_code=400, detail="Token expirado")
+    
+    if token.get("current_uses", 0) >= token.get("max_uses", 1):
+        raise HTTPException(status_code=400, detail="Token atingiu limite de uso")
+    
+    # Get athletes for this coach
+    athletes = await db.athletes.find({
+        "coach_id": token["coach_id"]
+    }).to_list(1000)
+    
+    # Return only names and IDs
+    return [{"id": str(a["_id"]), "name": a["name"]} for a in athletes]
+
+@api_router.get("/wellness/token/{token_id}/check-athlete/{athlete_id}")
+async def check_athlete_token_usage(token_id: str, athlete_id: str):
+    """Check if an athlete has already used this token (public, no auth required)"""
+    token_code = token_id.upper().strip()
+    
+    # === APPLE REVIEW TOKEN - Sempre permite uso para App Review ===
+    if token_code == "APPS26":
+        return {
+            "already_used": False,
+            "message": "OK"
+        }
+    # === FIM APPLE REVIEW TOKEN ===
+    
+    # Check if usage already exists
+    existing_usage = await db.token_usage.find_one({
+        "token_id": token_code,
+        "athlete_id": athlete_id
+    })
+    
+    if existing_usage:
+        return {
+            "already_used": True,
+            "message": "Você já respondeu este questionário."
+        }
+    
+    return {
+        "already_used": False,
+        "message": "OK"
+    }
+
+@api_router.post("/wellness/token/submit")
+async def submit_wellness_via_token(data: TokenWellnessSubmit):
+    """Submit wellness questionnaire via token (public, no auth required)"""
+    token_code = data.token.upper().strip()
+    
+    # === APPLE REVIEW TOKEN - Bypass isolado para App Review ===
+    coach_id_for_record = None
+    if token_code == "APPS26":
+        demo_coach = await db.users.find_one({"email": "contato@loadmanagerpro.com.br"})
+        if demo_coach:
+            coach_id_for_record = str(demo_coach["_id"])
+            # Verificar se atleta pertence a este coach
+            athlete = await db.athletes.find_one({
+                "_id": ObjectId(data.athlete_id),
+                "coach_id": coach_id_for_record
+            })
+            if not athlete:
+                raise HTTPException(status_code=404, detail="Atleta não encontrado")
+            
+            # Verificar se já usou (permitir múltiplos usos para review)
+            # Não bloquear por uso anterior para Apple Review
+            
+            # Calculate readiness score
+            readiness_score = round(
+                (data.sleep_quality * 2 +
+                 (10 - data.fatigue) * 2 +
+                 (10 - data.muscle_soreness) * 1.5 +
+                 (10 - data.stress) * 1 +
+                 data.mood * 1.5) / 8, 1
+            )
+            
+            # Create wellness record
+            wellness_record = {
+                "athlete_id": data.athlete_id,
+                "coach_id": coach_id_for_record,
+                "date": data.date,
+                "sleep_hours": data.sleep_hours,
+                "sleep_quality": data.sleep_quality,
+                "fatigue": data.fatigue,
+                "muscle_soreness": data.muscle_soreness,
+                "stress": data.stress,
+                "mood": data.mood,
+                "hydration": data.hydration or 5,
+                "readiness_score": readiness_score,
+                "notes": data.notes,
+                "created_at": datetime.utcnow(),
+                "submitted_via": "apple_review_token",
+                "token_id": token_code,
+            }
+            
+            await db.wellness.insert_one(wellness_record)
+            
+            # Generate feedback
+            feedback = {
+                "athlete_name": athlete["name"],
+                "date": data.date,
+                "readiness_score": readiness_score,
+                "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
+                "recommendations": []
+            }
+            
+            if data.sleep_hours < 7:
+                feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
+            if data.sleep_quality < 6:
+                feedback["recommendations"].append("Considere melhorar sua higiene do sono")
+            if data.fatigue > 7:
+                feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
+            if data.muscle_soreness > 7:
+                feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
+            if data.stress > 7:
+                feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
+            
+            if not feedback["recommendations"]:
+                feedback["recommendations"].append("Ótimo! Você está em boas condições!")
+            
+            return {
+                "success": True,
+                "message": "Questionário enviado com sucesso!",
+                "feedback": feedback
+            }
+    # === FIM APPLE REVIEW TOKEN ===
+    
+    # Validate token
+    token = await db.wellness_tokens.find_one({"token_id": token_code})
+    
+    if not token:
+        raise HTTPException(status_code=404, detail="Token não encontrado")
+    
+    if token.get("status") != "active":
+        raise HTTPException(status_code=400, detail="Token inativo")
+    
+    if datetime.utcnow() > token.get("expires_at"):
+        await db.wellness_tokens.update_one(
+            {"_id": token["_id"]},
+            {"$set": {"status": "expired"}}
+        )
+        raise HTTPException(status_code=400, detail="Token expirado")
+    
+    if token.get("current_uses", 0) >= token.get("max_uses", 1):
+        await db.wellness_tokens.update_one(
+            {"_id": token["_id"]},
+            {"$set": {"status": "inactive"}}
+        )
+        raise HTTPException(status_code=400, detail="Token atingiu limite de uso")
+    
+    # CRITICAL: Check if athlete already used this token
+    existing_usage = await db.token_usage.find_one({
+        "token_id": token_code,
+        "athlete_id": data.athlete_id
+    })
+    
+    if existing_usage:
+        raise HTTPException(
+            status_code=400, 
+            detail="Você já respondeu este questionário."
+        )
+    
+    # Verify athlete belongs to this coach
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(data.athlete_id),
+        "coach_id": token["coach_id"]
+    })
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Calculate readiness score
+    readiness_score = round(
+        (data.sleep_quality * 2 +
+         (10 - data.fatigue) * 2 +
+         (10 - data.muscle_soreness) * 1.5 +
+         (10 - data.stress) * 1 +
+         data.mood * 1.5) / 8, 1
+    )
+    
+    # Create wellness record
+    wellness_record = {
+        "athlete_id": data.athlete_id,
+        "coach_id": token["coach_id"],
+        "date": data.date,
+        "sleep_hours": data.sleep_hours,
+        "sleep_quality": data.sleep_quality,
+        "fatigue": data.fatigue,
+        "muscle_soreness": data.muscle_soreness,
+        "stress": data.stress,
+        "mood": data.mood,
+        "hydration": data.hydration or 5,
+        "readiness_score": readiness_score,
+        "notes": data.notes,
+        "created_at": datetime.utcnow(),
+        "submitted_via": "wellness_token",
+        "token_id": token_code,
+    }
+    
+    await db.wellness.insert_one(wellness_record)
+    
+    # Record usage in token_usage collection
+    await db.token_usage.insert_one({
+        "token_id": token_code,
+        "athlete_id": data.athlete_id,
+        "used_at": datetime.utcnow(),
+    })
+    
+    # Increment current_uses
+    new_uses = token.get("current_uses", 0) + 1
+    update_data = {"current_uses": new_uses}
+    
+    # If max_uses reached, set status to inactive
+    if new_uses >= token.get("max_uses", 1):
+        update_data["status"] = "inactive"
+    
+    await db.wellness_tokens.update_one(
+        {"_id": token["_id"]},
+        {"$set": update_data}
+    )
+    
+    # Generate feedback
+    feedback = {
+        "athlete_name": athlete["name"],
+        "date": data.date,
+        "readiness_score": readiness_score,
+        "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
+        "recommendations": []
+    }
+    
+    if data.sleep_hours < 7:
+        feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
+    if data.sleep_quality < 6:
+        feedback["recommendations"].append("Considere melhorar sua higiene do sono")
+    if data.fatigue > 7:
+        feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
+    if data.muscle_soreness > 7:
+        feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
+    if data.stress > 7:
+        feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
+    
+    if not feedback["recommendations"]:
+        feedback["recommendations"].append("Ótimo! Você está em boas condições!")
+    
+    return {
+        "success": True,
+        "message": "Questionário enviado com sucesso!",
+        "feedback": feedback
+    }
+
+@api_router.get("/wellness/tokens")
+async def get_coach_tokens(current_user: dict = Depends(get_current_user)):
+    """Get all tokens for the current coach"""
+    tokens = await db.wellness_tokens.find({
+        "coach_id": str(current_user["_id"])
+    }).sort("created_at", -1).to_list(100)
+    
+    result = []
+    now = datetime.utcnow()
+    
+    for token in tokens:
+        # Auto-update expired tokens
+        if token.get("status") == "active" and now > token.get("expires_at"):
+            await db.wellness_tokens.update_one(
+                {"_id": token["_id"]},
+                {"$set": {"status": "expired"}}
+            )
+            token["status"] = "expired"
+        
+        result.append({
+            "token_id": token["token_id"],
+            "max_uses": token["max_uses"],
+            "current_uses": token.get("current_uses", 0),
+            "expires_at": token["expires_at"].isoformat(),
+            "status": token["status"],
+            "created_at": token["created_at"].isoformat(),
+        })
+    
+    return result
+
+# ============= LEGACY PUBLIC WELLNESS ROUTES (keeping for backwards compatibility) =============
+
+class WellnessLinkCreate(BaseModel):
+    coach_id: str
+    expires_days: int = 7
+
+class WellnessLink(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    coach_id: str
+    link_token: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    expires_at: datetime
+    is_active: bool = True
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+class PublicWellnessSubmit(BaseModel):
+    athlete_id: str
+    date: str
+    sleep_hours: float
+    sleep_quality: int  # 1-10
+    fatigue: int  # 1-10
+    muscle_soreness: int  # 1-10
+    stress: int  # 1-10
+    mood: int  # 1-10
+    hydration: Optional[int] = None  # 1-10
+    nutrition: Optional[int] = None  # 1-10
+    notes: Optional[str] = None
+
+@api_router.post("/wellness/generate-link")
+async def generate_wellness_link(
+    expires_hours: float = 24,
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate a shareable link for athletes to submit wellness questionnaires
+    
+    expires_hours: Duration in hours (0.5 = 30min, 2, 8, 24)
+    """
+    import secrets
+    
+    link_token = secrets.token_urlsafe(32)
+    expires_at = datetime.utcnow() + timedelta(hours=expires_hours)
+    
+    wellness_link = WellnessLink(
+        coach_id=current_user["_id"],
+        link_token=link_token,
+        expires_at=expires_at
+    )
+    
+    result = await db.wellness_links.insert_one(wellness_link.model_dump(by_alias=True, exclude=["id"]))
+    wellness_link.id = str(result.inserted_id)
+    
+    return {
+        "link_token": link_token,
+        "expires_at": expires_at.isoformat(),
+        "share_url": f"/wellness-form/{link_token}"
+    }
+
+@api_router.get("/wellness/public/{link_token}/athletes")
+async def get_athletes_for_wellness_link(link_token: str):
+    """Get list of athletes for a wellness link (public, no auth required)"""
+    # Verify link is valid
+    link = await db.wellness_links.find_one({
+        "link_token": link_token,
+        "is_active": True,
+        "expires_at": {"$gte": datetime.utcnow()}
+    })
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+    
+    # Get athletes for this coach
+    athletes = await db.athletes.find({
+        "coach_id": link["coach_id"]
+    }).to_list(1000)
+    
+    # Return only names and IDs
+    return [{"id": str(a["_id"]), "name": a["name"]} for a in athletes]
+
+@api_router.post("/wellness/public/{link_token}/submit")
+async def submit_public_wellness(
+    link_token: str,
+    wellness_data: PublicWellnessSubmit
+):
+    """Submit wellness questionnaire via public link (no auth required)"""
+    # Verify link is valid
+    link = await db.wellness_links.find_one({
+        "link_token": link_token,
+        "is_active": True,
+        "expires_at": {"$gte": datetime.utcnow()}
+    })
+    
+    if not link:
+        raise HTTPException(status_code=404, detail="Link inválido ou expirado")
+    
+    # Verify athlete belongs to this coach
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(wellness_data.athlete_id),
+        "coach_id": link["coach_id"]
+    })
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Calculate readiness score
+    readiness_score = round(
+        (wellness_data.sleep_quality * 2 +
+         (10 - wellness_data.fatigue) * 2 +
+         (10 - wellness_data.muscle_soreness) * 1.5 +
+         (10 - wellness_data.stress) * 1 +
+         wellness_data.mood * 1.5) / 8, 1
+    )
+    
+    # Create wellness record
+    wellness_record = {
+        "athlete_id": wellness_data.athlete_id,
+        "coach_id": link["coach_id"],
+        "date": wellness_data.date,
+        "sleep_hours": wellness_data.sleep_hours,
+        "sleep_quality": wellness_data.sleep_quality,
+        "fatigue": wellness_data.fatigue,
+        "muscle_soreness": wellness_data.muscle_soreness,
+        "stress": wellness_data.stress,
+        "mood": wellness_data.mood,
+        "hydration": wellness_data.hydration,
+        "nutrition": wellness_data.nutrition,
+        "readiness_score": readiness_score,
+        "notes": wellness_data.notes,
+        "created_at": datetime.utcnow(),
+        "submitted_via": "public_link"
+    }
+    
+    result = await db.wellness.insert_one(wellness_record)
+    
+    # Generate feedback report for the athlete
+    feedback = {
+        "athlete_name": athlete["name"],
+        "date": wellness_data.date,
+        "readiness_score": readiness_score,
+        "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
+        "recommendations": []
+    }
+    
+    if wellness_data.sleep_hours < 7:
+        feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
+    if wellness_data.sleep_quality < 6:
+        feedback["recommendations"].append("Considere melhorar sua higiene do sono")
+    if wellness_data.fatigue > 7:
+        feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
+    if wellness_data.muscle_soreness > 7:
+        feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
+    if wellness_data.stress > 7:
+        feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
+    
+    if not feedback["recommendations"]:
+        feedback["recommendations"].append("Ótimo! Você está em boas condições!")
+    
+    return {
+        "success": True,
+        "message": "Questionário enviado com sucesso!",
+        "feedback": feedback
+    }
+
+# ============= PHYSICAL ASSESSMENT ROUTES =============
+
+@api_router.post("/assessments", response_model=PhysicalAssessment)
+async def create_assessment(
+    assessment_data: PhysicalAssessmentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(assessment_data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    assessment = PhysicalAssessment(
+        coach_id=current_user["_id"],
+        **assessment_data.model_dump()
+    )
+    
+    result = await db.assessments.insert_one(assessment.model_dump(by_alias=True, exclude=["id"]))
+    assessment.id = str(result.inserted_id)
+    return assessment
+
+@api_router.get("/assessments/athlete/{athlete_id}", response_model=List[PhysicalAssessment])
+async def get_athlete_assessments(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    for record in assessments:
+        record["_id"] = str(record["_id"])
+    return [PhysicalAssessment(**record) for record in assessments]
+
+# ============= BODY COMPOSITION CALCULATIONS =============
+
+def calculate_body_density_pollock_jackson_7(gender: str, age: int, skinfolds: dict) -> float:
+    """
+    Pollock & Jackson 7 Skinfold Protocol
+    Males: chest, midaxillary, triceps, subscapular, abdominal, suprailiac, thigh
+    Females: triceps, thigh, suprailiac, abdominal, chest, midaxillary, subscapular
+    """
+    sum_7 = (
+        skinfolds.get('chest', 0) +
+        skinfolds.get('midaxillary', 0) +
+        skinfolds.get('triceps', 0) +
+        skinfolds.get('subscapular', 0) +
+        skinfolds.get('abdominal', 0) +
+        skinfolds.get('suprailiac', 0) +
+        skinfolds.get('thigh', 0)
+    )
+    
+    if gender.lower() == 'male':
+        # Jackson & Pollock (1978) equation for men
+        density = 1.112 - (0.00043499 * sum_7) + (0.00000055 * sum_7**2) - (0.00028826 * age)
+    else:
+        # Jackson, Pollock & Ward (1980) equation for women
+        density = 1.097 - (0.00046971 * sum_7) + (0.00000056 * sum_7**2) - (0.00012828 * age)
+    
+    return density
+
+def calculate_body_density_pollock_jackson_9(gender: str, age: int, skinfolds: dict) -> float:
+    """
+    Pollock & Jackson 9 Skinfold Protocol (more comprehensive)
+    All 9 sites: chest, midaxillary, triceps, subscapular, abdominal, suprailiac, thigh, biceps, calf
+    """
+    sum_9 = (
+        skinfolds.get('chest', 0) +
+        skinfolds.get('midaxillary', 0) +
+        skinfolds.get('triceps', 0) +
+        skinfolds.get('subscapular', 0) +
+        skinfolds.get('abdominal', 0) +
+        skinfolds.get('suprailiac', 0) +
+        skinfolds.get('thigh', 0) +
+        skinfolds.get('biceps', 0) +
+        skinfolds.get('calf', 0)
+    )
+    
+    if gender.lower() == 'male':
+        # Extended equation for 9 sites - males
+        density = 1.1125 - (0.0004 * sum_9) + (0.0000005 * sum_9**2) - (0.00029 * age)
+    else:
+        # Extended equation for 9 sites - females
+        density = 1.099 - (0.00043 * sum_9) + (0.00000054 * sum_9**2) - (0.00013 * age)
+    
+    return density
+
+
+def calculate_body_density_jackson_pollock_3(gender: str, age: int, skinfolds: dict) -> float:
+    """Jackson & Pollock 3 Skinfold Protocol. Males: chest, abdominal, thigh. Females: triceps, suprailiac, thigh."""
+    if gender.lower() == 'male':
+        s = skinfolds.get('chest', 0) + skinfolds.get('abdominal', 0) + skinfolds.get('thigh', 0)
+        return 1.10938 - 0.0008267 * s + 0.0000016 * s**2 - 0.0002574 * age
+    else:
+        s = skinfolds.get('triceps', 0) + skinfolds.get('suprailiac', 0) + skinfolds.get('thigh', 0)
+        return 1.0994921 - 0.0009929 * s + 0.0000023 * s**2 - 0.0001392 * age
+
+def calculate_body_density_durnin_womersley(gender: str, age: int, skinfolds: dict) -> float:
+    """Durnin & Womersley 4 Skinfold Protocol (1974). Sites: biceps, triceps, subscapular, suprailiac."""
+    import math
+    s = skinfolds.get('biceps', 0) + skinfolds.get('triceps', 0) + skinfolds.get('subscapular', 0) + skinfolds.get('suprailiac', 0)
+    log_s = math.log10(max(s, 1))
+    if gender.lower() == 'male':
+        if age < 20: return 1.1620 - 0.0630 * log_s
+        elif age < 30: return 1.1631 - 0.0632 * log_s
+        elif age < 40: return 1.1422 - 0.0544 * log_s
+        elif age < 50: return 1.1620 - 0.0700 * log_s
+        else: return 1.1715 - 0.0779 * log_s
+    else:
+        if age < 20: return 1.1549 - 0.0678 * log_s
+        elif age < 30: return 1.1599 - 0.0717 * log_s
+        elif age < 40: return 1.1423 - 0.0632 * log_s
+        elif age < 50: return 1.1333 - 0.0612 * log_s
+        else: return 1.1339 - 0.0645 * log_s
+
+
+def calculate_body_density_guedes(gender: str, skinfolds: dict) -> float:
+    """
+    Guedes Protocol (1985) - Brazilian validated protocol
+    Males: triceps, suprailiac, abdominal
+    Females: triceps, suprailiac, thigh
+    
+    Uses log10 transformation for better accuracy
+    Reference: Guedes, D.P. (1985). Estudo da gordura corporal através da mensuração dos valores de densidade corporal e da espessura de dobras cutâneas em universitários.
+    """
+    import math
+    
+    if gender.lower() == 'male':
+        sum_3 = (
+            skinfolds.get('triceps', 0) +
+            skinfolds.get('suprailiac', 0) +
+            skinfolds.get('abdominal', 0)
+        )
+        # Guedes male equation using log transformation
+        # BD = 1.1714 - 0.0671 * log10(sum_3)
+        if sum_3 > 0:
+            density = 1.1714 - (0.0671 * math.log10(sum_3))
+        else:
+            density = 1.0
+    else:
+        sum_3 = (
+            skinfolds.get('triceps', 0) +
+            skinfolds.get('suprailiac', 0) +
+            skinfolds.get('thigh', 0)
+        )
+        # Guedes female equation using log transformation
+        # BD = 1.1665 - 0.0706 * log10(sum_3)
+        if sum_3 > 0:
+            density = 1.1665 - (0.0706 * math.log10(sum_3))
+        else:
+            density = 1.0
+    
+    return density
+
+def calculate_body_fat_faulkner(skinfolds: dict) -> float:
+    """
+    Faulkner 4 Skinfold Protocol (1968)
+    Used for athletes, especially swimmers
+    Sites: triceps, subscapular, suprailiac, abdominal
+    """
+    sum_4 = (
+        skinfolds.get('triceps', 0) +
+        skinfolds.get('subscapular', 0) +
+        skinfolds.get('suprailiac', 0) +
+        skinfolds.get('abdominal', 0)
+    )
+    
+    # Faulkner equation (direct %BF calculation)
+    body_fat = (sum_4 * 0.153) + 5.783
+    return body_fat
+
+def siri_equation(density: float) -> float:
+    """Convert body density to body fat percentage using Siri equation (1961)"""
+    return (495 / density) - 450
+
+def calculate_bmi(weight_kg: float, height_cm: float) -> tuple:
+    """Calculate BMI and return classification"""
+    height_m = height_cm / 100
+    bmi = weight_kg / (height_m ** 2)
+    
+    if bmi < 18.5:
+        classification = "underweight"
+    elif bmi < 25:
+        classification = "normal"
+    elif bmi < 30:
+        classification = "overweight"
+    elif bmi < 35:
+        classification = "obese_class_1"
+    elif bmi < 40:
+        classification = "obese_class_2"
+    else:
+        classification = "obese_class_3"
+    
+    return round(bmi, 2), classification
+
+def estimate_bone_mass(weight_kg: float, height_cm: float, gender: str) -> float:
+    """Estimate bone mass using Martin formula approximation"""
+    # Simplified bone mass estimation (approx 15% of lean mass, which is ~12-15% of body weight for athletes)
+    base_factor = 0.035 if gender.lower() == 'male' else 0.030
+    bone_mass = weight_kg * base_factor * (height_cm / 170)
+    return round(bone_mass, 2)
+
+def calculate_fat_distribution(skinfolds: dict) -> dict:
+    """
+    Calculate fat distribution for 3D body visualization
+    Returns normalized percentages for different body regions
+    """
+    total = sum(v for v in skinfolds.values() if v)
+    if total == 0:
+        return {}
+    
+    distribution = {}
+    regions = {
+        'upper_arm': ['triceps', 'biceps'],
+        'trunk_front': ['chest', 'abdominal'],
+        'trunk_back': ['subscapular', 'midaxillary'],
+        'hip_waist': ['suprailiac'],
+        'lower_body': ['thigh', 'calf']
+    }
+    
+    for region, sites in regions.items():
+        region_sum = sum(skinfolds.get(site, 0) for site in sites)
+        distribution[region] = round((region_sum / total) * 100, 1) if total > 0 else 0
+    
+    return distribution
+
+def get_bmi_classification_text(classification: str, lang: str = 'pt') -> str:
+    """Get BMI classification text in specified language"""
+    classifications = {
+        'pt': {
+            'underweight': 'Abaixo do peso',
+            'normal': 'Peso normal',
+            'overweight': 'Sobrepeso',
+            'obese_class_1': 'Obesidade Grau I',
+            'obese_class_2': 'Obesidade Grau II',
+            'obese_class_3': 'Obesidade Grau III'
+        },
+        'en': {
+            'underweight': 'Underweight',
+            'normal': 'Normal weight',
+            'overweight': 'Overweight',
+            'obese_class_1': 'Obesity Class I',
+            'obese_class_2': 'Obesity Class II',
+            'obese_class_3': 'Obesity Class III'
+        }
+    }
+    return classifications.get(lang, classifications['pt']).get(classification, classification)
+
+# ============= BODY COMPOSITION ENDPOINTS =============
+
+@api_router.get("/body-composition/protocols")
+async def get_body_composition_protocols(lang: str = "pt"):
+    """Get available body composition protocols with descriptions"""
+    protocols = {
+        "guedes": {
+            "name": "Guedes (1985)",
+            "name_en": "Guedes (1985)",
+            "description_pt": "Protocolo validado para população brasileira. Usa 3 dobras cutâneas.",
+            "description_en": "Protocol validated for Brazilian population. Uses 3 skinfolds.",
+            "sites_male": ["triceps", "suprailiac", "abdominal"],
+            "sites_female": ["triceps", "suprailiac", "thigh"],
+            "sites_count": 3
+        },
+        "pollock_jackson_7": {
+            "name": "Pollock & Jackson 7 Dobras",
+            "name_en": "Pollock & Jackson 7 Skinfolds",
+            "description_pt": "Protocolo de 7 dobras, altamente preciso para atletas.",
+            "description_en": "7 skinfold protocol, highly accurate for athletes.",
+            "sites": ["chest", "midaxillary", "triceps", "subscapular", "abdominal", "suprailiac", "thigh"],
+            "sites_count": 7
+        },
+        "pollock_jackson_9": {
+            "name": "Pollock & Jackson 9 Dobras",
+            "name_en": "Pollock & Jackson 9 Skinfolds",
+            "description_pt": "Protocolo mais completo com 9 dobras cutâneas.",
+            "description_en": "Most comprehensive protocol with 9 skinfolds.",
+            "sites": ["chest", "midaxillary", "triceps", "subscapular", "abdominal", "suprailiac", "thigh", "biceps", "calf"],
+            "sites_count": 9
+        },
+        "faulkner_4": {
+            "name": "Faulkner 4 Dobras",
+            "name_en": "Faulkner 4 Skinfolds",
+            "description_pt": "Protocolo simplificado para atletas, especialmente nadadores.",
+            "description_en": "Simplified protocol for athletes, especially swimmers.",
+            "sites": ["triceps", "subscapular", "suprailiac", "abdominal"],
+            "sites_count": 4
+        }
+    }
+    return protocols
+
+@api_router.post("/body-composition", response_model=BodyComposition)
+async def create_body_composition(
+    data: BodyCompositionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new body composition assessment"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Collect skinfolds
+    skinfolds = {
+        'triceps': data.triceps or 0,
+        'subscapular': data.subscapular or 0,
+        'suprailiac': data.suprailiac or 0,
+        'abdominal': data.abdominal or 0,
+        'chest': data.chest or 0,
+        'midaxillary': data.midaxillary or 0,
+        'thigh': data.thigh or 0,
+        'calf': data.calf or 0,
+        'biceps': data.biceps or 0,
+    }
+    
+    # Calculate based on protocol
+    protocol = data.protocol.value
+    body_density = None
+    body_fat_percentage = None
+    
+    if protocol in ("guedes", "guedes_1985"):
+        body_density = calculate_body_density_guedes(data.gender, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol in ("pollock_jackson_7", "jackson_pollock_7"):
+        body_density = calculate_body_density_pollock_jackson_7(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol == "jackson_pollock_3":
+        body_density = calculate_body_density_jackson_pollock_3(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol == "durnin_womersley":
+        body_density = calculate_body_density_durnin_womersley(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol == "pollock_jackson_9":
+        body_density = calculate_body_density_pollock_jackson_9(data.gender, data.age, skinfolds)
+        body_fat_percentage = siri_equation(body_density)
+    elif protocol in ("faulkner_4", "faulkner"):
+        body_fat_percentage = calculate_body_fat_faulkner(skinfolds)
+        body_density = None  # Faulkner calculates %BF directly
+    
+    # Ensure body fat percentage is within reasonable range
+    body_fat_percentage = max(3, min(60, body_fat_percentage))
+    
+    # Calculate other metrics
+    fat_mass_kg = round(data.weight * (body_fat_percentage / 100), 2)
+    lean_mass_kg = round(data.weight - fat_mass_kg, 2)
+    bone_mass_kg = estimate_bone_mass(data.weight, data.height, data.gender)
+    bmi, bmi_classification = calculate_bmi(data.weight, data.height)
+    fat_distribution = calculate_fat_distribution(skinfolds)
+    
+    # Create body composition record
+    body_comp = BodyComposition(
+        athlete_id=data.athlete_id,
+        coach_id=current_user["_id"],
+        date=data.date,
+        protocol=protocol,
+        weight=data.weight,
+        height=data.height,
+        age=data.age,
+        gender=data.gender,
+        triceps=data.triceps,
+        subscapular=data.subscapular,
+        suprailiac=data.suprailiac,
+        abdominal=data.abdominal,
+        chest=data.chest,
+        midaxillary=data.midaxillary,
+        thigh=data.thigh,
+        calf=data.calf,
+        biceps=data.biceps,
+        body_fat_percentage=round(body_fat_percentage, 2),
+        lean_mass_kg=lean_mass_kg,
+        fat_mass_kg=fat_mass_kg,
+        bone_mass_kg=bone_mass_kg,
+        bmi=bmi,
+        bmi_classification=bmi_classification,
+        body_density=round(body_density, 5) if body_density else None,
+        fat_distribution=fat_distribution,
+        notes=data.notes
+    )
+    
+    result = await db.body_compositions.insert_one(body_comp.model_dump(by_alias=True, exclude=["id"]))
+    body_comp.id = str(result.inserted_id)
+    
+    return body_comp
+
+@api_router.get("/body-composition/athlete/{athlete_id}", response_model=List[BodyComposition])
+async def get_athlete_body_compositions(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all body composition assessments for an athlete"""
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    records = await db.body_compositions.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(1000)
+    
+    result = []
+    for record in records:
+        record["_id"] = str(record["_id"])
+        result.append(BodyComposition(**record))
+    
+    return result
+
+@api_router.get("/body-composition/{composition_id}", response_model=BodyComposition)
+async def get_body_composition(
+    composition_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get a specific body composition assessment"""
+    record = await db.body_compositions.find_one({
+        "_id": ObjectId(composition_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Body composition not found")
+    
+    record["_id"] = str(record["_id"])
+    return BodyComposition(**record)
+
+@api_router.delete("/body-composition/{composition_id}")
+async def delete_body_composition(
+    composition_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a body composition assessment"""
+    result = await db.body_compositions.delete_one({
+        "_id": ObjectId(composition_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Body composition not found")
+    
+    return {"message": "Body composition deleted successfully"}
+
+@api_router.get("/analysis/body-composition/{athlete_id}")
+async def get_body_composition_analysis(
+    athlete_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get AI-powered body composition analysis with insights"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get body composition history
+    compositions = await db.body_compositions.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(20)
+    
+    if not compositions:
+        raise HTTPException(status_code=400, detail="No body composition data available")
+    
+    latest = compositions[0]
+    
+    # Calculate trends if we have history
+    trends = {}
+    if len(compositions) >= 2:
+        prev = compositions[1]
+        trends = {
+            "body_fat_change": round(latest.get("body_fat_percentage", 0) - prev.get("body_fat_percentage", 0), 2),
+            "lean_mass_change": round(latest.get("lean_mass_kg", 0) - prev.get("lean_mass_kg", 0), 2),
+            "weight_change": round(latest.get("weight", 0) - prev.get("weight", 0), 2),
+            "bmi_change": round(latest.get("bmi", 0) - prev.get("bmi", 0), 2)
+        }
+    
+    # Generate AI insights
+    try:
+        llm_client = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY"))
+        
+        composition_summary = f"""
+        Athlete: {athlete.get('name')}
+        Position: {athlete.get('position', 'N/A')}
+        
+        Latest Body Composition ({latest.get('date')}):
+        - Protocol: {latest.get('protocol')}
+        - Weight: {latest.get('weight')} kg
+        - Height: {latest.get('height')} cm
+        - Body Fat: {latest.get('body_fat_percentage')}%
+        - Lean Mass: {latest.get('lean_mass_kg')} kg
+        - Fat Mass: {latest.get('fat_mass_kg')} kg
+        - BMI: {latest.get('bmi')} ({get_bmi_classification_text(latest.get('bmi_classification', ''), lang)})
+        
+        Fat Distribution: {latest.get('fat_distribution', {})}
+        
+        {"Trends (vs previous): " + str(trends) if trends else "First assessment"}
+        """
+        
+        prompt = f"""You are an expert sports scientist analyzing body composition data for an athlete.
+        
+        {composition_summary}
+        
+        Provide a comprehensive analysis in {"Portuguese" if lang == 'pt' else "English"} including:
+        1. Summary of current body composition status
+        2. Risk assessment for the athlete's sport position
+        3. Areas requiring attention (highlight regions with high fat accumulation)
+        4. Specific recommendations for body composition optimization
+        5. Training and nutrition suggestions
+        
+        Be specific and actionable. Format your response clearly with sections."""
+        
+        response = await llm_client.send_message([UserMessage(content=prompt)])
+        ai_analysis = response.content
+    except Exception as e:
+        logging.error(f"AI analysis error: {e}")
+        ai_analysis = "AI analysis unavailable" if lang == 'en' else "Análise de IA indisponível"
+    
+    # Prepare response
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "latest_assessment": {
+            "id": str(latest["_id"]),
+            "date": latest.get("date"),
+            "protocol": latest.get("protocol"),
+            "weight": latest.get("weight"),
+            "height": latest.get("height"),
+            "body_fat_percentage": latest.get("body_fat_percentage"),
+            "lean_mass_kg": latest.get("lean_mass_kg"),
+            "fat_mass_kg": latest.get("fat_mass_kg"),
+            "bone_mass_kg": latest.get("bone_mass_kg"),
+            "bmi": latest.get("bmi"),
+            "bmi_classification": latest.get("bmi_classification"),
+            "bmi_classification_text": get_bmi_classification_text(latest.get("bmi_classification", ""), lang),
+            "fat_distribution": latest.get("fat_distribution", {})
+        },
+        "trends": trends,
+        "history": [
+            {
+                "date": c.get("date"),
+                "body_fat_percentage": c.get("body_fat_percentage"),
+                "lean_mass_kg": c.get("lean_mass_kg"),
+                "weight": c.get("weight"),
+                "bmi": c.get("bmi")
+            } for c in compositions[:10]
+        ],
+        "ai_analysis": ai_analysis,
+        "risk_zones": {
+            "body_fat": "high" if latest.get("body_fat_percentage", 0) > 25 else "moderate" if latest.get("body_fat_percentage", 0) > 18 else "optimal",
+            "bmi": "high" if latest.get("bmi", 0) > 30 else "moderate" if latest.get("bmi", 0) > 25 else "optimal"
+        }
+    }
+
+# ============= AI ANALYSIS ROUTES =============
+
+# Try to import emergentintegrations, fallback if not available (Railway deploy)
+try:
+    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    EMERGENT_AVAILABLE = True
+except ImportError:
+    EMERGENT_AVAILABLE = False
+    LlmChat = None
+    UserMessage = None
+
+import statistics
+
+class ACWRAnalysis(BaseModel):
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str  # "low", "optimal", "moderate", "high"
+    recommendation: str
+
+class FatigueAnalysis(BaseModel):
+    fatigue_level: str  # "low", "moderate", "high", "critical"
+    fatigue_score: float
+    contributing_factors: List[str]
+    recommendation: str
+
+class AIInsights(BaseModel):
+    summary: str
+    strengths: List[str]
+    concerns: List[str]
+    recommendations: List[str]
+    training_zones: Dict[str, Any]
+
+class ComprehensiveAnalysis(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    acwr: Optional[ACWRAnalysis] = None
+    fatigue: Optional[FatigueAnalysis] = None
+    ai_insights: Optional[AIInsights] = None
+
+def calculate_training_load(gps_data: GPSData) -> float:
+    """Calculate training load from GPS data using a weighted formula"""
+    # Weighted formula considering multiple factors
+    load = (
+        gps_data.total_distance * 0.001 +  # Distance component
+        gps_data.high_intensity_distance * 0.003 +  # High intensity weight
+        gps_data.sprint_distance * 0.005 +  # Sprint weight
+        gps_data.number_of_sprints * 2 +  # Sprint count
+        gps_data.number_of_accelerations * 1 +  # Accelerations
+        gps_data.number_of_decelerations * 1  # Decelerations
+    )
+    return round(load, 2)
+
+# ============= ANALYSIS TRANSLATIONS - EARLY DEFINITION =============
+# This section defines translations used by analysis functions
+
+ANALYSIS_TRANSLATIONS = {
+    "en": {
+        "acwr_low": "Training load below optimal. Consider gradually increasing intensity to maintain fitness.",
+        "acwr_optimal": "Optimal training load! Continue maintaining this balance between training and recovery.",
+        "acwr_moderate": "Moderately high training load. Monitor fatigue signs and consider reducing volume in coming days.",
+        "acwr_high": "⚠️ ATTENTION: Training load very high! High injury risk. Immediate load reduction recommended.",
+        "acwr_detail_high": "⚠️ ATTENTION: One or more parameters are in high risk zone. Immediate training load reduction recommended.",
+        "acwr_detail_moderate": "Some parameters are elevated. Monitor fatigue and consider adjusting training volume.",
+        "acwr_detail_optimal": "Balanced training load! Continue maintaining this pattern.",
+        "acwr_detail_low": "Low training load. Consider progressively increasing intensity.",
+        "fatigue_low": "Low fatigue level. Athlete is well recovered and ready for intense training.",
+        "fatigue_moderate": "Moderate fatigue. Athlete can train normally, but monitor for overload signs.",
+        "fatigue_high": "High fatigue detected. Reduce volume/intensity and prioritize active recovery.",
+        "fatigue_critical": "⚠️ CRITICAL FATIGUE! Complete rest or light regenerative training recommended. Overtraining risk.",
+        "poor_sleep": "Poor sleep quality affecting recovery",
+        "insufficient_sleep": "Insufficient sleep hours",
+        "high_muscle_soreness": "Elevated muscle soreness",
+        "high_fatigue_perception": "High fatigue perception",
+        "elevated_stress": "Elevated stress level",
+        "low_mood": "Low mood",
+        "compromised_readiness": "Compromised readiness",
+        "sleep_hours_tip": "Try to sleep at least 7-8 hours per night",
+        "sleep_quality_tip": "Consider improving your sleep hygiene",
+        "fatigue_tip": "High fatigue level - consider extra rest",
+        "muscle_soreness_tip": "High muscle soreness - consider active recovery",
+        "stress_tip": "High stress level - practice relaxation techniques",
+        "all_good": "Great! You are in good condition!",
+        "ai_default_rec": "Maintain current monitoring routine",
+        "ai_no_data": "Insufficient data for analysis",
+        "metric_total_distance": "Total Distance",
+        "metric_hsr": "HSR (20-25 km/h)",
+        "metric_hid": "HID (15-20 km/h)",
+        "metric_sprint": "Sprint (+25 km/h)",
+        "metric_acc_dec": "Acc/Dec",
+    },
+    "pt": {
+        "acwr_low": "Carga de treino abaixo do ideal. Considere aumentar gradualmente a intensidade.",
+        "acwr_optimal": "Carga de treino ótima! Continue mantendo este equilíbrio entre treino e recuperação.",
+        "acwr_moderate": "Carga de treino moderadamente elevada. Monitore sinais de fadiga e considere reduzir volume.",
+        "acwr_high": "⚠️ ATENÇÃO: Carga de treino muito elevada! Alto risco de lesão. Recomenda-se redução imediata.",
+        "acwr_detail_high": "⚠️ ATENÇÃO: Um ou mais parâmetros estão em zona de alto risco. Recomenda-se redução imediata.",
+        "acwr_detail_moderate": "Alguns parâmetros estão elevados. Monitore a fadiga e considere ajustar o volume.",
+        "acwr_detail_optimal": "Carga de treino equilibrada! Continue mantendo este padrão.",
+        "acwr_detail_low": "Carga de treino baixa. Considere aumentar progressivamente a intensidade.",
+        "fatigue_low": "Baixo nível de fadiga. Atleta está bem recuperado e pronto para treinos intensos.",
+        "fatigue_moderate": "Fadiga moderada. Atleta pode treinar normalmente, mas monitore sinais de sobrecarga.",
+        "fatigue_high": "Alta fadiga detectada. Reduza volume/intensidade e priorize recuperação ativa.",
+        "fatigue_critical": "⚠️ FADIGA CRÍTICA! Recomenda-se descanso completo ou treino regenerativo leve. Risco de overtraining.",
+        "poor_sleep": "Qualidade do sono ruim afetando recuperação",
+        "insufficient_sleep": "Horas de sono insuficientes",
+        "high_muscle_soreness": "Dor muscular elevada",
+        "high_fatigue_perception": "Alta percepção de fadiga",
+        "elevated_stress": "Nível de estresse elevado",
+        "low_mood": "Humor baixo",
+        "compromised_readiness": "Prontidão comprometida",
+        "sleep_hours_tip": "Tente dormir pelo menos 7-8 horas por noite",
+        "sleep_quality_tip": "Considere melhorar sua higiene do sono",
+        "fatigue_tip": "Nível de fadiga elevado - considere descanso extra",
+        "muscle_soreness_tip": "Dor muscular alta - considere recuperação ativa",
+        "stress_tip": "Nível de estresse alto - pratique técnicas de relaxamento",
+        "all_good": "Ótimo! Você está em boas condições!",
+        "ai_default_rec": "Manter rotina atual de monitoramento",
+        "ai_no_data": "Dados insuficientes para análise",
+        "metric_total_distance": "Distância Total",
+        "metric_hsr": "HSR (20-25 km/h)",
+        "metric_hid": "HID (15-20 km/h)",
+        "metric_sprint": "Sprint (+25 km/h)",
+        "metric_acc_dec": "Acel/Desac",
+    },
+    "es": {
+        "acwr_low": "Carga de entrenamiento por debajo del óptimo. Considere aumentar gradualmente la intensidad.",
+        "acwr_optimal": "¡Carga de entrenamiento óptima! Continúe manteniendo este equilibrio.",
+        "acwr_moderate": "Carga de entrenamiento moderadamente alta. Monitoree signos de fatiga.",
+        "acwr_high": "⚠️ ATENCIÓN: ¡Carga muy alta! Alto riesgo de lesión. Se recomienda reducción inmediata.",
+        "acwr_detail_high": "⚠️ ATENCIÓN: Uno o más parámetros en zona de alto riesgo.",
+        "acwr_detail_moderate": "Algunos parámetros elevados. Monitoree la fatiga.",
+        "acwr_detail_optimal": "¡Carga equilibrada! Continúe así.",
+        "acwr_detail_low": "Carga baja. Considere aumentar progresivamente.",
+        "fatigue_low": "Bajo nivel de fatiga. Atleta bien recuperado.",
+        "fatigue_moderate": "Fatiga moderada. Puede entrenar normalmente.",
+        "fatigue_high": "Alta fatiga. Reduzca volumen y priorice recuperación.",
+        "fatigue_critical": "⚠️ ¡FATIGA CRÍTICA! Se recomienda descanso completo.",
+        "poor_sleep": "Calidad de sueño deficiente",
+        "insufficient_sleep": "Horas de sueño insuficientes",
+        "high_muscle_soreness": "Dolor muscular elevado",
+        "high_fatigue_perception": "Alta percepción de fatiga",
+        "elevated_stress": "Nivel de estrés elevado",
+        "low_mood": "Estado de ánimo bajo",
+        "compromised_readiness": "Preparación comprometida",
+        "sleep_hours_tip": "Intente dormir al menos 7-8 horas",
+        "sleep_quality_tip": "Mejore su higiene del sueño",
+        "fatigue_tip": "Fatiga alta - considere descanso extra",
+        "muscle_soreness_tip": "Dolor muscular alto - recuperación activa",
+        "stress_tip": "Estrés alto - practique relajación",
+        "all_good": "¡Excelente! Está en buenas condiciones.",
+        "ai_default_rec": "Mantener rutina actual de monitoreo",
+        "ai_no_data": "Datos insuficientes para análisis",
+        "metric_total_distance": "Distancia Total",
+        "metric_hsr": "HSR (20-25 km/h)",
+        "metric_hid": "HID (15-20 km/h)",
+        "metric_sprint": "Sprint (+25 km/h)",
+        "metric_acc_dec": "Acel/Desac",
+    },
+    "fr": {
+        "acwr_low": "Charge d'entraînement en dessous de l'optimal. Augmentez progressivement l'intensité.",
+        "acwr_optimal": "Charge d'entraînement optimale ! Continuez à maintenir cet équilibre.",
+        "acwr_moderate": "Charge modérément élevée. Surveillez les signes de fatigue.",
+        "acwr_high": "⚠️ ATTENTION: Charge très élevée ! Risque de blessure. Réduction immédiate recommandée.",
+        "acwr_detail_high": "⚠️ ATTENTION: Un ou plusieurs paramètres en zone à haut risque.",
+        "acwr_detail_moderate": "Certains paramètres sont élevés. Surveillez la fatigue.",
+        "acwr_detail_optimal": "Charge équilibrée ! Continuez ainsi.",
+        "acwr_detail_low": "Charge faible. Augmentez progressivement.",
+        "fatigue_low": "Faible niveau de fatigue. Athlète bien récupéré.",
+        "fatigue_moderate": "Fatigue modérée. Peut s'entraîner normalement.",
+        "fatigue_high": "Fatigue élevée. Réduisez le volume.",
+        "fatigue_critical": "⚠️ FATIGUE CRITIQUE ! Repos complet recommandé.",
+        "poor_sleep": "Mauvaise qualité de sommeil",
+        "insufficient_sleep": "Heures de sommeil insuffisantes",
+        "high_muscle_soreness": "Douleur musculaire élevée",
+        "high_fatigue_perception": "Perception élevée de fatigue",
+        "elevated_stress": "Niveau de stress élevé",
+        "low_mood": "Humeur basse",
+        "compromised_readiness": "Préparation compromise",
+        "sleep_hours_tip": "Dormez au moins 7-8 heures",
+        "sleep_quality_tip": "Améliorez votre hygiène de sommeil",
+        "fatigue_tip": "Fatigue élevée - repos supplémentaire",
+        "muscle_soreness_tip": "Douleur musculaire - récupération active",
+        "stress_tip": "Stress élevé - relaxation",
+        "all_good": "Excellent ! Vous êtes en bonne condition.",
+        "ai_default_rec": "Maintenir la routine de surveillance",
+        "ai_no_data": "Données insuffisantes pour l'analyse",
+        "metric_total_distance": "Distance Totale",
+        "metric_hsr": "HSR (20-25 km/h)",
+        "metric_hid": "HID (15-20 km/h)",
+        "metric_sprint": "Sprint (+25 km/h)",
+        "metric_acc_dec": "Acc/Déc",
+    },
+}
+
+def get_analysis_text(lang: str, key: str) -> str:
+    """Get translated analysis text"""
+    translations = ANALYSIS_TRANSLATIONS.get(lang, ANALYSIS_TRANSLATIONS["en"])
+    return translations.get(key, ANALYSIS_TRANSLATIONS["en"].get(key, key))
+
+@api_router.get("/analysis/acwr/{athlete_id}")
+async def get_acwr_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    # ACWR STANDARDIZATION: ACWR MUST always come from load_engine (EWMA)
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Read latest metrics from load_engine
+    latest = await db.athlete_load_metrics.find_one(
+        {"athlete_id": athlete_id},
+        sort=[("date", -1)],
+        projection={"_id": 0}
+    )
+    
+    if not latest or not latest.get("distance"):
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
+    
+    dist = latest["distance"]
+    acwr_ratio = round(dist.get("acwr") or 0, 2)
+    acute_load = round(dist.get("ewma_acute") or 0, 2)
+    chronic_load = round(dist.get("ewma_chronic") or 0, 2)
+    risk_level = classify_acwr_risk(acwr_ratio)
+    
+    rec_map = {"low": "acwr_low", "optimal": "acwr_optimal", "moderate": "acwr_moderate", "high": "acwr_high"}
+    recommendation = t(rec_map.get(risk_level, "acwr_optimal"))
+    
+    return ACWRAnalysis(
+        acute_load=acute_load,
+        chronic_load=chronic_load,
+        acwr_ratio=acwr_ratio,
+        risk_level=risk_level,
+        recommendation=recommendation
+    )
+
+# ============= ACWR DETAILED ANALYSIS =============
+
+class ACWRDetailedMetric(BaseModel):
+    name: str
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str
+    unit: str
+
+class ACWRDetailedAnalysis(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    metrics: List[ACWRDetailedMetric]
+    overall_risk: str
+    recommendation: str
+
+def calculate_metric_acwr(acute_values: List[float], chronic_values: List[float]) -> tuple:
+    """Calculate ACWR for a specific metric"""
+    if not acute_values or not chronic_values:
+        return 0, 0, 0, "unknown"
+    
+    acute_load = sum(acute_values)
+    chronic_load = sum(chronic_values) / 4 if chronic_values else 0
+    
+    if chronic_load > 0:
+        acwr_ratio = round(acute_load / chronic_load, 2)
+    else:
+        acwr_ratio = 0
+    
+    # Determine risk level
+    if acwr_ratio < 0.8:
+        risk_level = "low"
+    elif 0.8 <= acwr_ratio <= 1.3:
+        risk_level = "optimal"
+    elif 1.3 < acwr_ratio <= 1.5:
+        risk_level = "moderate"
+    else:
+        risk_level = "high"
+    
+    return round(acute_load, 2), round(chronic_load, 2), acwr_ratio, risk_level
+
+
+
+# ============= CORREÇÃO 5-9: ACWR COM ROLLING WINDOW REAL =============
+# Inclui dias sem treino como valor ZERO para simular recuperação real
+
+def calculate_rolling_average(
+    gps_data_by_date: dict,
+    metric_key: str,
+    window_size: int,
+    end_date: datetime
+) -> float:
+    """
+    Calcula média móvel REAL incluindo dias sem treino como ZERO.
+    """
+    total = 0.0
+    for i in range(window_size):
+        date = (end_date - timedelta(days=i)).strftime("%Y-%m-%d")
+        day_data = gps_data_by_date.get(date, {})
+        value = day_data.get(metric_key, 0) or 0
+        total += value
+    
+    return total / window_size if window_size > 0 else 0
+
+
+def calculate_rolling_acwr(
+    gps_data_by_date: dict,
+    metric_key: str,
+    current_date: datetime = None
+) -> tuple:
+    """
+    Calcula ACWR com rolling window real - inclui dias sem treino como ZERO.
+    Returns: (acute_load, chronic_load, acwr_ratio, risk_level)
+    """
+    if current_date is None:
+        current_date = datetime.utcnow()
+    
+    acute_load = calculate_rolling_average(gps_data_by_date, metric_key, 7, current_date)
+    chronic_load = calculate_rolling_average(gps_data_by_date, metric_key, 28, current_date)
+    
+    if chronic_load > 0:
+        acwr_ratio = round(acute_load / chronic_load, 2)
+    else:
+        acwr_ratio = 0
+    
+    if acwr_ratio < 0.8:
+        risk_level = "low"
+    elif 0.8 <= acwr_ratio <= 1.3:
+        risk_level = "optimal"
+    elif 1.3 < acwr_ratio <= 1.5:
+        risk_level = "moderate"
+    else:
+        risk_level = "high"
+    
+    return round(acute_load, 2), round(chronic_load, 2), acwr_ratio, risk_level
+
+
+class ACWRMetricDetail(BaseModel):
+    metric_id: str
+    metric_name: str
+    acute_load: float
+    chronic_load: float
+    acwr_ratio: float
+    risk_level: str
+    unit: str
+
+
+class ACWRRollingResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    metrics: List[ACWRMetricDetail]
+    overall_risk: str
+    recommendation: str
+
+
+@api_router.get("/analysis/acwr-rolling/{athlete_id}", response_model=ACWRRollingResponse)
+async def get_acwr_rolling_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """ACWR STANDARDIZATION: All ACWR from load_engine (EWMA)."""
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Read latest metrics from load_engine
+    latest = await db.athlete_load_metrics.find_one(
+        {"athlete_id": athlete_id},
+        sort=[("date", -1)],
+        projection={"_id": 0}
+    )
+    
+    if not latest or not latest.get("distance"):
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
+    
+    metric_configs = [
+        ("total_distance", "distance", t("metric_total_distance"), "m"),
+        ("hid_z3", "high_intensity_distance", t("metric_hid"), "m"),
+        ("hsr_z4", "hsr", t("metric_hsr"), "m"),
+        ("sprint_z5", "sprint_distance", t("metric_sprint"), "m"),
+        ("sprints_count", "number_of_sprints", "Sprints", ""),
+        ("acc_dec_total", "acc_dec_load", t("metric_acc_dec"), ""),
+    ]
+    
+    metrics = []
+    risk_levels = []
+    for metric_id, engine_field, name, unit in metric_configs:
+        field_data = latest.get(engine_field, {})
+        if isinstance(field_data, dict):
+            acwr_val = round(field_data.get("acwr") or 0, 2)
+            acute = round(field_data.get("ewma_acute") or 0, 2)
+            chronic = round(field_data.get("ewma_chronic") or 0, 2)
+        else:
+            acwr_val, acute, chronic = 0, 0, 0
+        risk = classify_acwr_risk(acwr_val)
+        metrics.append(ACWRMetricDetail(
+            metric_id=metric_id, metric_name=name,
+            acute_load=acute, chronic_load=chronic,
+            acwr_ratio=acwr_val, risk_level=risk, unit=unit
+        ))
+        risk_levels.append(risk)
+    
+    if "high" in risk_levels:
+        overall_risk = "high"
+        recommendation = t("acwr_detail_high")
+    elif "moderate" in risk_levels:
+        overall_risk = "moderate"
+        recommendation = t("acwr_detail_moderate")
+    elif all(r == "low" for r in risk_levels):
+        overall_risk = "low"
+        recommendation = t("acwr_detail_low")
+    else:
+        overall_risk = "optimal"
+        recommendation = t("acwr_detail_optimal")
+    
+    return ACWRRollingResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete.get("name", "Unknown"),
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d"),
+        metrics=metrics,
+        overall_risk=overall_risk,
+        recommendation=recommendation
+    )
+
+
+# CORREÇÃO 7: ACWR médio da equipe
+class TeamACWRMetric(BaseModel):
+    metric_id: str
+    metric_name: str
+    avg_acwr: float
+    risk_level: str
+
+
+class TeamACWRResponse(BaseModel):
+    team_size: int
+    analysis_date: str
+    metrics: List[TeamACWRMetric]
+    overall_risk: str
+
+
+@api_router.get("/analysis/team-acwr", response_model=TeamACWRResponse)
+async def get_team_acwr_analysis(
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """ACWR STANDARDIZATION: Team ACWR from load_engine (EWMA)."""
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(1000)
+    if not athletes:
+        raise HTTPException(status_code=404, detail="No athletes found")
+    
+    # Read latest metrics for all athletes from load_engine
+    athlete_ids = [str(a["_id"]) for a in athletes]
+    all_metrics = await db.athlete_load_metrics.aggregate([
+        {"$match": {"athlete_id": {"$in": athlete_ids}}},
+        {"$sort": {"date": -1}},
+        {"$group": {"_id": "$athlete_id", "doc": {"$first": "$$ROOT"}}},
+        {"$replaceRoot": {"newRoot": "$doc"}},
+        {"$project": {"_id": 0}}
+    ]).to_list(1000)
+    
+    metric_configs = [
+        ("total_distance", "distance"),
+        ("hid_z3", "high_intensity_distance"),
+        ("hsr_z4", "hsr"),
+        ("sprint_z5", "sprint_distance"),
+        ("sprints_count", "number_of_sprints"),
+        ("acc_dec_total", "acc_dec_load"),
+    ]
+    
+    metric_acwrs = {mc[0]: [] for mc in metric_configs}
+    
+    for m in all_metrics:
+        for metric_id, engine_field in metric_configs:
+            field_data = m.get(engine_field, {})
+            if isinstance(field_data, dict) and field_data.get("acwr") is not None:
+                metric_acwrs[metric_id].append(round(field_data["acwr"], 2))
+    
+    metric_names = {
+        "total_distance": t("metric_total_distance"), "hid_z3": t("metric_hid"),
+        "hsr_z4": t("metric_hsr"), "sprint_z5": t("metric_sprint"),
+        "sprints_count": "Sprints", "acc_dec_total": t("metric_acc_dec")
+    }
+    
+    metrics = []
+    risk_levels = []
+    for metric_id, _ in metric_configs:
+        values = metric_acwrs[metric_id]
+        avg_acwr = round(sum(values) / len(values), 2) if values else 0
+        risk = classify_acwr_risk(avg_acwr)
+        risk_levels.append(risk)
+        metrics.append(TeamACWRMetric(
+            metric_id=metric_id, metric_name=metric_names.get(metric_id, metric_id),
+            avg_acwr=avg_acwr, risk_level=risk
+        ))
+    
+    if "high" in risk_levels: overall_risk = "high"
+    elif "moderate" in risk_levels: overall_risk = "moderate"
+    elif all(r == "low" for r in risk_levels): overall_risk = "low"
+    else: overall_risk = "optimal"
+    
+    return TeamACWRResponse(team_size=len(athletes), analysis_date=datetime.utcnow().strftime("%Y-%m-%d"), metrics=metrics, overall_risk=overall_risk)
+
+
+@api_router.get("/analysis/acwr-detailed/{athlete_id}", response_model=ACWRDetailedAnalysis)
+async def get_acwr_detailed_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """ACWR STANDARDIZATION: All ACWR from load_engine (EWMA).
+    Metrics: Total Distance, HSR, HID, Sprint, Acc/Dec
+    """
+    t = lambda key: get_analysis_text(lang, key)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Read latest metrics from load_engine
+    latest = await db.athlete_load_metrics.find_one(
+        {"athlete_id": athlete_id},
+        sort=[("date", -1)],
+        projection={"_id": 0}
+    )
+    
+    if not latest or not latest.get("distance"):
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
+    
+    # Build metrics from load_engine fields
+    metric_configs = [
+        ("distance", t("metric_total_distance"), "m"),
+        ("hsr", t("metric_hsr"), "m"),
+        ("high_intensity_distance", t("metric_hid"), "m"),
+        ("sprint_distance", t("metric_sprint"), "m"),
+        ("acc_dec_load", t("metric_acc_dec"), "count"),
+    ]
+    
+    metrics = []
+    risk_levels = []
+    for engine_field, name, unit in metric_configs:
+        field_data = latest.get(engine_field, {})
+        if isinstance(field_data, dict):
+            acwr_val = round(field_data.get("acwr") or 0, 2)
+            acute = round(field_data.get("ewma_acute") or 0, 2)
+            chronic = round(field_data.get("ewma_chronic") or 0, 2)
+        else:
+            acwr_val, acute, chronic = 0, 0, 0
+        risk = classify_acwr_risk(acwr_val)
+        metrics.append(ACWRDetailedMetric(
+            name=name, acute_load=acute, chronic_load=chronic,
+            acwr_ratio=acwr_val, risk_level=risk, unit=unit
+        ))
+        risk_levels.append(risk)
+    
+    if "high" in risk_levels:
+        overall_risk = "high"
+        recommendation = t("acwr_detail_high")
+    elif risk_levels.count("moderate") >= 2:
+        overall_risk = "moderate"
+        recommendation = t("acwr_detail_moderate")
+    elif "optimal" in risk_levels and risk_levels.count("optimal") >= 3:
+        overall_risk = "optimal"
+        recommendation = t("acwr_detail_optimal")
+    else:
+        overall_risk = "low"
+        recommendation = t("acwr_detail_low")
+    
+    return ACWRDetailedAnalysis(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d"),
+        metrics=metrics,
+        overall_risk=overall_risk,
+        recommendation=recommendation
+    )
+
+# ============= ACWR HISTORY FOR CHARTS =============
+
+class ACWRHistoryPoint(BaseModel):
+    date: str
+    acwr: float
+    acute: float
+    chronic: float
+    risk_level: str
+
+class ACWRHistoryResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    metric: str
+    history: List[ACWRHistoryPoint]
+
+@api_router.get("/analysis/acwr-history/{athlete_id}")
+async def get_acwr_history(
+    athlete_id: str,
+    metric: str = "total_distance",
+    days: int = 30,
+    current_user: dict = Depends(get_current_user)
+):
+    """ACWR STANDARDIZATION: ACWR history from load_engine (EWMA).
+    Reads historical athlete_load_metrics documents.
+    Metrics: total_distance, hsr, hid, sprint, acc_dec
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Map frontend metric key to load_engine field
+    engine_field = ANALYSIS_METRIC_TO_ENGINE.get(metric, "distance")
+    
+    # Read historical metrics from load_engine
+    today = datetime.utcnow()
+    start_date = (today - timedelta(days=days)).strftime("%Y-%m-%d")
+    
+    docs = await db.athlete_load_metrics.find(
+        {"athlete_id": athlete_id, "date": {"$gte": start_date}},
+        projection={"_id": 0, "date": 1, engine_field: 1}
+    ).sort("date", 1).to_list(1000)
+    
+    history = []
+    for doc in docs:
+        field_data = doc.get(engine_field, {})
+        if not isinstance(field_data, dict):
+            continue
+        acwr_val = field_data.get("acwr")
+        if acwr_val is None:
+            continue
+        history.append(ACWRHistoryPoint(
+            date=doc.get("date", ""),
+            acwr=round(acwr_val, 2),
+            acute=round(field_data.get("ewma_acute") or 0, 0),
+            chronic=round(field_data.get("ewma_chronic") or 0, 0),
+            risk_level=classify_acwr_risk(acwr_val)
+        ))
+    
+    return ACWRHistoryResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        metric=metric,
+        history=history
+    )
+
+
+# ============= ROLLING LOAD ENGINE ENDPOINTS (EWMA-BASED ACWR) =============
+
+class EWMAMetricResponse(BaseModel):
+    """Response for a single EWMA-calculated metric"""
+    load: float
+    ewma_acute: float
+    ewma_chronic: float
+    acwr: Optional[float]
+    acwr_zone: str
+
+class AthleteLoadMetricsResponse(BaseModel):
+    """Complete load metrics for an athlete"""
+    athlete_id: str
+    date: str
+    
+    distance: EWMAMetricResponse
+    hsr: EWMAMetricResponse
+    sprint_distance: EWMAMetricResponse
+    acc_dec_load: EWMAMetricResponse
+    
+    monotony: float
+    strain: float
+    weekly_load: float
+    
+    has_spike: bool
+    spike_metrics: List[str]
+    spike_status: str
+
+class RecalculateResponse(BaseModel):
+    """Response for recalculation request"""
+    success: bool
+    athlete_id: str
+    dates_processed: int
+    message: str
+
+
+@api_router.get("/load-metrics/{athlete_id}", response_model=AthleteLoadMetricsResponse)
+async def get_athlete_load_metrics(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get EWMA-based load metrics for an athlete.
+    
+    Returns pre-calculated metrics including:
+    - EWMA Acute/Chronic loads
+    - ACWR (EWMA-based)
+    - Monotony
+    - Strain
+    - Spike detection
+    
+    These metrics are calculated incrementally when GPS data is added,
+    making this endpoint extremely fast.
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get latest metrics from load engine
+    metrics = await load_engine.get_latest_metrics(athlete_id)
+    
+    if not metrics:
+        raise HTTPException(
+            status_code=404,
+            detail="No load metrics available. Add training data first."
+        )
+    
+    def metric_to_response(m) -> EWMAMetricResponse:
+        if isinstance(m, dict):
+            return EWMAMetricResponse(
+                load=m.get("load", 0),
+                ewma_acute=m.get("ewma_acute", 0),
+                ewma_chronic=m.get("ewma_chronic", 0),
+                acwr=m.get("acwr"),
+                acwr_zone=m.get("acwr_zone", "unknown")
+            )
+        return EWMAMetricResponse(
+            load=m.load,
+            ewma_acute=m.ewma_acute,
+            ewma_chronic=m.ewma_chronic,
+            acwr=m.acwr,
+            acwr_zone=m.acwr_zone
+        )
+    
+    return AthleteLoadMetricsResponse(
+        athlete_id=athlete_id,
+        date=metrics.date,
+        distance=metric_to_response(metrics.distance),
+        hsr=metric_to_response(metrics.hsr),
+        sprint_distance=metric_to_response(metrics.sprint_distance),
+        acc_dec_load=metric_to_response(metrics.acc_dec_load),
+        monotony=metrics.monotony,
+        strain=metrics.strain,
+        weekly_load=metrics.weekly_load,
+        has_spike=metrics.has_spike,
+        spike_metrics=metrics.spike_metrics,
+        spike_status=metrics.spike_status
+    )
+
+
+@api_router.post("/load-metrics/{athlete_id}/recalculate", response_model=RecalculateResponse)
+async def recalculate_athlete_metrics(
+    athlete_id: str,
+    from_date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Recalculate load metrics for an athlete.
+    
+    Use this when:
+    - Historical training data has been modified
+    - Metrics appear incorrect
+    - Migrating existing data to the new EWMA system
+    
+    Parameters:
+    - from_date: Start recalculation from this date (YYYY-MM-DD). 
+                 Defaults to 60 days ago.
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Default to 60 days ago if not specified
+    if not from_date:
+        from_date = (datetime.utcnow() - timedelta(days=60)).strftime("%Y-%m-%d")
+    
+    coach_id = str(current_user["_id"])
+    
+    # Recalculate metrics
+    results = await load_engine.recalculate_from_date(
+        athlete_id=athlete_id,
+        coach_id=coach_id,
+        start_date=from_date
+    )
+    
+    success_count = sum(1 for r in results if r.success)
+    
+    return RecalculateResponse(
+        success=success_count > 0,
+        athlete_id=athlete_id,
+        dates_processed=len(results),
+        message=f"Recalculated {success_count} of {len(results)} dates"
+    )
+
+
+@api_router.post("/load-metrics/recalculate-all")
+async def recalculate_all_load_metrics(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Force full recalculation of athlete_load_metrics for ALL athletes.
+    This rebuilds all EWMA, ACWR, monotony, strain values using corrected
+    GPS dedup logic. Should be called after fixing aggregate_gps_for_date.
+    """
+    user_id = current_user["_id"]
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(200)
+
+    if not athletes:
+        return {"success": False, "message": "No athletes found", "athletes_processed": 0}
+
+    results = []
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        coach_id = str(user_id)
+
+        # Delete existing metrics for this athlete
+        await db.athlete_load_metrics.delete_many({"athlete_id": athlete_id})
+
+        # Find earliest GPS date
+        earliest = await db.gps_data.find_one(
+            {"athlete_id": athlete_id, "coach_id": coach_id},
+            sort=[("date", 1)],
+            projection={"date": 1, "_id": 0}
+        )
+
+        if earliest and earliest.get("date"):
+            try:
+                recalc_results = await load_engine.recalculate_from_date(
+                    athlete_id=athlete_id,
+                    coach_id=coach_id,
+                    start_date=earliest["date"]
+                )
+                success_count = sum(1 for r in recalc_results if r.success)
+                results.append({
+                    "athlete_id": athlete_id,
+                    "name": athlete.get("name"),
+                    "dates_processed": len(recalc_results),
+                    "success_count": success_count
+                })
+            except Exception as e:
+                results.append({
+                    "athlete_id": athlete_id,
+                    "name": athlete.get("name"),
+                    "error": str(e)
+                })
+        else:
+            results.append({
+                "athlete_id": athlete_id,
+                "name": athlete.get("name"),
+                "dates_processed": 0,
+                "message": "No GPS data"
+            })
+
+    return {
+        "success": True,
+        "athletes_processed": len(results),
+        "details": results
+    }
+
+
+@api_router.get("/load-metrics/team/latest")
+async def get_team_load_metrics(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get latest load metrics for all athletes in a team.
+    
+    Returns pre-calculated EWMA-based ACWR and other metrics
+    for each athlete, optimized for the Team Dashboard.
+    """
+    coach_id = str(current_user["_id"])
+    
+    # Get all latest metrics
+    team_metrics = await load_engine.get_team_metrics(coach_id)
+    
+    # Get athlete names
+    athletes = await db.athletes.find({"coach_id": current_user["_id"]}).to_list(100)
+    athlete_names = {str(a["_id"]): a.get("name", "Unknown") for a in athletes}
+    
+    # Format response
+    result = []
+    for m in team_metrics:
+        athlete_id = m.get("athlete_id")
+        
+        # Extract ACWR values for each metric
+        distance = m.get("distance", {})
+        hsr = m.get("hsr", {})
+        sprint = m.get("sprint_distance", {})
+        acc_dec = m.get("acc_dec_load", {})
+        
+        result.append({
+            "athlete_id": athlete_id,
+            "athlete_name": athlete_names.get(athlete_id, "Unknown"),
+            "date": m.get("date"),
+            "distance_acwr": distance.get("acwr") if isinstance(distance, dict) else None,
+            "distance_zone": distance.get("acwr_zone", "unknown") if isinstance(distance, dict) else "unknown",
+            "hsr_acwr": hsr.get("acwr") if isinstance(hsr, dict) else None,
+            "sprint_acwr": sprint.get("acwr") if isinstance(sprint, dict) else None,
+            "acc_dec_acwr": acc_dec.get("acwr") if isinstance(acc_dec, dict) else None,
+            "monotony": m.get("monotony", 0),
+            "strain": m.get("strain", 0),
+            "has_spike": m.get("has_spike", False),
+            "spike_status": m.get("spike_status", "none"),
+        })
+    
+    return {
+        "success": True,
+        "count": len(result),
+        "metrics": result
+    }
+
+
+@api_router.get("/analysis/fatigue/{athlete_id}")
+async def get_fatigue_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    t = lambda key: get_analysis_text(lang, key)
+    
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get recent wellness data (last 7 days)
+    today = datetime.utcnow()
+    date_7_days_ago = (today - timedelta(days=7)).strftime("%Y-%m-%d")
+    
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_7_days_ago}
+    }).sort("date", -1).to_list(7)
+    
+    if not wellness_records:
+        raise HTTPException(
+            status_code=400,
+            detail=t("ai_no_data")
+        )
+    
+    # Get recent GPS data for workload context
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "date": {"$gte": date_7_days_ago}
+    }).to_list(7)
+    
+    # Calculate average wellness metrics
+    avg_fatigue = statistics.mean([w["fatigue"] for w in wellness_records])
+    avg_sleep_quality = statistics.mean([w["sleep_quality"] for w in wellness_records])
+    avg_sleep_hours = statistics.mean([w["sleep_hours"] for w in wellness_records])
+    avg_muscle_soreness = statistics.mean([w["muscle_soreness"] for w in wellness_records])
+    avg_stress = statistics.mean([w["stress"] for w in wellness_records])
+    avg_readiness = statistics.mean([w["readiness_score"] for w in wellness_records])
+    
+    # Calculate fatigue score (0-100, higher is more fatigued)
+    fatigue_score = (
+        avg_fatigue * 8 +  # Fatigue is primary indicator
+        (10 - avg_sleep_quality) * 5 +  # Poor sleep increases fatigue
+        avg_muscle_soreness * 6 +  # Soreness indicates fatigue
+        avg_stress * 4 +  # Stress contributes to fatigue
+        (10 - min(avg_sleep_hours / 8 * 10, 10)) * 3  # Insufficient sleep
+    ) / 2.6  # Normalize to 0-100
+    
+    fatigue_score = round(fatigue_score, 1)
+    
+    # Determine fatigue level
+    if fatigue_score < 30:
+        fatigue_level = "low"
+        recommendation = t("fatigue_low")
+    elif fatigue_score < 50:
+        fatigue_level = "moderate"
+        recommendation = t("fatigue_moderate")
+    elif fatigue_score < 70:
+        fatigue_level = "high"
+        recommendation = t("fatigue_high")
+    else:
+        fatigue_level = "critical"
+        recommendation = t("fatigue_critical")
+    
+    # Identify contributing factors (using translations)
+    contributing_factors = []
+    if avg_fatigue >= 7:
+        contributing_factors.append(t("high_fatigue_perception"))
+    if avg_sleep_quality <= 5:
+        contributing_factors.append(t("poor_sleep"))
+    if avg_sleep_hours < 7:
+        contributing_factors.append(t("insufficient_sleep"))
+    if avg_muscle_soreness >= 7:
+        contributing_factors.append(t("high_muscle_soreness"))
+    if avg_stress >= 7:
+        contributing_factors.append(t("elevated_stress"))
+    if avg_readiness < 6:
+        contributing_factors.append(t("compromised_readiness"))
+    
+    if not contributing_factors:
+        contributing_factors.append(t("all_good"))
+    
+    return FatigueAnalysis(
+        fatigue_level=fatigue_level,
+        fatigue_score=fatigue_score,
+        contributing_factors=contributing_factors,
+        recommendation=recommendation
+    )
+
+@api_router.get("/analysis/ai-insights/{athlete_id}")
+async def get_ai_insights(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    t = lambda key: get_analysis_text(lang, key)
+    
+    # Language-specific prompts
+    lang_prompts = {
+        "en": {
+            "system": "You are a sports science and football training expert. Analyze the provided data and provide professional, practical and actionable insights. Respond in clear and objective English.",
+            "analysis_prompt": """Based on this data, provide a complete professional analysis including:
+
+1. EXECUTIVE SUMMARY (2-3 lines about the athlete's current state)
+
+2. STRENGTHS (2-3 positive aspects identified in the data)
+
+3. AREAS OF CONCERN (2-3 areas that require monitoring or adjustment)
+
+4. SPECIFIC RECOMMENDATIONS (3-4 concrete actions to optimize training)
+
+5. RECOMMENDED TRAINING ZONES:
+   - Recovery Zone: distance and characteristics
+   - Aerobic Zone: distance and characteristics
+   - Anaerobic Zone: distance and characteristics
+   - Maximum Zone: distance and characteristics
+
+Format your response in a structured and professional manner.""",
+            "data_labels": {
+                "analysis": "Athlete Analysis",
+                "position": "Position",
+                "gps_data": "GPS DATA (last 30 records)",
+                "total_sessions": "Total sessions",
+                "avg_distance": "Average distance",
+                "avg_hi_distance": "Average high intensity distance",
+                "avg_sprints": "Average sprints per session",
+                "avg_max_speed": "Average max speed",
+                "wellness": "WELLNESS (last 30 records)",
+                "total_questionnaires": "Total questionnaires",
+                "avg_wellness": "Average wellness score",
+                "avg_readiness": "Average readiness score",
+                "avg_fatigue": "Average fatigue",
+                "avg_sleep_quality": "Average sleep quality",
+                "avg_sleep_hours": "Average sleep hours",
+                "assessments": "PHYSICAL ASSESSMENTS",
+                "total_assessments": "Total assessments"
+            },
+            "defaults": {
+                "summary": "Athlete data analysis completed successfully.",
+                "strength": "Consistent training data",
+                "concern": "Continue monitoring regularly",
+                "recommendation": "Maintain current monitoring routine"
+            },
+            "zones": {
+                "recovery": "Zone 1: <60% v.max (Recovery, light jogging)",
+                "aerobic": "Zone 2: 60-75% v.max (Aerobic base, steady state)",
+                "anaerobic": "Zone 3: 75-90% v.max (Tempo runs, threshold)",
+                "maximum": "Zone 4: >90% v.max (Sprints, max speed)"
+            }
+        },
+        "pt": {
+            "system": "Você é um especialista em ciência do esporte e treinamento de futebol. Analise os dados fornecidos e forneça insights profissionais, práticos e acionáveis. Responda em português brasileiro de forma clara e objetiva.",
+            "analysis_prompt": """Com base nesses dados, forneça uma análise profissional completa incluindo:
+
+1. RESUMO EXECUTIVO (2-3 linhas sobre o estado atual do atleta)
+
+2. PONTOS FORTES (2-3 aspectos positivos identificados nos dados)
+
+3. PONTOS DE ATENÇÃO (2-3 áreas que requerem monitoramento ou ajuste)
+
+4. RECOMENDAÇÕES ESPECÍFICAS (3-4 ações concretas para otimizar o treinamento)
+
+5. ZONAS DE TREINAMENTO RECOMENDADAS:
+   - Zona de Recuperação: distância e características
+   - Zona Aeróbica: distância e características
+   - Zona Anaeróbica: distância e características
+   - Zona Máxima: distância e características
+
+Formate sua resposta de forma estruturada e profissional.""",
+            "data_labels": {
+                "analysis": "Análise do Atleta",
+                "position": "Posição",
+                "gps_data": "DADOS GPS (últimos 30 registros)",
+                "total_sessions": "Total de sessões",
+                "avg_distance": "Distância média",
+                "avg_hi_distance": "Distância alta intensidade média",
+                "avg_sprints": "Sprints médios por sessão",
+                "avg_max_speed": "Velocidade máxima média",
+                "wellness": "WELLNESS (últimos 30 registros)",
+                "total_questionnaires": "Total de questionários",
+                "avg_wellness": "Wellness score médio",
+                "avg_readiness": "Readiness score médio",
+                "avg_fatigue": "Fadiga média",
+                "avg_sleep_quality": "Qualidade sono média",
+                "avg_sleep_hours": "Horas de sono média",
+                "assessments": "AVALIAÇÕES FÍSICAS",
+                "total_assessments": "Total de avaliações"
+            },
+            "defaults": {
+                "summary": "Análise dos dados do atleta concluída com sucesso.",
+                "strength": "Dados consistentes de treinamento",
+                "concern": "Continue monitorando regularmente",
+                "recommendation": "Manter rotina atual de monitoramento"
+            },
+            "zones": {
+                "recovery": "Zona 1: <60% v.max (Recuperação, trote leve)",
+                "aerobic": "Zona 2: 60-75% v.max (Base aeróbica, ritmo estável)",
+                "anaerobic": "Zona 3: 75-90% v.max (Corridas de tempo, limiar)",
+                "maximum": "Zona 4: >90% v.max (Sprints, velocidade máxima)"
+            }
+        }
+    }
+    
+    # Default to English if language not supported
+    lp = lang_prompts.get(lang, lang_prompts["en"])
+    labels = lp["data_labels"]
+    
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get all data for comprehensive analysis
+    gps_records = await db.gps_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(30).to_list(30)
+    
+    wellness_records = await db.wellness.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(30).to_list(30)
+    
+    assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).limit(5).to_list(5)
+    
+    if not gps_records and not wellness_records:
+        raise HTTPException(
+            status_code=400,
+            detail=t("ai_no_data")
+        )
+    
+    # Prepare data summary for AI using translated labels
+    avg_gps_distance = statistics.mean([g['total_distance'] for g in gps_records]) if gps_records else 0
+    avg_hi_distance = statistics.mean([g['high_intensity_distance'] for g in gps_records]) if gps_records else 0
+    avg_sprints = statistics.mean([g['number_of_sprints'] for g in gps_records]) if gps_records else 0
+    max_speeds = [g.get('max_speed', 0) for g in gps_records if g.get('max_speed')]
+    avg_max_speed = statistics.mean(max_speeds) if max_speeds else 0
+    
+    avg_wellness = statistics.mean([w['wellness_score'] for w in wellness_records]) if wellness_records else 0
+    avg_readiness = statistics.mean([w['readiness_score'] for w in wellness_records]) if wellness_records else 0
+    avg_fatigue = statistics.mean([w['fatigue'] for w in wellness_records]) if wellness_records else 0
+    avg_sleep_quality = statistics.mean([w['sleep_quality'] for w in wellness_records]) if wellness_records else 0
+    avg_sleep_hours = statistics.mean([w['sleep_hours'] for w in wellness_records]) if wellness_records else 0
+    
+    data_summary = f"""
+{labels['analysis']}: {athlete['name']}
+{labels['position']}: {athlete['position']}
+
+{labels['gps_data']}:
+- {labels['total_sessions']}: {len(gps_records)}
+- {labels['avg_distance']}: {avg_gps_distance:.0f}m
+- {labels['avg_hi_distance']}: {avg_hi_distance:.0f}m
+- {labels['avg_sprints']}: {avg_sprints:.1f}
+- {labels['avg_max_speed']}: {avg_max_speed:.1f} km/h
+
+{labels['wellness']}:
+- {labels['total_questionnaires']}: {len(wellness_records)}
+- {labels['avg_wellness']}: {avg_wellness:.1f}/10
+- {labels['avg_readiness']}: {avg_readiness:.1f}/10
+- {labels['avg_fatigue']}: {avg_fatigue:.1f}/10
+- {labels['avg_sleep_quality']}: {avg_sleep_quality:.1f}/10
+- {labels['avg_sleep_hours']}: {avg_sleep_hours:.1f}h
+
+{labels['assessments']}:
+- {labels['total_assessments']}: {len(assessments)}
+"""
+    
+    if assessments:
+        for assessment in assessments[:2]:  # Last 2 assessments
+            data_summary += f"- {assessment['assessment_type']}: {assessment['date']}\n"
+    
+    # Use Emergent LLM for insights
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY')
+        chat = LlmChat(
+            api_key=emergent_key,
+            session_id=f"analysis_{athlete_id}_{datetime.utcnow().timestamp()}",
+            system_message=lp["system"]
+        ).with_model("openai", "gpt-4o")
+        
+        user_message = UserMessage(
+            text=f"{data_summary}\n\n{lp['analysis_prompt']}"
+        )
+        
+        response = await chat.send_message(user_message)
+        
+        # Parse AI response (basic parsing, can be improved)
+        lines = response.split('\n')
+        
+        summary = ""
+        strengths = []
+        concerns = []
+        recommendations = []
+        training_zones = {}
+        
+        current_section = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Detect sections based on common keywords in multiple languages
+            line_upper = line.upper()
+            if "RESUMO" in line_upper or "SUMMARY" in line_upper or "EXECUTIVO" in line_upper:
+                current_section = "summary"
+            elif "FORTE" in line_upper or "STRENGTH" in line_upper or "POSITIVO" in line_upper:
+                current_section = "strengths"
+            elif "ATENÇÃO" in line_upper or "CONCERN" in line_upper or "ATTENTION" in line_upper or "PREOCUP" in line_upper:
+                current_section = "concerns"
+            elif "RECOMENDA" in line_upper or "RECOMMENDATION" in line_upper:
+                current_section = "recommendations"
+            elif "ZONA" in line_upper or "ZONE" in line_upper:
+                current_section = "zones"
+            elif line.startswith('-') or line.startswith('•') or (len(line) > 0 and line[0].isdigit()):
+                content = line.lstrip('-•0123456789. ')
+                if current_section == "strengths":
+                    strengths.append(content)
+                elif current_section == "concerns":
+                    concerns.append(content)
+                elif current_section == "recommendations":
+                    recommendations.append(content)
+            elif current_section == "summary" and len(line) > 20:
+                summary += line + " "
+        
+        # Default zones using translated values
+        training_zones = lp["zones"]
+        
+        defaults = lp["defaults"]
+        return AIInsights(
+            summary=summary.strip() if summary else defaults["summary"],
+            strengths=strengths if strengths else [defaults["strength"]],
+            concerns=concerns if concerns else [defaults["concern"]],
+            recommendations=recommendations if recommendations else [defaults["recommendation"]],
+            training_zones=training_zones
+        )
+        
+    except Exception as e:
+        logger.error(f"AI Analysis error: {str(e)}")
+        # Fallback to rule-based insights using translated text
+        defaults = lp["defaults"]
+        zones = lp["zones"]
+        
+        return AIInsights(
+            summary=defaults["summary"],
+            strengths=[defaults["strength"]],
+            concerns=[defaults["concern"]],
+            recommendations=[defaults["recommendation"]],
+            training_zones=zones
+        )
+
+@api_router.get("/analysis/comprehensive/{athlete_id}")
+async def get_comprehensive_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all analyses in one endpoint"""
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    result = ComprehensiveAnalysis(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d")
+    )
+    
+    # Try to get each analysis (non-blocking)
+    try:
+        acwr = await get_acwr_analysis(athlete_id, lang, current_user)
+        result.acwr = acwr
+    except:
+        pass
+    
+    try:
+        fatigue = await get_fatigue_analysis(athlete_id, lang, current_user)
+        result.fatigue = fatigue
+    except:
+        pass
+    
+    try:
+        insights = await get_ai_insights(athlete_id, lang, current_user)
+        result.ai_insights = insights
+    except:
+        pass
+    
+    return result
+
+# ============= STRENGTH ANALYSIS =============
+
+class StrengthMetric(BaseModel):
+    name: str
+    value: float
+    unit: str
+    classification: str  # "excellent", "good", "average", "below_average", "poor"
+    percentile: float  # Position compared to normative data
+    variation_from_peak: Optional[float] = None  # % change from personal best
+    variation_from_previous: Optional[float] = None  # % change from previous assessment
+    previous_value: Optional[float] = None  # Value from previous assessment
+
+class StrengthAnalysisResult(BaseModel):
+    athlete_id: str
+    assessment_date: str
+    previous_assessment_date: Optional[str] = None
+    metrics: List[StrengthMetric]
+    fatigue_index: float
+    fatigue_alert: bool
+    peripheral_fatigue_detected: bool
+    overall_strength_classification: str
+    ai_insights: Optional[str] = None
+    recommendations: List[str]
+    historical_trend: Optional[Dict[str, Any]] = None
+    comparison_with_previous: Optional[Dict[str, Any]] = None
+
+# Normative data for football players (based on literature)
+STRENGTH_NORMATIVES = {
+    "mean_power": {"excellent": 2500, "good": 2200, "average": 1900, "below_average": 1600, "unit": "W"},
+    "peak_power": {"excellent": 4000, "good": 3500, "average": 3000, "below_average": 2500, "unit": "W"},
+    "mean_speed": {"excellent": 1.5, "good": 1.3, "average": 1.1, "below_average": 0.9, "unit": "m/s"},
+    "peak_speed": {"excellent": 3.0, "good": 2.6, "average": 2.2, "below_average": 1.8, "unit": "m/s"},
+    "rsi": {"excellent": 2.5, "good": 2.0, "average": 1.5, "below_average": 1.0, "unit": ""},
+    "fatigue_index": {"low": 30, "moderate": 50, "high": 70, "critical": 85, "unit": "%"}
+}
+
+# ============= JUMP ASSESSMENT MODELS (CMJ, SL-CMJ) =============
+
+import math
+
+class JumpProtocol(str, Enum):
+    CMJ = "cmj"  # Counter Movement Jump
+    SL_CMJ_RIGHT = "sl_cmj_right"  # Single Leg CMJ - Right
+    SL_CMJ_LEFT = "sl_cmj_left"  # Single Leg CMJ - Left
+
+class JumpAssessmentCreate(BaseModel):
+    athlete_id: str
+    date: str
+    protocol: JumpProtocol
+    flight_time_ms: float  # Tempo de Voo em milissegundos
+    contact_time_ms: float = 0  # Mantido para compatibilidade (sempre 0 para CMJ/SL-CMJ)
+    jump_height_cm: Optional[float] = None  # Altura do salto (pode ser calculada)
+    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (eccentric+concentric)
+    notes: Optional[str] = None
+
+class JumpAssessment(BaseModel):
+    id: Optional[str] = Field(None, alias="_id")
+    athlete_id: str
+    coach_id: str
+    date: str
+    protocol: str
+    flight_time_ms: float
+    contact_time_ms: float
+    jump_height_cm: float
+    box_height_cm: Optional[float] = None
+    time_to_takeoff_ms: Optional[float] = None  # Tempo de decolagem (CMJ/SL-CMJ)
+    # Calculated metrics
+    rsi: float  # Reactive Strength Index
+    rsi_modified: Optional[float] = None  # RSI modificado
+    peak_power_w: float  # Pico de Potência (Sayers Equation)
+    peak_velocity_ms: float  # Pico de Velocidade
+    relative_power_wkg: float  # Potência Relativa (W/kg)
+    # Classification
+    rsi_classification: str
+    fatigue_status: str
+    fatigue_percentage: float
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        populate_by_name = True
+        json_encoders = {ObjectId: str}
+
+# RSI Reference Values (based on sports science literature)
+# RSImod Classification (CMJ-specific)
+# Based on: McMahon et al. (2018), Comfort et al. (2015), McGuigan (2017)
+# NOTE: These are RSImod thresholds (CMJ), NOT classic RSI (drop jump).
+# Classic RSI uses contact_time and ranges 1.0-3.0+.
+# RSImod uses time-to-takeoff and ranges 0.1-1.2+.
+RSI_REFERENCES = {
+    "excellent": {"min": 1.00, "label_pt": "Excelente", "label_en": "Excellent"},
+    "very_good": {"min": 0.80, "label_pt": "Muito Bom", "label_en": "Very Good"},
+    "good": {"min": 0.60, "label_pt": "Bom", "label_en": "Good"},
+    "moderate": {"min": 0.40, "label_pt": "Moderado", "label_en": "Moderate"},
+    "low": {"min": 0.25, "label_pt": "Baixo", "label_en": "Low"},
+    "very_low": {"min": 0, "label_pt": "Muito Baixo", "label_en": "Very Low"}
+}
+
+# Fatigue Index based on RSI variation (CNS Fatigue Detection)
+FATIGUE_RSI_THRESHOLDS = {
+    "green": {"min": -5, "max": 100, "status_pt": "Treino Normal", "status_en": "Normal Training", "color": "#10b981"},
+    "yellow": {"min": -12, "max": -5.01, "status_pt": "Monitorar Volume/Carga de Sprints", "status_en": "Monitor Volume/Sprint Load", "color": "#f59e0b"},
+    "red": {"min": -100, "max": -12.01, "status_pt": "Alto Risco de Lesão - Reduzir Carga", "status_en": "High Injury Risk - Reduce Load", "color": "#ef4444"}
+}
+
+def calculate_jump_height_from_flight_time(flight_time_ms: float) -> float:
+    """
+    Calculate jump height from flight time using kinematic equation
+    h = (g * t²) / 8
+    where t is flight time in seconds and g = 9.81 m/s²
+    """
+    flight_time_s = flight_time_ms / 1000
+    g = 9.81
+    height_m = (g * (flight_time_s ** 2)) / 8
+    return round(height_m * 100, 2)  # Convert to cm
+
+def calculate_rsi(jump_height_cm: float, time_to_takeoff_ms: float) -> float:
+    """
+    Calculate RSImod (Reactive Strength Index Modified)
+    RSImod = Jump Height (m) / Time to Takeoff (s)
+    
+    Unica formula de RSI no sistema.
+    """
+    if time_to_takeoff_ms <= 0:
+        return 0
+    jump_height_m = jump_height_cm / 100
+    time_to_takeoff_s = time_to_takeoff_ms / 1000
+    rsi = jump_height_m / time_to_takeoff_s
+    return round(rsi, 2)
+
+def calculate_rsi_modified(flight_time_ms: float, time_to_takeoff_ms: float) -> float:
+    """
+    DEPRECATED: Mantido para compatibilidade.
+    Usa mesma formula RSImod = jumpHeight / time_to_takeoff.
+    """
+    if time_to_takeoff_ms <= 0 or flight_time_ms <= 0:
+        return 0
+    jump_height_cm = calculate_jump_height_from_flight_time(flight_time_ms)
+    return calculate_rsi(jump_height_cm, time_to_takeoff_ms)
+
+def calculate_peak_power_sayers(jump_height_cm: float, body_mass_kg: float) -> float:
+    """
+    Calculate Peak Power using Sayers Equation (1999)
+    PP (Watts) = 60.7 × jump height (cm) + 45.3 × body mass (kg) - 2055
+    
+    Reference: Sayers SP, Harackiewicz DV, Harman EA, Frykman PN, Rosenstein MT.
+    Cross-validation of three jump power equations.
+    Med Sci Sports Exerc. 1999;31(4):572-577.
+    """
+    peak_power = (60.7 * jump_height_cm) + (45.3 * body_mass_kg) - 2055
+    return round(max(0, peak_power), 1)
+
+def calculate_peak_velocity(jump_height_cm: float) -> float:
+    """
+    Calculate Peak Velocity using kinematic equation
+    v = √(2 × g × h)
+    """
+    g = 9.81
+    height_m = jump_height_cm / 100
+    velocity = math.sqrt(2 * g * height_m)
+    return round(velocity, 2)
+
+def classify_rsi(rsi: float) -> str:
+    """Classify RSImod based on CMJ-specific reference values (McMahon et al., 2018)"""
+    for classification, values in RSI_REFERENCES.items():
+        if rsi >= values["min"]:
+            return classification
+    return "very_low"
+
+def get_fatigue_status(rsi_variation_percent: float) -> dict:
+    """Get fatigue status based on RSI variation from baseline"""
+    for status, thresholds in FATIGUE_RSI_THRESHOLDS.items():
+        if thresholds["min"] <= rsi_variation_percent <= thresholds["max"]:
+            return {
+                "status": status,
+                "status_pt": thresholds["status_pt"],
+                "status_en": thresholds["status_en"],
+                "color": thresholds["color"]
+            }
+    return {
+        "status": "green",
+        "status_pt": FATIGUE_RSI_THRESHOLDS["green"]["status_pt"],
+        "status_en": FATIGUE_RSI_THRESHOLDS["green"]["status_en"],
+        "color": FATIGUE_RSI_THRESHOLDS["green"]["color"]
+    }
+
+def calculate_z_score(current_value: float, historical_values: List[float]) -> float:
+    """
+    Calculate Z-Score comparing current value with historical mean
+    Z = (X - μ) / σ
+    """
+    if len(historical_values) < 2:
+        return 0
+    mean = sum(historical_values) / len(historical_values)
+    variance = sum((x - mean) ** 2 for x in historical_values) / len(historical_values)
+    std_dev = math.sqrt(variance)
+    if std_dev == 0:
+        return 0
+    z_score = (current_value - mean) / std_dev
+    return round(z_score, 2)
+
+def calculate_limb_asymmetry(right_value: float, left_value: float) -> dict:
+    """
+    Calculate limb asymmetry percentage
+    Asymmetry > 10% is considered a Red Flag
+    """
+    if right_value == 0 and left_value == 0:
+        return {"asymmetry_percent": 0, "dominant_leg": "equal", "red_flag": False}
+    
+    max_val = max(right_value, left_value)
+    min_val = min(right_value, left_value)
+    
+    asymmetry = ((max_val - min_val) / max_val) * 100 if max_val > 0 else 0
+    dominant = "right" if right_value > left_value else "left" if left_value > right_value else "equal"
+    
+    return {
+        "asymmetry_percent": round(asymmetry, 1),
+        "dominant_leg": dominant,
+        "red_flag": asymmetry > 10
+    }
+
+# ============= JUMP ASSESSMENT ENDPOINTS =============
+
+@api_router.get("/jump/protocols")
+async def get_jump_protocols(lang: str = "pt"):
+    """Get available jump assessment protocols"""
+    protocols = {
+        "cmj": {
+            "id": "cmj",
+            "name": "CMJ" if lang == "en" else "CMJ",
+            "full_name": "Counter Movement Jump" if lang == "en" else "Counter Movement Jump",
+            "description": "Standard bilateral countermovement jump test" if lang == "en" else "Teste de salto bilateral com contra-movimento padrão",
+            "required_fields": ["flight_time_ms", "contact_time_ms"],
+            "optional_fields": ["jump_height_cm"],
+            "icon": "trending-up"
+        },
+        "sl_cmj_right": {
+            "id": "sl_cmj_right",
+            "name": "SL-CMJ (D)" if lang == "pt" else "SL-CMJ (R)",
+            "full_name": "Single Leg CMJ - Right" if lang == "en" else "Single Leg CMJ - Direita",
+            "description": "Single leg jump test for right leg" if lang == "en" else "Teste de salto unilateral para perna direita",
+            "required_fields": ["flight_time_ms", "contact_time_ms"],
+            "optional_fields": ["jump_height_cm"],
+            "icon": "fitness"
+        },
+        "sl_cmj_left": {
+            "id": "sl_cmj_left",
+            "name": "SL-CMJ (E)" if lang == "pt" else "SL-CMJ (L)",
+            "full_name": "Single Leg CMJ - Left" if lang == "en" else "Single Leg CMJ - Esquerda",
+            "description": "Single leg jump test for left leg" if lang == "en" else "Teste de salto unilateral para perna esquerda",
+            "required_fields": ["flight_time_ms", "contact_time_ms"],
+            "optional_fields": ["jump_height_cm"],
+            "icon": "fitness"
+        },
+    }
+    return protocols
+
+@api_router.post("/jump/assessment")
+async def create_jump_assessment(
+    data: JumpAssessmentCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create a new jump assessment with automatic calculations"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get athlete weight for power calculations
+    body_mass_kg = athlete.get("weight") or 70  # Default 70kg if not set or None
+    
+    # Calculate jump height if not provided
+    jump_height_cm = data.jump_height_cm
+    if not jump_height_cm or jump_height_cm <= 0:
+        jump_height_cm = calculate_jump_height_from_flight_time(data.flight_time_ms)
+    
+    # Calculate RSImod = jumpHeight(m) / timeToTakeoff(s) — formula unica
+    ttt = data.time_to_takeoff_ms or 0
+    if ttt > 0:
+        rsi = round((jump_height_cm / 100) / (ttt / 1000), 2)
+        rsi_modified = rsi
+    else:
+        rsi = 0.0
+        rsi_modified = 0.0
+    
+    # Calculate Peak Power (Sayers Equation)
+    peak_power = calculate_peak_power_sayers(jump_height_cm, body_mass_kg)
+    
+    # Calculate Peak Velocity
+    peak_velocity = calculate_peak_velocity(jump_height_cm)
+    
+    # Calculate Relative Power
+    relative_power = round(peak_power / body_mass_kg, 2) if body_mass_kg > 0 else 0
+    
+    # Classify RSI
+    rsi_classification = classify_rsi(rsi)
+    
+    # Get historical RSI for fatigue calculation
+    historical_assessments = await db.jump_assessments.find({
+        "athlete_id": data.athlete_id,
+        "coach_id": current_user["_id"],
+        "protocol": data.protocol.value
+    }).sort("date", -1).to_list(30)
+    
+    # Calculate fatigue based on RSI variation from baseline (average of last 5)
+    fatigue_percentage = 0
+    fatigue_status = "green"
+    
+    if historical_assessments:
+        historical_rsi = [a.get("rsi", 0) for a in historical_assessments[:5] if a.get("rsi", 0) > 0]
+        if historical_rsi:
+            baseline_rsi = sum(historical_rsi) / len(historical_rsi)
+            if baseline_rsi > 0:
+                fatigue_percentage = ((rsi - baseline_rsi) / baseline_rsi) * 100
+    
+    fatigue_info = get_fatigue_status(fatigue_percentage)
+    fatigue_status = fatigue_info["status"]
+    
+    # Create assessment record
+    assessment = JumpAssessment(
+        athlete_id=data.athlete_id,
+        coach_id=current_user["_id"],
+        date=data.date,
+        protocol=data.protocol.value,
+        flight_time_ms=data.flight_time_ms,
+        contact_time_ms=data.contact_time_ms,
+        jump_height_cm=jump_height_cm,
+        time_to_takeoff_ms=data.time_to_takeoff_ms,
+        rsi=rsi,
+        rsi_modified=rsi_modified,
+        peak_power_w=peak_power,
+        peak_velocity_ms=peak_velocity,
+        relative_power_wkg=relative_power,
+        rsi_classification=rsi_classification,
+        fatigue_status=fatigue_status,
+        fatigue_percentage=round(fatigue_percentage, 1),
+        notes=data.notes
+    )
+    
+    result = await db.jump_assessments.insert_one(assessment.model_dump(by_alias=True, exclude=["id"]))
+    assessment.id = str(result.inserted_id)
+    
+    return {
+        "assessment": assessment.model_dump(by_alias=True),
+        "calculations": {
+            "jump_height_cm": jump_height_cm,
+            "rsi": rsi,
+            "rsi_modified": rsi_modified,
+            "peak_power_w": peak_power,
+            "peak_velocity_ms": peak_velocity,
+            "relative_power_wkg": relative_power,
+            "rsi_classification": rsi_classification,
+            "fatigue_status": fatigue_status,
+            "fatigue_percentage": round(fatigue_percentage, 1)
+        }
+    }
+
+@api_router.get("/jump/assessments/{athlete_id}")
+async def get_jump_assessments(
+    athlete_id: str,
+    protocol: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get all jump assessments for an athlete"""
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    query = {
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }
+    if protocol:
+        query["protocol"] = protocol
+    
+    assessments = await db.jump_assessments.find(query).sort("date", -1).to_list(100)
+    
+    for a in assessments:
+        a["_id"] = str(a["_id"])
+        # Re-classify RSImod using current CMJ-specific thresholds
+        # (fixes legacy assessments stored with old drop-jump thresholds)
+        if a.get("rsi") is not None:
+            a["rsi_classification"] = classify_rsi(a["rsi"])
+    
+    return assessments
+
+@api_router.get("/jump/analysis/{athlete_id}")
+async def get_jump_analysis(
+    athlete_id: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Complete jump analysis with RSI, fatigue index, asymmetry, power/velocity insights, and Z-score
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    body_mass_kg = athlete.get("weight", 70)
+    
+    # Get all jump assessments
+    all_assessments = await db.jump_assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("date", -1).to_list(100)
+    
+    if not all_assessments:
+        raise HTTPException(
+            status_code=400, 
+            detail="No jump assessment data available" if lang == "en" else "Nenhuma avaliação de salto disponível"
+        )
+    
+    # Separate by protocol
+    cmj_assessments = [a for a in all_assessments if a.get("protocol") == "cmj"]
+    sl_right_assessments = [a for a in all_assessments if a.get("protocol") == "sl_cmj_right"]
+    sl_left_assessments = [a for a in all_assessments if a.get("protocol") == "sl_cmj_left"]
+    
+    # Get latest assessment for each protocol
+    latest_cmj = cmj_assessments[0] if cmj_assessments else None
+    latest_sl_right = sl_right_assessments[0] if sl_right_assessments else None
+    latest_sl_left = sl_left_assessments[0] if sl_left_assessments else None
+    
+    # Build analysis response
+    analysis = {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "body_mass_kg": body_mass_kg,
+        "analysis_date": datetime.utcnow().strftime("%Y-%m-%d"),
+        "protocols": {},
+        "asymmetry": None,
+        "fatigue_analysis": None,
+        "power_velocity_insights": None,
+        "z_score": None,
+        "ai_feedback": None,
+        "recommendations": []
+    }
+    
+    # Process CMJ data
+    if latest_cmj:
+        historical_rsi = [a.get("rsi", 0) for a in cmj_assessments if a.get("rsi", 0) > 0]
+        historical_heights = [a.get("jump_height_cm", 0) for a in cmj_assessments if a.get("jump_height_cm", 0) > 0]
+        
+        baseline_rsi = sum(historical_rsi[:5]) / len(historical_rsi[:5]) if len(historical_rsi) >= 5 else (historical_rsi[0] if historical_rsi else latest_cmj.get("rsi", 0))
+        current_rsi = latest_cmj.get("rsi", 0)
+        rsi_variation = ((current_rsi - baseline_rsi) / baseline_rsi * 100) if baseline_rsi > 0 else 0
+        
+        fatigue_info = get_fatigue_status(rsi_variation)
+        
+        # Calculate Z-Score for jump height
+        z_score_height = calculate_z_score(latest_cmj.get("jump_height_cm", 0), historical_heights)
+        
+        analysis["protocols"]["cmj"] = {
+            "latest": {
+                "date": latest_cmj.get("date"),
+                "jump_height_cm": latest_cmj.get("jump_height_cm"),
+                "flight_time_ms": latest_cmj.get("flight_time_ms"),
+                "contact_time_ms": latest_cmj.get("contact_time_ms"),
+                "time_to_takeoff_ms": latest_cmj.get("time_to_takeoff_ms"),
+                "rsi": latest_cmj.get("rsi"),
+                "rsi_modified": latest_cmj.get("rsi_modified"),
+                "rsi_classification": classify_rsi(latest_cmj.get("rsi", 0)),
+                "peak_power_w": latest_cmj.get("peak_power_w"),
+                "peak_velocity_ms": latest_cmj.get("peak_velocity_ms"),
+                "relative_power_wkg": latest_cmj.get("relative_power_wkg")
+            },
+            "baseline_rsi": round(baseline_rsi, 2),
+            "rsi_variation_percent": round(rsi_variation, 1),
+            "fatigue_status": fatigue_info,
+            "z_score_height": z_score_height,
+            "history": [
+                {
+                    "date": a.get("date"),
+                    "rsi": a.get("rsi"),
+                    "jump_height_cm": a.get("jump_height_cm"),
+                    "peak_power_w": a.get("peak_power_w")
+                } for a in cmj_assessments[:10]
+            ]
+        }
+        
+        # Set main fatigue analysis from CMJ
+        analysis["fatigue_analysis"] = {
+            "status": fatigue_info["status"],
+            "status_label": fatigue_info["status_pt"] if lang == "pt" else fatigue_info["status_en"],
+            "color": fatigue_info["color"],
+            "rsi_variation_percent": round(rsi_variation, 1),
+            "baseline_rsi": round(baseline_rsi, 2),
+            "current_rsi": round(current_rsi, 2),
+            "interpretation": get_fatigue_interpretation(rsi_variation, lang)
+        }
+        
+        analysis["z_score"] = {
+            "jump_height": z_score_height,
+            "interpretation": get_z_score_interpretation(z_score_height, lang)
+        }
+    
+    # Process SL-CMJ data for Asymmetry
+    if latest_sl_right and latest_sl_left:
+        right_rsi = latest_sl_right.get("rsi", 0)
+        left_rsi = latest_sl_left.get("rsi", 0)
+        right_height = latest_sl_right.get("jump_height_cm", 0)
+        left_height = latest_sl_left.get("jump_height_cm", 0)
+        
+        asymmetry_rsi = calculate_limb_asymmetry(right_rsi, left_rsi)
+        asymmetry_height = calculate_limb_asymmetry(right_height, left_height)
+        
+        analysis["protocols"]["sl_cmj"] = {
+            "right": {
+                "date": latest_sl_right.get("date"),
+                "jump_height_cm": right_height,
+                "rsi": right_rsi,
+                "rsi_modified": latest_sl_right.get("rsi_modified"),
+                "time_to_takeoff_ms": latest_sl_right.get("time_to_takeoff_ms"),
+                "peak_power_w": latest_sl_right.get("peak_power_w")
+            },
+            "left": {
+                "date": latest_sl_left.get("date"),
+                "jump_height_cm": left_height,
+                "rsi": left_rsi,
+                "rsi_modified": latest_sl_left.get("rsi_modified"),
+                "time_to_takeoff_ms": latest_sl_left.get("time_to_takeoff_ms"),
+                "peak_power_w": latest_sl_left.get("peak_power_w")
+            }
+        }
+        
+        analysis["asymmetry"] = {
+            "rsi": asymmetry_rsi,
+            "jump_height": asymmetry_height,
+            "red_flag": asymmetry_rsi["red_flag"] or asymmetry_height["red_flag"],
+            "interpretation": get_asymmetry_interpretation(asymmetry_rsi, lang)
+        }
+    
+    # Power-Velocity Insights (using CMJ data)
+    primary_assessment = latest_cmj
+    if primary_assessment:
+        peak_power = primary_assessment.get("peak_power_w", 0)
+        peak_velocity = primary_assessment.get("peak_velocity_ms", 0)
+        relative_power = primary_assessment.get("relative_power_wkg", 0)
+        
+        # Compare with team/population averages (simplified)
+        # These would ideally come from actual team data
+        avg_power = 3000  # Watts
+        avg_velocity = 2.8  # m/s
+        
+        power_vs_avg = ((peak_power - avg_power) / avg_power * 100) if avg_power > 0 else 0
+        velocity_vs_avg = ((peak_velocity - avg_velocity) / avg_velocity * 100) if avg_velocity > 0 else 0
+        
+        analysis["power_velocity_insights"] = {
+            "peak_power_w": peak_power,
+            "peak_velocity_ms": peak_velocity,
+            "relative_power_wkg": relative_power,
+            "power_vs_average_percent": round(power_vs_avg, 1),
+            "velocity_vs_average_percent": round(velocity_vs_avg, 1),
+            "profile": get_power_velocity_profile(power_vs_avg, velocity_vs_avg, lang)
+        }
+    
+    # Generate AI-powered feedback
+    try:
+        ai_feedback = await generate_jump_ai_feedback(analysis, athlete, lang)
+        analysis["ai_feedback"] = ai_feedback
+    except Exception as e:
+        logging.error(f"AI feedback generation error: {e}")
+        analysis["ai_feedback"] = None
+    
+    # Generate recommendations
+    analysis["recommendations"] = generate_jump_recommendations(analysis, lang)
+    
+    return analysis
+
+def get_fatigue_interpretation(rsi_variation: float, lang: str) -> str:
+    """Get interpretation text for fatigue based on RSI variation"""
+    if rsi_variation >= -5:
+        return "Sistema nervoso central recuperado. Treino normal permitido." if lang == "pt" else "Central nervous system recovered. Normal training permitted."
+    elif rsi_variation >= -12:
+        return "Possível fadiga do SNC detectada. Monitorar volume de sprints e exercícios de alta velocidade." if lang == "pt" else "Possible CNS fatigue detected. Monitor sprint volume and high-speed exercises."
+    else:
+        return "⚠️ Fadiga significativa do SNC. Alto risco de lesão. Reduzir carga ou individualizar treino." if lang == "pt" else "⚠️ Significant CNS fatigue. High injury risk. Reduce load or individualize training."
+
+def get_z_score_interpretation(z_score: float, lang: str) -> str:
+    """Get interpretation text for Z-Score"""
+    if z_score >= 1.5:
+        return "Performance significativamente acima da média histórica!" if lang == "pt" else "Performance significantly above historical average!"
+    elif z_score >= 0.5:
+        return "Performance acima da média histórica." if lang == "pt" else "Performance above historical average."
+    elif z_score >= -0.5:
+        return "Performance dentro da média histórica." if lang == "pt" else "Performance within historical average."
+    elif z_score >= -1.5:
+        return "Performance abaixo da média histórica. Monitorar recuperação." if lang == "pt" else "Performance below historical average. Monitor recovery."
+    else:
+        return "⚠️ Performance significativamente abaixo da média. Investigar causas." if lang == "pt" else "⚠️ Performance significantly below average. Investigate causes."
+
+def get_asymmetry_interpretation(asymmetry: dict, lang: str) -> str:
+    """Get interpretation text for limb asymmetry"""
+    if not asymmetry["red_flag"]:
+        return "Simetria entre membros dentro dos limites aceitáveis." if lang == "pt" else "Limb symmetry within acceptable limits."
+    else:
+        dominant = "direita" if asymmetry["dominant_leg"] == "right" else "esquerda"
+        dominant_en = asymmetry["dominant_leg"]
+        if lang == "pt":
+            return f"🚩 RED FLAG: Assimetria de {asymmetry['asymmetry_percent']:.1f}% detectada. Perna {dominant} dominante. Risco aumentado de lesão. Recomenda-se trabalho de correção."
+        else:
+            return f"🚩 RED FLAG: {asymmetry['asymmetry_percent']:.1f}% asymmetry detected. {dominant_en.capitalize()} leg dominant. Increased injury risk. Corrective work recommended."
+
+def get_power_velocity_profile(power_vs_avg: float, velocity_vs_avg: float, lang: str) -> dict:
+    """Determine training profile based on power-velocity relationship"""
+    if power_vs_avg < -10 and velocity_vs_avg >= 0:
+        # High velocity, low power -> needs max strength training
+        return {
+            "type": "velocity_dominant",
+            "label": "Dominante em Velocidade" if lang == "pt" else "Velocity Dominant",
+            "recommendation": "Priorizar treino de Força Máxima (cargas >85% 1RM)" if lang == "pt" else "Prioritize Maximum Strength training (loads >85% 1RM)",
+            "color": "#3b82f6"
+        }
+    elif power_vs_avg >= 0 and velocity_vs_avg < -10:
+        # High power, low velocity -> needs power/velocity training
+        return {
+            "type": "power_dominant",
+            "label": "Dominante em Potência" if lang == "pt" else "Power Dominant",
+            "recommendation": "Priorizar treino de Potência/Velocidade (Pliométricos, Sprints)" if lang == "pt" else "Prioritize Power/Velocity training (Plyometrics, Sprints)",
+            "color": "#f59e0b"
+        }
+    elif power_vs_avg >= 0 and velocity_vs_avg >= 0:
+        # Both high -> balanced/elite
+        return {
+            "type": "balanced",
+            "label": "Perfil Equilibrado" if lang == "pt" else "Balanced Profile",
+            "recommendation": "Manter equilíbrio entre força, potência e velocidade" if lang == "pt" else "Maintain balance between strength, power and velocity",
+            "color": "#10b981"
+        }
+    else:
+        # Both low -> general improvement needed
+        return {
+            "type": "development",
+            "label": "Em Desenvolvimento" if lang == "pt" else "In Development",
+            "recommendation": "Programa completo de força e condicionamento recomendado" if lang == "pt" else "Complete strength and conditioning program recommended",
+            "color": "#6366f1"
+        }
+
+async def generate_jump_ai_feedback(analysis: dict, athlete: dict, lang: str) -> str:
+    """Generate AI-powered scientific feedback based on jump analysis"""
+    try:
+        system_message = """You are an expert sports scientist specializing in neuromuscular assessment and jump testing.
+        You provide concise, scientific analysis based on sports science literature.
+        Use proper terminology and be direct with recommendations."""
+        
+        llm_client = LlmChat(
+            api_key=os.environ.get("EMERGENT_LLM_KEY"),
+            system_message=system_message,
+            session_id=f"jump_analysis_{analysis['athlete_id']}_{datetime.utcnow().strftime('%Y%m%d')}"
+        )
+        llm_client = llm_client.with_model("openai", "gpt-4o")
+        
+        # Build context for AI
+        context = f"""
+        Analyze the following jump test data and provide scientific feedback in {"Portuguese" if lang == "pt" else "English"}.
+        
+        Athlete: {athlete.get('name')}
+        Position: {athlete.get('position', 'N/A')}
+        Body Mass: {analysis.get('body_mass_kg', 70)} kg
+        
+        CMJ Data: {analysis.get('protocols', {}).get('cmj', {}).get('latest', 'No data')}
+        RSI Classification: {analysis.get('protocols', {}).get('cmj', {}).get('latest', {}).get('rsi_classification', 'N/A')}
+        RSI Baseline: {analysis.get('protocols', {}).get('cmj', {}).get('baseline_rsi', 'N/A')}
+        RSI Variation: {analysis.get('protocols', {}).get('cmj', {}).get('rsi_variation_percent', 'N/A')}%
+        
+        Fatigue Status: {analysis.get('fatigue_analysis', {}).get('status_label', 'N/A')}
+        
+        Asymmetry: {analysis.get('asymmetry', 'Not assessed')}
+        
+        Power-Velocity Profile: {analysis.get('power_velocity_insights', {}).get('profile', {}).get('label', 'N/A')}
+        Peak Power: {analysis.get('power_velocity_insights', {}).get('peak_power_w', 'N/A')} W
+        Relative Power: {analysis.get('power_velocity_insights', {}).get('relative_power_wkg', 'N/A')} W/kg
+        
+        Z-Score (Jump Height): {analysis.get('z_score', {}).get('jump_height', 'N/A')}
+        
+        Based on this data and current sports science literature:
+        1. Provide a brief assessment of the athlete's neuromuscular status
+        2. If RSI is low (<1.5), explain why explosive exercises, COD, plyometrics with concentric emphasis, sprints should be limited
+        3. If fatigue is detected (yellow or red), provide specific recovery recommendations
+        4. If asymmetry is detected, explain the injury risk implications
+        5. Based on the power-velocity profile, suggest specific training focus
+        
+        Be concise but scientific. Use proper terminology. Keep response under 300 words.
+        """
+        
+        response = await llm_client.send_message(UserMessage(text=context))
+        return response
+        
+    except Exception as e:
+        logging.error(f"AI feedback generation error: {e}")
+        return None
+
+def generate_jump_recommendations(analysis: dict, lang: str) -> List[str]:
+    """Generate actionable recommendations based on jump analysis"""
+    recommendations = []
+    
+    # RSI-based recommendations
+    cmj_data = analysis.get("protocols", {}).get("cmj", {})
+    if cmj_data:
+        latest = cmj_data.get("latest", {})
+        rsi = latest.get("rsi", 0)
+        rsi_class = classify_rsi(rsi)
+        
+        if rsi < 0.40:
+            if lang == "pt":
+                recommendations.append("RSImod muito baixo (<0.40). Focar em desenvolvimento de forca base e potencia. Limitar exercicios explosivos de alta intensidade.")
+            else:
+                recommendations.append("Very low RSImod (<0.40). Focus on base strength and power development. Limit high-intensity explosive exercises.")
+        elif rsi < 0.60:
+            if lang == "pt":
+                recommendations.append("RSImod moderado. Continuar desenvolvendo capacidade de producao rapida de forca com pliometricos progressivos.")
+            else:
+                recommendations.append("Moderate RSImod. Continue developing rapid force production capacity with progressive plyometrics.")
+    
+    # Fatigue-based recommendations
+    fatigue = analysis.get("fatigue_analysis", {})
+    if fatigue:
+        status = fatigue.get("status", "green")
+        if status == "red":
+            if lang == "pt":
+                recommendations.append("🔴 ALERTA: Fadiga do SNC detectada (variação >13%). Reduzir carga de treino imediatamente. Priorizar sono e recuperação. Considerar treino individualizado.")
+            else:
+                recommendations.append("🔴 ALERT: CNS fatigue detected (>13% variation). Reduce training load immediately. Prioritize sleep and recovery. Consider individualized training.")
+        elif status == "yellow":
+            if lang == "pt":
+                recommendations.append("🟡 MONITORAR: Sinais de fadiga. Reduzir volume de sprints e exercícios de alta velocidade nos próximos dias.")
+            else:
+                recommendations.append("🟡 MONITOR: Fatigue signs detected. Reduce sprint volume and high-speed exercises in coming days.")
+    
+    # Asymmetry-based recommendations
+    asymmetry = analysis.get("asymmetry", {})
+    if asymmetry and asymmetry.get("red_flag"):
+        dominant = asymmetry.get("rsi", {}).get("dominant_leg", "")
+        percent = asymmetry.get("rsi", {}).get("asymmetry_percent", 0)
+        if lang == "pt":
+            recommendations.append(f"🚩 Assimetria significativa ({percent:.1f}%) detectada. Incluir exercícios unilaterais corretivos focando no membro não-dominante.")
+        else:
+            recommendations.append(f"🚩 Significant asymmetry ({percent:.1f}%) detected. Include corrective unilateral exercises focusing on non-dominant limb.")
+    
+    # Power-velocity profile recommendations
+    pv_profile = analysis.get("power_velocity_insights", {}).get("profile", {})
+    if pv_profile:
+        rec = pv_profile.get("recommendation", "")
+        if rec:
+            recommendations.append(f"💪 {rec}")
+    
+    # Z-score recommendations
+    z_score = analysis.get("z_score", {})
+    if z_score and z_score.get("jump_height", 0) < -1.5:
+        if lang == "pt":
+            recommendations.append("📉 Performance significativamente abaixo da média histórica. Investigar: qualidade do sono, estresse, nutrição, sobrecarga de treino.")
+        else:
+            recommendations.append("📉 Performance significantly below historical average. Investigate: sleep quality, stress, nutrition, training overload.")
+    
+    if not recommendations:
+        if lang == "pt":
+            recommendations.append("✅ Atleta em boas condições. Continuar com protocolo de treino atual.")
+        else:
+            recommendations.append("✅ Athlete in good condition. Continue with current training protocol.")
+    
+    return recommendations
+
+@api_router.get("/jump/protocol-analysis/{athlete_id}")
+async def get_jump_protocol_analysis(
+    athlete_id: str,
+    protocol: str = "cmj",
+    date: Optional[str] = None,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Protocol-specific jump analysis with scientific Fatigue Index.
+    Each protocol is analyzed independently — no cross-protocol mixing.
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+
+    body_mass_kg = athlete.get("weight") or 70
+
+    # Fetch all assessments for this protocol only
+    all_assessments = await db.jump_assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "protocol": protocol
+    }).sort("date", -1).to_list(200)
+
+    # Available dates (unique, sorted desc)
+    available_dates = sorted(
+        list({a.get("date") for a in all_assessments if a.get("date")}),
+        reverse=True
+    )
+
+    if not all_assessments:
+        return {
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name"),
+            "body_mass_kg": body_mass_kg,
+            "protocol": protocol,
+            "available_dates": [],
+            "selected_date": None,
+            "metrics": None,
+            "fatigue_index": None,
+            "history": [],
+            "power_velocity_insights": None,
+            "z_score": None,
+            "recommendations": [],
+            "has_data": False
+        }
+
+    # Select assessment by date or default to latest
+    selected = None
+    if date:
+        selected = next((a for a in all_assessments if a.get("date") == date), None)
+    if not selected:
+        selected = all_assessments[0]
+
+    selected_date = selected.get("date")
+
+    # Determine metric label — RSImod e o padrao unico
+    metric_label = "RSImod"
+
+    current_metric_value = selected.get("rsi", 0)
+
+    # Build metrics object
+    metrics = {
+        "jump_height_cm": selected.get("jump_height_cm"),
+        "flight_time_ms": selected.get("flight_time_ms"),
+        "contact_time_ms": selected.get("contact_time_ms"),
+        "time_to_takeoff_ms": selected.get("time_to_takeoff_ms"),
+        "rsi": selected.get("rsi"),
+        "rsi_modified": selected.get("rsi_modified"),
+        "rsi_classification": classify_rsi(selected.get("rsi", 0)),
+        "peak_power_w": selected.get("peak_power_w"),
+        "peak_velocity_ms": selected.get("peak_velocity_ms"),
+        "relative_power_wkg": selected.get("relative_power_wkg"),
+    }
+
+    # === SCIENTIFIC FATIGUE INDEX ===
+    # Baseline = average of top 3 best metric values in last 90 days
+    from datetime import timedelta
+    cutoff_date_str = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+    recent_assessments = [
+        a for a in all_assessments
+        if a.get("date", "") >= cutoff_date_str and a.get("rsi", 0) > 0
+    ]
+    
+    metric_values = [a.get("rsi", 0) for a in recent_assessments if a.get("rsi", 0) > 0]
+    
+    fatigue_index = None
+    if metric_values:
+        # Top 3 best values (or all if < 3)
+        sorted_values = sorted(metric_values, reverse=True)
+        top_n = sorted_values[:3] if len(sorted_values) >= 3 else sorted_values
+        baseline = sum(top_n) / len(top_n)
+        
+        if baseline > 0:
+            fi_value = ((baseline - current_metric_value) / baseline) * 100
+            fi_value = round(fi_value, 1)
+            
+            # Classification per spec
+            if fi_value < 0:
+                fi_class = "above_baseline"
+                fi_label = "Performance Acima do Baseline" if lang == "pt" else "Performance Above Baseline"
+                fi_color = "#22c55e"
+            elif fi_value <= 5:
+                fi_class = "normal"
+                fi_label = "Variação Normal" if lang == "pt" else "Normal Variation"
+                fi_color = "#86efac"
+            elif fi_value <= 10:
+                fi_class = "mild"
+                fi_label = "Fadiga Leve" if lang == "pt" else "Mild Fatigue"
+                fi_color = "#fbbf24"
+            elif fi_value <= 15:
+                fi_class = "moderate"
+                fi_label = "Fadiga Moderada" if lang == "pt" else "Moderate Fatigue"
+                fi_color = "#f97316"
+            elif fi_value <= 20:
+                fi_class = "high"
+                fi_label = "Fadiga Alta" if lang == "pt" else "High Fatigue"
+                fi_color = "#f87171"
+            else:
+                fi_class = "severe"
+                fi_label = "Fadiga Severa" if lang == "pt" else "Severe Fatigue"
+                fi_color = "#ef4444"
+            
+            fatigue_index = {
+                "value": fi_value,
+                "baseline": round(baseline, 2),
+                "current": round(current_metric_value, 2),
+                "metric_label": metric_label,
+                "classification": fi_class,
+                "label": fi_label,
+                "color": fi_color,
+            }
+
+    # History for evolution chart
+    history = [
+        {
+            "date": a.get("date"),
+            "rsi": a.get("rsi"),
+            "jump_height_cm": a.get("jump_height_cm"),
+            "peak_power_w": a.get("peak_power_w"),
+        }
+        for a in all_assessments[:20]
+    ]
+
+    # Z-Score
+    historical_heights = [a.get("jump_height_cm", 0) for a in all_assessments if a.get("jump_height_cm", 0) > 0]
+    z_score_val = calculate_z_score(selected.get("jump_height_cm", 0), historical_heights)
+    z_score = {
+        "jump_height": z_score_val,
+        "interpretation": get_z_score_interpretation(z_score_val, lang)
+    } if len(historical_heights) >= 2 else None
+
+    # Power-Velocity Insights
+    peak_power = selected.get("peak_power_w", 0)
+    peak_velocity = selected.get("peak_velocity_ms", 0)
+    relative_power = selected.get("relative_power_wkg", 0)
+    avg_power = 3000
+    avg_velocity = 2.8
+    power_vs_avg = ((peak_power - avg_power) / avg_power * 100) if avg_power > 0 else 0
+    velocity_vs_avg = ((peak_velocity - avg_velocity) / avg_velocity * 100) if avg_velocity > 0 else 0
+
+    power_velocity_insights = {
+        "peak_power_w": peak_power,
+        "peak_velocity_ms": peak_velocity,
+        "relative_power_wkg": relative_power,
+        "power_vs_average_percent": round(power_vs_avg, 1),
+        "velocity_vs_average_percent": round(velocity_vs_avg, 1),
+        "profile": get_power_velocity_profile(power_vs_avg, velocity_vs_avg, lang)
+    } if peak_power > 0 else None
+
+    # SL-CMJ Asymmetry: fetch contralateral leg for comparison
+    asymmetry = None
+    if protocol in ("sl_cmj_left", "sl_cmj_right"):
+        contra_protocol = "sl_cmj_right" if protocol == "sl_cmj_left" else "sl_cmj_left"
+        contra_assessment = await db.jump_assessments.find_one(
+            {"athlete_id": athlete_id, "coach_id": current_user["_id"], "protocol": contra_protocol, "date": selected_date},
+            {"_id": 0}
+        )
+        if not contra_assessment:
+            # Try latest from contralateral
+            contra_assessment = await db.jump_assessments.find_one(
+                {"athlete_id": athlete_id, "coach_id": current_user["_id"], "protocol": contra_protocol},
+                {"_id": 0},
+                sort=[("date", -1)]
+            )
+        if contra_assessment:
+            current_rsi = current_metric_value
+            contra_rsi = contra_assessment.get("rsi", 0)
+            current_height = selected.get("jump_height_cm", 0)
+            contra_height = contra_assessment.get("jump_height_cm", 0)
+            
+            max_rsi = max(current_rsi, contra_rsi) if max(current_rsi, contra_rsi) > 0 else 1
+            max_height = max(current_height, contra_height) if max(current_height, contra_height) > 0 else 1
+            
+            rsi_asym = abs(current_rsi - contra_rsi) / max_rsi * 100
+            height_asym = abs(current_height - contra_height) / max_height * 100
+            
+            left_rsi = current_rsi if "left" in protocol else contra_rsi
+            right_rsi = contra_rsi if "left" in protocol else current_rsi
+            left_height = current_height if "left" in protocol else contra_height
+            right_height = contra_height if "left" in protocol else current_height
+            
+            asymmetry = {
+                "rsi_asymmetry_percent": round(rsi_asym, 1),
+                "height_asymmetry_percent": round(height_asym, 1),
+                "left_rsi": round(left_rsi, 2),
+                "right_rsi": round(right_rsi, 2),
+                "left_height": round(left_height, 1),
+                "right_height": round(right_height, 1),
+                "dominant_leg": "right" if right_rsi > left_rsi else "left",
+                "red_flag": rsi_asym > 10,
+                "contra_date": contra_assessment.get("date"),
+            }
+
+    # Recommendations - alias data under "cmj" key so generate_jump_recommendations works
+    rec_analysis = {
+        "protocols": {"cmj": {"latest": metrics}},
+        "fatigue_analysis": {
+            "status": "red" if fatigue_index and fatigue_index["classification"] in ("severe", "high") else
+                     "yellow" if fatigue_index and fatigue_index["classification"] in ("moderate", "mild") else "green",
+            "status_label": fatigue_index["label"] if fatigue_index else "",
+        } if fatigue_index else None,
+        "power_velocity_insights": power_velocity_insights,
+        "z_score": z_score,
+    }
+    recommendations = generate_jump_recommendations(rec_analysis, lang)
+
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "body_mass_kg": body_mass_kg,
+        "protocol": protocol,
+        "available_dates": available_dates,
+        "selected_date": selected_date,
+        "selected_assessment_id": str(selected.get("_id", "")) if selected.get("_id") else None,
+        "metrics": metrics,
+        "fatigue_index": fatigue_index,
+        "history": history,
+        "power_velocity_insights": power_velocity_insights,
+        "z_score": z_score,
+        "asymmetry": asymmetry,
+        "recommendations": recommendations,
+        "has_data": True
+    }
+
+
+@api_router.delete("/jump/assessment/{assessment_id}")
+async def delete_jump_assessment(
+    assessment_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Delete a jump assessment"""
+    result = await db.jump_assessments.delete_one({
+        "_id": ObjectId(assessment_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Assessment not found")
+    
+    return {"message": "Assessment deleted successfully"}
+
+@api_router.get("/analysis/strength/{athlete_id}", response_model=StrengthAnalysisResult)
+async def get_strength_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """Analyze strength assessment data with normative comparisons and fatigue detection"""
+    
+    t = lambda key: get_analysis_text(lang, key)
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get all strength assessments for this athlete (ordered by date and created_at)
+    assessments = await db.assessments.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "assessment_type": "strength"
+    }).sort([("date", -1), ("created_at", -1)]).to_list(100)
+    
+    if not assessments:
+        raise HTTPException(status_code=400, detail=t("ai_no_data"))
+    
+    latest = assessments[0]
+    previous = assessments[1] if len(assessments) > 1 else None
+    metrics_data = latest.get("metrics", {})
+    previous_metrics = previous.get("metrics", {}) if previous else {}
+    
+    # Calculate historical peaks
+    historical_peaks = {}
+    for a in assessments:
+        m = a.get("metrics", {})
+        for key in ["mean_power", "peak_power", "mean_speed", "peak_speed", "rsi"]:
+            if key in m and m[key] is not None:
+                if key not in historical_peaks or m[key] > historical_peaks[key]:
+                    historical_peaks[key] = m[key]
+    
+    # Analyze each metric
+    analyzed_metrics = []
+    normatives = STRENGTH_NORMATIVES
+    
+    def classify_metric(value, metric_name):
+        if metric_name not in normatives:
+            return "average", 50.0
+        
+        norm = normatives[metric_name]
+        if value >= norm["excellent"]:
+            return "excellent", 95.0
+        elif value >= norm["good"]:
+            return "good", 75.0
+        elif value >= norm["average"]:
+            return "average", 50.0
+        elif value >= norm["below_average"]:
+            return "below_average", 25.0
+        else:
+            return "poor", 10.0
+    
+    # Process each metric
+    for metric_key, display_name in [
+        ("mean_power", "Mean Power"),
+        ("peak_power", "Peak Power"),
+        ("mean_speed", "Mean Speed"),
+        ("peak_speed", "Peak Speed"),
+        ("rsi", "RSI")
+    ]:
+        value = metrics_data.get(metric_key)
+        if value is not None:
+            classification, percentile = classify_metric(value, metric_key)
+            
+            # Calculate variation from personal peak
+            variation = None
+            if metric_key in historical_peaks and historical_peaks[metric_key] > 0:
+                variation = ((value - historical_peaks[metric_key]) / historical_peaks[metric_key]) * 100
+            
+            # Calculate variation from previous assessment
+            variation_from_previous = None
+            previous_value = previous_metrics.get(metric_key) if previous_metrics else None
+            if previous_value is not None and previous_value > 0:
+                variation_from_previous = ((value - previous_value) / previous_value) * 100
+            
+            analyzed_metrics.append(StrengthMetric(
+                name=display_name,
+                value=value,
+                unit=normatives.get(metric_key, {}).get("unit", ""),
+                classification=classification,
+                percentile=percentile,
+                variation_from_peak=round(variation, 1) if variation else None,
+                variation_from_previous=round(variation_from_previous, 1) if variation_from_previous is not None else None,
+                previous_value=previous_value
+            ))
+    
+    # Detect peripheral fatigue
+    # Peripheral fatigue = RSI decrease + Peak Power decrease
+    rsi_current = metrics_data.get("rsi", 0)
+    peak_power_current = metrics_data.get("peak_power", 0)
+    rsi_peak = historical_peaks.get("rsi", rsi_current)
+    peak_power_peak = historical_peaks.get("peak_power", peak_power_current)
+    
+    rsi_drop = (rsi_peak - rsi_current) / rsi_peak * 100 if rsi_peak > 0 else 0
+    power_drop = (peak_power_peak - peak_power_current) / peak_power_peak * 100 if peak_power_peak > 0 else 0
+    
+    # Calculate fatigue index automatically based on power drop from historical peak
+    # Formula: 
+    # - power_drop > 30% => fatigue_index < 70% (low recovery)
+    # - power_drop 15-30% => fatigue_index 70-85% (moderate recovery)
+    # - power_drop < 15% => fatigue_index 85-100% (good recovery)
+    # We invert the logic: higher fatigue_index = more recovered = lower fatigue
+    # But the user wants to show "fatigue level" so we calculate actual fatigue percentage
+    
+    # Calculate fatigue based on power drop and RSI drop
+    # If power drops > 30%, fatigue is HIGH (>70%)
+    # If power drops 15-30%, fatigue is MODERATE (50-70%)
+    # If power drops < 15%, fatigue is LOW (<50%)
+    
+    manual_fatigue = metrics_data.get("fatigue_index", None)
+    if manual_fatigue is not None and manual_fatigue > 0:
+        # Use manual input if provided
+        fatigue_index = manual_fatigue
+    else:
+        # Calculate fatigue from power drop
+        # power_drop > 30% => fatigue_index = 80-100% (very fatigued)
+        # power_drop 20-30% => fatigue_index = 70-80% (high fatigue)
+        # power_drop 10-20% => fatigue_index = 50-70% (moderate fatigue)
+        # power_drop < 10% => fatigue_index = 0-50% (low fatigue/well recovered)
+        
+        if power_drop >= 30:
+            # Very high fatigue - scales from 80-100% based on how much above 30%
+            fatigue_index = min(100, 80 + (power_drop - 30) * 0.5)
+        elif power_drop >= 20:
+            # High fatigue - scales from 70-80%
+            fatigue_index = 70 + (power_drop - 20)
+        elif power_drop >= 10:
+            # Moderate fatigue - scales from 50-70%
+            fatigue_index = 50 + (power_drop - 10) * 2
+        elif power_drop >= 5:
+            # Low fatigue - scales from 30-50%
+            fatigue_index = 30 + (power_drop - 5) * 4
+        else:
+            # Well recovered - scales from 0-30%
+            fatigue_index = power_drop * 6
+        
+        # Also factor in RSI drop
+        if rsi_drop > 20:
+            fatigue_index = min(100, fatigue_index + 10)
+        elif rsi_drop > 10:
+            fatigue_index = min(100, fatigue_index + 5)
+        
+        fatigue_index = round(fatigue_index, 1)
+    
+    fatigue_alert = fatigue_index > 70
+    peripheral_fatigue = (rsi_drop > 10 and power_drop > 10) or fatigue_index > 70
+    
+    # Overall classification
+    avg_percentile = sum(m.percentile for m in analyzed_metrics) / len(analyzed_metrics) if analyzed_metrics else 50
+    if avg_percentile >= 80:
+        overall_class = "excellent"
+    elif avg_percentile >= 60:
+        overall_class = "good"
+    elif avg_percentile >= 40:
+        overall_class = "average"
+    else:
+        overall_class = "below_average"
+    
+    # Generate recommendations
+    recommendations = []
+    
+    if peripheral_fatigue:
+        if lang == "pt":
+            recommendations.append("⚠️ FADIGA PERIFÉRICA DETECTADA: Redução significativa no RSI e Pico de Potência indica acúmulo de fadiga muscular.")
+            recommendations.append("Recomenda-se período de recuperação ativa e redução do volume de treino.")
+            recommendations.append("Risco aumentado de lesão se os esforços intensos persistirem.")
+        else:
+            recommendations.append("⚠️ PERIPHERAL FATIGUE DETECTED: Significant RSI and Peak Power reduction indicates accumulated muscle fatigue.")
+            recommendations.append("Active recovery period and reduced training volume recommended.")
+            recommendations.append("Increased injury risk if intense efforts persist.")
+    
+    if fatigue_alert:
+        if lang == "pt":
+            recommendations.append(f"Índice de Fadiga em {fatigue_index}% - acima do limiar de 70%. Monitorar recuperação.")
+        else:
+            recommendations.append(f"Fatigue Index at {fatigue_index}% - above 70% threshold. Monitor recovery.")
+    
+    if not recommendations:
+        if lang == "pt":
+            recommendations.append("Níveis de força dentro dos parâmetros normais. Manter rotina de treino.")
+        else:
+            recommendations.append("Strength levels within normal parameters. Maintain training routine.")
+    
+    # Generate AI insights
+    ai_insights = None
+    try:
+        emergent_key = os.environ.get('EMERGENT_LLM_KEY')
+        if emergent_key and len(analyzed_metrics) > 0:
+            system_msg = "You are a sports science expert specializing in strength and conditioning for football players." if lang == "en" else "Você é um especialista em ciência do esporte, especializado em força e condicionamento para jogadores de futebol."
+            
+            metrics_summary = "\n".join([f"- {m.name}: {m.value}{m.unit} ({m.classification}, {m.percentile}th percentile)" for m in analyzed_metrics])
+            
+            prompt = f"""Analyze this football player's strength assessment:
+{metrics_summary}
+Fatigue Index: {fatigue_index}%
+Peripheral Fatigue: {'Yes' if peripheral_fatigue else 'No'}
+RSI Drop from Peak: {rsi_drop:.1f}%
+Peak Power Drop from Peak: {power_drop:.1f}%
+
+Provide a brief (2-3 sentences) professional insight about this athlete's strength profile and any concerns."""
+            
+            if lang == "pt":
+                prompt = f"""Analise esta avaliação de força de um jogador de futebol:
+{metrics_summary}
+Índice de Fadiga: {fatigue_index}%
+Fadiga Periférica: {'Sim' if peripheral_fatigue else 'Não'}
+Queda do RSI do Pico: {rsi_drop:.1f}%
+Queda do Pico de Potência do Pico: {power_drop:.1f}%
+
+Forneça um insight profissional breve (2-3 frases) sobre o perfil de força deste atleta e quaisquer preocupações."""
+            
+            chat = LlmChat(
+                api_key=emergent_key,
+                session_id=f"strength_{athlete_id}_{datetime.utcnow().timestamp()}",
+                system_message=system_msg
+            ).with_model("openai", "gpt-4o")
+            
+            response = await chat.send_message(UserMessage(text=prompt))
+            ai_insights = response
+    except Exception as e:
+        logger.error(f"AI strength analysis error: {str(e)}")
+    
+    # Build comparison with previous
+    comparison_with_previous = None
+    if previous:
+        comparison_with_previous = {
+            "date": previous.get("date"),
+            "metrics": {}
+        }
+        for metric in analyzed_metrics:
+            if metric.previous_value is not None:
+                comparison_with_previous["metrics"][metric.name] = {
+                    "current": metric.value,
+                    "previous": metric.previous_value,
+                    "change_percent": metric.variation_from_previous
+                }
+    
+    return StrengthAnalysisResult(
+        athlete_id=athlete_id,
+        assessment_date=latest.get("date", ""),
+        previous_assessment_date=previous.get("date") if previous else None,
+        metrics=analyzed_metrics,
+        fatigue_index=fatigue_index,
+        fatigue_alert=fatigue_alert,
+        peripheral_fatigue_detected=peripheral_fatigue,
+        overall_strength_classification=overall_class,
+        ai_insights=ai_insights,
+        recommendations=recommendations,
+        historical_trend={
+            "rsi_peak": rsi_peak,
+            "rsi_current": rsi_current,
+            "rsi_drop_percent": round(rsi_drop, 1),
+            "peak_power_peak": peak_power_peak,
+            "peak_power_current": peak_power_current,
+            "power_drop_percent": round(power_drop, 1)
+        },
+        comparison_with_previous=comparison_with_previous
+    )
+
+
+# ============= SCIENTIFIC ANALYSIS - COMPLETE INSIGHTS =============
+
+class ScientificInsightsResponse(BaseModel):
+    athlete_id: str
+    athlete_name: str
+    analysis_date: str
+    
+    # GPS Metrics
+    gps_summary: Optional[Dict[str, Any]] = None
+    
+    # ACWR Analysis
+    acwr_analysis: Optional[Dict[str, Any]] = None
+    
+    # Wellness Metrics
+    wellness_summary: Optional[Dict[str, Any]] = None
+    
+    # Jump Assessment (CMJ, RSI, Fatigue)
+    jump_analysis: Optional[Dict[str, Any]] = None
+    
+    # VBT Analysis (Load-Velocity Profile)
+    vbt_analysis: Optional[Dict[str, Any]] = None
+    
+    # Body Composition
+    body_composition: Optional[Dict[str, Any]] = None
+    
+    # AI Scientific Insights
+    scientific_insights: Optional[str] = None
+    
+    # Risk Assessment
+    overall_risk_level: str = "unknown"
+    injury_risk_factors: List[str] = []
+    
+    # Recommendations
+    training_recommendations: List[str] = []
+    recovery_recommendations: List[str] = []
+
+
+@api_router.get("/analysis/scientific/{athlete_id}")
+async def get_scientific_analysis(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Complete scientific analysis consolidating GPS, ACWR, Wellness, Jump Assessment, 
+    VBT (Load-Velocity Profile), Body Composition with AI-powered insights based on 
+    sports science literature.
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    response = ScientificInsightsResponse(
+        athlete_id=athlete_id,
+        athlete_name=athlete["name"],
+        analysis_date=datetime.utcnow().strftime("%Y-%m-%d %H:%M")
+    )
+    
+    injury_risk_factors = []
+    
+    # 1. GPS Data Summary (últimos 30 dias)
+    # Only count SESSION periods to avoid counting sub-periods as separate activities
+    try:
+        gps_data_raw = await db.gps_data.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).to_list(500)
+        
+        # Filter: only include records where period is "SESSION" or there's no multi-period structure
+        _SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+        
+        def _is_session_record(record):
+            pname = (record.get("period_name") or "").lower()
+            session_id = record.get("session_id")
+            if not pname or not session_id:
+                return True  # Legacy records without period_name count as sessions
+            return any(kw in pname for kw in _SESSION_KW)
+        
+        gps_data = [g for g in gps_data_raw if _is_session_record(g)][:30]
+        
+        if gps_data:
+            total_distance = sum(g.get("total_distance", 0) for g in gps_data)
+            avg_distance = total_distance / len(gps_data) if gps_data else 0
+            avg_hi_distance = sum(g.get("high_intensity_distance", 0) for g in gps_data) / len(gps_data)
+            avg_sprints = sum(g.get("sprint_count", 0) for g in gps_data) / len(gps_data)
+            max_speed = max((g.get("max_speed", 0) for g in gps_data), default=0)
+            avg_max_speed = sum(g.get("max_speed", 0) for g in gps_data) / len(gps_data)
+            
+            response.gps_summary = {
+                "sessions_count": len(gps_data),
+                "total_distance_m": round(total_distance, 0),
+                "avg_distance_m": round(avg_distance, 0),
+                "avg_high_intensity_m": round(avg_hi_distance, 0),
+                "avg_sprints": round(avg_sprints, 1),
+                "max_speed_kmh": round(max_speed, 1),
+                "avg_max_speed_kmh": round(avg_max_speed, 1),
+                "last_session_date": gps_data[0].get("date", "") if gps_data else None,
+                "latest_session": {
+                    "distance": gps_data[0].get("total_distance", 0),
+                    "high_intensity": gps_data[0].get("high_intensity_distance", 0),
+                    "sprints": gps_data[0].get("sprint_count", 0),
+                    "max_speed": gps_data[0].get("max_speed", 0)
+                } if gps_data else None
+            }
+    except Exception as e:
+        print(f"GPS Error: {e}")
+    
+    # 2. ACWR Analysis
+    try:
+        acwr_result = await get_acwr_detailed_analysis(athlete_id, lang, current_user)
+        response.acwr_analysis = {
+            "overall_risk": acwr_result.overall_risk,
+            "recommendation": acwr_result.recommendation,
+            "metrics": [
+                {
+                    "name": m.name,
+                    "acwr_ratio": m.acwr_ratio,
+                    "acute_load": m.acute_load,
+                    "chronic_load": m.chronic_load,
+                    "risk_level": m.risk_level
+                } for m in acwr_result.metrics
+            ]
+        }
+        if acwr_result.overall_risk in ["high", "moderate"]:
+            injury_risk_factors.append(f"ACWR em nível {acwr_result.overall_risk}" if lang == "pt" else f"ACWR at {acwr_result.overall_risk} level")
+    except:
+        pass
+    
+    # 3. Wellness Summary
+    try:
+        wellness_data = await db.wellness_questionnaires.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(14).to_list(14)
+        
+        if wellness_data:
+            avg_wellness = sum(w.get("wellness_score", 0) for w in wellness_data) / len(wellness_data)
+            avg_readiness = sum(w.get("readiness_score", 0) for w in wellness_data) / len(wellness_data)
+            avg_sleep = sum(w.get("sleep_hours", 0) for w in wellness_data) / len(wellness_data)
+            avg_fatigue = sum(w.get("fatigue", 0) for w in wellness_data) / len(wellness_data)
+            avg_stress = sum(w.get("stress", 0) for w in wellness_data) / len(wellness_data)
+            avg_soreness = sum(w.get("muscle_soreness", 0) for w in wellness_data) / len(wellness_data)
+            
+            latest = wellness_data[0]
+            response.wellness_summary = {
+                "records_count": len(wellness_data),
+                "avg_wellness_score": round(avg_wellness, 1),
+                "avg_readiness_score": round(avg_readiness, 1),
+                "avg_sleep_hours": round(avg_sleep, 1),
+                "avg_fatigue": round(avg_fatigue, 1),
+                "avg_stress": round(avg_stress, 1),
+                "avg_soreness": round(avg_soreness, 1),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "wellness_score": latest.get("wellness_score", 0),
+                    "readiness_score": latest.get("readiness_score", 0),
+                    "sleep_hours": latest.get("sleep_hours", 0),
+                    "sleep_quality": latest.get("sleep_quality", 0),
+                    "fatigue": latest.get("fatigue", 0),
+                    "stress": latest.get("stress", 0),
+                    "muscle_soreness": latest.get("muscle_soreness", 0),
+                    "mood": latest.get("mood", 0)
+                }
+            }
+            
+            if avg_fatigue >= 7:
+                injury_risk_factors.append("Fadiga percebida elevada (RPE ≥ 7)" if lang == "pt" else "High perceived fatigue (RPE ≥ 7)")
+            if avg_sleep < 7:
+                injury_risk_factors.append("Déficit de sono crônico (<7h)" if lang == "pt" else "Chronic sleep deficit (<7h)")
+            if avg_soreness >= 7:
+                injury_risk_factors.append("Dor muscular elevada persistente" if lang == "pt" else "Persistent high muscle soreness")
+    except Exception as e:
+        print(f"Wellness Error: {e}")
+    
+    # 4. Jump Assessment (CMJ, RSI, Fatigue Index)
+    try:
+        jump_data = await db.jump_assessments.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(10).to_list(10)
+        
+        if jump_data:
+            latest = jump_data[0]
+            
+            # Calculate Z-Score against athlete's history
+            rsi_values = [j.get("rsi", 0) for j in jump_data]
+            avg_rsi = sum(rsi_values) / len(rsi_values) if rsi_values else 0
+            std_rsi = (sum((x - avg_rsi) ** 2 for x in rsi_values) / len(rsi_values)) ** 0.5 if len(rsi_values) > 1 else 0
+            z_score = (latest.get("rsi", 0) - avg_rsi) / std_rsi if std_rsi > 0 else 0
+            
+            # Fatigue detection based on RSI variation
+            if len(jump_data) >= 2:
+                baseline_rsi = sum(rsi_values[1:min(5, len(rsi_values))]) / min(4, len(rsi_values) - 1)
+                rsi_variation = ((latest.get("rsi", 0) - baseline_rsi) / baseline_rsi * 100) if baseline_rsi > 0 else 0
+            else:
+                rsi_variation = 0
+            
+            response.jump_analysis = {
+                "assessments_count": len(jump_data),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "protocol": latest.get("protocol", ""),
+                    "jump_height_cm": latest.get("jump_height_cm", 0),
+                    "flight_time_ms": latest.get("flight_time_ms", 0),
+                    "contact_time_ms": latest.get("contact_time_ms", 0),
+                    "rsi": round(latest.get("rsi", 0), 2),
+                    "rsi_classification": classify_rsi(round(latest.get("rsi", 0), 2)),
+                    "peak_power_w": round(latest.get("peak_power_w", 0), 0),
+                    "peak_velocity_ms": round(latest.get("peak_velocity_ms", 0), 2),
+                    "relative_power_wkg": round(latest.get("relative_power_wkg", 0), 1),
+                    "fatigue_status": latest.get("fatigue_status", ""),
+                    "fatigue_percentage": round(latest.get("fatigue_percentage", 0), 1)
+                },
+                "historical": {
+                    "avg_rsi": round(avg_rsi, 2),
+                    "std_rsi": round(std_rsi, 2),
+                    "z_score": round(z_score, 2),
+                    "rsi_variation_percent": round(rsi_variation, 1),
+                    "trend": "declining" if rsi_variation < -5 else "stable" if rsi_variation < 5 else "improving"
+                },
+                "fatigue_alert": latest.get("fatigue_status", "") in ["yellow", "red"],
+                "history": [
+                    {
+                        "date": j.get("date", ""),
+                        "rsi": round(j.get("rsi", 0), 2),
+                        "jump_height_cm": j.get("jump_height_cm", 0),
+                        "protocol": j.get("protocol", "")
+                    } for j in jump_data[:7]
+                ]
+            }
+            
+            if latest.get("fatigue_status", "") == "red":
+                injury_risk_factors.append("RSI indica fadiga neuromuscular severa (>12% abaixo do baseline)" if lang == "pt" else "RSI indicates severe neuromuscular fatigue (>12% below baseline)")
+            elif latest.get("fatigue_status", "") == "yellow":
+                injury_risk_factors.append("RSI indica fadiga moderada (5-12% abaixo do baseline)" if lang == "pt" else "RSI indicates moderate fatigue (5-12% below baseline)")
+    except Exception as e:
+        print(f"Jump Error: {e}")
+    
+    # 5. VBT Analysis (Load-Velocity Profile)
+    try:
+        vbt_data = await db.vbt_data.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(20).to_list(20)
+        
+        if vbt_data:
+            # Group by exercise and get latest for primary exercise
+            exercises = {}
+            for v in vbt_data:
+                ex = v.get("exercise", "Back Squat")
+                if ex not in exercises:
+                    exercises[ex] = []
+                exercises[ex].append(v)
+            
+            primary_exercise = max(exercises.keys(), key=lambda x: len(exercises[x]))
+            primary_data = exercises[primary_exercise]
+            
+            # Calculate load-velocity profile
+            all_sets = []
+            for session in primary_data:
+                for s in session.get("sets", []):
+                    if s.get("load_kg", 0) > 0 and s.get("mean_velocity", 0) > 0:
+                        all_sets.append({
+                            "load": s.get("load_kg"),
+                            "velocity": s.get("mean_velocity")
+                        })
+            
+            # Linear regression for load-velocity
+            slope, intercept, estimated_1rm, optimal_load = None, None, None, None
+            if len(all_sets) >= 2:
+                loads = [s["load"] for s in all_sets]
+                velocities = [s["velocity"] for s in all_sets]
+                n = len(loads)
+                sum_x = sum(loads)
+                sum_y = sum(velocities)
+                sum_xy = sum(l * v for l, v in zip(loads, velocities))
+                sum_x2 = sum(l * l for l in loads)
+                
+                denom = n * sum_x2 - sum_x * sum_x
+                if denom != 0:
+                    slope = (n * sum_xy - sum_x * sum_y) / denom
+                    intercept = (sum_y - slope * sum_x) / n
+                    
+                    # MVT (Minimum Velocity Threshold) typically 0.3 m/s for squat
+                    mvt = 0.3
+                    if slope != 0:
+                        estimated_1rm = (mvt - intercept) / slope
+                        # Optimal load for power (typically around 50-60% 1RM)
+                        optimal_load = estimated_1rm * 0.55
+            
+            # Latest session velocity loss
+            latest_session = primary_data[0]
+            sets = latest_session.get("sets", [])
+            velocity_loss = []
+            if len(sets) >= 2:
+                first_velocity = sets[0].get("mean_velocity", 0)
+                for i, s in enumerate(sets):
+                    loss = ((first_velocity - s.get("mean_velocity", 0)) / first_velocity * 100) if first_velocity > 0 else 0
+                    velocity_loss.append({
+                        "set": i + 1,
+                        "velocity": s.get("mean_velocity", 0),
+                        "loss_percent": round(loss, 1)
+                    })
+            
+            response.vbt_analysis = {
+                "sessions_count": len(vbt_data),
+                "primary_exercise": primary_exercise,
+                "load_velocity_profile": {
+                    "slope": round(slope, 4) if slope else None,
+                    "intercept": round(intercept, 2) if intercept else None,
+                    "estimated_1rm_kg": round(estimated_1rm, 1) if estimated_1rm else None,
+                    "optimal_load_kg": round(optimal_load, 1) if optimal_load else None,
+                    "mvt": 0.3,
+                    "data_points": len(all_sets)
+                },
+                "latest_session": {
+                    "date": latest_session.get("date", ""),
+                    "exercise": latest_session.get("exercise", ""),
+                    "sets_count": len(sets),
+                    "avg_velocity": round(sum(s.get("mean_velocity", 0) for s in sets) / len(sets), 2) if sets else 0,
+                    "max_velocity": round(max((s.get("peak_velocity", 0) for s in sets), default=0), 2),
+                    "max_load": max((s.get("load_kg", 0) for s in sets), default=0),
+                    "max_power": max((s.get("power_watts", 0) for s in sets), default=0)
+                },
+                "velocity_loss_analysis": velocity_loss,
+                "fatigue_detected": any(v["loss_percent"] >= 20 for v in velocity_loss) if velocity_loss else False
+            }
+            
+            if response.vbt_analysis.get("fatigue_detected"):
+                injury_risk_factors.append("Perda de velocidade ≥20% detectada na última sessão VBT (fadiga periférica)" if lang == "pt" else "Velocity loss ≥20% detected in last VBT session (peripheral fatigue)")
+    except Exception as e:
+        print(f"VBT Error: {e}")
+    
+    # 6. Body Composition
+    try:
+        body_comp = await db.body_compositions.find({
+            "athlete_id": athlete_id
+        }).sort("date", -1).limit(5).to_list(5)
+        
+        if body_comp:
+            latest = body_comp[0]
+            # Get body_fat_percentage - calculate from fat_mass_kg and weight if not present
+            body_fat_pct = latest.get("body_fat_percentage", None)
+            if body_fat_pct is None:
+                weight = latest.get("weight", 0)
+                fat_mass = latest.get("fat_mass_kg", 0)
+                if weight > 0:
+                    body_fat_pct = round((fat_mass / weight) * 100, 1)
+                else:
+                    body_fat_pct = 0
+            
+            response.body_composition = {
+                "records_count": len(body_comp),
+                "latest": {
+                    "date": latest.get("date", ""),
+                    "protocol": latest.get("protocol", ""),
+                    "body_fat_percent": body_fat_pct,
+                    "lean_mass_kg": latest.get("lean_mass_kg", 0),
+                    "fat_mass_kg": latest.get("fat_mass_kg", 0),
+                    "weight_kg": latest.get("weight", 0),
+                    "classification": latest.get("classification", "")
+                },
+                "trend": None
+            }
+            
+            if len(body_comp) >= 2:
+                prev = body_comp[1]
+                # Calculate prev body fat percent if not present
+                prev_fat_pct = prev.get("body_fat_percentage", None)
+                if prev_fat_pct is None:
+                    prev_weight = prev.get("weight", 0)
+                    prev_fat_mass = prev.get("fat_mass_kg", 0)
+                    if prev_weight > 0:
+                        prev_fat_pct = round((prev_fat_mass / prev_weight) * 100, 1)
+                    else:
+                        prev_fat_pct = 0
+                
+                fat_change = body_fat_pct - prev_fat_pct
+                lean_change = latest.get("lean_mass_kg", 0) - prev.get("lean_mass_kg", 0)
+                response.body_composition["trend"] = {
+                    "fat_percent_change": round(fat_change, 1),
+                    "lean_mass_change_kg": round(lean_change, 1),
+                    "direction": "improving" if fat_change < 0 and lean_change >= 0 else "declining" if fat_change > 0 else "stable"
+                }
+    except Exception as e:
+        print(f"Body Comp Error: {e}")
+    
+    # 7. Determine Overall Risk Level
+    response.injury_risk_factors = injury_risk_factors
+    if len(injury_risk_factors) >= 3:
+        response.overall_risk_level = "high"
+    elif len(injury_risk_factors) >= 1:
+        response.overall_risk_level = "moderate"
+    else:
+        response.overall_risk_level = "low"
+    
+    # 8. Generate AI Scientific Insights
+    try:
+        insights_text = await generate_scientific_ai_insights(response, athlete, lang)
+        response.scientific_insights = insights_text
+    except Exception as e:
+        print(f"AI Insights Error: {e}")
+        response.scientific_insights = None
+    
+    return response
+
+
+async def generate_scientific_ai_insights(data: ScientificInsightsResponse, athlete: dict, lang: str) -> str:
+    """
+    Generate AI-powered scientific insights based on comprehensive athlete data.
+    Uses sports science terminology and evidence-based recommendations.
+    """
+    # Check if emergentintegrations is available
+    if not EMERGENT_AVAILABLE:
+        return None
+    
+    try:
+        from emergentintegrations.llm.chat import LlmChat
+    except ImportError:
+        return None
+    
+    llm_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not llm_key:
+        return None
+    
+    # Build comprehensive data context
+    context_parts = []
+    
+    # Athlete info
+    athlete_info = f"Atleta: {athlete['name']}, Posição: {athlete.get('position', 'N/A')}"
+    if athlete.get('weight'):
+        athlete_info += f", Peso: {athlete['weight']}kg"
+    if athlete.get('height'):
+        athlete_info += f", Altura: {athlete['height']}cm"
+    context_parts.append(athlete_info)
+    
+    # GPS Data
+    if data.gps_summary:
+        gps = data.gps_summary
+        context_parts.append(f"""
+DADOS GPS (últimas {gps['sessions_count']} sessões):
+- Distância média: {gps['avg_distance_m']}m
+- Distância alta intensidade média: {gps['avg_high_intensity_m']}m
+- Sprints médios: {gps['avg_sprints']}
+- Velocidade máxima: {gps['max_speed_kmh']} km/h
+- Última sessão: {gps.get('latest_session', {})}
+""")
+    
+    # ACWR
+    if data.acwr_analysis:
+        acwr = data.acwr_analysis
+        context_parts.append(f"""
+ANÁLISE ACWR (Acute:Chronic Workload Ratio):
+- Risco geral: {acwr['overall_risk']}
+- Métricas: {acwr['metrics']}
+""")
+    
+    # Wellness
+    if data.wellness_summary:
+        w = data.wellness_summary
+        context_parts.append(f"""
+WELLNESS (últimos {w['records_count']} registros):
+- Wellness Score médio: {w['avg_wellness_score']}/10
+- Readiness médio: {w['avg_readiness_score']}/10
+- Sono médio: {w['avg_sleep_hours']}h
+- Fadiga média: {w['avg_fatigue']}/10
+- Dor muscular média: {w['avg_soreness']}/10
+- Último registro: {w.get('latest', {})}
+""")
+    
+    # Jump Assessment
+    if data.jump_analysis:
+        j = data.jump_analysis
+        latest = j.get('latest', {})
+        hist = j.get('historical', {})
+        context_parts.append(f"""
+AVALIACAO DE SALTO (CMJ/SL-CMJ):
+- RSI atual: {latest.get('rsi', 0)} ({latest.get('rsi_classification', '')})
+- Altura do salto: {latest.get('jump_height_cm', 0)} cm
+- Pico de potência: {latest.get('peak_power_w', 0)} W
+- Potência relativa: {latest.get('relative_power_wkg', 0)} W/kg
+- Status de fadiga: {latest.get('fatigue_status', '')}
+- Z-Score RSI: {hist.get('z_score', 0)} (variação: {hist.get('rsi_variation_percent', 0)}%)
+- Tendência: {hist.get('trend', '')}
+""")
+    
+    # VBT
+    if data.vbt_analysis:
+        v = data.vbt_analysis
+        lvp = v.get('load_velocity_profile', {})
+        context_parts.append(f"""
+PERFIL CARGA-VELOCIDADE (VBT):
+- Exercício principal: {v['primary_exercise']}
+- 1RM estimado: {lvp.get('estimated_1rm_kg', 'N/A')} kg
+- Carga ótima (potência máx): {lvp.get('optimal_load_kg', 'N/A')} kg
+- Slope: {lvp.get('slope', 'N/A')}
+- Intercept: {lvp.get('intercept', 'N/A')}
+- Perda de velocidade: {v.get('velocity_loss_analysis', [])}
+- Fadiga periférica detectada: {v.get('fatigue_detected', False)}
+""")
+    
+    # Body Composition
+    if data.body_composition:
+        bc = data.body_composition
+        latest = bc.get('latest', {})
+        context_parts.append(f"""
+COMPOSIÇÃO CORPORAL:
+- Gordura corporal: {latest.get('body_fat_percent', 0)}%
+- Massa magra: {latest.get('lean_mass_kg', 0)} kg
+- Massa gorda: {latest.get('fat_mass_kg', 0)} kg
+- Classificação: {latest.get('classification', '')}
+- Tendência: {bc.get('trend', {})}
+""")
+    
+    # Risk factors
+    if data.injury_risk_factors:
+        context_parts.append(f"""
+FATORES DE RISCO IDENTIFICADOS:
+{chr(10).join('- ' + f for f in data.injury_risk_factors)}
+Nível de risco geral: {data.overall_risk_level}
+""")
+    
+    full_context = "\n".join(context_parts)
+    
+    # Determine language
+    if lang == "pt":
+        system_prompt = """Você é um cientista do esporte especializado em fisiologia do exercício, biomecânica e 
+periodização do treinamento. Analise os dados fornecidos usando terminologia científica específica e forneça 
+insights baseados em evidências da literatura científica atual.
+
+IMPORTANTE: Use termos científicos específicos como:
+- Fadiga neuromuscular central vs periférica
+- Capacidade contrátil muscular
+- Potencialização pós-ativação (PAP)
+- Supercompensação e adaptação
+- Índice de Força Reativa (RSI)
+- Perfil força-velocidade
+- Déficit bilateral
+- Assimetria funcional
+- Monotonia e strain da carga
+- Readiness neuromuscular
+
+Cite referências científicas quando apropriado (ex: "Segundo Gabbett (2016)...")."""
+
+        user_prompt = f"""Com base nos seguintes dados científicos do atleta, forneça uma análise técnica completa:
+
+{full_context}
+
+Forneça sua análise no seguinte formato estruturado:
+
+## SÍNTESE FISIOLÓGICA
+Breve avaliação do estado neuromuscular e metabólico atual do atleta (3-4 linhas).
+
+## ANÁLISE DE CARGA DE TREINAMENTO
+Interpretação do ACWR e métricas de carga com base na literatura de monitoramento de carga.
+
+## ESTADO NEUROMUSCULAR
+Análise do RSI, perfil carga-velocidade e indicadores de fadiga central/periférica.
+
+## ESTADO DE RECUPERAÇÃO
+Avaliação baseada nos dados de wellness, sono e fatores psicométricos.
+
+## COMPOSIÇÃO CORPORAL E POTÊNCIA
+Relação entre composição corporal e métricas de potência/força.
+
+## FATORES DE RISCO E PREVENÇÃO
+Análise dos fatores de risco identificados com recomendações baseadas em evidências.
+
+## RECOMENDAÇÕES DE TREINAMENTO
+Prescrições específicas baseadas nos dados para otimização da performance e redução de risco de lesão.
+
+## RECOMENDAÇÕES DE RECUPERAÇÃO
+Estratégias de recuperação baseadas no perfil atual do atleta.
+
+Seja específico, use terminologia científica e fundamente em evidências quando possível."""
+
+    else:
+        system_prompt = """You are a sports scientist specialized in exercise physiology, biomechanics and 
+training periodization. Analyze the provided data using specific scientific terminology and provide 
+evidence-based insights from current scientific literature.
+
+IMPORTANT: Use specific scientific terms such as:
+- Central vs peripheral neuromuscular fatigue
+- Muscle contractile capacity
+- Post-activation potentiation (PAP)
+- Supercompensation and adaptation
+- Reactive Strength Index (RSI)
+- Force-velocity profile
+- Bilateral deficit
+- Functional asymmetry
+- Load monotony and strain
+- Neuromuscular readiness
+
+Cite scientific references when appropriate (e.g., "According to Gabbett (2016)...")."""
+
+        user_prompt = f"""Based on the following scientific data from the athlete, provide a complete technical analysis:
+
+{full_context}
+
+Provide your analysis in the following structured format:
+
+## PHYSIOLOGICAL SYNTHESIS
+Brief assessment of the athlete's current neuromuscular and metabolic state (3-4 lines).
+
+## TRAINING LOAD ANALYSIS
+Interpretation of ACWR and load metrics based on load monitoring literature.
+
+## NEUROMUSCULAR STATE
+Analysis of RSI, load-velocity profile and central/peripheral fatigue indicators.
+
+## RECOVERY STATE
+Assessment based on wellness data, sleep and psychometric factors.
+
+## BODY COMPOSITION AND POWER
+Relationship between body composition and power/strength metrics.
+
+## RISK FACTORS AND PREVENTION
+Analysis of identified risk factors with evidence-based recommendations.
+
+## TRAINING RECOMMENDATIONS
+Specific prescriptions based on data for performance optimization and injury risk reduction.
+
+## RECOVERY RECOMMENDATIONS
+Recovery strategies based on the athlete's current profile.
+
+Be specific, use scientific terminology and base on evidence when possible."""
+    
+    try:
+        chat = LlmChat(
+            api_key=llm_key,
+            model="gpt-4o",
+            system_message=system_prompt
+        )
+        response = chat.send_message(user_prompt)
+        return response
+    except Exception as e:
+        print(f"LLM Error: {e}")
+        return None
+
+
+@api_router.get("/report/scientific/{athlete_id}")
+async def get_scientific_report_pdf(
+    athlete_id: str,
+    lang: str = "en",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate a printable scientific report in HTML format with all charts.
+    The browser can print this page to PDF.
+    """
+    # Get all scientific analysis data
+    analysis = await get_scientific_analysis(athlete_id, lang, current_user)
+    
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get additional data for charts
+    # GPS historical data
+    gps_history = await db.gps_data.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(10).to_list(10)
+    gps_history.reverse()
+    
+    # Wellness historical data
+    wellness_history = await db.wellness_questionnaires.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(14).to_list(14)
+    wellness_history.reverse()
+    
+    # Jump history for RSI evolution
+    jump_history = await db.jump_assessments.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(10).to_list(10)
+    jump_history.reverse()
+    
+    # VBT data for load-velocity chart
+    vbt_data = await db.vbt_data.find({
+        "athlete_id": athlete_id
+    }).sort("date", -1).limit(20).to_list(20)
+    
+    is_pt = lang == "pt"
+    
+    def risk_color(level):
+        return {
+            "low": "#10b981",
+            "moderate": "#f59e0b", 
+            "high": "#ef4444"
+        }.get(level, "#6b7280")
+    
+    def risk_label(level):
+        if is_pt:
+            return {"low": "Baixo", "moderate": "Moderado", "high": "Alto"}.get(level, "Desconhecido")
+        return level.title() if level else "Unknown"
+    
+    # Calculate IMC - safely handle None values
+    weight = athlete.get('weight') or 0
+    height_cm = athlete.get('height') or 0
+    imc = (weight / ((height_cm/100) ** 2)) if height_cm > 0 and weight > 0 else 0
+    imc_class = ""
+    if imc > 0:
+        if imc < 18.5:
+            imc_class = "Abaixo do peso" if is_pt else "Underweight"
+        elif imc < 25:
+            imc_class = "Normal" if is_pt else "Normal"
+        elif imc < 30:
+            imc_class = "Sobrepeso" if is_pt else "Overweight"
+        else:
+            imc_class = "Obesidade" if is_pt else "Obese"
+    
+    html_content = f"""
+<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{'Relatório Científico' if is_pt else 'Scientific Report'} - {athlete['name']}</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{ 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 20px;
+            line-height: 1.5;
+        }}
+        .container {{ max-width: 900px; margin: 0 auto; }}
+        .header {{ 
+            text-align: center; 
+            padding: 30px 0;
+            border-bottom: 2px solid #334155;
+            margin-bottom: 30px;
+        }}
+        .header h1 {{ font-size: 24px; color: #f8fafc; margin-bottom: 8px; }}
+        .header p {{ color: #94a3b8; font-size: 14px; }}
+        .section {{ 
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid #334155;
+            page-break-inside: avoid;
+        }}
+        .section-title {{ 
+            font-size: 16px;
+            font-weight: 600;
+            color: #f8fafc;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }}
+        .section-title span {{ font-size: 20px; }}
+        .risk-badge {{
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            color: white;
+        }}
+        .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }}
+        .grid-3 {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }}
+        .grid-4 {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }}
+        .stat-card {{
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }}
+        .stat-value {{ font-size: 20px; font-weight: bold; color: #f8fafc; }}
+        .stat-label {{ font-size: 11px; color: #94a3b8; margin-top: 4px; }}
+        .chart-container {{
+            margin: 16px 0;
+            text-align: center;
+        }}
+        .chart-title {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            text-align: left;
+        }}
+        .alert {{
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            padding: 12px;
+            margin: 12px 0;
+            border-radius: 0 8px 8px 0;
+        }}
+        .alert p {{ color: #fca5a5; font-size: 13px; }}
+        .alert.warning {{
+            background: rgba(245, 158, 11, 0.1);
+            border-left-color: #f59e0b;
+        }}
+        .alert.warning p {{ color: #fcd34d; }}
+        .insights {{
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.1));
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            page-break-inside: avoid;
+        }}
+        .insights-title {{ font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #f8fafc; }}
+        .insights-text {{ 
+            white-space: pre-wrap;
+            font-size: 12px;
+            line-height: 1.7;
+            color: #cbd5e1;
+        }}
+        .legend {{
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 10px;
+            color: #94a3b8;
+        }}
+        .legend-dot {{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }}
+        .print-btn {{
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #8b5cf6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 100;
+        }}
+        .print-btn:hover {{ background: #7c3aed; }}
+        .factor-item {{ 
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            font-size: 13px;
+            color: #94a3b8;
+        }}
+        .factor-item::before {{ content: '⚠️'; }}
+        .two-col {{ display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }}
+        @media print {{
+            body {{ background: white; color: #1e293b; padding: 10px; font-size: 11px; }}
+            .section {{ border: 1px solid #e2e8f0; background: #f8fafc; padding: 15px; margin-bottom: 15px; }}
+            .print-btn {{ display: none; }}
+            .stat-card {{ background: #f1f5f9; }}
+            .stat-value, .section-title {{ color: #1e293b; }}
+            .stat-label {{ color: #64748b; }}
+            .insights {{ background: #f8fafc; border: 1px solid #e2e8f0; }}
+            .insights-text {{ color: #475569; }}
+            .chart-title {{ color: #475569; }}
+            .legend-item {{ color: #64748b; }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{'📊 Relatório Científico Completo' if is_pt else '📊 Complete Scientific Report'}</h1>
+            <p><strong>{athlete['name']}</strong> • {analysis.analysis_date}</p>
+            <p>{'Posição' if is_pt else 'Position'}: {athlete.get('position', 'N/A')} | {'Peso' if is_pt else 'Weight'}: {weight} kg | {'Altura' if is_pt else 'Height'}: {height_cm} cm | IMC: {imc:.1f} ({imc_class})</p>
+        </div>
+        
+        <!-- Risk Level -->
+        <div class="section">
+            <div class="section-title"><span>🎯</span> {'Nível de Risco de Lesão' if is_pt else 'Injury Risk Level'}</div>
+            <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 12px;">
+                <div class="risk-badge" style="background: {risk_color(analysis.overall_risk_level)}">
+                    {risk_label(analysis.overall_risk_level)}
+                </div>
+            </div>
+            {''.join(f'<div class="factor-item">{f}</div>' for f in analysis.injury_risk_factors) if analysis.injury_risk_factors else f'<p style="color: #10b981;">{"✅ Nenhum fator de risco identificado" if is_pt else "✅ No risk factors identified"}</p>'}
+        </div>
+"""
+
+    # ============= GPS SECTION WITH CHARTS =============
+    if analysis.gps_summary and gps_history:
+        gps = analysis.gps_summary
+        
+        # Generate GPS charts SVG
+        chart_width = 380
+        chart_height = 120
+        padding = 40
+        
+        # Prepare data for charts
+        distances = [g.get('total_distance', 0) for g in gps_history]
+        hi_distances = [g.get('high_intensity_distance', 0) for g in gps_history]
+        sprint_distances = [g.get('sprint_distance', 0) for g in gps_history]
+        sprints = [g.get('sprint_count', 0) for g in gps_history]
+        dates = [g.get('date', '')[:5] for g in gps_history]
+        
+        def make_line_chart(values, color, title, unit, width=chart_width, height=chart_height):
+            if not values or all(v == 0 for v in values):
+                return ""
+            max_val = max(values) * 1.1 if max(values) > 0 else 1
+            min_val = 0
+            inner_w = width - padding * 2
+            inner_h = height - 40
+            
+            points = []
+            for i, v in enumerate(values):
+                x = padding + (i / max(len(values)-1, 1)) * inner_w
+                y = height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else height - 20
+                points.append(f"{x},{y}")
+            
+            polyline = " ".join(points)
+            
+            # Grid lines
+            grid_lines = ""
+            for i in range(4):
+                y = height - 20 - (i / 3) * inner_h
+                val = min_val + (i / 3) * (max_val - min_val)
+                grid_lines += f'<line x1="{padding}" y1="{y}" x2="{width-padding}" y2="{y}" stroke="#334155" stroke-dasharray="4"/>'
+                grid_lines += f'<text x="{padding-5}" y="{y+4}" text-anchor="end" fill="#64748b" font-size="9">{val:.0f}</text>'
+            
+            # Date labels
+            date_labels = ""
+            for i, d in enumerate(dates):
+                if i == 0 or i == len(dates) - 1:
+                    x = padding + (i / max(len(dates)-1, 1)) * inner_w
+                    date_labels += f'<text x="{x}" y="{height-5}" text-anchor="middle" fill="#64748b" font-size="8">{d}</text>'
+            
+            # Points
+            point_circles = ""
+            for i, v in enumerate(values):
+                x = padding + (i / max(len(values)-1, 1)) * inner_w
+                y = height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else height - 20
+                point_circles += f'<circle cx="{x}" cy="{y}" r="4" fill="{color}"/>'
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{title} ({unit})</div>
+                <svg width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+                    {grid_lines}
+                    <polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="2"/>
+                    {point_circles}
+                    {date_labels}
+                </svg>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>📍</span> {'Dados GPS' if is_pt else 'GPS Data'} ({gps['sessions_count']} {'sessões' if is_pt else 'sessions'})</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_distance_m'] / 1000:.1f}</div>
+                    <div class="stat-label">{'Dist. Média (km)' if is_pt else 'Avg Dist (km)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_high_intensity_m']:.0f}</div>
+                    <div class="stat-label">{'Alta Int. (m)' if is_pt else 'High Int (m)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['avg_sprints']:.1f}</div>
+                    <div class="stat-label">{'Sprints/Sessão' if is_pt else 'Sprints/Sess'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{gps['max_speed_kmh']:.1f}</div>
+                    <div class="stat-label">{'Vel. Máx (km/h)' if is_pt else 'Max Speed'}</div>
+                </div>
+            </div>
+            <div class="two-col">
+                {make_line_chart(distances, '#3b82f6', 'Distância Total' if is_pt else 'Total Distance', 'm')}
+                {make_line_chart(hi_distances, '#f59e0b', 'Alta Intensidade' if is_pt else 'High Intensity', 'm')}
+            </div>
+            <div class="two-col">
+                {make_line_chart(sprint_distances, '#ef4444', 'Distância Sprints' if is_pt else 'Sprint Distance', 'm')}
+                {make_line_chart(sprints, '#8b5cf6', 'Número de Sprints' if is_pt else 'Number of Sprints', '')}
+            </div>
+        </div>
+"""
+
+    # ============= WELLNESS SECTION WITH CHART =============
+    if analysis.wellness_summary and wellness_history:
+        w = analysis.wellness_summary
+        
+        # Wellness evolution chart
+        wellness_scores = [wh.get('wellness_score', 0) for wh in wellness_history]
+        readiness_scores = [wh.get('readiness_score', 0) for wh in wellness_history]
+        wellness_dates = [wh.get('date', '')[:5] for wh in wellness_history]
+        
+        chart_width = 760
+        chart_height = 140
+        padding = 50
+        
+        def make_dual_line_chart(values1, values2, color1, color2, label1, label2):
+            if not values1:
+                return ""
+            max_val = 10
+            min_val = 0
+            inner_w = chart_width - padding * 2
+            inner_h = chart_height - 40
+            
+            def get_points(values):
+                pts = []
+                for i, v in enumerate(values):
+                    x = padding + (i / max(len(values)-1, 1)) * inner_w
+                    y = chart_height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h
+                    pts.append(f"{x},{y}")
+                return " ".join(pts)
+            
+            # Grid
+            grid = ""
+            for i in range(5):
+                y = chart_height - 20 - (i / 4) * inner_h
+                val = min_val + (i / 4) * (max_val - min_val)
+                grid += f'<line x1="{padding}" y1="{y}" x2="{chart_width-padding}" y2="{y}" stroke="#334155" stroke-dasharray="4"/>'
+                grid += f'<text x="{padding-5}" y="{y+4}" text-anchor="end" fill="#64748b" font-size="9">{int(val)}</text>'
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Evolução Wellness & Prontidão' if is_pt else 'Wellness & Readiness Evolution'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    {grid}
+                    <polyline points="{get_points(values1)}" fill="none" stroke="{color1}" stroke-width="2"/>
+                    <polyline points="{get_points(values2)}" fill="none" stroke="{color2}" stroke-width="2"/>
+                </svg>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:{color1}"></div>{label1}</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:{color2}"></div>{label2}</div>
+                </div>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>💚</span> Wellness & {'Prontidão' if is_pt else 'Readiness'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_wellness_score']:.1f}</div>
+                    <div class="stat-label">Wellness Médio</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_readiness_score']:.1f}</div>
+                    <div class="stat-label">{'Prontidão Média' if is_pt else 'Avg Readiness'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_sleep_hours']:.1f}h</div>
+                    <div class="stat-label">{'Sono Médio' if is_pt else 'Avg Sleep'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{w['avg_fatigue']:.1f}</div>
+                    <div class="stat-label">{'Fadiga Média' if is_pt else 'Avg Fatigue'}</div>
+                </div>
+            </div>
+            {make_dual_line_chart(wellness_scores, readiness_scores, '#10b981', '#3b82f6', 'Wellness', 'Prontidão' if is_pt else 'Readiness')}
+        </div>
+"""
+
+    # ============= JUMP ASSESSMENT SECTION WITH CHARTS =============
+    if analysis.jump_analysis and jump_history:
+        j = analysis.jump_analysis
+        latest = j.get('latest', {})
+        hist = j.get('historical', {})
+        
+        # RSI evolution chart
+        rsi_values = [jh.get('rsi', 0) for jh in jump_history]
+        jump_dates = [jh.get('date', '')[:5] for jh in jump_history]
+        
+        chart_width = 380
+        chart_height = 120
+        
+        def make_rsi_chart():
+            if not rsi_values or all(v == 0 for v in rsi_values):
+                return ""
+            max_val = max(rsi_values) * 1.2 if max(rsi_values) > 0 else 2
+            min_val = min(rsi_values) * 0.8 if min(rsi_values) > 0 else 0
+            inner_w = chart_width - 80
+            inner_h = chart_height - 40
+            
+            points = []
+            circles = ""
+            for i, v in enumerate(rsi_values):
+                x = 50 + (i / max(len(rsi_values)-1, 1)) * inner_w
+                y = chart_height - 20 - ((v - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else chart_height - 20
+                points.append(f"{x},{y}")
+                circles += f'<circle cx="{x}" cy="{y}" r="4" fill="#10b981"/>'
+            
+            # Baseline line
+            avg_rsi = sum(rsi_values) / len(rsi_values)
+            baseline_y = chart_height - 20 - ((avg_rsi - min_val) / (max_val - min_val)) * inner_h if max_val > min_val else chart_height / 2
+            
+            return f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Evolução RSI' if is_pt else 'RSI Evolution'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <line x1="50" y1="{baseline_y}" x2="{chart_width-30}" y2="{baseline_y}" stroke="#f59e0b" stroke-dasharray="6 3"/>
+                    <text x="{chart_width-25}" y="{baseline_y-5}" fill="#f59e0b" font-size="9">Baseline</text>
+                    <polyline points="{' '.join(points)}" fill="none" stroke="#10b981" stroke-width="2"/>
+                    {circles}
+                    <text x="45" y="{chart_height - 20 - inner_h + 4}" text-anchor="end" fill="#64748b" font-size="9">{max_val:.2f}</text>
+                    <text x="45" y="{chart_height - 16}" text-anchor="end" fill="#64748b" font-size="9">{min_val:.2f}</text>
+                </svg>
+            </div>
+            '''
+        
+        # Z-Score gauge
+        z_score = hist.get('z_score', 0)
+        z_color = "#ef4444" if z_score < -1.5 else "#f59e0b" if z_score < -0.5 else "#10b981" if z_score < 0.5 else "#3b82f6"
+        
+        # Fatigue index visualization
+        fatigue_pct = abs(hist.get('rsi_variation_percent', 0))
+        fatigue_status = latest.get('fatigue_status', 'green')
+        fatigue_color = "#ef4444" if fatigue_status == 'red' else "#f59e0b" if fatigue_status == 'yellow' else "#10b981"
+        
+        # Check for asymmetry
+        asymmetry_alert = ""
+        if latest.get('protocol', '').startswith('SL-CMJ'):
+            # Would need additional data - for now just show if available in analysis
+            pass
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>🦘</span> {'Avaliação de Salto' if is_pt else 'Jump Assessment'} - {latest.get('protocol', 'CMJ')}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {fatigue_color}">{latest.get('rsi', 0):.2f}</div>
+                    <div class="stat-label">RSI</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('jump_height_cm', 0):.1f}</div>
+                    <div class="stat-label">{'Altura (cm)' if is_pt else 'Height (cm)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('peak_power_w', 0):.0f}</div>
+                    <div class="stat-label">{'Potência (W)' if is_pt else 'Power (W)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('relative_power_wkg', 0):.1f}</div>
+                    <div class="stat-label">W/kg</div>
+                </div>
+            </div>
+            <div class="grid-3">
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {z_color}">{z_score:.2f}</div>
+                    <div class="stat-label">Z-Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" style="color: {fatigue_color}">{fatigue_pct:.1f}%</div>
+                    <div class="stat-label">{'Índice de Fadiga' if is_pt else 'Fatigue Index'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{latest.get('peak_velocity_ms', 0):.2f}</div>
+                    <div class="stat-label">{'Vel. Pico (m/s)' if is_pt else 'Peak Vel (m/s)'}</div>
+                </div>
+            </div>
+            {make_rsi_chart()}
+            {f'<div class="alert"><p>⚠️ {"RSI indica fadiga neuromuscular" if is_pt else "RSI indicates neuromuscular fatigue"} ({hist.get("rsi_variation_percent", 0):.1f}% {"abaixo do baseline" if is_pt else "below baseline"})</p></div>' if j.get('fatigue_alert') else ''}
+        </div>
+"""
+
+    # ============= VBT SECTION WITH LOAD-VELOCITY CHART =============
+    if analysis.vbt_analysis and vbt_data:
+        v = analysis.vbt_analysis
+        lvp = v.get('load_velocity_profile', {})
+        
+        # Collect all data points for load-velocity chart
+        all_points = []
+        for session in vbt_data:
+            for s in session.get('sets', []):
+                if s.get('load_kg', 0) > 0 and s.get('mean_velocity', 0) > 0:
+                    all_points.append({'load': s['load_kg'], 'velocity': s['mean_velocity']})
+        
+        # Load-Velocity Chart
+        lv_chart = ""
+        if lvp.get('slope') and lvp.get('intercept') and all_points:
+            chart_width = 380
+            chart_height = 160
+            max_load = lvp.get('estimated_1rm_kg', 150) * 1.1
+            max_vel = 1.5
+            slope = lvp['slope']
+            intercept = lvp['intercept']
+            
+            # Points
+            points_svg = ""
+            for p in all_points:
+                x = 50 + (p['load'] / max_load) * (chart_width - 80)
+                y = chart_height - 30 - (p['velocity'] / max_vel) * (chart_height - 50)
+                points_svg += f'<circle cx="{x}" cy="{y}" r="4" fill="#8b5cf6" opacity="0.6"/>'
+            
+            # Regression line
+            x1 = 50
+            y1 = chart_height - 30 - (intercept / max_vel) * (chart_height - 50)
+            x2 = 50 + (max_load / max_load) * (chart_width - 80)
+            y2_vel = intercept + slope * max_load
+            y2 = chart_height - 30 - (y2_vel / max_vel) * (chart_height - 50)
+            
+            # MVT line
+            mvt = 0.3
+            mvt_y = chart_height - 30 - (mvt / max_vel) * (chart_height - 50)
+            
+            # 1RM point
+            est_1rm = lvp.get('estimated_1rm_kg', 0)
+            rm_x = 50 + (est_1rm / max_load) * (chart_width - 80) if est_1rm else 0
+            
+            # Optimal load point
+            opt_load = lvp.get('optimal_load_kg', 0)
+            opt_vel = intercept + slope * opt_load if opt_load else 0
+            opt_x = 50 + (opt_load / max_load) * (chart_width - 80) if opt_load else 0
+            opt_y = chart_height - 30 - (opt_vel / max_vel) * (chart_height - 50) if opt_vel > 0 else 0
+            
+            lv_chart = f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Perfil Carga-Velocidade' if is_pt else 'Load-Velocity Profile'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <!-- Grid -->
+                    <line x1="50" y1="{chart_height - 30}" x2="{chart_width - 30}" y2="{chart_height - 30}" stroke="#334155"/>
+                    <line x1="50" y1="20" x2="50" y2="{chart_height - 30}" stroke="#334155"/>
+                    
+                    <!-- MVT Line -->
+                    <line x1="50" y1="{mvt_y}" x2="{chart_width - 30}" y2="{mvt_y}" stroke="#ef4444" stroke-dasharray="6 3"/>
+                    <text x="{chart_width - 25}" y="{mvt_y - 5}" fill="#ef4444" font-size="9">MVT</text>
+                    
+                    <!-- Data points -->
+                    {points_svg}
+                    
+                    <!-- Regression line -->
+                    <line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="#8b5cf6" stroke-width="2"/>
+                    
+                    <!-- 1RM point -->
+                    {f'<circle cx="{rm_x}" cy="{mvt_y}" r="6" fill="#10b981"/><text x="{rm_x}" y="{mvt_y + 15}" text-anchor="middle" fill="#10b981" font-size="9" font-weight="bold">1RM</text>' if est_1rm else ''}
+                    
+                    <!-- Optimal load point -->
+                    {f'<circle cx="{opt_x}" cy="{opt_y}" r="6" fill="#f59e0b"/>' if opt_load else ''}
+                    
+                    <!-- Axis labels -->
+                    <text x="{chart_width / 2}" y="{chart_height - 5}" text-anchor="middle" fill="#64748b" font-size="9">{'Carga (kg)' if is_pt else 'Load (kg)'}</text>
+                    <text x="15" y="{chart_height / 2}" text-anchor="middle" fill="#64748b" font-size="9" transform="rotate(-90, 15, {chart_height / 2})">m/s</text>
+                </svg>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>1RM: {est_1rm:.0f}kg</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>{'Carga Ótima' if is_pt else 'Optimal'}: {opt_load:.0f}kg</div>
+                </div>
+            </div>
+            '''
+        
+        # Velocity Loss Chart
+        vl_data = v.get('velocity_loss_analysis', [])
+        vl_chart = ""
+        if vl_data:
+            chart_width = 380
+            chart_height = 120
+            max_loss = max(30, max(d['loss_percent'] for d in vl_data) * 1.2)
+            bar_width = min(35, (chart_width - 80) / len(vl_data) - 8)
+            
+            bars = ""
+            for i, d in enumerate(vl_data):
+                x = 50 + i * (bar_width + 8)
+                bar_h = (d['loss_percent'] / max_loss) * (chart_height - 50)
+                y = chart_height - 30 - bar_h
+                color = "#ef4444" if d['loss_percent'] >= 20 else "#f59e0b" if d['loss_percent'] >= 10 else "#10b981"
+                bars += f'''
+                    <rect x="{x}" y="{y}" width="{bar_width}" height="{bar_h}" fill="{color}" rx="4"/>
+                    <text x="{x + bar_width/2}" y="{y - 5}" text-anchor="middle" fill="{color}" font-size="9" font-weight="bold">{d['loss_percent']:.0f}%</text>
+                    <text x="{x + bar_width/2}" y="{chart_height - 15}" text-anchor="middle" fill="#64748b" font-size="9">S{d['set']}</text>
+                '''
+            
+            # Fatigue zone line
+            fatigue_y = chart_height - 30 - (20 / max_loss) * (chart_height - 50)
+            
+            vl_chart = f'''
+            <div class="chart-container">
+                <div class="chart-title">{'Perda de Velocidade por Série' if is_pt else 'Velocity Loss by Set'}</div>
+                <svg width="{chart_width}" height="{chart_height}" viewBox="0 0 {chart_width} {chart_height}">
+                    <line x1="50" y1="{fatigue_y}" x2="{chart_width - 30}" y2="{fatigue_y}" stroke="#ef4444" stroke-dasharray="4"/>
+                    <text x="{chart_width - 25}" y="{fatigue_y - 5}" fill="#ef4444" font-size="8">{"Zona Fadiga" if is_pt else "Fatigue"}</text>
+                    {bars}
+                </svg>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>⚡</span> VBT - {'Perfil Força-Velocidade' if is_pt else 'Force-Velocity Profile'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('estimated_1rm_kg', 0):.0f}</div>
+                    <div class="stat-label">1RM Est. (kg)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('optimal_load_kg', 0):.0f}</div>
+                    <div class="stat-label">{'Carga Ótima (kg)' if is_pt else 'Optimal (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{abs(lvp.get('slope', 0)) * 1000:.2f}</div>
+                    <div class="stat-label">Slope (mm/s/kg)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lvp.get('intercept', 0):.2f}</div>
+                    <div class="stat-label">V0 (m/s)</div>
+                </div>
+            </div>
+            <div class="two-col">
+                {lv_chart}
+                {vl_chart}
+            </div>
+            {f'<div class="alert"><p>⚠️ {"Perda de velocidade ≥20% detectada - Indica fadiga periférica" if is_pt else "Velocity loss ≥20% detected - Indicates peripheral fatigue"}</p></div>' if v.get("fatigue_detected") else ""}
+        </div>
+"""
+
+    # ============= BODY COMPOSITION SECTION =============
+    if analysis.body_composition:
+        bc = analysis.body_composition
+        latest = bc.get('latest', {})
+        
+        body_fat = latest.get('body_fat_percent', 0)
+        lean_mass = latest.get('lean_mass_kg', 0)
+        fat_mass = latest.get('fat_mass_kg', 0)
+        
+        # Donut chart for body composition
+        donut_chart = ""
+        if lean_mass > 0 or fat_mass > 0:
+            total = lean_mass + fat_mass
+            lean_pct = (lean_mass / total) * 100 if total > 0 else 0
+            
+            # SVG donut
+            size = 120
+            stroke_width = 14
+            radius = (size - stroke_width) / 2
+            circumference = 2 * 3.14159 * radius
+            fat_offset = circumference * (1 - body_fat / 100)
+            
+            donut_chart = f'''
+            <div style="display: flex; align-items: center; gap: 20px; justify-content: center; margin: 16px 0;">
+                <svg width="{size}" height="{size}" viewBox="0 0 {size} {size}">
+                    <circle cx="{size/2}" cy="{size/2}" r="{radius}" stroke="#10b981" stroke-width="{stroke_width}" fill="none"/>
+                    <circle cx="{size/2}" cy="{size/2}" r="{radius}" stroke="#f59e0b" stroke-width="{stroke_width}" fill="none"
+                            stroke-dasharray="{circumference}" stroke-dashoffset="{fat_offset}" stroke-linecap="round"
+                            transform="rotate(-90 {size/2} {size/2})"/>
+                    <text x="{size/2}" y="{size/2 - 8}" text-anchor="middle" fill="#f8fafc" font-size="18" font-weight="bold">{body_fat:.1f}%</text>
+                    <text x="{size/2}" y="{size/2 + 10}" text-anchor="middle" fill="#94a3b8" font-size="10">{"Gordura" if is_pt else "Body Fat"}</text>
+                </svg>
+                <div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #10b981;"></div>
+                        <span style="color: #f8fafc; font-weight: bold;">{lean_mass:.1f} kg</span>
+                        <span style="color: #94a3b8; font-size: 12px;">{"Massa Magra" if is_pt else "Lean Mass"}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 12px; height: 12px; border-radius: 50%; background: #f59e0b;"></div>
+                        <span style="color: #f8fafc; font-weight: bold;">{fat_mass:.1f} kg</span>
+                        <span style="color: #94a3b8; font-size: 12px;">{"Massa Gorda" if is_pt else "Fat Mass"}</span>
+                    </div>
+                </div>
+            </div>
+            '''
+        
+        trend = bc.get('trend', {})
+        trend_html = ""
+        if trend:
+            fat_change = trend.get('fat_percent_change', 0)
+            lean_change = trend.get('lean_mass_change_kg', 0)
+            trend_color = "#10b981" if fat_change <= 0 and lean_change >= 0 else "#ef4444"
+            trend_icon = "📈" if trend.get('direction') == 'improving' else "📉" if trend.get('direction') == 'declining' else "➡️"
+            trend_html = f'''
+            <div class="alert {'warning' if trend.get('direction') != 'improving' else ''}" style="background: rgba(16, 185, 129, 0.1); border-left-color: {trend_color};">
+                <p style="color: {trend_color};">{trend_icon} {"Tendência" if is_pt else "Trend"}: {'+' if fat_change > 0 else ''}{fat_change:.1f}% {"gordura" if is_pt else "fat"}, {'+' if lean_change > 0 else ''}{lean_change:.1f}kg {"massa magra" if is_pt else "lean"}</p>
+            </div>
+            '''
+        
+        html_content += f"""
+        <div class="section">
+            <div class="section-title"><span>🏋️</span> {'Composição Corporal' if is_pt else 'Body Composition'}</div>
+            <div class="grid-4">
+                <div class="stat-card">
+                    <div class="stat-value">{body_fat:.1f}%</div>
+                    <div class="stat-label">{'Gordura' if is_pt else 'Body Fat'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{lean_mass:.1f}</div>
+                    <div class="stat-label">{'Massa Magra (kg)' if is_pt else 'Lean (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{fat_mass:.1f}</div>
+                    <div class="stat-label">{'Massa Gorda (kg)' if is_pt else 'Fat (kg)'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{imc:.1f}</div>
+                    <div class="stat-label">IMC</div>
+                </div>
+            </div>
+            {donut_chart}
+            {trend_html}
+        </div>
+"""
+
+    # AI Insights Section
+    if analysis.scientific_insights:
+        html_content += f"""
+        <div class="insights">
+            <div class="insights-title">🧠 {'Insights Científicos (IA)' if is_pt else 'Scientific Insights (AI)'}</div>
+            <div class="insights-text">{analysis.scientific_insights}</div>
+        </div>
+"""
+
+    html_content += """
+        <button class="print-btn" onclick="window.print()">
+            🖨️ Imprimir PDF
+        </button>
+    </div>
+</body>
+</html>
+"""
+
+    return HTMLResponse(content=html_content, status_code=200)
+
+
+# ============= TEAM DASHBOARD =============
+
+class TeamDashboardAthlete(BaseModel):
+    id: str
+    name: str
+    position: str
+    acwr: Optional[float] = None
+    risk_level: str = "unknown"
+    fatigue_score: Optional[float] = None
+    readiness_score: Optional[float] = None  # Wellness readiness 0-100%
+    last_gps_date: Optional[str] = None
+    last_wellness_date: Optional[str] = None
+    wellness_score: Optional[float] = None
+    total_sessions_7d: int = 0
+    avg_distance_7d: float = 0
+    injury_risk: bool = False
+    peripheral_fatigue: bool = False
+    # Extended fields for dashboard metrics
+    monotony: Optional[float] = None
+    strain: Optional[float] = None
+    metric_value: Optional[float] = None  # Value for selected ACWR metric
+
+class TeamDashboardStats(BaseModel):
+    total_athletes: int
+    athletes_high_risk: int
+    athletes_optimal: int
+    athletes_fatigued: int
+    team_avg_acwr: float
+    team_avg_wellness: float
+    team_avg_fatigue: float
+    team_avg_readiness: Optional[float] = None  # Wellness readiness 0-100%
+    sessions_this_week: int
+    total_distance_this_week: float
+    team_avg_power: Optional[float] = None
+    team_avg_body_fat: Optional[float] = None
+    team_avg_hid: Optional[float] = None  # High Intensity Distance
+    team_avg_rsi: Optional[float] = None  # Reactive Strength Index
+    rsi_trend: Optional[str] = None  # up, down, stable
+    rsi_percentile: Optional[float] = None
+    avg_distance_per_session: Optional[float] = None
+
+class TeamDashboardResponse(BaseModel):
+    stats: TeamDashboardStats
+    athletes: List[TeamDashboardAthlete]
+    risk_distribution: Dict[str, int]
+    position_summary: Dict[str, Dict[str, Any]]
+    alerts: List[str]
+
+@api_router.get("/dashboard/team", response_model=TeamDashboardResponse)
+async def get_team_dashboard(
+    lang: str = "pt",
+    acwr_metric: str = "total_distance",
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get aggregated team statistics and individual athlete status for team-wide overview
+    
+    OPTIMIZED VERSION - Eliminates N+1 query problem by pre-loading all data
+    
+    Parameters:
+    - acwr_metric: Metric to use for ACWR calculation. Options:
+        - total_distance (default)
+        - high_intensity_distance (HID Z3)
+        - high_speed_running (HSR Z4)
+        - sprint_distance (Sprint Z5)
+        - number_of_sprints (Sprint count)
+        - acc_dec (ACC + DEC events)
+    - date_range: Date range filter. Options:
+        - today (only today's data)
+        - 7d (default, last 7 days)
+        - 14d (last 14 days)
+        - 28d (last 28 days)
+        - 90d (last 90 days)
+    """
+    
+    user_id = current_user["_id"]
+    
+    # Validate acwr_metric parameter
+    valid_metrics = [
+        "total_distance",
+        "high_intensity_distance",
+        "high_speed_running", 
+        "sprint_distance",
+        "number_of_sprints",
+        "acc_dec"
+    ]
+    if acwr_metric not in valid_metrics:
+        acwr_metric = "total_distance"
+    
+    # Parse date_range parameter
+    valid_date_ranges = ["today", "7d", "14d", "28d", "90d"]
+    if date_range not in valid_date_ranges:
+        date_range = "7d"
+    
+    # Calculate filter days based on date_range
+    date_range_days_map = {
+        "today": 0,
+        "7d": 7,
+        "14d": 14,
+        "28d": 28,
+        "90d": 90
+    }
+    filter_days = date_range_days_map.get(date_range, 7)
+    
+    # Date ranges - calculated once
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    seven_days_ago = today - timedelta(days=7)
+    ninety_days_ago = today - timedelta(days=90)  # Max window for queries
+    ninety_days_ago_str = ninety_days_ago.strftime("%Y-%m-%d")
+    
+    # Calculate filter start date based on date_range parameter
+    if filter_days == 0:  # today
+        filter_start_date = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start_date = today - timedelta(days=filter_days)
+    
+    # Get all athletes for this coach
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(100)
+    
+    if not athletes:
+        return TeamDashboardResponse(
+            stats=TeamDashboardStats(
+                total_athletes=0,
+                athletes_high_risk=0,
+                athletes_optimal=0,
+                athletes_fatigued=0,
+                team_avg_acwr=0,
+                team_avg_wellness=0,
+                team_avg_fatigue=0,
+                sessions_this_week=0,
+                total_distance_this_week=0
+            ),
+            athletes=[],
+            risk_distribution={"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0},
+            position_summary={},
+            alerts=[]
+        )
+    
+    # Create athlete ID list for bulk queries
+    athlete_ids = [str(a["_id"]) for a in athletes]
+    
+    # ============================================================
+    # OPTIMIZED: BULK LOAD ALL DATA BEFORE PROCESSING (5-6 queries total)
+    # ============================================================
+    
+    # Query 1: GPS data - limited to 90 days max
+    all_gps_data = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": ninety_days_ago_str}
+    }).to_list(5000)
+    
+    # Query 2: Wellness data - last 7 days per athlete is enough
+    all_wellness_data = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(1000)
+    
+    # Query 3: Jump assessments
+    all_jump_assessments = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Query 4: Legacy assessments (strength)
+    all_assessments = await db.assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Query 5: Body compositions
+    all_body_compositions = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    # Query 6: EWMA load metrics (latest per athlete from load_engine)
+    all_load_metrics = await db.athlete_load_metrics.find(
+        {"coach_id": user_id}
+    ).sort("date", -1).to_list(5000)
+    
+    # Index load metrics by athlete_id (keep only latest per athlete)
+    load_metrics_by_athlete: Dict[str, dict] = {}
+    for m in all_load_metrics:
+        aid = m.get("athlete_id")
+        if aid and aid not in load_metrics_by_athlete:
+            load_metrics_by_athlete[aid] = m
+    
+    # Map the acwr_metric parameter to load_engine field name
+    load_engine_field = ACWR_METRIC_TO_ENGINE_FIELD.get(acwr_metric, "distance")
+    
+    # ============================================================
+    # BUILD INDEXED DATA STRUCTURES FOR O(1) LOOKUPS
+    # ============================================================
+    
+    # GPS data indexed by athlete_id
+    gps_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_gps_data:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in gps_by_athlete:
+                gps_by_athlete[aid] = []
+            gps_by_athlete[aid].append(record)
+    
+    # Sort GPS data by date descending for each athlete
+    for aid in gps_by_athlete:
+        gps_by_athlete[aid].sort(key=lambda x: x.get("date", ""), reverse=True)
+    
+    # Wellness data indexed by athlete_id (already sorted by date desc)
+    wellness_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_wellness_data:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in wellness_by_athlete:
+                wellness_by_athlete[aid] = []
+            wellness_by_athlete[aid].append(record)
+    
+    # Jump assessments indexed by athlete_id
+    jump_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_jump_assessments:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in jump_by_athlete:
+                jump_by_athlete[aid] = []
+            jump_by_athlete[aid].append(record)
+    
+    # Assessments indexed by athlete_id
+    assessments_by_athlete: Dict[str, List[dict]] = {}
+    for record in all_assessments:
+        aid = record.get("athlete_id")
+        if aid:
+            if aid not in assessments_by_athlete:
+                assessments_by_athlete[aid] = []
+            assessments_by_athlete[aid].append(record)
+    
+    # Body compositions indexed by athlete_id (only need latest per athlete)
+    body_comp_by_athlete: Dict[str, dict] = {}
+    for record in all_body_compositions:
+        aid = record.get("athlete_id")
+        if aid and aid not in body_comp_by_athlete:  # Keep only first (latest)
+            body_comp_by_athlete[aid] = record
+    
+    # ============================================================
+    # CALCULATE GLOBAL SESSION COUNTS FROM PRE-LOADED DATA
+    # ============================================================
+    global_sessions_7d = set()
+    global_sessions_total = set()
+    global_sessions_filtered = set()
+    
+    for record in all_gps_data:
+        try:
+            record_date = datetime.strptime(record.get("date", ""), "%Y-%m-%d")
+            session_key = f"{record.get('date')}_{record.get('session_name', 'default')}"
+            global_sessions_total.add(session_key)
+            if record_date >= seven_days_ago:
+                global_sessions_7d.add(session_key)
+            if record_date >= filter_start_date:
+                global_sessions_filtered.add(session_key)
+        except:
+            continue
+    
+    total_sessions_7d_global = len(global_sessions_7d)
+    
+    # ============================================================
+    # PROCESS EACH ATHLETE (NO DATABASE QUERIES IN THIS LOOP)
+    # ============================================================
+    athlete_data = []
+    total_acwr = 0
+    acwr_count = 0
+    total_wellness = 0
+    wellness_count = 0
+    total_fatigue = 0
+    fatigue_count = 0
+    total_readiness = 0
+    readiness_count = 0
+    total_distance = 0
+    total_power = 0
+    power_count = 0
+    total_body_fat = 0
+    body_fat_count = 0
+    total_hid = 0
+    hid_count = 0
+    all_rsi_values = []
+    
+    risk_distribution = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
+    position_summary: Dict[str, Dict[str, Any]] = {}
+    alerts = []
+    
+    for athlete in athletes:
+        athlete_id = str(athlete["_id"])
+        position = athlete.get("position", "")
+        if not position or position == "Unknown":
+            position = "Não especificado" if lang == "pt" else "Not specified"
+        
+        # Initialize position summary
+        if position not in position_summary:
+            position_summary[position] = {
+                "count": 0, "avg_acwr": 0, "avg_wellness": 0, "avg_fatigue": 0,
+                "avg_distance": 0, "avg_sprints": 0, "avg_max_speed": 0, "high_risk_count": 0,
+                "_total_acwr": 0, "_total_wellness": 0, "_total_fatigue": 0,
+                "_total_distance": 0, "_total_sprints": 0, "_total_max_speed": 0,
+                "_acwr_count": 0, "_wellness_count": 0, "_fatigue_count": 0, "_gps_count": 0
+            }
+        position_summary[position]["count"] += 1
+        
+        # Get athlete's GPS data from pre-loaded index (O(1) lookup)
+        gps_data = gps_by_athlete.get(athlete_id, [])
+        
+        # Calculate ACWR
+        acwr = None
+        athlete_ewma = None
+        risk_level = "unknown"
+        sessions_7d = 0
+        distance_7d = 0
+        last_gps_date = None
+        gps_data_by_date = {}
+        
+        if gps_data:
+            last_gps_date = gps_data[0].get("date")
+            unique_sessions_7d = set()
+            
+            # ============================================================
+            # GPS AGGREGATION FIX: Avoid double-counting periods
+            # Group records by (date, session_name), then apply session/period logic
+            # ============================================================
+            _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+            _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+            
+            # Step 1: Group records by (date, session_name)
+            grouped: Dict[str, Dict[str, list]] = {}  # date -> session_name -> [records]
+            for record in gps_data:
+                try:
+                    record_date_str = record["date"]
+                    datetime.strptime(record_date_str, "%Y-%m-%d")
+                except:
+                    continue
+                sname = record.get("session_name") or "default"
+                grouped.setdefault(record_date_str, {}).setdefault(sname, []).append(record)
+            
+            # Step 2: For each (date, session), pick session-total or sum periods
+            for record_date_str, sessions_map in grouped.items():
+                record_date = datetime.strptime(record_date_str, "%Y-%m-%d")
+                if record_date_str not in gps_data_by_date:
+                    gps_data_by_date[record_date_str] = {
+                        "total_distance": 0, "high_intensity_distance": 0,
+                        "high_speed_running": 0, "sprint_distance": 0,
+                        "number_of_sprints": 0, "acc_dec": 0
+                    }
+                
+                for sname, records in sessions_map.items():
+                    session_key = f"{record_date_str}_{sname}"
+                    
+                    # Apply session/period dedup logic (same as extract_gps_metrics_from_session)
+                    session_total_rec = None
+                    period_recs = []
+                    for r in records:
+                        pname = (r.get("period_name") or "").lower()
+                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
+                        if is_sess and not is_period:
+                            if session_total_rec is None:
+                                session_total_rec = r
+                        else:
+                            period_recs.append(r)
+                    
+                    # Choose source: session total > periods > all records
+                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    
+                    for r in source:
+                        dist = r.get("total_distance", 0) or 0
+                        hid = r.get("high_intensity_distance", 0) or 0
+                        hsr = r.get("high_speed_running", 0) or 0
+                        sprint_dist = r.get("sprint_distance", 0) or 0
+                        sprint_count = r.get("number_of_sprints", 0) or 0
+                        acc_count = r.get("number_of_accelerations", 0) or 0
+                        dec_count = r.get("number_of_decelerations", 0) or 0
+                        
+                        gps_data_by_date[record_date_str]["total_distance"] += dist
+                        gps_data_by_date[record_date_str]["high_intensity_distance"] += hid
+                        gps_data_by_date[record_date_str]["high_speed_running"] += hsr
+                        gps_data_by_date[record_date_str]["sprint_distance"] += sprint_dist
+                        gps_data_by_date[record_date_str]["number_of_sprints"] += sprint_count
+                        gps_data_by_date[record_date_str]["acc_dec"] += acc_count + dec_count
+                        
+                        if record_date >= seven_days_ago:
+                            distance_7d += dist
+                            unique_sessions_7d.add(session_key)
+                            total_hid += hid
+                            hid_count += 1
+            
+            sessions_7d = len(unique_sessions_7d)
+            total_distance += distance_7d
+            
+            # ACWR from EWMA (load_engine) — replaces inline Coupled ACWR
+            athlete_ewma = load_metrics_by_athlete.get(athlete_id)
+            if athlete_ewma:
+                ewma_metric_data = athlete_ewma.get(load_engine_field, {})
+                if isinstance(ewma_metric_data, dict) and ewma_metric_data.get("acwr") is not None:
+                    acwr = ewma_metric_data["acwr"]
+                    total_acwr += acwr
+                    acwr_count += 1
+                    
+                    if acwr < 0.8:
+                        risk_level = "low"
+                    elif acwr <= 1.3:
+                        risk_level = "optimal"
+                    elif acwr <= 1.5:
+                        risk_level = "moderate"
+                    else:
+                        risk_level = "high"
+                    
+                    risk_distribution[risk_level] += 1
+                    
+                    if risk_level == "high":
+                        position_summary[position]["high_risk_count"] += 1
+                        alert_msg = f"⚠️ {athlete['name']} ({position}): ACWR alto ({acwr})" if lang == "pt" else f"⚠️ {athlete['name']} ({position}): High ACWR ({acwr})"
+                        alerts.append(alert_msg)
+                else:
+                    risk_distribution["unknown"] += 1
+            else:
+                risk_distribution["unknown"] += 1
+            
+            # RSI from jump assessments (from pre-loaded data)
+            athlete_jump_assessments = [j for j in jump_by_athlete.get(athlete_id, []) if j.get("protocol") == "cmj"][:10]
+            
+            if athlete_jump_assessments:
+                for jump_assessment in athlete_jump_assessments:
+                    rsi = jump_assessment.get("rsi")
+                    if rsi and rsi > 0:
+                        all_rsi_values.append({"value": rsi, "date": jump_assessment.get("date"), "athlete_id": athlete_id})
+            else:
+                # Fallback to legacy assessments
+                athlete_assessments = assessments_by_athlete.get(athlete_id, [])
+                for assessment in athlete_assessments:
+                    metrics = assessment.get("metrics", {})
+                    rsi = metrics.get("rsi") if isinstance(metrics, dict) else None
+                    if rsi and rsi > 0:
+                        all_rsi_values.append({"value": rsi, "date": assessment.get("date"), "athlete_id": athlete_id})
+        else:
+            risk_distribution["unknown"] += 1
+        
+        # Wellness data (from pre-loaded data)
+        wellness_data = wellness_by_athlete.get(athlete_id, [])[:7]
+        wellness_score = None
+        fatigue_score = None
+        readiness_score_pct = None  # Readiness as 0-100%
+        last_wellness_date = None
+        
+        if wellness_data:
+            latest_wellness = wellness_data[0]
+            last_wellness_date = latest_wellness.get("date")
+            wellness_score = latest_wellness.get("wellness_score")
+            
+            if wellness_score is None or wellness_score == 0:
+                fatigue_val = latest_wellness.get("fatigue", 5)
+                stress_val = latest_wellness.get("stress", 5)
+                mood_val = latest_wellness.get("mood", 5)
+                sleep_quality_val = latest_wellness.get("sleep_quality", 5)
+                muscle_soreness_val = latest_wellness.get("muscle_soreness", 5)
+                hydration_val = latest_wellness.get("hydration", 5)
+                
+                calculated_wellness = (
+                    (10 - fatigue_val) * 0.20 + (10 - stress_val) * 0.15 +
+                    mood_val * 0.15 + sleep_quality_val * 0.20 +
+                    (10 - muscle_soreness_val) * 0.15 + hydration_val * 0.15
+                )
+                if calculated_wellness > 0:
+                    wellness_score = round(calculated_wellness, 2)
+            
+            fatigue = latest_wellness.get("fatigue", 5)
+            fatigue_score = fatigue * 10
+            
+            # Extract readiness_score (0-10 scale) and convert to 0-100%
+            raw_readiness = latest_wellness.get("readiness_score")
+            if raw_readiness is not None:
+                readiness_score_pct = round(raw_readiness * 10, 1)
+            
+            if wellness_score and wellness_score > 0:
+                total_wellness += wellness_score
+                wellness_count += 1
+            
+            total_fatigue += fatigue_score
+            fatigue_count += 1
+            
+            # Accumulate readiness for team average
+            if readiness_score_pct is not None:
+                total_readiness += readiness_score_pct
+                readiness_count += 1
+            
+            if fatigue_score > 70:
+                alert_msg = f"🔴 {athlete['name']}: Fadiga alta ({fatigue_score}%)" if lang == "pt" else f"🔴 {athlete['name']}: High fatigue ({fatigue_score}%)"
+                alerts.append(alert_msg)
+        
+        # Peripheral fatigue (from pre-loaded data)
+        peripheral_fatigue = False
+        strength_assessments = [a for a in assessments_by_athlete.get(athlete_id, []) if a.get("assessment_type") == "strength"][:10]
+        
+        if len(strength_assessments) >= 2:
+            latest = strength_assessments[0].get("metrics", {})
+            historical_peak_power = max([a.get("metrics", {}).get("peak_power", 0) for a in strength_assessments])
+            current_peak_power = latest.get("peak_power", 0)
+            
+            if historical_peak_power > 0:
+                power_drop = (historical_peak_power - current_peak_power) / historical_peak_power * 100
+                if power_drop > 20:
+                    peripheral_fatigue = True
+                    if power_drop > 30:
+                        alert_msg = f"⚡ {athlete['name']}: Queda de potência de {power_drop:.0f}%" if lang == "pt" else f"⚡ {athlete['name']}: Power drop of {power_drop:.0f}%"
+                        alerts.append(alert_msg)
+        
+        # Power data (from pre-loaded data)
+        power_found = False
+        if strength_assessments:
+            latest_strength = strength_assessments[0].get("metrics", {})
+            mean_power = latest_strength.get("mean_power")
+            if mean_power and mean_power > 0:
+                total_power += mean_power
+                power_count += 1
+                power_found = True
+        
+        if not power_found:
+            jump_assessments = jump_by_athlete.get(athlete_id, [])[:5]
+            if jump_assessments:
+                peak_power = jump_assessments[0].get("peak_power_w")
+                if peak_power and peak_power > 0:
+                    total_power += peak_power
+                    power_count += 1
+        
+        # Body composition (from pre-loaded data)
+        latest_body_comp = body_comp_by_athlete.get(athlete_id)
+        if latest_body_comp and latest_body_comp.get("body_fat_percentage"):
+            total_body_fat += latest_body_comp["body_fat_percentage"]
+            body_fat_count += 1
+        
+        # RC6: DO NOT compute load metrics manually.
+        # ALWAYS use load_engine as single source of truth.
+        monotony_value = None
+        strain_value = None
+        metric_value_for_athlete = None
+        
+        # Read monotony/strain from load_engine (same source as ACWR)
+        if athlete_ewma:
+            monotony_value = athlete_ewma.get("monotony") or None
+            strain_value = athlete_ewma.get("strain") or None
+        
+        # metric_value is a display sum for the filter period (not a load engine metric)
+        if gps_data:
+            days_to_check = max(1, filter_days) if filter_days == 0 else filter_days
+            days_to_check = min(days_to_check, 7)
+            
+            daily_loads = []
+            for i in range(days_to_check if filter_days > 0 else 1):
+                date_str = (today - timedelta(days=i)).strftime("%Y-%m-%d")
+                day_data = gps_data_by_date.get(date_str, {})
+                daily_loads.append(day_data.get(acwr_metric, 0) or 0)
+            
+            if filter_days == 0:
+                metric_value_for_athlete = daily_loads[0] if daily_loads else 0
+            else:
+                metric_value_for_athlete = sum(daily_loads)
+        
+        athlete_data.append(TeamDashboardAthlete(
+            id=athlete_id,
+            name=athlete["name"],
+            position=position,
+            acwr=acwr,
+            risk_level=risk_level,
+            fatigue_score=fatigue_score,
+            readiness_score=readiness_score_pct,
+            last_gps_date=last_gps_date,
+            last_wellness_date=last_wellness_date,
+            wellness_score=wellness_score,
+            total_sessions_7d=sessions_7d,
+            avg_distance_7d=round(distance_7d / sessions_7d, 0) if sessions_7d > 0 else 0,
+            injury_risk=risk_level == "high" or (fatigue_score is not None and fatigue_score > 70),
+            peripheral_fatigue=peripheral_fatigue,
+            monotony=monotony_value,
+            strain=strain_value,
+            metric_value=metric_value_for_athlete
+        ))
+        
+        # Update position averages
+        if acwr:
+            position_summary[position]["_total_acwr"] += acwr
+            position_summary[position]["_acwr_count"] += 1
+        if wellness_score:
+            position_summary[position]["_total_wellness"] += wellness_score
+            position_summary[position]["_wellness_count"] += 1
+        if fatigue_score:
+            position_summary[position]["_total_fatigue"] += fatigue_score
+            position_summary[position]["_fatigue_count"] += 1
+        
+        if gps_data:
+            recent_gps = gps_data[:7]
+            if recent_gps:
+                avg_dist = sum(g.get("total_distance", 0) for g in recent_gps) / len(recent_gps)
+                avg_sprints = sum(g.get("number_of_sprints", 0) for g in recent_gps) / len(recent_gps)
+                max_speeds = [g.get("max_speed", 0) for g in recent_gps if g.get("max_speed")]
+                avg_max_speed = sum(max_speeds) / len(max_speeds) if max_speeds else 0
+                
+                position_summary[position]["_total_distance"] += avg_dist
+                position_summary[position]["_total_sprints"] += avg_sprints
+                position_summary[position]["_total_max_speed"] += avg_max_speed
+                position_summary[position]["_gps_count"] += 1
+    
+    # Calculate position averages and cleanup
+    for pos in position_summary:
+        ps = position_summary[pos]
+        if ps["_acwr_count"] > 0:
+            ps["avg_acwr"] = round(ps["_total_acwr"] / ps["_acwr_count"], 2)
+        if ps["_wellness_count"] > 0:
+            ps["avg_wellness"] = round(ps["_total_wellness"] / ps["_wellness_count"], 1)
+        if ps["_fatigue_count"] > 0:
+            ps["avg_fatigue"] = round(ps["_total_fatigue"] / ps["_fatigue_count"], 1)
+        if ps["_gps_count"] > 0:
+            ps["avg_distance"] = round(ps["_total_distance"] / ps["_gps_count"], 0)
+            ps["avg_sprints"] = round(ps["_total_sprints"] / ps["_gps_count"], 1)
+            ps["avg_max_speed"] = round(ps["_total_max_speed"] / ps["_gps_count"], 1)
+        for key in list(ps.keys()):
+            if key.startswith("_"):
+                del ps[key]
+    
+    # Sort alerts and athletes
+    alerts.sort(key=lambda x: (0 if "🔴" in x else (1 if "⚡" in x else 2)))
+    risk_order = {"high": 0, "moderate": 1, "optimal": 2, "low": 3, "unknown": 4}
+    athlete_data.sort(key=lambda x: risk_order.get(x.risk_level, 4))
+    
+    # Calculate RSI stats
+    team_avg_rsi = None
+    rsi_trend = None
+    rsi_percentile = None
+    
+    if all_rsi_values:
+        sorted_rsi = sorted(all_rsi_values, key=lambda x: x.get("date", ""))
+        rsi_values_only = [r["value"] for r in sorted_rsi]
+        team_avg_rsi = round(sum(rsi_values_only) / len(rsi_values_only), 2)
+        
+        if len(rsi_values_only) >= 6:
+            recent_avg = sum(rsi_values_only[-3:]) / 3
+            previous_avg = sum(rsi_values_only[-6:-3]) / 3
+            rsi_trend = "up" if recent_avg > previous_avg * 1.05 else ("down" if recent_avg < previous_avg * 0.95 else "stable")
+        elif len(rsi_values_only) >= 2:
+            rsi_trend = "up" if rsi_values_only[-1] > rsi_values_only[-2] * 1.05 else ("down" if rsi_values_only[-1] < rsi_values_only[-2] * 0.95 else "stable")
+        
+        rsi_percentile = 25.0 if team_avg_rsi < 1.0 else (50.0 if team_avg_rsi < 2.0 else (75.0 if team_avg_rsi < 3.0 else 95.0))
+    
+    avg_distance_per_session = round(total_distance / total_sessions_7d_global, 0) if total_sessions_7d_global > 0 and total_distance > 0 else None
+    
+    return TeamDashboardResponse(
+        stats=TeamDashboardStats(
+            total_athletes=len(athletes),
+            athletes_high_risk=risk_distribution["high"],
+            athletes_optimal=risk_distribution["optimal"],
+            athletes_fatigued=sum(1 for a in athlete_data if a.fatigue_score and a.fatigue_score > 70),
+            team_avg_acwr=round(total_acwr / acwr_count, 2) if acwr_count > 0 else 0,
+            team_avg_wellness=round(total_wellness / wellness_count, 1) if wellness_count > 0 else 0,
+            team_avg_fatigue=round(total_fatigue / fatigue_count, 1) if fatigue_count > 0 else 0,
+            team_avg_readiness=round(total_readiness / readiness_count, 1) if readiness_count > 0 else None,
+            sessions_this_week=total_sessions_7d_global,
+            total_distance_this_week=round(total_distance, 0),
+            team_avg_power=round(total_power / power_count, 0) if power_count > 0 else None,
+            team_avg_body_fat=round(total_body_fat / body_fat_count, 1) if body_fat_count > 0 else None,
+            team_avg_hid=round(total_hid / hid_count, 0) if hid_count > 0 else None,
+            team_avg_rsi=team_avg_rsi,
+            rsi_trend=rsi_trend,
+            rsi_percentile=rsi_percentile,
+            avg_distance_per_session=avg_distance_per_session
+        ),
+        athletes=athlete_data,
+        risk_distribution=risk_distribution,
+        position_summary=position_summary,
+        alerts=alerts[:10]
+    )
+
+
+
+# ============= TEAM TABLE (TABELA ANALÍTICA) =============
+
+class TeamTableRow(BaseModel):
+    athlete_id: str
+    name: str
+    position: str
+    total_distance: float = 0
+    z3: float = 0
+    z4: float = 0
+    z5: float = 0
+    sprint_count: int = 0
+    acc_dec: int = 0
+    rsimod: Optional[float] = None
+    rsimod_delta: Optional[float] = None
+    rsimod_baseline_28d: Optional[float] = None
+    fatigue_index: Optional[float] = None
+    fatigue_baseline_28d: Optional[float] = None
+    fatigue_status: str = "UNKNOWN"
+    readiness_status: str = "UNKNOWN"
+    weight: Optional[float] = None
+    body_fat: Optional[float] = None
+    lean_mass: Optional[float] = None
+
+class TeamTableResponse(BaseModel):
+    rows: List[TeamTableRow]
+    period_label: str
+
+@api_router.get("/dashboard/team-table", response_model=TeamTableResponse)
+async def get_team_table(
+    lang: str = "pt",
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user)
+):
+    """Aggregated table data for the analytical team table.
+    Merges GPS, Jump, BodyComp and Wellness into a single flat row per athlete.
+    NO metric recalculation — only read and merge."""
+    
+    user_id = current_user["_id"]
+    
+    date_range_days = {"today": 0, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_days.get(date_range, 7)
+    
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    
+    if filter_days == 0:
+        filter_start = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start = today - timedelta(days=filter_days)
+    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    
+    period_labels = {
+        "today": "Hoje" if lang == "pt" else "Today",
+        "7d": "7 dias" if lang == "pt" else "7 days",
+        "14d": "14 dias" if lang == "pt" else "14 days",
+        "28d": "28 dias" if lang == "pt" else "28 days",
+        "90d": "90 dias" if lang == "pt" else "90 days",
+    }
+    
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(100)
+    if not athletes:
+        return TeamTableResponse(rows=[], period_label=period_labels.get(date_range, "7d"))
+    
+    athlete_ids = [str(a["_id"]) for a in athletes]
+    
+    # Bulk queries
+    all_gps = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": filter_start_str}
+    }).to_list(5000)
+    
+    all_jumps = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_body = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    all_wellness = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Index by athlete
+    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+    
+    gps_by_athlete: Dict[str, list] = {}
+    for r in all_gps:
+        aid = r.get("athlete_id")
+        if aid:
+            gps_by_athlete.setdefault(aid, []).append(r)
+    
+    jump_by_athlete: Dict[str, list] = {}
+    for r in all_jumps:
+        aid = r.get("athlete_id")
+        if aid:
+            jump_by_athlete.setdefault(aid, []).append(r)
+    
+    body_by_athlete: Dict[str, dict] = {}
+    for r in all_body:
+        aid = r.get("athlete_id")
+        if aid and aid not in body_by_athlete:
+            body_by_athlete[aid] = r
+    
+    wellness_by_athlete: Dict[str, list] = {}
+    for r in all_wellness:
+        aid = r.get("athlete_id")
+        if aid:
+            wellness_by_athlete.setdefault(aid, []).append(r)
+    
+    rows = []
+    for athlete in athletes:
+        aid = str(athlete["_id"])
+        name = athlete.get("name", "")
+        position = athlete.get("position", "")
+        if not position or position == "Unknown":
+            position = "N/A"
+        
+        # --- GPS aggregation (same dedup logic as team dashboard) ---
+        total_dist = 0.0
+        z3_total = 0.0
+        z4_total = 0.0
+        z5_total = 0.0
+        sprint_total = 0
+        acc_dec_total = 0
+        
+        gps_records = gps_by_athlete.get(aid, [])
+        if gps_records:
+            grouped: Dict[str, Dict[str, list]] = {}
+            for rec in gps_records:
+                try:
+                    d = rec["date"]
+                    datetime.strptime(d, "%Y-%m-%d")
+                except:
+                    continue
+                sname = rec.get("session_name") or "default"
+                grouped.setdefault(d, {}).setdefault(sname, []).append(rec)
+            
+            for date_str, sessions_map in grouped.items():
+                for sname, records in sessions_map.items():
+                    session_total_rec = None
+                    period_recs = []
+                    for r in records:
+                        pname = (r.get("period_name") or "").lower()
+                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
+                        if is_sess and not is_period:
+                            if session_total_rec is None:
+                                session_total_rec = r
+                        else:
+                            period_recs.append(r)
+                    
+                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    for r in source:
+                        total_dist += r.get("total_distance", 0) or 0
+                        z3_total += r.get("high_intensity_distance", 0) or 0
+                        z4_total += r.get("high_speed_running", 0) or 0
+                        z5_total += r.get("sprint_distance", 0) or 0
+                        sprint_total += r.get("number_of_sprints", 0) or 0
+                        acc_dec_total += max(0, r.get("number_of_accelerations", 0) or 0) + max(0, r.get("number_of_decelerations", 0) or 0)
+        
+        # --- RSImod ---
+        rsimod_val = None
+        rsimod_delta_val = None
+        rsimod_baseline_val = None
+        cmj_jumps = [j for j in jump_by_athlete.get(aid, []) if j.get("protocol") == "cmj"]
+        if cmj_jumps:
+            latest_rsi = cmj_jumps[0].get("rsi")
+            if latest_rsi and latest_rsi > 0:
+                rsimod_val = round(latest_rsi, 2)
+                if len(cmj_jumps) >= 2:
+                    prev_rsi = cmj_jumps[1].get("rsi")
+                    if prev_rsi and prev_rsi > 0:
+                        rsimod_delta_val = round(((latest_rsi - prev_rsi) / prev_rsi) * 100, 1)
+            # Baseline 28d: average of all CMJ RSI values (already sorted desc by date)
+            rsi_vals_28d = []
+            for j in cmj_jumps:
+                jd = j.get("date", "")
+                try:
+                    if jd and (today - datetime.strptime(jd[:10], "%Y-%m-%d")).days <= 28:
+                        rv = j.get("rsi")
+                        if rv and rv > 0:
+                            rsi_vals_28d.append(rv)
+                except:
+                    pass
+            if rsi_vals_28d:
+                rsimod_baseline_val = round(sum(rsi_vals_28d) / len(rsi_vals_28d), 2)
+        
+        # --- Body Composition ---
+        weight_val = None
+        bf_val = None
+        lm_val = None
+        bc = body_by_athlete.get(aid)
+        if bc:
+            weight_val = bc.get("weight") or bc.get("peso")
+            bf_val = bc.get("body_fat_percentage")
+            lm_val = bc.get("lean_mass_kg") or bc.get("lean_mass")
+            if weight_val:
+                weight_val = round(float(weight_val), 1)
+            if bf_val:
+                bf_val = round(float(bf_val), 1)
+            if lm_val:
+                lm_val = round(float(lm_val), 1)
+        
+        # --- Wellness / Fatigue / Readiness ---
+        fatigue_idx = None
+        fatigue_baseline_val = None
+        fatigue_st = "UNKNOWN"
+        readiness_st = "UNKNOWN"
+        
+        w_list = wellness_by_athlete.get(aid, [])
+        if w_list:
+            latest_w = w_list[0]
+            fatigue_raw = latest_w.get("fatigue", None)
+            if fatigue_raw is not None:
+                fatigue_idx = round(float(fatigue_raw) * 10, 1)
+                if fatigue_idx <= 30:
+                    fatigue_st = "READY"
+                elif fatigue_idx <= 60:
+                    fatigue_st = "ATTENTION"
+                else:
+                    fatigue_st = "NOT_READY"
+            
+            readiness_raw = latest_w.get("readiness_score")
+            if readiness_raw is not None:
+                r_pct = float(readiness_raw) * 10
+                if r_pct >= 70:
+                    readiness_st = "READY"
+                elif r_pct >= 40:
+                    readiness_st = "ATTENTION"
+                else:
+                    readiness_st = "NOT_READY"
+            elif fatigue_st != "UNKNOWN":
+                readiness_st = fatigue_st
+            
+            # Fatigue baseline 28d: average of last 28d wellness fatigue values
+            fatigue_vals_28d = []
+            for w in w_list:
+                wd = w.get("date", "")
+                try:
+                    if wd and (today - datetime.strptime(wd[:10], "%Y-%m-%d")).days <= 28:
+                        fv = w.get("fatigue")
+                        if fv is not None:
+                            fatigue_vals_28d.append(float(fv) * 10)
+                except:
+                    pass
+            if fatigue_vals_28d:
+                fatigue_baseline_val = round(sum(fatigue_vals_28d) / len(fatigue_vals_28d), 1)
+        
+        rows.append(TeamTableRow(
+            athlete_id=aid,
+            name=name,
+            position=position,
+            total_distance=round(total_dist, 0),
+            z3=round(z3_total, 0),
+            z4=round(z4_total, 0),
+            z5=round(z5_total, 0),
+            sprint_count=sprint_total,
+            acc_dec=acc_dec_total,
+            rsimod=rsimod_val,
+            rsimod_delta=rsimod_delta_val,
+            rsimod_baseline_28d=rsimod_baseline_val,
+            fatigue_index=fatigue_idx,
+            fatigue_baseline_28d=fatigue_baseline_val,
+            fatigue_status=fatigue_st,
+            readiness_status=readiness_st,
+            weight=weight_val,
+            body_fat=bf_val,
+            lean_mass=lm_val,
+        ))
+    
+    rows.sort(key=lambda r: r.total_distance, reverse=True)
+    
+    return TeamTableResponse(rows=rows, period_label=period_labels.get(date_range, "7d"))
+
+
+
+# ============= DASHBOARD OVERVIEW (VISÃO GERAL DA EQUIPE) =============
+
+@api_router.get("/dashboard/overview")
+async def get_dashboard_overview(
+    lang: str = "pt",
+    athlete_id: Optional[str] = None,
+    position: Optional[str] = None,
+    date_range: str = "28d",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Advanced team performance intelligence dashboard.
+    Aggregation & visualization layer over existing metrics.
+    
+    Modes:
+    - TEAM: athlete_id=None, position=None → team averages
+    - POSITION: athlete_id=None, position=<pos> → position group
+    - ATHLETE: athlete_id=<id> → individual longitudinal
+    
+    ACWR always uses total_distance.
+    """
+    user_id = current_user["_id"]
+    
+    # Parse date range
+    date_range_map = {"today": 0, "yesterday": 1, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_map.get(date_range, 28)
+    # RC2: "today" must be treated as 1 valid day, not 0
+    effective_days = max(1, filter_days)
+    
+    today = datetime.utcnow()
+    
+    # RC3: Centralize temporal anchor in reference_date
+    # "yesterday" → reference_date = yesterday; all else → reference_date = today
+    if date_range == "yesterday":
+        reference_date = today - timedelta(days=1)
+    else:
+        reference_date = today
+    
+    today_str = reference_date.strftime("%Y-%m-%d")
+    
+    filter_start = reference_date - timedelta(days=filter_days)
+    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    
+    ninety_days_ago_str = (reference_date - timedelta(days=90)).strftime("%Y-%m-%d")
+    seven_days_ago = reference_date - timedelta(days=7)
+    twentyeight_days_ago = reference_date - timedelta(days=28)
+    
+    # Load all athletes
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(200)
+    if not athletes:
+        return {"mode": "team", "athletes": [], "layers": {}}
+    
+    athlete_map = {str(a["_id"]): a for a in athletes}
+    all_athlete_ids = list(athlete_map.keys())
+    
+    # Determine mode and target athletes
+    mode = "team"
+    target_ids = all_athlete_ids
+    
+    if athlete_id and athlete_id != "all":
+        mode = "athlete"
+        target_ids = [athlete_id]
+    elif position and position != "all":
+        mode = "position"
+        target_ids = [aid for aid, a in athlete_map.items() if a.get("position", "") == position]
+    
+    # ============ BULK DATA LOAD (same as team dashboard) ============
+    all_gps = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": ninety_days_ago_str}
+    }).to_list(10000)
+    
+    # EWMA load metrics from RollingLoadEngine (same source as Team Dashboard)
+    all_load_metrics = await db.athlete_load_metrics.find(
+        {"coach_id": user_id}
+    ).sort("date", -1).to_list(5000)
+    
+    # Index: latest per athlete + full history per athlete
+    load_metrics_latest: dict = {}
+    load_metrics_history: dict = {}
+    for m in all_load_metrics:
+        aid = m.get("athlete_id")
+        if not aid:
+            continue
+        if aid not in load_metrics_latest:
+            load_metrics_latest[aid] = m
+        if aid not in load_metrics_history:
+            load_metrics_history[aid] = []
+        load_metrics_history[aid].append(m)
+    
+    all_wellness = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(2000)
+    
+    all_jumps = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_vbt = await db.vbt_data.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_body_comp = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    # ============ INDEX BY ATHLETE ============
+    gps_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_gps:
+        aid = r.get("athlete_id")
+        if aid:
+            gps_by_athlete.setdefault(aid, []).append(r)
+    for aid in gps_by_athlete:
+        gps_by_athlete[aid].sort(key=lambda x: x.get("date", ""))
+    
+    wellness_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_wellness:
+        aid = r.get("athlete_id")
+        if aid:
+            wellness_by_athlete.setdefault(aid, []).append(r)
+    
+    jump_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_jumps:
+        aid = r.get("athlete_id")
+        if aid:
+            jump_by_athlete.setdefault(aid, []).append(r)
+    
+    vbt_by_athlete: Dict[str, List[dict]] = {}
+    for r in all_vbt:
+        aid = r.get("athlete_id")
+        if aid:
+            vbt_by_athlete.setdefault(aid, []).append(r)
+    
+    body_comp_by_athlete: Dict[str, dict] = {}
+    for r in all_body_comp:
+        aid = r.get("athlete_id")
+        if aid and aid not in body_comp_by_athlete:
+            body_comp_by_athlete[aid] = r
+    
+    # ============ GPS DEDUP HELPER ============
+    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+    
+    def build_daily_gps(gps_records):
+        """Build daily aggregated GPS from records, deduped by session/period."""
+        daily = {}
+        grouped = {}
+        for r in gps_records:
+            d = r.get("date", "")
+            sname = r.get("session_name") or "default"
+            grouped.setdefault(d, {}).setdefault(sname, []).append(r)
+        
+        for date_str, sessions_map in grouped.items():
+            day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
+                   "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
+            for sname, records in sessions_map.items():
+                session_total = None
+                period_recs = []
+                for r in records:
+                    pname = (r.get("period_name") or "").lower()
+                    is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                    is_per = any(kw in pname for kw in _GPS_PERIOD_KW)
+                    if is_sess and not is_per:
+                        if session_total is None:
+                            session_total = r
+                    else:
+                        period_recs.append(r)
+                source = [session_total] if session_total else (period_recs if period_recs else records)
+                for r in source:
+                    day["total_distance"] += r.get("total_distance", 0) or 0
+                    day["high_intensity_distance"] += r.get("high_intensity_distance", 0) or 0
+                    day["high_speed_running"] += r.get("high_speed_running", 0) or 0
+                    day["sprint_distance"] += r.get("sprint_distance", 0) or 0
+                    day["number_of_sprints"] += r.get("number_of_sprints", 0) or 0
+                    acc = r.get("number_of_accelerations", 0) or 0
+                    dec = r.get("number_of_decelerations", 0) or 0
+                    day["acc_dec"] += acc + dec
+            daily[date_str] = day
+        return daily
+    
+    def get_wellness_score(w):
+        """Extract or compute wellness score from a wellness record."""
+        ws = w.get("wellness_score")
+        if ws and ws > 0:
+            return ws
+        f = w.get("fatigue", 5); s = w.get("stress", 5); m = w.get("mood", 5)
+        sq = w.get("sleep_quality", 5); ms = w.get("muscle_soreness", 5); h = w.get("hydration", 5)
+        calc = (10-f)*0.20 + (10-s)*0.15 + m*0.15 + sq*0.20 + (10-ms)*0.15 + h*0.15
+        return round(calc, 2) if calc > 0 else None
+    
+    def calc_lmpi(acwr_val, wellness_val, rsimod_val, vbt_fatigue_pct, monotony_val):
+        """
+        LMPI = Performance Indicator (0-100).
+        ACWR→30%, Wellness→25%, RSImod→20%, VBT Fatigue→15%, Monotony→10%
+        
+        VALIDITY RULES:
+        - ACWR is MANDATORY. Without it, LMPI is invalid (returns None).
+        - At least Wellness OR RSImod must be present for full validity.
+        - Missing data ≠ low performance. Return None instead of artificial low score.
+        """
+        # RULE: Without ACWR, LMPI cannot be computed
+        if acwr_val is None:
+            return None, "invalid"
+        
+        # Determine data completeness
+        has_wellness = wellness_val is not None and wellness_val > 0
+        has_rsimod = rsimod_val is not None and rsimod_val > 0
+        has_state_data = has_wellness or has_rsimod
+        
+        if has_state_data:
+            validity = "valid"       # ACWR + at least 1 state indicator
+        else:
+            validity = "partial"     # ACWR only, no state data
+        
+        score = 0.0
+        # ACWR component: optimal=1.0-1.3→100, <0.8→50, >1.5→20
+        if 0.8 <= acwr_val <= 1.3:
+            acwr_score = 100
+        elif acwr_val < 0.8:
+            acwr_score = max(20, acwr_val / 0.8 * 80)
+        elif acwr_val <= 1.5:
+            acwr_score = max(30, 100 - (acwr_val - 1.3) / 0.2 * 70)
+        else:
+            acwr_score = max(10, 100 - (acwr_val - 1.0) * 60)
+        score += acwr_score * 0.30
+        
+        # Wellness: 0-10 scale → 0-100
+        if has_wellness:
+            score += min(100, wellness_val * 10) * 0.25
+        
+        # RSImod: typical range 0.2-0.6 → 0-100
+        if has_rsimod:
+            rsi_score = min(100, (rsimod_val / 0.5) * 100)
+            score += rsi_score * 0.20
+        
+        # VBT Fatigue: velocity loss % (0=good, 20+=bad) → inverted
+        if vbt_fatigue_pct is not None:
+            vbt_score = max(0, 100 - vbt_fatigue_pct * 5)
+            score += vbt_score * 0.15
+        
+        # Monotony: <1.5=good, >2=bad
+        if monotony_val is not None:
+            if monotony_val <= 1.5:
+                mono_score = 100
+            elif monotony_val <= 2.0:
+                mono_score = 60
+            else:
+                mono_score = max(10, 100 - (monotony_val - 1.5) * 60)
+            score += mono_score * 0.10
+        
+        # Normalize: divide by actual weight used (only components present)
+        total_weight = 0.30  # ACWR always present
+        if has_wellness: total_weight += 0.25
+        if has_rsimod: total_weight += 0.20
+        if vbt_fatigue_pct is not None: total_weight += 0.15
+        if monotony_val is not None: total_weight += 0.10
+        
+        if total_weight > 0:
+            normalized = score / total_weight
+        else:
+            normalized = score
+        
+        return round(min(100, max(0, normalized)), 1), validity
+    
+    # ============ PER-ATHLETE CALCULATIONS ============
+    athlete_results = []
+    
+    for aid in target_ids:
+        if aid not in athlete_map:
+            continue
+        a = athlete_map[aid]
+        name = a.get("name", "")
+        pos = a.get("position", "")
+        
+        # GPS daily
+        gps_recs = gps_by_athlete.get(aid, [])
+        daily_gps = build_daily_gps(gps_recs)
+        has_gps_data = len(gps_recs) > 0
+        
+        # ACWR from EWMA (athlete_load_metrics) — ONLY when GPS data exists
+        # This matches Team Dashboard logic: no GPS data = no load metrics shown
+        acwr = None
+        acute_load = None
+        chronic_load = None
+        monotony = None
+        strain = None
+        
+        if has_gps_data:
+            athlete_ewma = load_metrics_latest.get(aid)
+            if athlete_ewma:
+                ewma_distance = athlete_ewma.get("distance", {})
+                if isinstance(ewma_distance, dict) and ewma_distance.get("acwr") is not None:
+                    acwr = ewma_distance["acwr"]
+                acute_load = ewma_distance.get("ewma_acute", 0) if isinstance(ewma_distance, dict) else 0
+                chronic_load = ewma_distance.get("ewma_chronic", 0) if isinstance(ewma_distance, dict) else 0
+                monotony = athlete_ewma.get("monotony") or None
+                strain = athlete_ewma.get("strain") or None
+            else:
+                acute_load = 0
+                chronic_load = 0
+        
+        # Daily load timeline (for charts)
+        # RC2: use effective_days (min 1) so "today" filter generates 1 data point
+        daily_timeline = []
+        for i in range(effective_days):
+            d = (reference_date - timedelta(days=effective_days - 1 - i)).strftime("%Y-%m-%d")
+            day_data = daily_gps.get(d, {})
+            daily_timeline.append({
+                "date": d,
+                "total_distance": day_data.get("total_distance", 0),
+                "hid": day_data.get("high_intensity_distance", 0),
+                "hsr": day_data.get("high_speed_running", 0),
+                "sprint": day_data.get("sprint_distance", 0),
+                "sprints_count": day_data.get("number_of_sprints", 0),
+                "acc_dec": day_data.get("acc_dec", 0)
+            })
+        
+        # Weekly heatmap (last 4 weeks, day-of-week)
+        weekly_heatmap = []
+        for w in range(4):
+            week_data = []
+            for dow in range(7):  # Mon=0 to Sun=6
+                d = reference_date - timedelta(days=(3-w)*7 + (6 - dow))
+                d_str = d.strftime("%Y-%m-%d")
+                dist = daily_gps.get(d_str, {}).get("total_distance", 0)
+                week_data.append({"date": d_str, "dow": dow, "value": dist})
+            weekly_heatmap.append({"week": w, "days": week_data})
+        
+        # ACWR timeline from EWMA history (athlete_load_metrics)
+        acwr_timeline = []
+        history = load_metrics_history.get(aid, [])
+        for m in reversed(history):  # oldest first
+            m_date = m.get("date", "")
+            if filter_start_str <= m_date <= today_str:
+                dist = m.get("distance", {})
+                if isinstance(dist, dict) and dist.get("acwr") is not None:
+                    acwr_timeline.append({"date": m_date, "acwr": dist["acwr"]})
+        
+        # Velocity zones distribution (aggregate over period)
+        vz_total = {"hid": 0, "hsr": 0, "sprint": 0, "other": 0}
+        for d_str, day_data in daily_gps.items():
+            if d_str >= filter_start_str:
+                vz_total["hid"] += day_data.get("high_intensity_distance", 0)
+                vz_total["hsr"] += day_data.get("high_speed_running", 0)
+                vz_total["sprint"] += day_data.get("sprint_distance", 0)
+                td = day_data.get("total_distance", 0)
+                other = td - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"]
+        total_dist_period = sum(daily_gps.get(d, {}).get("total_distance", 0) 
+                               for d in [((reference_date - timedelta(days=i)).strftime("%Y-%m-%d")) for i in range(effective_days)])
+        vz_other = max(0, total_dist_period - vz_total["hid"] - vz_total["hsr"] - vz_total["sprint"])
+        velocity_zones = {
+            "low_intensity": round(vz_other),
+            "hid_z3": round(vz_total["hid"]),
+            "hsr_z4": round(vz_total["hsr"]),
+            "sprint_z5": round(vz_total["sprint"])
+        }
+        
+        # Wellness + Readiness
+        w_recs = wellness_by_athlete.get(aid, [])
+        latest_wellness = None
+        wellness_score = None
+        readiness_score = None
+        wellness_details = {}
+        wellness_timeline = []
+        
+        if w_recs:
+            latest_w = w_recs[0]
+            latest_wellness = latest_w.get("date")
+            wellness_score = get_wellness_score(latest_w)
+            # Extract real readiness_score (different formula from wellness)
+            raw_readiness = latest_w.get("readiness_score")
+            if raw_readiness is not None and raw_readiness > 0:
+                readiness_score = round(raw_readiness * 10, 1)  # 0-10 → 0-100%
+            wellness_details = {
+                "sleep": latest_w.get("sleep_quality", 5),
+                "fatigue": latest_w.get("fatigue", 5),
+                "stress": latest_w.get("stress", 5),
+                "soreness": latest_w.get("muscle_soreness", 5),
+                "mood": latest_w.get("mood", 5)
+            }
+            # Wellness timeline
+            for w in w_recs[:filter_days]:
+                ws = get_wellness_score(w)
+                if ws:
+                    wellness_timeline.append({
+                        "date": w.get("date"),
+                        "score": ws,
+                        "sleep": w.get("sleep_quality", 5),
+                        "fatigue": w.get("fatigue", 5),
+                        "stress": w.get("stress", 5),
+                        "soreness": w.get("muscle_soreness", 5),
+                        "mood": w.get("mood", 5)
+                    })
+        
+        # Jump data — CMJ (primary neuromuscular), SL-CMJ (asymmetry)
+        j_recs = jump_by_athlete.get(aid, [])
+        cmj_recs = [j for j in j_recs if j.get("protocol") == "cmj"]
+        sl_right_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_right"]
+        sl_left_recs = [j for j in j_recs if j.get("protocol") == "sl_cmj_left"]
+        rsimod = None
+        rsimod_timeline = []
+        jump_metrics = {}
+        asymmetry = None
+        
+        if cmj_recs:
+            latest_j = cmj_recs[0]
+            rsimod = latest_j.get("rsi") or latest_j.get("rsi_modified")
+            jump_metrics = {
+                "jump_height_cm": latest_j.get("jump_height_cm"),
+                "flight_time_ms": latest_j.get("flight_time_ms"),
+                "contraction_time_ms": latest_j.get("contraction_time_ms") or latest_j.get("time_to_takeoff_ms"),
+                "rsimod": rsimod,
+                "peak_power_w": latest_j.get("peak_power_w")
+            }
+            # CMJ fatigue index (baseline from best 3 in last 60 days)
+            recent_rsi = [j.get("rsi") or j.get("rsi_modified") or 0 for j in cmj_recs[:20] if (j.get("rsi") or j.get("rsi_modified"))]
+            if len(recent_rsi) >= 3:
+                baseline_rsi = sum(sorted(recent_rsi, reverse=True)[:3]) / 3
+                fatigue_index = round(((rsimod - baseline_rsi) / baseline_rsi) * 100, 1) if baseline_rsi > 0 and rsimod else None
+            else:
+                fatigue_index = None
+                baseline_rsi = recent_rsi[0] if recent_rsi else None
+            jump_metrics["fatigue_index"] = fatigue_index
+            jump_metrics["baseline_rsi"] = round(baseline_rsi, 3) if baseline_rsi else None
+            
+            for j in cmj_recs[:20]:
+                r = j.get("rsi") or j.get("rsi_modified")
+                if r:
+                    rsimod_timeline.append({"date": j.get("date"), "rsimod": r, 
+                                           "height": j.get("jump_height_cm")})
+        
+        # SL-CMJ asymmetry
+        if sl_right_recs and sl_left_recs:
+            r_height = sl_right_recs[0].get("jump_height_cm", 0)
+            l_height = sl_left_recs[0].get("jump_height_cm", 0)
+            r_rsi = sl_right_recs[0].get("rsi") or sl_right_recs[0].get("rsi_modified") or 0
+            l_rsi = sl_left_recs[0].get("rsi") or sl_left_recs[0].get("rsi_modified") or 0
+            max_h = max(r_height, l_height)
+            max_r = max(r_rsi, l_rsi)
+            asymmetry = {
+                "height_pct": round(abs(r_height - l_height) / max_h * 100, 1) if max_h > 0 else 0,
+                "rsi_pct": round(abs(r_rsi - l_rsi) / max_r * 100, 1) if max_r > 0 else 0,
+                "dominant": "right" if r_height >= l_height else "left",
+                "right_height": r_height, "left_height": l_height,
+                "right_rsi": round(r_rsi, 3), "left_rsi": round(l_rsi, 3),
+                "risk_flag": abs(r_height - l_height) / max_h * 100 > 10 if max_h > 0 else False
+            }
+        
+        # VBT data — grouped by exercise, never mixed
+        v_recs = vbt_by_athlete.get(aid, [])
+        vbt_fatigue_pct = None
+        vbt_metrics = {}
+        vbt_by_exercise = {}
+        
+        if v_recs:
+            # Group by exercise
+            for vr in v_recs:
+                ex = vr.get("exercise", "unknown")
+                vbt_by_exercise.setdefault(ex, []).append(vr)
+            
+            # For each exercise, get latest metrics
+            vbt_exercises_summary = {}
+            for ex, ex_recs in vbt_by_exercise.items():
+                latest_v = ex_recs[0]
+                sets = latest_v.get("sets", [])
+                velocities = [s.get("mean_velocity", 0) for s in sets if s.get("mean_velocity")]
+                ex_fatigue = None
+                if len(velocities) >= 2 and velocities[0] > 0:
+                    ex_fatigue = round((1 - velocities[-1] / velocities[0]) * 100, 1)
+                vbt_exercises_summary[ex] = {
+                    "mean_velocity": round(sum(velocities)/len(velocities), 3) if velocities else None,
+                    "peak_velocity": round(max(velocities), 3) if velocities else None,
+                    "fatigue_pct": ex_fatigue,
+                    "date": latest_v.get("date"),
+                    "sessions": len(ex_recs)
+                }
+            
+            # Overall VBT fatigue: use the exercise with most recent data
+            latest_v = v_recs[0]
+            sets = latest_v.get("sets", [])
+            if sets:
+                velocities = [s.get("mean_velocity", 0) for s in sets if s.get("mean_velocity")]
+                if len(velocities) >= 2 and velocities[0] > 0:
+                    vbt_fatigue_pct = round((1 - velocities[-1] / velocities[0]) * 100, 1)
+            
+            vbt_metrics = {
+                "latest_exercise": v_recs[0].get("exercise"),
+                "fatigue_pct": vbt_fatigue_pct,
+                "exercises": vbt_exercises_summary
+            }
+        
+        # Body composition
+        bc = body_comp_by_athlete.get(aid)
+        body_comp = {}
+        if bc:
+            body_comp = {
+                "weight": bc.get("weight_kg"),
+                "body_fat_pct": bc.get("body_fat_percentage"),
+                "lean_mass_kg": bc.get("lean_mass_kg")
+            }
+        
+        # LMPI — only compute when athlete has GPS/load data
+        # Returns (score, validity) where validity is "valid", "partial", or "invalid"
+        lmpi = None
+        lmpi_validity = "invalid"
+        if has_gps_data:
+            lmpi, lmpi_validity = calc_lmpi(acwr, wellness_score, rsimod, vbt_fatigue_pct, monotony)
+        
+        # Risk classification — derived from LMPI when valid, ACWR-only fallback when partial
+        risk_level = "unknown"
+        if lmpi is not None and lmpi_validity == "valid":
+            # LMPI-based risk (performance-based)
+            if lmpi >= 70: risk_level = "optimal"
+            elif lmpi >= 40: risk_level = "moderate"
+            else: risk_level = "high"
+        elif acwr is not None:
+            # ACWR-only fallback
+            if acwr < 0.8: risk_level = "low"
+            elif acwr <= 1.3: risk_level = "optimal"
+            elif acwr <= 1.5: risk_level = "moderate"
+            else: risk_level = "high"
+        
+        # Risk score — None when LMPI is invalid (missing data ≠ low performance)
+        risk_score = (100 - lmpi) if lmpi is not None else None
+        
+        athlete_results.append({
+            "id": aid,
+            "name": name,
+            "position": pos,
+            "acwr": acwr,
+            "acute_load": round(acute_load) if acute_load is not None else None,
+            "chronic_load": round(chronic_load) if chronic_load is not None else None,
+            "monotony": monotony,
+            "strain": strain,
+            "wellness_score": wellness_score,
+            "readiness_score": readiness_score,
+            "wellness_details": wellness_details,
+            "wellness_timeline": wellness_timeline,
+            "rsimod": rsimod,
+            "rsimod_timeline": rsimod_timeline,
+            "jump_metrics": jump_metrics,
+            "asymmetry": asymmetry,
+            "vbt_metrics": vbt_metrics,
+            "vbt_fatigue_pct": vbt_fatigue_pct,
+            "body_comp": body_comp,
+            "lmpi": lmpi,
+            "lmpi_validity": lmpi_validity,
+            "risk_level": risk_level,
+            "risk_score": round(risk_score, 1) if risk_score is not None else None,
+            "daily_timeline": daily_timeline,
+            "acwr_timeline": acwr_timeline,
+            "velocity_zones": velocity_zones,
+            "weekly_heatmap": weekly_heatmap,
+            "has_gps_data": has_gps_data
+        })
+    
+    # ============ AGGREGATION ============
+    n = len(athlete_results)
+    
+    def safe_avg(vals):
+        filtered = [v for v in vals if v is not None]
+        return round(sum(filtered) / len(filtered), 2) if filtered else None
+    
+    # Load-related team averages: only from athletes WITH GPS data (matches Team Dashboard)
+    gps_athletes = [a for a in athlete_results if a.get("has_gps_data")]
+    
+    team_acwr = safe_avg([a["acwr"] for a in gps_athletes])
+    team_monotony = safe_avg([a["monotony"] for a in gps_athletes])
+    team_strain = safe_avg([a["strain"] for a in gps_athletes])
+    team_lmpi = safe_avg([a["lmpi"] for a in gps_athletes if a.get("lmpi") is not None])
+    team_acute = safe_avg([a["acute_load"] for a in gps_athletes])
+    team_chronic = safe_avg([a["chronic_load"] for a in gps_athletes])
+    team_rsimod = safe_avg([a["rsimod"] for a in gps_athletes])
+    
+    # Wellness/readiness: from ALL athletes (not gated by GPS, same as Team Dashboard)
+    team_wellness = safe_avg([a["wellness_score"] for a in athlete_results])
+    team_readiness = safe_avg([a["readiness_score"] for a in athlete_results])
+    
+    # Aggregated daily timeline (team/position average)
+    # RC2: use effective_days for consistent timeline generation
+    agg_timeline = []
+    if mode != "athlete" and n > 0:
+        for day_idx in range(effective_days):
+            d = (reference_date - timedelta(days=effective_days - 1 - day_idx)).strftime("%Y-%m-%d")
+            day_vals = [a["daily_timeline"][day_idx] if day_idx < len(a["daily_timeline"]) else {} for a in athlete_results]
+            agg_timeline.append({
+                "date": d,
+                "total_distance": round(safe_avg([dv.get("total_distance", 0) for dv in day_vals]) or 0),
+                "hid": round(safe_avg([dv.get("hid", 0) for dv in day_vals]) or 0),
+                "hsr": round(safe_avg([dv.get("hsr", 0) for dv in day_vals]) or 0),
+                "sprint": round(safe_avg([dv.get("sprint", 0) for dv in day_vals]) or 0),
+            })
+    
+    # Risk distribution
+    risk_dist = {"low": 0, "optimal": 0, "moderate": 0, "high": 0, "unknown": 0}
+    for a in athlete_results:
+        risk_dist[a.get("risk_level", "unknown")] += 1
+    
+    # Available count (athletes with data in period)
+    available = sum(1 for a in athlete_results if a["acwr"] is not None or a["wellness_score"] is not None)
+    unavailable = n - available
+    
+    # Positions list
+    positions = sorted(set(a.get("position", "") for a in athletes if a.get("position")))
+    
+    # ============ GENERATE INSIGHTS ============
+    insights = {}
+    
+    # Smart Summary insight
+    ss_parts = []
+    if team_acwr is not None:
+        if team_acwr > 1.5:
+            ss_parts.append("ACWR elevado indica sobrecarga aguda. Risco aumentado de lesão." if lang == "pt" else "High ACWR indicates acute overload. Increased injury risk.")
+        elif team_acwr < 0.8:
+            ss_parts.append("ACWR baixo sugere sub-treinamento. Considerar aumento progressivo." if lang == "pt" else "Low ACWR suggests undertraining. Consider progressive increase.")
+        else:
+            ss_parts.append("ACWR na zona ótima (0.8-1.3)." if lang == "pt" else "ACWR in optimal zone (0.8-1.3).")
+    if team_wellness is not None and team_wellness < 5:
+        ss_parts.append("Wellness abaixo de 5/10 indica fadiga geral significativa." if lang == "pt" else "Wellness below 5/10 indicates significant general fatigue.")
+    if team_rsimod is not None and team_monotony is not None and team_monotony > 2.0:
+        ss_parts.append("Monotonia alta (>2.0) combinada com dados neuromusculares requer atenção." if lang == "pt" else "High monotony (>2.0) combined with neuromuscular data requires attention.")
+    insights["smart_summary"] = " ".join(ss_parts) if ss_parts else ("Dados insuficientes para gerar insight." if lang == "pt" else "Insufficient data for insight.")
+    
+    # Load Intelligence insight
+    li_parts = []
+    if team_acwr is not None:
+        if team_monotony and team_monotony > 2.0:
+            li_parts.append("Monotonia elevada detectada. Variar estímulos de treino para reduzir risco." if lang == "pt" else "High monotony detected. Vary training stimuli to reduce risk.")
+        if team_strain and team_strain > 5000:
+            li_parts.append("Strain semanal alto. Monitorar recuperação individual." if lang == "pt" else "High weekly strain. Monitor individual recovery.")
+    insights["load_intelligence"] = " ".join(li_parts) if li_parts else ("Carga dentro dos parâmetros esperados." if lang == "pt" else "Load within expected parameters.")
+    
+    # Team Status insight
+    low_wellness = [a for a in athlete_results if a["wellness_score"] and a["wellness_score"] < 5]
+    if low_wellness:
+        names = ", ".join([a["name"].split()[0] for a in low_wellness[:3]])
+        insights["team_status"] = f"Atletas com baixa prontidão: {names}. Considerar ajuste de volume." if lang == "pt" else f"Athletes with low readiness: {names}. Consider volume adjustment."
+    else:
+        insights["team_status"] = "Equipe com boa prontidão geral." if lang == "pt" else "Team with good overall readiness."
+    
+    # Neuromuscular insight
+    nm_parts = []
+    low_rsi = [a for a in athlete_results if a["rsimod"] and a["rsimod"] < 0.3]
+    if low_rsi:
+        nm_parts.append(f"{len(low_rsi)} atleta(s) com RSImod baixo (<0.30)." if lang == "pt" else f"{len(low_rsi)} athlete(s) with low RSImod (<0.30).")
+    high_vbt_fatigue = [a for a in athlete_results if a["vbt_fatigue_pct"] and a["vbt_fatigue_pct"] > 15]
+    if high_vbt_fatigue:
+        nm_parts.append("Perda de velocidade >15% no VBT sugere fadiga neuromuscular periférica." if lang == "pt" else "Velocity loss >15% in VBT suggests peripheral neuromuscular fatigue.")
+    insights["neuromuscular"] = " ".join(nm_parts) if nm_parts else ("Status neuromuscular estável." if lang == "pt" else "Stable neuromuscular status.")
+    
+    # Risk Intelligence insight
+    high_risk = [a for a in athlete_results if a["risk_level"] == "high"]
+    if high_risk:
+        names = ", ".join([a["name"].split()[0] for a in high_risk[:3]])
+        insights["risk_intelligence"] = f"Atletas em alto risco: {names}. ACWR + wellness combinados indicam necessidade de intervenção imediata." if lang == "pt" else f"High risk athletes: {names}. Combined ACWR + wellness indicate need for immediate intervention."
+    else:
+        insights["risk_intelligence"] = "Nenhum atleta em zona de alto risco atualmente." if lang == "pt" else "No athletes currently in high risk zone."
+    
+    # Build response
+    response = {
+        "mode": mode,
+        "filter": {
+            "athlete_id": athlete_id,
+            "position": position,
+            "date_range": date_range,
+            "filter_days": filter_days
+        },
+        "positions": positions,
+        "summary": {
+            "total_athletes": n,
+            "available": available,
+            "unavailable": unavailable,
+            "team_acwr": team_acwr,
+            "team_wellness": team_wellness,
+            "team_readiness": team_readiness,
+            "team_rsimod": team_rsimod,
+            "team_monotony": team_monotony,
+            "team_strain": team_strain,
+            "team_lmpi": team_lmpi,
+            "team_acute_load": team_acute,
+            "team_chronic_load": team_chronic,
+            "risk_distribution": risk_dist
+        },
+        "athletes": athlete_results,
+        "aggregated_timeline": agg_timeline,
+        "insights": insights,
+        "last_update": datetime.utcnow().isoformat()
+    }
+    
+    return response
+
+
+
+# ============= DASHBOARD OVERVIEW PDF REPORT =============
+
+@api_router.get("/report/dashboard-overview")
+async def get_dashboard_overview_pdf(
+    lang: str = "pt",
+    athlete_id: Optional[str] = None,
+    position: Optional[str] = None,
+    date_range: str = "28d",
+    layers: str = "load,summary,status,neuro,risk",
+    current_user: dict = Depends(get_current_user)
+):
+    """Generate HTML report for dashboard overview PDF export with inline SVG charts."""
+    from fastapi.responses import HTMLResponse
+    
+    overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    
+    is_pt = lang == "pt"
+    selected_layers = set(layers.split(","))
+    mode = overview.get("mode", "team")
+    mode_label = {"team": "Equipe" if is_pt else "Team", "position": "Posicao" if is_pt else "Position", "athlete": "Atleta" if is_pt else "Athlete"}.get(mode, mode)
+    
+    # ── Map actual response data to PDF sections ──
+    summary = overview.get("summary", {})
+    athletes_list = overview.get("athletes", [])
+    agg_timeline = overview.get("aggregated_timeline", [])
+    
+    # Build load_data from summary + athletes + aggregated_timeline
+    # Velocity zones: average across athletes
+    vz_agg = {"low_intensity": 0, "hid_z3": 0, "hsr_z4": 0, "sprint_z5": 0}
+    vz_count = 0
+    for a in athletes_list:
+        vz = a.get("velocity_zones", {})
+        if vz:
+            vz_agg["low_intensity"] += vz.get("low_intensity", 0)
+            vz_agg["hid_z3"] += vz.get("hid_z3", 0)
+            vz_agg["hsr_z4"] += vz.get("hsr_z4", 0)
+            vz_agg["sprint_z5"] += vz.get("sprint_z5", 0)
+            vz_count += 1
+    if vz_count > 1:
+        for k in vz_agg:
+            vz_agg[k] = round(vz_agg[k] / vz_count)
+    
+    load_data = {
+        "acwr": summary.get("team_acwr"),
+        "acute_load": summary.get("team_acute_load"),
+        "chronic_load": summary.get("team_chronic_load"),
+        "monotony": summary.get("team_monotony"),
+        "strain": summary.get("team_strain"),
+        "velocity_zones": vz_agg,
+        "distance_timeline": [{"date": d.get("date", ""), "distance": d.get("total_distance", 0)} for d in agg_timeline],
+    }
+    
+    # Build summary_data from summary + athletes
+    # LMPI VALIDITY: Only athletes with valid LMPI appear in risk rankings
+    high_risk_athletes = [a for a in athletes_list if a.get("risk_level") == "high" and a.get("lmpi") is not None]
+    total = summary.get("total_athletes", len(athletes_list))
+    avail_count = summary.get("available", total)
+    
+    summary_data = {
+        "lmpi": {"score": summary.get("team_lmpi") or 0},
+        "availability": {"available_pct": round(avail_count / total * 100) if total else 0},
+        "high_risk_athletes": [{"name": a.get("name"), "lmpi": a.get("lmpi", 0), "acwr": a.get("acwr", 0)} for a in high_risk_athletes],
+        "performance_profile": {
+            "load": min(100, round((summary.get("team_acwr") or 0) / 1.3 * 100)),
+            "wellness": round((summary.get("team_wellness") or 0) * 10),
+            "neuromuscular": round((summary.get("team_rsimod") or 0) * 100) if summary.get("team_rsimod") else 0,
+            "power": 0,
+        }
+    }
+    
+    # Build status_data from athletes' wellness
+    w_sleep, w_fatigue, w_soreness, w_stress, w_count = 0, 0, 0, 0, 0
+    low_readiness_list = []
+    for a in athletes_list:
+        wd = a.get("wellness_details", {})
+        ws = a.get("wellness_score")
+        if ws is not None:
+            w_sleep += wd.get("sleep", 5)
+            w_fatigue += wd.get("fatigue", 5)
+            w_soreness += wd.get("soreness", 5)
+            w_stress += wd.get("stress", 5)
+            w_count += 1
+            readiness = ws * 10
+            if readiness < 60:
+                low_readiness_list.append({"name": a.get("name"), "readiness": readiness, "wellness": ws})
+    
+    team_wellness_score = (summary.get("team_wellness") or 0)
+    status_data = {
+        "readiness": {"score": round(team_wellness_score * 10)},
+        "wellness_avg": {
+            "sleep": round(w_sleep / w_count, 1) if w_count else 0,
+            "fatigue": round(w_fatigue / w_count, 1) if w_count else 0,
+            "soreness": round(w_soreness / w_count, 1) if w_count else 0,
+            "stress": round(w_stress / w_count, 1) if w_count else 0,
+        },
+        "low_readiness_athletes": low_readiness_list,
+    }
+    
+    # Build neuro_data from athletes' jump metrics
+    rsimod_vals = [a.get("rsimod") for a in athletes_list if a.get("rsimod") is not None]
+    fi_vals = [a.get("jump_metrics", {}).get("fatigue_index") for a in athletes_list if a.get("jump_metrics", {}).get("fatigue_index") is not None]
+    team_rsimod = round(sum(rsimod_vals) / len(rsimod_vals), 3) if rsimod_vals else 0
+    team_fi = round(sum(fi_vals) / len(fi_vals), 1) if fi_vals else 0
+    neuro_score_val = round(50 + (team_rsimod * 50) + (team_fi * 0.5)) if rsimod_vals else 0
+    
+    neuro_data = {
+        "neuro_score": {"score": min(100, max(0, neuro_score_val))},
+        "rsimod": {"value": team_rsimod},
+        "fatigue_index": team_fi,
+    }
+    
+    # Build risk_data from athletes
+    # LMPI VALIDITY: Only include athletes with valid risk_score in rankings
+    risk_scores = [a.get("risk_score") for a in athletes_list if a.get("risk_score") is not None and a.get("lmpi_validity") != "invalid"]
+    team_risk_score = round(sum(risk_scores) / len(risk_scores)) if risk_scores else 0
+    risk_panel = sorted(
+        [{"name": a.get("name"), "risk_score": a.get("risk_score") or 0, "acwr": a.get("acwr") or 0, "wellness": a.get("wellness_score") or 0, "lmpi_validity": a.get("lmpi_validity", "invalid")}
+         for a in athletes_list if a.get("risk_score") is not None],
+        key=lambda x: x["risk_score"], reverse=True
+    )
+    
+    risk_data = {
+        "risk_score": {"score": team_risk_score},
+        "risk_panel": risk_panel,
+    }
+    
+    # ── SVG chart helpers ──
+    def make_line_chart_svg(values, dates_list, color, title, unit, w=500, h=140):
+        if not values or all(v == 0 for v in values):
+            return ""
+        pad = 50
+        max_v = max(values) * 1.1 or 1
+        iw, ih = w - pad * 2, h - 40
+        pts = []
+        for i, v in enumerate(values):
+            x = pad + (i / max(len(values) - 1, 1)) * iw
+            y = h - 20 - (v / max_v) * ih
+            pts.append((x, y, v))
+        polyline = " ".join(f"{x},{y}" for x, y, _ in pts)
+        circles = "".join(f'<circle cx="{x}" cy="{y}" r="3" fill="{color}"/>' for x, y, _ in pts)
+        grid = ""
+        for i in range(4):
+            gy = h - 20 - (i / 3) * ih
+            gv = (i / 3) * max_v
+            grid += f'<line x1="{pad}" y1="{gy}" x2="{w - pad}" y2="{gy}" stroke="#cbd5e1" stroke-dasharray="3"/>'
+            grid += f'<text x="{pad - 5}" y="{gy + 4}" text-anchor="end" fill="#64748b" font-size="9">{gv:,.0f}</text>'
+        dlabels = ""
+        step = max(1, len(dates_list) // 6)
+        for i in range(0, len(dates_list), step):
+            x = pad + (i / max(len(dates_list) - 1, 1)) * iw
+            dlabels += f'<text x="{x}" y="{h - 4}" text-anchor="middle" fill="#64748b" font-size="8">{dates_list[i]}</text>'
+        area_pts = f"{pts[0][0]},{h - 20} " + polyline + f" {pts[-1][0]},{h - 20}"
+        return f'''<div class="chart-container">
+            <div class="chart-title">{title} ({unit})</div>
+            <svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">
+                {grid}
+                <polygon points="{area_pts}" fill="{color}" opacity="0.08"/>
+                <polyline points="{polyline}" fill="none" stroke="{color}" stroke-width="2"/>
+                {circles} {dlabels}
+            </svg></div>'''
+
+    def make_bar_chart_svg(values, labels, colors, title, w=500, h=140):
+        if not values or all(v == 0 for v in values):
+            return ""
+        pad_l, pad_r, pad_t, pad_b = 50, 20, 20, 30
+        iw = w - pad_l - pad_r
+        ih = h - pad_t - pad_b
+        max_v = max(values) * 1.1 or 1
+        n = len(values)
+        bw = min(40, iw / n * 0.6)
+        gap = iw / n
+        bars = ""
+        for i, (v, lbl, col) in enumerate(zip(values, labels, colors)):
+            x = pad_l + i * gap + (gap - bw) / 2
+            bh = (v / max_v) * ih
+            y = pad_t + ih - bh
+            bars += f'<rect x="{x}" y="{y}" width="{bw}" height="{bh}" rx="3" fill="{col}"/>'
+            bars += f'<text x="{x + bw / 2}" y="{y - 4}" text-anchor="middle" fill="#374151" font-size="9" font-weight="600">{v:,.0f}</text>'
+            bars += f'<text x="{x + bw / 2}" y="{h - 8}" text-anchor="middle" fill="#64748b" font-size="8">{lbl}</text>'
+        grid = ""
+        for i in range(4):
+            gy = pad_t + ih - (i / 3) * ih
+            gv = (i / 3) * max_v
+            grid += f'<line x1="{pad_l}" y1="{gy}" x2="{w - pad_r}" y2="{gy}" stroke="#e2e8f0" stroke-dasharray="3"/>'
+            grid += f'<text x="{pad_l - 5}" y="{gy + 3}" text-anchor="end" fill="#94a3b8" font-size="8">{gv:,.0f}</text>'
+        return f'''<div class="chart-container">
+            <div class="chart-title">{title}</div>
+            <svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">{grid}{bars}</svg></div>'''
+
+    def make_gauge_svg(value, label, w=120, h=120):
+        cx, cy, r = w / 2, h / 2 + 5, 45
+        circ = 2 * 3.14159 * r
+        half = circ / 2
+        pct = min(max(value / 2.0, 0), 1)
+        col = "#10b981" if 0.8 <= value <= 1.3 else "#f59e0b" if value < 0.8 else "#ef4444"
+        return f'''<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">
+            <circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#e2e8f0" stroke-width="8"
+                stroke-dasharray="{half} {circ}" stroke-dashoffset="0" transform="rotate(180 {cx} {cy})"/>
+            <circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{col}" stroke-width="8"
+                stroke-dasharray="{pct * half} {circ}" stroke-dashoffset="0" transform="rotate(180 {cx} {cy})" stroke-linecap="round"/>
+            <text x="{cx}" y="{cy + 2}" text-anchor="middle" fill="#1e293b" font-size="18" font-weight="800">{value:.2f}</text>
+            <text x="{cx}" y="{cy + 16}" text-anchor="middle" fill="#64748b" font-size="9">{label}</text></svg>'''
+
+    def make_horiz_bar(value, max_val, label, color, w=400, h=28):
+        pct = (value / max_val * 100) if max_val else 0
+        bw = max(2, pct / 100 * (w - 120))
+        return f'''<svg width="100%" viewBox="0 0 {w} {h}" preserveAspectRatio="xMidYMid meet">
+            <text x="0" y="{h / 2 + 4}" fill="#374151" font-size="10">{label}</text>
+            <rect x="90" y="{h / 2 - 6}" width="{w - 170}" height="12" rx="6" fill="#f1f5f9"/>
+            <rect x="90" y="{h / 2 - 6}" width="{bw}" height="12" rx="6" fill="{color}"/>
+            <text x="{w - 5}" y="{h / 2 + 4}" text-anchor="end" fill="#374151" font-size="10" font-weight="600">{value:,.0f}m</text></svg>'''
+
+    # ── Build sections ──
+    sections_html = ""
+    
+    if "load" in selected_layers:
+        acwr = load_data.get("acwr") or 0
+        acute = load_data.get("acute_load") or 0
+        chronic = load_data.get("chronic_load") or 0
+        mono = load_data.get("monotony") or 0
+        strain_val = load_data.get("strain") or 0
+        vz = load_data.get("velocity_zones", {})
+        
+        timeline = load_data.get("distance_timeline", [])
+        timeline_chart = ""
+        if timeline:
+            tl_vals = [d.get("distance", 0) for d in timeline[-14:]]
+            tl_dates = [d.get("date", "")[-5:] for d in timeline[-14:]]
+            timeline_chart = make_line_chart_svg(tl_vals, tl_dates, "#0891b2", "Distancia Total" if is_pt else "Total Distance", "m")
+        
+        vz_vals = [vz.get("low_intensity", 0), vz.get("hid_z3", 0), vz.get("hsr_z4", 0), vz.get("sprint_z5", 0)]
+        vz_labels = ["Low Int", "HID Z3", "HSR Z4", "Sprint Z5"]
+        vz_colors = ["#3b82f6", "#06b6d4", "#eab308", "#ef4444"]
+        vz_total = sum(vz_vals) or 1
+        
+        vz_horiz = "".join([make_horiz_bar(v, vz_total, l, c) for v, l, c in zip(vz_vals, vz_labels, vz_colors)])
+        vz_bar_chart = make_bar_chart_svg(vz_vals, vz_labels, vz_colors, "Zonas de Velocidade" if is_pt else "Velocity Zones")
+        
+        acwr_color = "#10b981" if 0.8 <= acwr <= 1.3 else "#f59e0b" if acwr < 0.8 else "#ef4444"
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-cyan">Load Intelligence</span></div>
+        <div class="metrics-row">
+            <div class="metric-card"><div class="metric-label">Acute 7d</div><div class="metric-value" style="color:#0891b2">{acute:,.0f} m</div></div>
+            <div class="metric-card"><div class="metric-label">Chronic 28d</div><div class="metric-value" style="color:#3b82f6">{chronic:,.0f} m</div></div>
+            <div class="metric-card"><div class="metric-label">ACWR</div><div class="metric-value" style="color:{acwr_color}">{acwr:.2f}</div>
+                <div style="text-align:center;margin-top:4px">{make_gauge_svg(acwr, "ACWR")}</div></div>
+            <div class="metric-card"><div class="metric-label">Monotony</div><div class="metric-value">{mono:.1f}</div></div>
+            <div class="metric-card"><div class="metric-label">Strain</div><div class="metric-value">{strain_val:,.0f}</div></div>
+        </div>
+        {timeline_chart}
+        {vz_bar_chart}
+        <div style="margin-top:8px">{vz_horiz}</div>
+        </div>'''
+    
+    if "summary" in selected_layers:
+        lmpi = summary_data.get("lmpi", {}).get("score", 0)
+        profile = summary_data.get("performance_profile", {})
+        avail = summary_data.get("availability", {}).get("available_pct", 0)
+        high_risk = summary_data.get("high_risk_athletes", [])
+        
+        lmpi_color = "#ef4444" if lmpi < 40 else "#f59e0b" if lmpi < 70 else "#10b981"
+        
+        prof_vals = [profile.get("load", 0), profile.get("wellness", 0), profile.get("neuromuscular", 0), profile.get("power", 0)]
+        prof_labels = ["Load", "Wellness", "Neuro", "Power"]
+        prof_colors = ["#0891b2", "#10b981", "#8b5cf6", "#f59e0b"]
+        prof_chart = make_bar_chart_svg(prof_vals, prof_labels, prof_colors, "Performance Profile")
+        
+        risk_table = ""
+        if high_risk:
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("lmpi",0):.0f}</td><td>{a.get("acwr",0):.2f}</td></tr>' for a in high_risk[:10]])
+            risk_table = f'<div class="chart-title">{"Atletas Alto Risco" if is_pt else "High Risk Athletes"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>LMPI</th><th>ACWR</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-amber">Smart Summary</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">LMPI Score</div><div class="metric-value" style="color:{lmpi_color};font-size:32px">{lmpi:.0f}<span class="metric-sub">/100</span></div></div>
+            <div class="metric-card"><div class="metric-label">{"Disponibilidade" if is_pt else "Availability"}</div><div class="metric-value" style="color:#10b981">{avail:.0f}%</div></div>
+        </div>
+        {prof_chart}
+        {risk_table}
+        </div>'''
+    
+    if "status" in selected_layers:
+        readiness = status_data.get("readiness", {}).get("score", 0)
+        wellness_avg = status_data.get("wellness_avg", {})
+        low_ready = status_data.get("low_readiness_athletes", [])
+        
+        rd_color = "#ef4444" if readiness < 50 else "#f59e0b" if readiness < 75 else "#10b981"
+        
+        w_vals = [wellness_avg.get("sleep", 0), wellness_avg.get("fatigue", 0), wellness_avg.get("soreness", 0), wellness_avg.get("stress", 0)]
+        w_labels = ["Sono" if is_pt else "Sleep", "Fadiga" if is_pt else "Fatigue", "Dor" if is_pt else "Soreness", "Estresse" if is_pt else "Stress"]
+        w_colors = ["#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
+        w_chart = make_bar_chart_svg(w_vals, w_labels, w_colors, "Wellness Breakdown")
+        
+        lrt = ""
+        if low_ready:
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("readiness",0):.0f}%</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in low_ready[:10]])
+            lrt = f'<div class="chart-title">{"Baixa Prontidao" if is_pt else "Low Readiness"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Readiness</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-green">Team Status</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">{"Prontidao" if is_pt else "Readiness"}</div><div class="metric-value" style="color:{rd_color};font-size:32px">{readiness:.0f}%</div></div>
+        </div>
+        {w_chart}
+        {lrt}
+        </div>'''
+    
+    if "neuro" in selected_layers:
+        neuro_score = neuro_data.get("neuro_score", {}).get("score", 0)
+        rsimod = neuro_data.get("rsimod", {}).get("value", 0)
+        fatigue_idx = neuro_data.get("fatigue_index", 0)
+        
+        ns_color = "#ef4444" if neuro_score < 50 else "#f59e0b" if neuro_score < 75 else "#10b981"
+        fi_color = "#ef4444" if fatigue_idx < -10 else "#f59e0b" if fatigue_idx < -5 else "#10b981"
+        
+        n_vals = [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)]
+        n_labels = ["Neuro", "RSImod", "Fatigue"]
+        n_colors = [ns_color, "#8b5cf6", fi_color]
+        n_chart = make_bar_chart_svg(n_vals, n_labels, n_colors, "Neuromuscular Overview")
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-purple">Neuromuscular Status</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">Neuro Score</div><div class="metric-value" style="color:{ns_color};font-size:32px">{neuro_score:.0f}</div></div>
+            <div class="metric-card"><div class="metric-label">RSImod</div><div class="metric-value">{rsimod:.2f}</div></div>
+            <div class="metric-card"><div class="metric-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="metric-value" style="color:{fi_color}">{fatigue_idx:.1f}%</div></div>
+        </div>
+        {n_chart}
+        </div>'''
+    
+    if "risk" in selected_layers:
+        risk_score = risk_data.get("risk_score", {}).get("score", 0)
+        risk_panel = risk_data.get("risk_panel", [])
+        
+        rs_color = "#10b981" if risk_score < 30 else "#f59e0b" if risk_score < 60 else "#ef4444"
+        
+        panel_html = ""
+        if risk_panel:
+            # Handle None values for acwr and wellness safely
+            def safe_format(val, fmt):
+                if val is None:
+                    return "-"
+                return f"{val:{fmt}}"
+            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{"#10b981" if (a.get("risk_score") or 0)<30 else "#f59e0b" if (a.get("risk_score") or 0)<60 else "#ef4444"}">{safe_format(a.get("risk_score"), ".0f")}</td><td>{safe_format(a.get("acwr"), ".2f")}</td><td>{safe_format(a.get("wellness"), ".0f")}</td></tr>' for a in risk_panel[:15]])
+            panel_html = f'<div class="chart-title">{"Painel de Risco" if is_pt else "Risk Panel"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Risk</th><th>ACWR</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
+        
+        sections_html += f'''<div class="section">
+        <div class="section-header"><span class="layer-badge lb-red">Risk Intelligence</span></div>
+        <div class="metrics-row">
+            <div class="metric-card big"><div class="metric-label">{"Risco Geral" if is_pt else "Risk Score"}</div><div class="metric-value" style="color:{rs_color};font-size:32px">{risk_score:.0f}</div></div>
+        </div>
+        {panel_html}
+        </div>'''
+    
+    from datetime import datetime
+    now = datetime.now().strftime("%d/%m/%Y %H:%M")
+    
+    html = f"""<!DOCTYPE html>
+<html lang="{lang}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Report</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #ffffff;
+            color: #1e293b;
+            padding: 24px;
+            line-height: 1.5;
+        }}
+        .container {{ max-width: 800px; margin: 0 auto; }}
+        .report-header {{
+            text-align: center; margin-bottom: 28px; padding-bottom: 16px;
+            border-bottom: 2px solid #e2e8f0;
+        }}
+        .report-title {{ font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 1.5px; }}
+        .report-subtitle {{ font-size: 11px; color: #64748b; margin-top: 4px; }}
+        .section {{
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
+            padding: 20px; margin-bottom: 20px; page-break-inside: avoid;
+        }}
+        .section-header {{ margin-bottom: 14px; }}
+        .layer-badge {{
+            display: inline-block; padding: 5px 12px; border-radius: 6px;
+            font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
+        }}
+        .lb-cyan {{ background: #ecfeff; color: #0891b2; }}
+        .lb-amber {{ background: #fffbeb; color: #d97706; }}
+        .lb-green {{ background: #ecfdf5; color: #059669; }}
+        .lb-purple {{ background: #f5f3ff; color: #7c3aed; }}
+        .lb-red {{ background: #fef2f2; color: #dc2626; }}
+        .metrics-row {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }}
+        .metric-card {{
+            flex: 1; min-width: 90px; background: #ffffff; border: 1px solid #e2e8f0;
+            border-radius: 10px; padding: 12px; text-align: center;
+        }}
+        .metric-card.big {{ min-width: 140px; }}
+        .metric-label {{ font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }}
+        .metric-value {{ font-size: 20px; font-weight: 800; color: #1e293b; }}
+        .metric-sub {{ font-size: 10px; color: #94a3b8; font-weight: 400; }}
+        .chart-container {{ margin: 12px 0; }}
+        .chart-title {{ font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; margin-top: 12px; letter-spacing: 0.3px; }}
+        .data-table {{ width: 100%; border-collapse: collapse; margin-bottom: 14px; }}
+        .data-table th {{
+            text-align: left; font-size: 9px; color: #64748b; padding: 6px 10px;
+            border-bottom: 2px solid #e2e8f0; text-transform: uppercase; letter-spacing: 0.5px;
+        }}
+        .data-table td {{
+            font-size: 11px; color: #334155; padding: 6px 10px;
+            border-bottom: 1px solid #f1f5f9;
+        }}
+        .data-table td.danger {{ color: #dc2626; font-weight: 600; }}
+        .footer {{
+            text-align: center; color: #94a3b8; font-size: 9px; margin-top: 24px;
+            padding-top: 10px; border-top: 1px solid #e2e8f0;
+        }}
+        @media print {{
+            body {{ background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
+            .section {{ break-inside: avoid; }}
+        }}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="report-header">
+        <div class="report-title">DASHBOARD REPORT</div>
+        <div class="report-subtitle">{mode_label} | {"Periodo" if is_pt else "Period"}: {date_range} | {now}</div>
+    </div>
+    {sections_html}
+    <div class="footer">Load Manager Pro &mdash; {now}</div>
+</div>
+</body>
+</html>"""
+    
+    return HTMLResponse(content=html)
+
+
+# ============= SUBSCRIPTION ENDPOINTS =============
+
+# ============= WEARABLE IMPORT ENDPOINTS =============
+
+@api_router.get("/wearables/supported")
+async def get_supported_wearables():
+    """Get list of supported wearable integrations"""
+    return {
+        "import_methods": [
+            {
+                "id": "fit_file",
+                "name": "FIT File Import",
+                "description_pt": "Importe arquivos .FIT exportados de dispositivos Garmin, Polar, Suunto e outros",
+                "description_en": "Import .FIT files exported from Garmin, Polar, Suunto and other devices",
+                "supported_devices": ["Garmin", "Polar", "Suunto", "Wahoo", "Coros"],
+                "file_types": [".fit"]
+            },
+            {
+                "id": "csv_import",
+                "name": "CSV Import",
+                "description_pt": "Importe dados de GPS e treino via arquivo CSV",
+                "description_en": "Import GPS and training data via CSV file",
+                "supported_devices": ["Any device with CSV export"],
+                "file_types": [".csv"]
+            }
+        ],
+        "planned_integrations": [
+            {
+                "id": "garmin_connect",
+                "name": "Garmin Connect",
+                "status": "planned",
+                "description": "Direct sync with Garmin Connect API (requires developer credentials)"
+            },
+            {
+                "id": "polar_flow",
+                "name": "Polar Flow",
+                "status": "planned",
+                "description": "Direct sync with Polar Flow API"
+            }
+        ]
+    }
+
+
+# ============= ENHANCED CSV IMPORT — Analyze, Map, Import =============
+
+from csv_analyzer import analyze_csv, apply_custom_mapping, INTERNAL_FIELDS
+
+
+@api_router.post("/csv/analyze")
+async def csv_analyze(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+):
+    """Analyze CSV file structure and return auto-mappings + suggestions."""
+    content = await file.read()
+    analysis = analyze_csv(content, filename=file.filename or "upload.csv")
+
+    # Attach athlete matching info
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]}, {"_id": 0, "id": {"$toString": "$_id"}, "name": 1}
+    ).to_list(1000)
+    # MongoDB $toString may not work in all versions; fallback
+    athlete_list = []
+    async for a in db.athletes.find({"coach_id": current_user["_id"]}):
+        athlete_list.append({"id": str(a["_id"]), "name": a["name"]})
+
+    analysis["existing_athletes"] = athlete_list
+    return analysis
+
+
+class CSVImportMappedRequest(BaseModel):
+    mapping: Dict[str, Optional[str]]
+    create_missing_athletes: bool = True
+
+
+@api_router.post("/csv/import-mapped")
+async def csv_import_mapped(
+    file: UploadFile = File(...),
+    mapping_json: str = Form(...),
+    create_missing: bool = Form(True),
+    current_user: dict = Depends(get_current_user),
+):
+    """
+    Import CSV with a custom field mapping.
+    Preserves existing athlete auto-creation + GPS data pipeline.
+    """
+    import json as _json
+
+    content = await file.read()
+    mapping = _json.loads(mapping_json)
+
+    records = apply_custom_mapping(content, mapping, filename=file.filename or "upload.csv")
+
+    if not records:
+        raise HTTPException(status_code=400, detail="No valid records found after applying mapping")
+
+    # Get existing athletes
+    existing = {}
+    async for a in db.athletes.find({"coach_id": current_user["_id"]}):
+        existing[a["name"].lower().strip()] = str(a["_id"])
+
+    # Group records by athlete
+    from collections import defaultdict
+    by_athlete: Dict[str, list] = defaultdict(list)
+    for rec in records:
+        name = rec.get("athlete_name", "").strip()
+        if name:
+            by_athlete[name].append(rec)
+
+    session_id = f"csv_import_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    session_name = (file.filename or "CSV Import").replace(".csv", "")
+
+    success_count = 0
+    created_athletes = []
+    errors_list = []
+    imported_by_athlete = {}
+
+    for athlete_name, recs in by_athlete.items():
+        # Resolve athlete ID
+        athlete_id = existing.get(athlete_name.lower().strip())
+
+        if not athlete_id:
+            # Partial match
+            for ex_name, ex_id in existing.items():
+                if ex_name in athlete_name.lower() or athlete_name.lower() in ex_name:
+                    athlete_id = ex_id
+                    break
+
+        if not athlete_id and create_missing:
+            # Auto-create athlete (preserves existing behavior)
+            new_athlete = {
+                "name": athlete_name,
+                "coach_id": current_user["_id"],
+                "birth_date": "2000-01-01",
+                "position": "Não especificado",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            }
+            result = await db.athletes.insert_one(new_athlete)
+            athlete_id = str(result.inserted_id)
+            existing[athlete_name.lower().strip()] = athlete_id
+            created_athletes.append(athlete_name)
+
+        if not athlete_id:
+            errors_list.append(f"Athlete not found: {athlete_name}")
+            continue
+
+        for rec in recs:
+            try:
+                gps_doc = {
+                    "athlete_id": athlete_id,
+                    "coach_id": current_user["_id"],
+                    "date": rec.get("session_date", datetime.now().strftime("%Y-%m-%d")),
+                    "session_id": session_id,
+                    "session_name": session_name,
+                    "period_name": rec.get("period_name", "Session") or "Session",
+                    "total_distance": float(rec.get("total_distance", 0) or 0),
+                    "high_intensity_distance": float(rec.get("hid_distance", 0) or 0),
+                    "high_speed_running": float(rec.get("hsr_distance", 0) or 0),
+                    "sprint_distance": float(rec.get("sprint_distance", 0) or 0),
+                    "number_of_sprints": int(float(rec.get("number_of_sprints", 0) or 0)),
+                    "number_of_accelerations": int(float(rec.get("accelerations", 0) or 0)),
+                    "number_of_decelerations": int(float(rec.get("decelerations", 0) or 0)),
+                    "max_speed": float(rec.get("max_speed", 0) or 0) if rec.get("max_speed") else None,
+                    "max_acceleration": float(rec.get("max_acceleration", 0) or 0) if rec.get("max_acceleration") else None,
+                    "max_deceleration": float(rec.get("max_deceleration", 0) or 0) if rec.get("max_deceleration") else None,
+                    "player_load": float(rec.get("player_load", 0) or 0) if rec.get("player_load") else None,
+                    "source": "csv_import",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }
+                await db.gps_data.insert_one(gps_doc)
+                success_count += 1
+                imported_by_athlete[athlete_name] = imported_by_athlete.get(athlete_name, 0) + 1
+            except Exception as e:
+                errors_list.append(f"Error importing {athlete_name}: {str(e)}")
+
+    # Build earliest_date per athlete from imported records
+    earliest_date_by_athlete: Dict[str, str] = {}
+    for athlete_name, recs in by_athlete.items():
+        aid = existing.get(athlete_name.lower().strip())
+        if not aid:
+            continue
+        for rec in recs:
+            rec_date = rec.get("session_date", "")
+            if rec_date and (aid not in earliest_date_by_athlete or rec_date < earliest_date_by_athlete[aid]):
+                earliest_date_by_athlete[aid] = rec_date
+
+    # Trigger recalculation from earliest_date for each affected athlete
+    coach_id_str = str(current_user["_id"])
+    for aid, earliest_date in earliest_date_by_athlete.items():
+        try:
+            await load_engine.recalculate_from_date(
+                athlete_id=aid,
+                coach_id=coach_id_str,
+                start_date=earliest_date
+            )
+        except Exception as e:
+            logging.error(f"[RC5] Recalculation failed for athlete {aid}: {e}")
+
+    return {
+        "success": True,
+        "records_imported": success_count,
+        "athletes_created": created_athletes,
+        "imported_by_athlete": imported_by_athlete,
+        "errors": errors_list,
+        "session_id": session_id,
+    }
+
+
+# ─── Mapping Templates CRUD ──────────────────────────────────────────────────
+
+class MappingTemplateCreate(BaseModel):
+    name: str
+    provider: Optional[str] = None
+    mapping: Dict[str, Optional[str]]
+
+
+@api_router.get("/csv/mapping-templates")
+async def list_mapping_templates(current_user: dict = Depends(get_current_user)):
+    templates = []
+    async for t in db.csv_mapping_templates.find({"coach_id": current_user["_id"]}):
+        templates.append({
+            "id": str(t["_id"]),
+            "name": t["name"],
+            "provider": t.get("provider"),
+            "mapping": t["mapping"],
+            "created_at": t.get("created_at"),
+        })
+    return templates
+
+
+@api_router.post("/csv/mapping-templates")
+async def save_mapping_template(
+    body: MappingTemplateCreate,
+    current_user: dict = Depends(get_current_user),
+):
+    doc = {
+        "coach_id": current_user["_id"],
+        "name": body.name,
+        "provider": body.provider,
+        "mapping": body.mapping,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await db.csv_mapping_templates.insert_one(doc)
+    return {"id": str(result.inserted_id), "message": "Template saved"}
+
+
+@api_router.delete("/csv/mapping-templates/{template_id}")
+async def delete_mapping_template(
+    template_id: str,
+    current_user: dict = Depends(get_current_user),
+):
+    result = await db.csv_mapping_templates.delete_one({
+        "_id": ObjectId(template_id),
+        "coach_id": current_user["_id"],
+    })
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return {"message": "Template deleted"}
+
+
+# ============= CSV IMPORT (via gps_import module) =============
+
+@api_router.post("/wearables/import/csv")
+async def import_wearable_csv(
+    athlete_id: str,
+    file: UploadFile = File(...),
+    provider: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import GPS data from CSV with automatic manufacturer detection.
+    Supported: Catapult, STATSports, PlayerTek, GPEXE (+ unknown fallback).
+    
+    BLOCKED if athlete_id is not resolved or if CSV contains unresolved athlete names.
+    """
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+
+    content = await file.read()
+
+    # Force manufacturer if provided
+    forced = None
+    if provider:
+        try:
+            forced = Manufacturer(provider.lower())
+        except ValueError:
+            forced = None
+
+    # Parse CSV through the new pipeline (tolerant mode)
+    parser = GPSCSVParser(strict_validation=False)
+    parse_result = parser.parse(content, filename=file.filename or "upload.csv")
+
+    manufacturer = forced if forced else parse_result.manufacturer
+    
+    # ========== IDENTITY RESOLUTION CHECK ==========
+    # Get existing athletes for alias checking
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Check if CSV contains multiple athlete names that need resolution
+    athlete_names_from_csv = set()
+    for rec in parse_result.records:
+        athlete_name = (
+            rec.get('athlete_name', '') or 
+            rec.get('player_name', '') or
+            rec.get('name', '') or
+            rec.get('player', '')
+        )
+        if athlete_name and isinstance(athlete_name, str):
+            athlete_name = athlete_name.strip()
+            if athlete_name and athlete_name not in existing_athlete_ids:
+                athlete_names_from_csv.add(athlete_name)
+    
+    # Run identity resolution if there are names in CSV
+    if athlete_names_from_csv:
+        identity_resolver = IdentityResolver()
+        resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+            names=list(athlete_names_from_csv),
+            athletes=athletes,
+            aliases=aliases,
+            coach_id=current_user["_id"],
+            source_system="gps"
+        )
+        
+        # BLOCK import if there are unresolved athletes
+        if unresolved_athletes:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": f"Importação bloqueada: {len(unresolved_athletes)} atleta(s) não resolvido(s) no CSV",
+                    "unresolved_count": len(unresolved_athletes),
+                    "unresolved": [u.to_dict() for u in unresolved_athletes],
+                    "action_required": "Use o endpoint /api/athletes/confirm-alias para confirmar as associações antes de importar"
+                }
+            )
+
+    # Normalize into GPSData documents
+    normalizer = GPSDataNormalizer(
+        athlete_id=athlete_id,
+        coach_id=current_user["_id"],
+        session_name=file.filename or "CSV Import",
+        manufacturer=manufacturer,
+    )
+    normalized = normalizer.normalize_records(parse_result.records)
+
+    # Consolidate all rows into ONE document per activity
+    consolidated = consolidate_session(normalized)
+
+    imported = []
+    errors_list = []
+
+    if consolidated:
+        try:
+            await db.gps_data.insert_one(consolidated)
+            imported.append({
+                "date": consolidated.get("date"),
+                "total_distance": consolidated.get("total_distance", 0),
+                "hid": consolidated.get("high_intensity_distance", 0),
+                "sprints": consolidated.get("number_of_sprints", 0),
+                "has_session_total": consolidated.get("has_session_total", False),
+                "periods_count": len(consolidated.get("periods", [])),
+            })
+            
+            # UPDATE ROLLING LOAD METRICS (EWMA, ACWR, etc.)
+            try:
+                await load_engine.update_athlete_metrics(
+                    athlete_id=athlete_id,
+                    coach_id=str(current_user["_id"]),
+                    date=consolidated.get("date")
+                )
+            except Exception as e:
+                logging.warning(f"[LoadEngine] Failed to update metrics after CSV import: {e}")
+        except Exception as e:
+            errors_list.append({"error": str(e)})
+
+    return {
+        "success": len(imported) > 0,
+        "provider_detected": manufacturer.value,
+        "records_imported": len(imported),
+        "records_from_csv": parse_result.total_rows,
+        "consolidated": True,
+        "has_session_total": consolidated.get("has_session_total", False) if consolidated else False,
+        "periods_count": len(consolidated.get("periods", [])) if consolidated else 0,
+        "errors": len(errors_list) + len(parse_result.errors),
+        "athlete_id": athlete_id,
+        "session_id": normalizer.session_id,
+        "column_mapping": parse_result.column_mapping,
+        "unmapped_columns": parse_result.unmapped_columns,
+        "parse_warnings": [w.to_dict() for w in parse_result.warnings[:10]],
+        "parse_errors": [e.to_dict() for e in parse_result.errors[:10]],
+        "import_details": {
+            "imported": imported,
+            "errors": errors_list[:5],
+        },
+    }
+
+
+@api_router.get("/wearables/csv/supported-providers")
+async def get_supported_csv_providers():
+    """List supported CSV manufacturers and the canonical metrics they can map."""
+    manufacturers = [m for m in Manufacturer if m != Manufacturer.UNKNOWN]
+    providers = []
+    for m in manufacturers:
+        providers.append({
+            "id": m.value,
+            "name": m.value.title(),
+        })
+
+    return {
+        "providers": providers,
+        "canonical_metrics": {
+            category: metrics for category, metrics in METRIC_CATEGORIES.items()
+        },
+        "tips": [
+            "The system automatically detects the manufacturer based on column headers",
+            "Supported delimiters: comma, semicolon, tab",
+            "Supported encodings: UTF-8, Latin-1, CP1252",
+            "Date formats supported: YYYY-MM-DD, DD/MM/YYYY, MM/DD/YYYY and more",
+            "Decimal separators: both dot and comma are supported",
+        ],
+    }
+
+
+@api_router.post("/wearables/csv/preview")
+async def preview_csv_import(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Preview CSV before importing.
+    Returns detected manufacturer, column mapping, sample normalized records.
+    Includes identity resolution for athlete names found in CSV.
+    Import is BLOCKED if any athletes are unresolved.
+    """
+    content = await file.read()
+
+    parse_result = parse_gps_csv(content, filename=file.filename or "upload.csv", strict=False)
+
+    # ========== IDENTITY RESOLUTION ==========
+    # Get existing athletes
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Extract unique athlete names from GPS data
+    athlete_names_from_csv = set()
+    for rec in parse_result.records:
+        # Check common GPS CSV columns for athlete name
+        athlete_name = (
+            rec.get('athlete_name', '') or 
+            rec.get('player_name', '') or
+            rec.get('name', '') or
+            rec.get('player', '')
+        )
+        if athlete_name and isinstance(athlete_name, str):
+            athlete_name = athlete_name.strip()
+            if athlete_name and athlete_name not in existing_athlete_ids:
+                athlete_names_from_csv.add(athlete_name)
+    
+    # Run identity resolution if there are names to resolve
+    identity_resolution = {
+        "resolved": {},
+        "resolved_count": 0,
+        "unresolved": [],
+        "unresolved_count": 0,
+        "can_import": True,
+        "message": "Nenhum nome de atleta encontrado no CSV ou todos já resolvidos"
+    }
+    
+    if athlete_names_from_csv:
+        identity_resolver = IdentityResolver()
+        resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+            names=list(athlete_names_from_csv),
+            athletes=athletes,
+            aliases=aliases,
+            coach_id=current_user["_id"],
+            source_system="gps"
+        )
+        
+        can_import = len(unresolved_athletes) == 0
+        identity_resolution = {
+            "resolved": resolved_names,
+            "resolved_count": len(resolved_names),
+            "unresolved": [u.to_dict() for u in unresolved_athletes],
+            "unresolved_count": len(unresolved_athletes),
+            "can_import": can_import,
+            "message": "Todos os atletas resolvidos" if can_import else f"{len(unresolved_athletes)} atleta(s) pendente(s) de confirmação"
+        }
+
+    # Build sample preview (first 5 parsed records)
+    sample = []
+    for rec in parse_result.records[:5]:
+        preview = {k: v for k, v in rec.items() if not k.startswith("_")}
+        sample.append(preview)
+
+    return {
+        "filename": file.filename,
+        "total_rows": parse_result.total_rows,
+        "valid_rows": parse_result.valid_rows,
+        "detected_manufacturer": parse_result.manufacturer.value,
+        "column_mapping": parse_result.column_mapping,
+        "unmapped_columns": parse_result.unmapped_columns,
+        "sample_data": sample,
+        "errors": [e.to_dict() for e in parse_result.errors[:10]],
+        "warnings": [w.to_dict() for w in parse_result.warnings[:10]],
+        "ready_to_import": parse_result.valid_rows > 0 and identity_resolution["can_import"],
+        "identity_resolution": identity_resolution,
+    }
+
+
+# ============= VBT (VELOCITY BASED TRAINING) INTEGRATION =============
+
+class VBTProvider(str, Enum):
+    PUSH_BAND = "push_band"
+    BEAST = "beast"
+    VITRUVE = "vitruve"
+    MANUAL = "manual"
+    CAMERA = "camera"
+
+class VBTDataCreate(BaseModel):
+    athlete_id: str
+    date: str
+    provider: VBTProvider
+    exercise: str
+    sets: List[dict]  # [{reps: int, mean_velocity: float, peak_velocity: float, load_kg: float, power_watts: float, rom_cm: float}]
+    notes: Optional[str] = None
+
+@api_router.get("/vbt/providers")
+async def get_vbt_providers():
+    """Get supported VBT providers with Bluetooth connectivity"""
+    return {
+        "providers": [
+            {
+                "id": "push_band",
+                "name": "PUSH Band 2.0",
+                "description_pt": "Sensor vestível Bluetooth para VBT",
+                "description_en": "Bluetooth wearable sensor for VBT",
+                "metrics": ["mean_velocity", "peak_velocity", "power"],
+                "connection": "bluetooth",
+                "icon": "fitness",
+                "color": "#FF6B35",
+                "website": "https://www.trainwithpush.com"
+            },
+            {
+                "id": "vitruve",
+                "name": "Vitruve",
+                "description_pt": "Encoder VBT compacto com Bluetooth",
+                "description_en": "Compact VBT encoder with Bluetooth",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
+                "connection": "bluetooth",
+                "icon": "speedometer",
+                "color": "#00D4AA",
+                "website": "https://vitruve.fit"
+            },
+            {
+                "id": "beast",
+                "name": "Beast Sensor",
+                "description_pt": "Sensor IMU Bluetooth para VBT",
+                "description_en": "Bluetooth IMU sensor for VBT",
+                "metrics": ["mean_velocity", "peak_velocity", "power"],
+                "connection": "bluetooth",
+                "icon": "flash",
+                "color": "#FFD700"
+            },
+            {
+                "id": "manual",
+                "name": "Manual Entry",
+                "description_pt": "Entrada manual de dados VBT",
+                "description_en": "Manual VBT data entry",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "rom"],
+                "import_format": "form"
+            },
+            {
+                "id": "camera",
+                "name": "Camera Tracking",
+                "description_pt": "Rastreamento de velocidade via câmera em tempo real",
+                "description_en": "Real-time velocity tracking via camera",
+                "metrics": ["mean_velocity", "peak_velocity", "power", "velocity_drop"],
+                "import_format": "camera",
+                "icon": "videocam",
+                "color": "#10b981"
+            }
+        ],
+        "exercises": [
+            "Back Squat", "Front Squat", "Bench Press", "Deadlift", 
+            "Power Clean", "Hang Clean", "Snatch", "Push Press",
+            "Overhead Press", "Hip Thrust", "Romanian Deadlift",
+            "Jump Squat", "Trap Bar Deadlift"
+        ]
+    }
+
+@api_router.post("/vbt/data")
+async def create_vbt_data(
+    data: VBTDataCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Create VBT (Velocity Based Training) data entry"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(data.athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Calculate summary metrics
+    all_velocities = [s.get("mean_velocity", 0) for s in data.sets if s.get("mean_velocity")]
+    all_powers = [s.get("power_watts", 0) for s in data.sets if s.get("power_watts")]
+    all_loads = [s.get("load_kg", 0) for s in data.sets if s.get("load_kg")]
+    
+    vbt_record = {
+        "athlete_id": data.athlete_id,
+        "coach_id": current_user["_id"],
+        "date": data.date,
+        "provider": data.provider.value,
+        "exercise": data.exercise,
+        "sets": data.sets,
+        "summary": {
+            "total_sets": len(data.sets),
+            "total_reps": sum(s.get("reps", 0) for s in data.sets),
+            "avg_velocity": sum(all_velocities) / len(all_velocities) if all_velocities else 0,
+            "max_velocity": max(all_velocities) if all_velocities else 0,
+            "avg_power": sum(all_powers) / len(all_powers) if all_powers else 0,
+            "max_power": max(all_powers) if all_powers else 0,
+            "max_load": max(all_loads) if all_loads else 0
+        },
+        "notes": data.notes,
+        "created_at": datetime.utcnow()
+    }
+    
+    result = await db.vbt_data.insert_one(vbt_record)
+    vbt_record["_id"] = str(result.inserted_id)
+    
+    return vbt_record
+
+@api_router.get("/vbt/athlete/{athlete_id}")
+async def get_athlete_vbt_data(
+    athlete_id: str,
+    exercise: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Get VBT data for an athlete"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    query = {
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }
+    
+    if exercise:
+        query["exercise"] = exercise
+    
+    records = await db.vbt_data.find(query).sort("date", -1).to_list(100)
+    
+    for record in records:
+        record["_id"] = str(record["_id"])
+    
+    return records
+
+@api_router.post("/vbt/import/csv")
+async def import_vbt_csv(
+    athlete_id: str,
+    provider: str,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Import VBT data from CSV file (PUSH Band, Vitruve, Beast formats)"""
+    import csv
+    
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    content = await file.read()
+    decoded = content.decode('utf-8')
+    reader = csv.DictReader(decoded.splitlines())
+    
+    # Group by exercise and date
+    exercises_data = {}
+    
+    for row in reader:
+        date = row.get("date", row.get("Date", ""))
+        exercise = row.get("exercise", row.get("Exercise", row.get("Movement", "")))
+        
+        key = f"{date}_{exercise}"
+        if key not in exercises_data:
+            exercises_data[key] = {
+                "date": date,
+                "exercise": exercise,
+                "sets": []
+            }
+        
+        set_data = {
+            "reps": int(row.get("reps", row.get("Reps", 1)) or 1),
+            "mean_velocity": float(row.get("mean_velocity", row.get("Mean Velocity", row.get("Avg Velocity", 0))) or 0),
+            "peak_velocity": float(row.get("peak_velocity", row.get("Peak Velocity", row.get("Max Velocity", 0))) or 0),
+            "load_kg": float(row.get("load_kg", row.get("Load", row.get("Weight", 0))) or 0),
+            "power_watts": float(row.get("power_watts", row.get("Power", row.get("Avg Power", 0))) or 0),
+            "rom_cm": float(row.get("rom_cm", row.get("ROM", row.get("Range of Motion", 0))) or 0)
+        }
+        exercises_data[key]["sets"].append(set_data)
+    
+    # Store each exercise session
+    imported_count = 0
+    for key, exercise_data in exercises_data.items():
+        all_velocities = [s["mean_velocity"] for s in exercise_data["sets"] if s["mean_velocity"]]
+        all_powers = [s["power_watts"] for s in exercise_data["sets"] if s["power_watts"]]
+        all_loads = [s["load_kg"] for s in exercise_data["sets"] if s["load_kg"]]
+        
+        vbt_record = {
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"],
+            "date": exercise_data["date"],
+            "provider": provider,
+            "exercise": exercise_data["exercise"],
+            "sets": exercise_data["sets"],
+            "summary": {
+                "total_sets": len(exercise_data["sets"]),
+                "total_reps": sum(s["reps"] for s in exercise_data["sets"]),
+                "avg_velocity": sum(all_velocities) / len(all_velocities) if all_velocities else 0,
+                "max_velocity": max(all_velocities) if all_velocities else 0,
+                "avg_power": sum(all_powers) / len(all_powers) if all_powers else 0,
+                "max_power": max(all_powers) if all_powers else 0,
+                "max_load": max(all_loads) if all_loads else 0
+            },
+            "source": "csv_import",
+            "created_at": datetime.utcnow()
+        }
+        
+        await db.vbt_data.insert_one(vbt_record)
+        imported_count += 1
+    
+    return {
+        "success": True,
+        "exercises_imported": imported_count,
+        "provider": provider,
+        "athlete_id": athlete_id
+    }
+
+@api_router.get("/vbt/analysis/{athlete_id}")
+async def get_vbt_analysis(
+    athlete_id: str,
+    exercise: str,
+    lang: str = "pt",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get VBT analysis with velocity-load profiling and fatigue detection"""
+    # Verify athlete
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Athlete not found")
+    
+    # Get VBT data for this exercise
+    records = await db.vbt_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"],
+        "exercise": exercise
+    }).sort("date", -1).to_list(50)
+    
+    if not records:
+        raise HTTPException(status_code=400, detail="No VBT data available for this exercise")
+    
+    # Calculate Load-Velocity Profile (LVP)
+    load_velocity_points = []
+    for record in records:
+        for set_data in record.get("sets", []):
+            if set_data.get("load_kg") and set_data.get("mean_velocity"):
+                load_velocity_points.append({
+                    "load": set_data["load_kg"],
+                    "velocity": set_data["mean_velocity"],
+                    "date": record["date"]
+                })
+    
+    # Calculate estimated 1RM based on load-velocity relationship
+    # Using Bazuelo-Ruiz et al. formula: 1RM velocity ≈ 0.17 m/s for most exercises
+    mvt_velocity = 0.17  # Minimum Velocity Threshold
+    
+    if len(load_velocity_points) >= 2:
+        # Simple linear regression for load-velocity
+        loads = [p["load"] for p in load_velocity_points]
+        velocities = [p["velocity"] for p in load_velocity_points]
+        
+        n = len(loads)
+        sum_x = sum(loads)
+        sum_y = sum(velocities)
+        sum_xy = sum(l * v for l, v in zip(loads, velocities))
+        sum_x2 = sum(l ** 2 for l in loads)
+        
+        if (n * sum_x2 - sum_x ** 2) != 0:
+            slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x ** 2)
+            intercept = (sum_y - slope * sum_x) / n
+            
+            # Estimated 1RM where velocity = MVT
+            if slope != 0:
+                estimated_1rm = (mvt_velocity - intercept) / slope
+            else:
+                estimated_1rm = None
+        else:
+            slope = 0
+            intercept = 0
+            estimated_1rm = None
+    else:
+        slope = 0
+        intercept = 0
+        estimated_1rm = None
+    
+    # Calculate OPTIMAL LOAD (where power is maximized)
+    # Power = Load × Velocity
+    # Using the linear regression: velocity = intercept + slope × load
+    # Power = load × (intercept + slope × load) = intercept×load + slope×load²
+    # To maximize: dP/dLoad = intercept + 2×slope×load = 0
+    # optimal_load = -intercept / (2 × slope)
+    optimal_load = None
+    optimal_velocity = None
+    optimal_power = None
+    
+    if slope and slope < 0 and intercept:  # slope should be negative for valid profile
+        optimal_load = -intercept / (2 * slope)
+        if optimal_load > 0:
+            optimal_velocity = intercept + slope * optimal_load
+            optimal_power = optimal_load * optimal_velocity
+            optimal_load = round(optimal_load, 1)
+            optimal_velocity = round(optimal_velocity, 3)
+            optimal_power = round(optimal_power, 0)
+        else:
+            optimal_load = None
+    
+    # Track optimal load evolution over time
+    optimal_load_history = []
+    if len(records) >= 2:
+        for record in records[:10]:
+            record_loads = []
+            record_velocities = []
+            for set_data in record.get("sets", []):
+                if set_data.get("load_kg") and set_data.get("mean_velocity"):
+                    record_loads.append(set_data["load_kg"])
+                    record_velocities.append(set_data["mean_velocity"])
+            
+            if len(record_loads) >= 2:
+                # Calculate slope and intercept for this session
+                n = len(record_loads)
+                sum_x = sum(record_loads)
+                sum_y = sum(record_velocities)
+                sum_xy = sum(l * v for l, v in zip(record_loads, record_velocities))
+                sum_x2 = sum(l ** 2 for l in record_loads)
+                
+                denom = n * sum_x2 - sum_x ** 2
+                if denom != 0:
+                    rec_slope = (n * sum_xy - sum_x * sum_y) / denom
+                    rec_intercept = (sum_y - rec_slope * sum_x) / n
+                    
+                    if rec_slope < 0 and rec_intercept > 0:
+                        rec_optimal_load = -rec_intercept / (2 * rec_slope)
+                        if rec_optimal_load > 0:
+                            rec_optimal_velocity = rec_intercept + rec_slope * rec_optimal_load
+                            rec_optimal_power = rec_optimal_load * rec_optimal_velocity
+                            optimal_load_history.append({
+                                "date": record["date"],
+                                "optimal_load": round(rec_optimal_load, 1),
+                                "optimal_velocity": round(rec_optimal_velocity, 3),
+                                "optimal_power": round(rec_optimal_power, 0)
+                            })
+    
+    # Velocity loss analysis (fatigue indicator)
+    latest_record = records[0]
+    velocity_loss_data = []
+    if len(latest_record.get("sets", [])) >= 2:
+        first_set_velocity = latest_record["sets"][0].get("mean_velocity", 0)
+        for i, set_data in enumerate(latest_record["sets"]):
+            velocity = set_data.get("mean_velocity", 0)
+            if first_set_velocity > 0:
+                loss_percent = ((first_set_velocity - velocity) / first_set_velocity) * 100
+                velocity_loss_data.append({
+                    "set": i + 1,
+                    "velocity": velocity,
+                    "loss_percent": round(loss_percent, 1)
+                })
+    
+    # Calculate trend
+    trend = "stable"
+    if len(records) >= 3:
+        recent_avg = sum(r["summary"]["avg_velocity"] for r in records[:3]) / 3
+        older_avg = sum(r["summary"]["avg_velocity"] for r in records[-3:]) / 3
+        if recent_avg > older_avg * 1.05:
+            trend = "improving"
+        elif recent_avg < older_avg * 0.95:
+            trend = "declining"
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name"),
+        "exercise": exercise,
+        "latest_session": {
+            "date": latest_record["date"],
+            "sets": len(latest_record.get("sets", [])),
+            "avg_velocity": latest_record["summary"]["avg_velocity"],
+            "max_velocity": latest_record["summary"]["max_velocity"],
+            "max_power": latest_record["summary"]["max_power"],
+            "max_load": latest_record["summary"]["max_load"]
+        },
+        "load_velocity_profile": {
+            "slope": round(slope, 4) if slope else None,
+            "intercept": round(intercept, 2) if intercept else None,
+            "estimated_1rm": round(estimated_1rm, 1) if estimated_1rm else None,
+            "mvt_velocity": mvt_velocity,
+            "data_points": len(load_velocity_points),
+            "optimal_load": optimal_load,
+            "optimal_velocity": optimal_velocity,
+            "optimal_power": optimal_power
+        },
+        "optimal_load_evolution": optimal_load_history,
+        "velocity_loss_analysis": velocity_loss_data,
+        "trend": trend,
+        "history": [
+            {
+                "date": r["date"],
+                "avg_velocity": r["summary"]["avg_velocity"],
+                "max_velocity": r["summary"]["max_velocity"],
+                "max_load": r["summary"]["max_load"]
+            } for r in records[:10]
+        ],
+        "recommendations": {
+            "pt": get_vbt_recommendations_pt(velocity_loss_data, trend, estimated_1rm),
+            "en": get_vbt_recommendations_en(velocity_loss_data, trend, estimated_1rm)
+        }.get(lang, get_vbt_recommendations_en(velocity_loss_data, trend, estimated_1rm))
+    }
+
+def get_vbt_recommendations_pt(velocity_loss, trend, estimated_1rm):
+    recs = []
+    if velocity_loss and len(velocity_loss) > 1:
+        max_loss = max(vl["loss_percent"] for vl in velocity_loss)
+        if max_loss > 20:
+            recs.append("⚠️ Perda de velocidade alta (>20%) indica fadiga significativa. Considere reduzir volume.")
+        elif max_loss < 10:
+            recs.append("✅ Baixa perda de velocidade. Pode aumentar intensidade ou volume.")
+    
+    if trend == "improving":
+        recs.append("📈 Tendência de melhora na velocidade. Continue progredindo gradualmente.")
+    elif trend == "declining":
+        recs.append("📉 Tendência de queda. Considere período de recuperação ou deload.")
+    
+    if estimated_1rm:
+        recs.append(f"💪 1RM estimado: {estimated_1rm:.1f} kg baseado no perfil carga-velocidade.")
+    
+    return recs
+
+def get_vbt_recommendations_en(velocity_loss, trend, estimated_1rm):
+    recs = []
+    if velocity_loss and len(velocity_loss) > 1:
+        max_loss = max(vl["loss_percent"] for vl in velocity_loss)
+        if max_loss > 20:
+            recs.append("⚠️ High velocity loss (>20%) indicates significant fatigue. Consider reducing volume.")
+        elif max_loss < 10:
+            recs.append("✅ Low velocity loss. Can increase intensity or volume.")
+    
+    if trend == "improving":
+        recs.append("📈 Improving velocity trend. Continue progressing gradually.")
+    elif trend == "declining":
+        recs.append("📉 Declining trend. Consider recovery period or deload.")
+    
+    if estimated_1rm:
+        recs.append(f"💪 Estimated 1RM: {estimated_1rm:.1f} kg based on load-velocity profile.")
+    
+    return recs
+
+@api_router.get("/subscription/plans")
+async def get_subscription_plans(lang: str = "pt", region: str = "BR"):
+    """Get all available subscription plans with regional pricing"""
+    plans = []
+    is_brazil = region.upper() == "BR"
+    is_portuguese = lang.lower() in ["pt", "pt-br"]
+    
+    for plan_id, plan_data in PLAN_LIMITS.items():
+        if plan_id != "free_trial":  # Don't show trial as a purchasable plan
+            price = plan_data.get("price_brl", 0) if is_brazil else plan_data.get("price_usd", 0)
+            currency = "BRL" if is_brazil else "USD"
+            currency_symbol = "R$" if is_brazil else "$"
+            
+            plans.append({
+                "id": plan_id,
+                "name": plan_data["name"] if is_portuguese else plan_data.get("name_en", plan_data["name"]),
+                "price": price,
+                "price_formatted": f"{currency_symbol} {price:.2f}".replace(".", ",") if is_brazil else f"{currency_symbol}{price:.2f}",
+                "currency": currency,
+                "max_athletes": plan_data["max_athletes"],
+                "history_months": plan_data["history_months"],
+                "advanced_analytics": plan_data.get("advanced_analytics", False),
+                "ai_insights": plan_data.get("ai_insights", False),
+                "fatigue_alerts": plan_data.get("fatigue_alerts", False),
+                "multi_user": plan_data.get("multi_user", False),
+                "max_users": plan_data.get("max_users", 1),
+                "features": plan_data.get("features", []),
+                "trial_days": plan_data.get("trial_days", 7),
+                "billing_period_days": plan_data.get("billing_period_days", 30),
+                "auto_renew": plan_data.get("auto_renew", True),
+                "description": plan_data.get("description_pt" if is_portuguese else "description_en", ""),
+                "features_list": plan_data.get("features_list_pt" if is_portuguese else "features_list_en", []),
+                "limitations": plan_data.get("limitations_pt" if is_portuguese else "limitations_en", []),
+                "popular": plan_data.get("popular", False),
+            })
+    return plans
+
+@api_router.get("/subscription/current", response_model=SubscriptionResponse)
+async def get_current_subscription(
+    lang: str = "pt", 
+    region: str = "BR",
+    current_user: dict = Depends(get_current_user)
+):
+    """Get current user's subscription status"""
+    user_id = current_user["_id"]
+    is_brazil = region.upper() == "BR"
+    
+    # Get subscription from database
+    subscription = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": {"$in": ["active", "trial"]}
+    })
+    
+    # Count current athletes
+    athlete_count = await db.athletes.count_documents({"coach_id": user_id})
+    
+    if not subscription:
+        # Create default trial subscription
+        trial_end = datetime.utcnow() + timedelta(days=7)
+        new_subscription = {
+            "user_id": user_id,
+            "plan": "free_trial",
+            "status": "trial",
+            "start_date": datetime.utcnow(),
+            "trial_end_date": trial_end,
+            "current_period_end": trial_end,
+            "created_at": datetime.utcnow(),
+        }
+        await db.subscriptions.insert_one(new_subscription)
+        subscription = new_subscription
+    
+    plan = subscription.get("plan", "free_trial")
+    plan_limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free_trial"])
+    status = subscription.get("status", "trial")
+    
+    # Get price based on region
+    price = plan_limits.get("price_brl", 0) if is_brazil else plan_limits.get("price_usd", 0)
+    
+    # Calculate days remaining
+    days_remaining = None
+    trial_end_str = None
+    if subscription.get("trial_end_date"):
+        trial_end = subscription["trial_end_date"]
+        if isinstance(trial_end, str):
+            trial_end = datetime.fromisoformat(trial_end)
+        days_remaining = max(0, (trial_end - datetime.utcnow()).days)
+        trial_end_str = trial_end.strftime("%Y-%m-%d")
+        
+        # Check if trial expired
+        if days_remaining == 0 and status == "trial":
+            await db.subscriptions.update_one(
+                {"_id": subscription.get("_id")},
+                {"$set": {"status": "expired"}}
+            )
+            status = "expired"
+    
+    # Calculate limits reached
+    max_athletes = plan_limits.get("max_athletes", 25)
+    limits_reached = {
+        "athletes": athlete_count >= max_athletes if max_athletes > 0 else False,
+        "advanced_analytics": not plan_limits.get("advanced_analytics", False),
+        "ai_insights": not plan_limits.get("ai_insights", False),
+    }
+    
+    return SubscriptionResponse(
+        plan=plan,
+        plan_name=plan_limits.get("name", "Trial"),
+        status=status,
+        price=price,
+        max_athletes=max_athletes,
+        current_athletes=athlete_count,
+        history_months=plan_limits.get("history_months", 3),
+        days_remaining=days_remaining,
+        trial_end_date=trial_end_str,
+        features={
+            "advanced_analytics": plan_limits.get("advanced_analytics", False),
+            "ai_insights": plan_limits.get("ai_insights", False),
+            "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
+            "multi_user": plan_limits.get("multi_user", False),
+            "priority_support": plan_limits.get("priority_support", False),
+        },
+        limits_reached=limits_reached
+    )
+
+@api_router.post("/subscription/subscribe")
+async def subscribe_to_plan(
+    subscription_data: SubscriptionCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Subscribe to a plan (simulated - no real payment)"""
+    user_id = current_user["_id"]
+    plan = subscription_data.plan.value
+    
+    if plan not in PLAN_LIMITS:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    
+    plan_limits = PLAN_LIMITS[plan]
+    
+    # Cancel any existing subscription
+    await db.subscriptions.update_many(
+        {"user_id": user_id, "status": {"$in": ["active", "trial"]}},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.utcnow()}}
+    )
+    
+    # Create new subscription
+    trial_end = datetime.utcnow() + timedelta(days=plan_limits.get("trial_days", 7))
+    period_end = datetime.utcnow() + timedelta(days=30)  # Monthly billing
+    
+    new_subscription = {
+        "user_id": user_id,
+        "plan": plan,
+        "status": "trial",  # Start with trial
+        "start_date": datetime.utcnow(),
+        "trial_end_date": trial_end,
+        "current_period_end": period_end,
+        "created_at": datetime.utcnow(),
+    }
+    
+    result = await db.subscriptions.insert_one(new_subscription)
+    
+    return {
+        "message": "Subscription created successfully",
+        "subscription_id": str(result.inserted_id),
+        "plan": plan,
+        "trial_end_date": trial_end.strftime("%Y-%m-%d"),
+        "status": "trial"
+    }
+
+@api_router.post("/subscription/cancel")
+async def cancel_subscription(current_user: dict = Depends(get_current_user)):
+    """Cancel current subscription"""
+    user_id = current_user["_id"]
+    
+    result = await db.subscriptions.update_one(
+        {"user_id": user_id, "status": {"$in": ["active", "trial"]}},
+        {"$set": {"status": "cancelled", "cancelled_at": datetime.utcnow()}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="No active subscription found")
+    
+    return {"message": "Subscription cancelled successfully"}
+
+@api_router.post("/subscription/restore")
+async def restore_subscription(current_user: dict = Depends(get_current_user)):
+    """Restore a previously cancelled subscription (simulates App Store/Google Play restore)"""
+    user_id = current_user["_id"]
+    
+    # Find any cancelled subscription for this user
+    cancelled_sub = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": "cancelled"
+    }, sort=[("cancelled_at", -1)])  # Get most recently cancelled
+    
+    if not cancelled_sub:
+        raise HTTPException(status_code=404, detail="No previous subscription found to restore")
+    
+    # Reactivate the subscription
+    # In a real app, this would verify with App Store/Google Play
+    new_period_end = datetime.utcnow() + timedelta(days=30)
+    
+    result = await db.subscriptions.update_one(
+        {"_id": cancelled_sub["_id"]},
+        {
+            "$set": {
+                "status": "active",
+                "cancelled_at": None,
+                "current_period_end": new_period_end,
+                "restored_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=500, detail="Failed to restore subscription")
+    
+    return {"message": "Subscription restored successfully", "plan": cancelled_sub.get("plan", "pro")}
+
+@api_router.get("/subscription/check-feature/{feature}")
+async def check_feature_access(
+    feature: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Check if user has access to a specific feature"""
+    user_id = current_user["_id"]
+    
+    subscription = await db.subscriptions.find_one({
+        "user_id": user_id,
+        "status": {"$in": ["active", "trial"]}
+    })
+    
+    if not subscription:
+        return {"has_access": False, "reason": "no_subscription"}
+    
+    plan = subscription.get("plan", "free_trial")
+    plan_limits = PLAN_LIMITS.get(plan, PLAN_LIMITS["free_trial"])
+    
+    # Check trial expiration
+    if subscription.get("status") == "trial":
+        trial_end = subscription.get("trial_end_date")
+        if trial_end:
+            if isinstance(trial_end, str):
+                trial_end = datetime.fromisoformat(trial_end)
+            if datetime.utcnow() > trial_end:
+                return {"has_access": False, "reason": "trial_expired"}
+    
+    # Check feature access
+    feature_map = {
+        "advanced_analytics": plan_limits.get("advanced_analytics", False),
+        "ai_insights": plan_limits.get("ai_insights", False),
+        "fatigue_alerts": plan_limits.get("fatigue_alerts", False),
+        "athlete_comparison": "athlete_comparison" in plan_limits.get("features", []) or "all" in plan_limits.get("features", []),
+    }
+    
+    has_access = feature_map.get(feature, False)
+    
+    return {
+        "has_access": has_access,
+        "feature": feature,
+        "plan": plan,
+        "upgrade_required": not has_access
+    }
+
+# ============= UNIVERSAL LINKS / DEEP LINKS CONFIGURATION =============
+# These routes serve the verification files needed for iOS Universal Links and Android App Links
+# Note: In production, these files should be served from the root domain (.well-known/)
+# For now, we provide them via /api/well-known for testing purposes
+
+@api_router.get("/well-known/apple-app-site-association")
+async def apple_app_site_association():
+    """Serve Apple App Site Association file for iOS Universal Links"""
+    return JSONResponse(
+        content={
+            "applinks": {
+                "apps": [],
+                "details": [
+                    {
+                        "appID": "TEAM_ID.com.loadmanager.app",
+                        "paths": [
+                            "/wellness-form/*",
+                            "/wellness/*"
+                        ]
+                    }
+                ]
+            },
+            "webcredentials": {
+                "apps": [
+                    "TEAM_ID.com.loadmanager.app"
+                ]
+            }
+        },
+        headers={
+            "Content-Type": "application/json"
+        }
+    )
+
+@api_router.get("/well-known/assetlinks.json")
+async def android_asset_links():
+    """Serve Asset Links file for Android App Links"""
+    return JSONResponse(
+        content=[
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": "com.loadmanager.app",
+                    "sha256_cert_fingerprints": [
+                        "SHA256_FINGERPRINT_PLACEHOLDER"
+                    ]
+                }
+            }
+        ],
+        headers={
+            "Content-Type": "application/json"
+        }
+    )
+
+# ============= REVENUECAT WEBHOOK INTEGRATION =============
+# These endpoints handle webhook events from RevenueCat for subscription management
+
+REVENUECAT_WEBHOOK_SECRET = os.environ.get('REVENUECAT_WEBHOOK_SECRET', '')
+
+class RevenueCatEventData(BaseModel):
+    """RevenueCat webhook event data"""
+    event_timestamp_ms: Optional[int] = None
+    product_id: Optional[str] = None
+    purchased_at_ms: Optional[int] = None
+    expiration_at_ms: Optional[int] = None
+    environment: Optional[str] = None  # SANDBOX or PRODUCTION
+    entitlement_ids: Optional[List[str]] = None
+    app_user_id: str
+    original_app_user_id: Optional[str] = None
+    currency: Optional[str] = None
+    price: Optional[float] = None
+    cancel_reason: Optional[str] = None
+    store: Optional[str] = None  # APP_STORE, PLAY_STORE
+
+class RevenueCatWebhookPayload(BaseModel):
+    """RevenueCat webhook payload"""
+    event: RevenueCatEventData
+    api_version: str
+    type: str  # Event type: INITIAL_PURCHASE, RENEWAL, CANCELLATION, etc.
+    id: str  # Unique event ID
+
+async def verify_revenuecat_webhook(authorization: Optional[str]) -> bool:
+    """Verify webhook authenticity using authorization header"""
+    if not REVENUECAT_WEBHOOK_SECRET:
+        logging.warning("RevenueCat webhook secret not configured")
+        return True  # Allow in development if not configured
+    
+    if not authorization:
+        return False
+    
+    expected = f"Bearer {REVENUECAT_WEBHOOK_SECRET}"
+    return authorization == expected
+
+@api_router.post("/webhooks/revenuecat")
+async def handle_revenuecat_webhook(
+    payload: RevenueCatWebhookPayload,
+    authorization: Optional[str] = Header(None)
+):
+    """
+    Handle RevenueCat webhooks for subscription events.
+    
+    Event types handled:
+    - INITIAL_PURCHASE: First-time subscription
+    - RENEWAL: Subscription renewed
+    - CANCELLATION: User cancelled
+    - EXPIRATION: Subscription expired
+    - BILLING_ISSUE: Payment failed
+    - UNCANCELLATION: User resubscribed
+    - PRODUCT_CHANGE: User changed plan
+    """
+    # Verify webhook authenticity
+    if REVENUECAT_WEBHOOK_SECRET and not await verify_revenuecat_webhook(authorization):
+        logging.warning(f"RevenueCat webhook: Invalid authorization")
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    event = payload.event
+    event_type = payload.type
+    event_id = payload.id
+    
+    logging.info(f"RevenueCat webhook received: type={event_type}, user={event.app_user_id}, id={event_id}")
+    
+    # Check for duplicate events (idempotency)
+    existing_event = await db.webhook_events.find_one({"event_id": event_id})
+    if existing_event:
+        logging.info(f"RevenueCat webhook: Duplicate event {event_id}, skipping")
+        return {"status": "duplicate", "message": "Event already processed"}
+    
+    # Log the event for audit trail
+    await db.webhook_events.insert_one({
+        "event_id": event_id,
+        "event_type": event_type,
+        "app_user_id": event.app_user_id,
+        "product_id": event.product_id,
+        "raw_payload": payload.model_dump(),
+        "processed": False,
+        "received_at": datetime.utcnow()
+    })
+    
+    try:
+        # Find user by app_user_id (this should match your user's _id)
+        user = await db.users.find_one({"_id": ObjectId(event.app_user_id)})
+        if not user:
+            # Try to find by email or other identifier
+            logging.warning(f"RevenueCat webhook: User not found for app_user_id={event.app_user_id}")
+            # Still process the event, user might register later
+        
+        user_id = event.app_user_id
+        
+        # Process based on event type
+        if event_type == "INITIAL_PURCHASE":
+            await handle_initial_purchase(user_id, event)
+        elif event_type == "RENEWAL":
+            await handle_renewal(user_id, event)
+        elif event_type == "CANCELLATION":
+            await handle_cancellation(user_id, event)
+        elif event_type == "EXPIRATION":
+            await handle_expiration(user_id, event)
+        elif event_type == "BILLING_ISSUE":
+            await handle_billing_issue(user_id, event)
+        elif event_type == "UNCANCELLATION":
+            await handle_uncancellation(user_id, event)
+        elif event_type == "PRODUCT_CHANGE":
+            await handle_product_change(user_id, event)
+        elif event_type == "SUBSCRIBER_ALIAS":
+            # User IDs were merged in RevenueCat
+            logging.info(f"RevenueCat webhook: Subscriber alias event for {user_id}")
+        else:
+            logging.info(f"RevenueCat webhook: Unhandled event type {event_type}")
+        
+        # Mark event as processed
+        await db.webhook_events.update_one(
+            {"event_id": event_id},
+            {"$set": {"processed": True, "processed_at": datetime.utcnow()}}
+        )
+        
+        return {"status": "success", "message": f"Event {event_type} processed"}
+        
+    except Exception as e:
+        logging.error(f"RevenueCat webhook error: {str(e)}")
+        await db.webhook_events.update_one(
+            {"event_id": event_id},
+            {"$set": {"processed": False, "error": str(e)}}
+        )
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+async def handle_initial_purchase(user_id: str, event: RevenueCatEventData):
+    """Handle initial purchase event from RevenueCat"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    purchased_at = datetime.utcnow()
+    if event.purchased_at_ms:
+        purchased_at = datetime.fromtimestamp(event.purchased_at_ms / 1000)
+    
+    subscription_data = {
+        "user_id": user_id,
+        "plan": "pro",
+        "status": "active",
+        "source": "revenuecat",
+        "store": event.store,
+        "product_id": event.product_id,
+        "entitlement_ids": event.entitlement_ids,
+        "environment": event.environment,
+        "currency": event.currency,
+        "price": event.price,
+        "start_date": purchased_at,
+        "current_period_end": expires_at,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
+    
+    # Upsert subscription
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {"$set": subscription_data},
+        upsert=True
+    )
+    
+    logging.info(f"RevenueCat: Initial purchase recorded for user {user_id}")
+
+async def handle_renewal(user_id: str, event: RevenueCatEventData):
+    """Handle subscription renewal event"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "active",
+                "current_period_end": expires_at,
+                "cancel_reason": None,
+                "updated_at": datetime.utcnow()
+            },
+            "$inc": {"renewal_count": 1}
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription renewed for user {user_id}")
+
+async def handle_cancellation(user_id: str, event: RevenueCatEventData):
+    """Handle cancellation event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "cancelled",
+                "cancel_reason": event.cancel_reason,
+                "cancelled_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription cancelled for user {user_id}, reason: {event.cancel_reason}")
+
+async def handle_expiration(user_id: str, event: RevenueCatEventData):
+    """Handle subscription expiration event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "expired",
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription expired for user {user_id}")
+
+async def handle_billing_issue(user_id: str, event: RevenueCatEventData):
+    """Handle billing issue event"""
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "billing_issue": True,
+                "billing_issue_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.warning(f"RevenueCat: Billing issue for user {user_id}")
+
+async def handle_uncancellation(user_id: str, event: RevenueCatEventData):
+    """Handle uncancellation (user resubscribed)"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "status": "active",
+                "current_period_end": expires_at,
+                "cancel_reason": None,
+                "cancelled_at": None,
+                "billing_issue": False,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Subscription reactivated for user {user_id}")
+
+async def handle_product_change(user_id: str, event: RevenueCatEventData):
+    """Handle product change event (user changed plan)"""
+    expires_at = None
+    if event.expiration_at_ms:
+        expires_at = datetime.fromtimestamp(event.expiration_at_ms / 1000)
+    
+    await db.subscriptions.update_one(
+        {"user_id": user_id, "source": "revenuecat"},
+        {
+            "$set": {
+                "product_id": event.product_id,
+                "current_period_end": expires_at,
+                "updated_at": datetime.utcnow()
+            }
+        }
+    )
+    
+    logging.info(f"RevenueCat: Product changed for user {user_id} to {event.product_id}")
+
+@api_router.get("/subscription/revenuecat-status/{app_user_id}")
+async def get_revenuecat_subscription_status(
+    app_user_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get subscription status from local database (synced via RevenueCat webhooks).
+    This is used to verify subscription status on the backend.
+    """
+    # Security: Only allow users to check their own subscription
+    if current_user["_id"] != app_user_id:
+        raise HTTPException(status_code=403, detail="Not authorized to view this subscription")
+    
+    subscription = await db.subscriptions.find_one({
+        "user_id": app_user_id,
+        "source": "revenuecat"
+    })
+    
+    if not subscription:
+        return {
+            "is_active": False,
+            "status": "NO_SUBSCRIPTION",
+            "message": "No RevenueCat subscription found"
+        }
+    
+    # Check if expired
+    is_expired = False
+    if subscription.get("current_period_end"):
+        is_expired = subscription["current_period_end"] < datetime.utcnow()
+    
+    return {
+        "is_active": subscription.get("status") == "active" and not is_expired,
+        "status": subscription.get("status", "unknown"),
+        "product_id": subscription.get("product_id"),
+        "store": subscription.get("store"),
+        "expires_at": subscription.get("current_period_end").isoformat() if subscription.get("current_period_end") else None,
+        "environment": subscription.get("environment"),
+        "has_billing_issue": subscription.get("billing_issue", False)
+    }
+
+# ============= JUMP DATA IMPORT ROUTES =============
+
+@api_router.get("/jumps/providers")
+async def get_jump_providers():
+    """
+    Get list of supported jump data providers/manufacturers.
+    
+    Returns list of supported contact mat and force plate systems.
+    """
+    return {
+        "providers": list_jump_manufacturers(),
+        "description": "Fabricantes de tapetes de contato e plataformas de força suportados"
+    }
+
+
+@api_router.post("/jumps/upload/preview")
+async def preview_jump_csv(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Preview jump data CSV before importing.
+    
+    Validates all rows and returns:
+    - Valid records (preview, not saved)
+    - Invalid rows with detailed error messages
+    - Detected manufacturer
+    - Metrics that will be auto-calculated
+    - Athletes not found in system
+    - Identity resolution status (resolved/unresolved athletes)
+    
+    Does NOT save anything to database.
+    Import is BLOCKED if any athletes are unresolved.
+    """
+    # Read file content
+    file_content = await file.read()
+    
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
+    
+    # Get existing athletes for this coach
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Parse CSV
+    parser = JumpCSVParser()
+    raw_rows, parse_errors = parser.parse(file_content, file.filename or "upload.csv")
+    
+    if not raw_rows and parse_errors:
+        return {
+            "success": False,
+            "total_rows": 0,
+            "valid_count": 0,
+            "error_count": len(parse_errors),
+            "errors": [e.model_dump() for e in parse_errors],
+            "valid_records": [],
+            "detected_manufacturer": parser.detected_manufacturer or "unknown",
+            "calculated_metrics": [],
+            "athletes_not_found": [],
+            "jump_types_found": [],
+            "identity_resolution": {
+                "resolved": {},
+                "unresolved": [],
+                "can_import": False,
+                "message": "Erro ao parsear CSV"
+            }
+        }
+    
+    # ========== IDENTITY RESOLUTION ==========
+    # Extract unique athlete names/IDs from CSV
+    athlete_names_from_csv = set()
+    for raw_row in raw_rows:
+        # Check for athlete_id or athlete_name columns
+        # Also check inside raw_row['raw_row'] which contains original CSV values
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        
+        # Check in raw_row (original CSV data)
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
+        
+        if athlete_name:
+            athlete_names_from_csv.add(athlete_name)
+        elif athlete_id and athlete_id not in existing_athlete_ids:
+            # athlete_id provided but not found - treat as name for resolution
+            athlete_names_from_csv.add(athlete_id)
+    
+    # Run identity resolution
+    identity_resolver = IdentityResolver()
+    resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+        names=list(athlete_names_from_csv),
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system="jump_data"
+    )
+    
+    can_import = len(unresolved_athletes) == 0
+    
+    # Build name -> athlete_id mapping (including resolved)
+    name_to_athlete_id = dict(resolved_names)
+    
+    # Add existing athlete IDs that are direct matches
+    for athlete in athletes:
+        aid = str(athlete["_id"])
+        name = athlete.get("name", "")
+        normalized = normalize_for_comparison(name)
+        if normalized:
+            name_to_athlete_id[name] = aid
+    
+    # ========== VALIDATION ==========
+    # Now validate with resolved athlete IDs
+    valid_records = []
+    all_errors = list(parse_errors)
+    jump_types_found = set()
+    all_calculated_metrics = set()
+    
+    # Expand existing_athlete_ids with resolved names
+    resolved_ids = set(existing_athlete_ids)
+    for name, aid in resolved_names.items():
+        resolved_ids.add(aid)
+    
+    validator = JumpValidator(resolved_ids)
+    calculator = JumpCalculator()
+    
+    for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Extract athlete_id and athlete_name from raw_row and inner raw_row
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
+        
+        # Try to resolve athlete name to ID
+        resolved_athlete_id = None
+        if athlete_name:
+            if athlete_name in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_name]
+            elif athlete_name in name_to_athlete_id:
+                resolved_athlete_id = name_to_athlete_id[athlete_name]
+        
+        if not resolved_athlete_id and athlete_id:
+            if athlete_id in existing_athlete_ids:
+                resolved_athlete_id = athlete_id
+            elif athlete_id in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_id]
+        
+        if resolved_athlete_id:
+            raw_row['athlete_id'] = resolved_athlete_id
+        
+        # Calculate derived metrics
+        calculator.reset_tracking()
+        row_with_metrics = calculator.calculate(raw_row)
+        all_calculated_metrics.update(calculator.calculated_fields)
+        
+        # Track jump types
+        jt = row_with_metrics.get('jump_type')
+        if jt:
+            jump_types_found.add(str(jt).upper())
+        
+        # Validate
+        is_valid, record_or_error = validator.validate(row_with_metrics, row_num)
+        
+        if is_valid:
+            # Convert record to dict for JSON response
+            record_dict = record_or_error.model_dump()
+            # Convert datetime to string for JSON
+            if record_dict.get('jump_date'):
+                record_dict['jump_date'] = record_dict['jump_date'].isoformat()
+            valid_records.append(record_dict)
+        else:
+            all_errors.append(record_or_error)
+    
+    return {
+        "success": len(all_errors) == 0 and can_import,
+        "total_rows": len(raw_rows),
+        "valid_count": len(valid_records),
+        "error_count": len(all_errors),
+        "valid_records": valid_records,
+        "errors": [e.model_dump() for e in all_errors],
+        "detected_manufacturer": parser.detected_manufacturer or "generic",
+        "calculated_metrics": list(all_calculated_metrics),
+        "athletes_not_found": list(validator.athletes_not_found),
+        "jump_types_found": list(jump_types_found),
+        "identity_resolution": {
+            "resolved": resolved_names,
+            "resolved_count": len(resolved_names),
+            "unresolved": [u.to_dict() for u in unresolved_athletes],
+            "unresolved_count": len(unresolved_athletes),
+            "can_import": can_import,
+            "message": "Todos os atletas resolvidos" if can_import else f"{len(unresolved_athletes)} atleta(s) pendente(s) de confirmação"
+        }
+    }
+
+
+@api_router.post("/jumps/upload/import")
+async def import_jump_csv(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Import validated jump data from CSV into database.
+    
+    Only imports valid records. Invalid rows are rejected with error messages.
+    BLOCKED if any athletes are unresolved - use preview first to resolve identities.
+    
+    Returns:
+    - Total imported count
+    - Total rejected count
+    - IDs of created records
+    - Error details for rejected rows
+    """
+    # Read file content
+    file_content = await file.read()
+    
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Arquivo CSV vazio")
+    
+    # Get existing athletes for this coach
+    athletes = await db.athletes.find(
+        {"coach_id": current_user["_id"]},
+        {"_id": 1, "name": 1}
+    ).to_list(1000)
+    existing_athlete_ids = {str(a["_id"]) for a in athletes}
+    
+    # Get existing aliases
+    aliases = await db.athlete_aliases.find(
+        {"coach_id": current_user["_id"]}
+    ).to_list(1000)
+    
+    # Parse CSV
+    parser = JumpCSVParser()
+    raw_rows, parse_errors = parser.parse(file_content, file.filename or "upload.csv")
+    
+    if not raw_rows:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nenhum dado válido encontrado no CSV. Erros: {[e.message for e in parse_errors]}"
+        )
+    
+    # ========== IDENTITY RESOLUTION CHECK ==========
+    # Extract unique athlete names/IDs from CSV
+    athlete_names_from_csv = set()
+    for raw_row in raw_rows:
+        # Check both raw_row and inner raw_row for athlete info
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
+        
+        if athlete_name:
+            athlete_names_from_csv.add(athlete_name)
+        elif athlete_id and athlete_id not in existing_athlete_ids:
+            athlete_names_from_csv.add(athlete_id)
+    
+    # Run identity resolution
+    identity_resolver = IdentityResolver()
+    resolved_names, unresolved_athletes = await identity_resolver.resolve_names(
+        names=list(athlete_names_from_csv),
+        athletes=athletes,
+        aliases=aliases,
+        coach_id=current_user["_id"],
+        source_system="jump_data"
+    )
+    
+    # BLOCK import if there are unresolved athletes
+    if unresolved_athletes:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": f"Importação bloqueada: {len(unresolved_athletes)} atleta(s) não resolvido(s)",
+                "unresolved_count": len(unresolved_athletes),
+                "unresolved": [u.to_dict() for u in unresolved_athletes],
+                "action_required": "Use o endpoint /api/athletes/confirm-alias para confirmar as associações antes de importar"
+            }
+        )
+    
+    # ========== VALIDATION & IMPORT ==========
+    # Expand existing_athlete_ids with resolved names
+    resolved_ids = set(existing_athlete_ids)
+    for name, aid in resolved_names.items():
+        resolved_ids.add(aid)
+    
+    # Build name -> athlete_id mapping
+    name_to_athlete_id = dict(resolved_names)
+    for athlete in athletes:
+        aid = str(athlete["_id"])
+        name = athlete.get("name", "")
+        if name:
+            name_to_athlete_id[name] = aid
+    
+    validator = JumpValidator(resolved_ids)
+    calculator = JumpCalculator()
+    
+    valid_records = []
+    all_errors = list(parse_errors)
+    
+    for row_num, raw_row in enumerate(raw_rows, start=2):
+        # Extract athlete_id and athlete_name from raw_row and inner raw_row
+        athlete_id = raw_row.get('athlete_id', '') or ''
+        athlete_name = raw_row.get('athlete_name', '') or ''
+        inner_raw = raw_row.get('raw_row', {}) or {}
+        
+        if not athlete_name:
+            athlete_name = inner_raw.get('athlete_name', '') or ''
+        if not athlete_id:
+            athlete_id = inner_raw.get('athlete_id', '') or ''
+        
+        athlete_id = str(athlete_id).strip()
+        athlete_name = str(athlete_name).strip()
+        
+        # Try to resolve athlete name to ID
+        resolved_athlete_id = None
+        if athlete_name:
+            if athlete_name in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_name]
+            elif athlete_name in name_to_athlete_id:
+                resolved_athlete_id = name_to_athlete_id[athlete_name]
+        
+        if not resolved_athlete_id and athlete_id:
+            if athlete_id in existing_athlete_ids:
+                resolved_athlete_id = athlete_id
+            elif athlete_id in resolved_names:
+                resolved_athlete_id = resolved_names[athlete_id]
+        
+        if resolved_athlete_id:
+            raw_row['athlete_id'] = resolved_athlete_id
+        
+        # Calculate derived metrics
+        row_with_metrics = calculator.calculate(raw_row)
+        
+        # Validate
+        is_valid, record_or_error = validator.validate(row_with_metrics, row_num)
+        
+        if is_valid:
+            valid_records.append(record_or_error)
+        else:
+            all_errors.append(record_or_error)
+    
+    if not valid_records:
+        return {
+            "success": False,
+            "message": "Nenhum registro válido para importar",
+            "imported_count": 0,
+            "rejected_count": len(all_errors),
+            "created_ids": [],
+            "errors": [e.model_dump() for e in all_errors]
+        }
+    
+    # Prepare documents for insertion
+    documents = []
+    for record in valid_records:
+        doc = record.model_dump()
+        doc['coach_id'] = current_user["_id"]
+        doc['created_at'] = datetime.utcnow()
+        # Convert jump_date if it's a datetime object
+        if isinstance(doc.get('jump_date'), datetime):
+            doc['jump_date_str'] = doc['jump_date'].strftime('%Y-%m-%d')
+        documents.append(doc)
+    
+    # Insert into database
+    result = await db.jump_data.insert_many(documents)
+    created_ids = [str(id) for id in result.inserted_ids]
+    
+    # Update last_used_at for aliases used
+    for name in resolved_names:
+        normalized = normalize_for_comparison(name)
+        await db.athlete_aliases.update_one(
+            {"coach_id": current_user["_id"], "alias_normalized": normalized},
+            {"$set": {"last_used_at": datetime.utcnow()}}
+        )
+    
+    return {
+        "success": True,
+        "message": f"{len(created_ids)} registros de salto importados com sucesso",
+        "imported_count": len(created_ids),
+        "rejected_count": len(all_errors),
+        "created_ids": created_ids,
+        "resolved_athletes": resolved_names,
+        "errors": [e.model_dump() for e in all_errors] if all_errors else []
+    }
+
+
+@api_router.get("/jumps/athlete/{athlete_id}")
+async def get_athlete_jumps(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get all jump data for a specific athlete.
+    
+    Returns jump records sorted by date (newest first).
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get jump records, excluding MongoDB _id from raw_row if present
+    jump_records = await db.jump_data.find(
+        {
+            "athlete_id": athlete_id,
+            "coach_id": current_user["_id"]
+        },
+        {"_id": 1, "athlete_id": 1, "jump_type": 1, "jump_height_cm": 1,
+         "flight_time_s": 1, "contact_time_s": 1, "reactive_strength_index": 1,
+         "peak_power_w": 1, "takeoff_velocity_m_s": 1, "load_kg": 1,
+         "jump_date": 1, "jump_date_str": 1, "source_system": 1,
+         "attempt_number": 1, "test_id": 1, "protocol": 1, "notes": 1,
+         "created_at": 1}
+    ).sort("jump_date", -1).to_list(1000)
+    
+    # Convert ObjectId to string
+    for record in jump_records:
+        record["id"] = str(record.pop("_id"))
+        # Convert datetime to ISO string
+        if isinstance(record.get("jump_date"), datetime):
+            record["jump_date"] = record["jump_date"].isoformat()
+        if isinstance(record.get("created_at"), datetime):
+            record["created_at"] = record["created_at"].isoformat()
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "total_jumps": len(jump_records),
+        "jumps": jump_records
+    }
+
+
+@api_router.delete("/jumps/{jump_id}")
+async def delete_jump(
+    jump_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Delete a specific jump record.
+    """
+    result = await db.jump_data.delete_one({
+        "_id": ObjectId(jump_id),
+        "coach_id": current_user["_id"]
+    })
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Registro de salto não encontrado")
+    
+    return {"message": "Registro de salto excluído com sucesso", "id": jump_id}
+
+
+@api_router.get("/jumps/analysis/{athlete_id}")
+async def get_jump_analysis(
+    athlete_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Get jump performance analysis for an athlete.
+    
+    Includes:
+    - Best values by jump type
+    - Recent trend analysis
+    - RSI analysis (for DJ/RJ)
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get all jump records
+    jump_records = await db.jump_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("jump_date", -1).to_list(1000)
+    
+    if not jump_records:
+        return {
+            "athlete_id": athlete_id,
+            "athlete_name": athlete.get("name", ""),
+            "total_jumps": 0,
+            "analysis": None,
+            "message": "Nenhum dado de salto encontrado para este atleta"
+        }
+    
+    # Analyze by jump type
+    by_type = {}
+    for record in jump_records:
+        jt = record.get("jump_type", "UNKNOWN")
+        if jt not in by_type:
+            by_type[jt] = {
+                "count": 0,
+                "best_height_cm": None,
+                "avg_height_cm": None,
+                "heights": [],
+                "best_rsi": None,
+                "avg_rsi": None,
+                "rsis": [],
+                "recent_heights": [],
+            }
+        
+        by_type[jt]["count"] += 1
+        
+        height = record.get("jump_height_cm")
+        if height is not None:
+            by_type[jt]["heights"].append(height)
+            if by_type[jt]["best_height_cm"] is None or height > by_type[jt]["best_height_cm"]:
+                by_type[jt]["best_height_cm"] = height
+        
+        rsi = record.get("reactive_strength_index")
+        if rsi is not None:
+            by_type[jt]["rsis"].append(rsi)
+            if by_type[jt]["best_rsi"] is None or rsi > by_type[jt]["best_rsi"]:
+                by_type[jt]["best_rsi"] = rsi
+    
+    # Calculate averages
+    for jt, data in by_type.items():
+        if data["heights"]:
+            data["avg_height_cm"] = round(sum(data["heights"]) / len(data["heights"]), 2)
+            data["recent_heights"] = data["heights"][:10]  # Last 10
+        if data["rsis"]:
+            data["avg_rsi"] = round(sum(data["rsis"]) / len(data["rsis"]), 2)
+        # Remove raw lists from response
+        del data["heights"]
+        del data["rsis"]
+    
+    # Overall best
+    all_heights = [r.get("jump_height_cm") for r in jump_records if r.get("jump_height_cm")]
+    overall_best = max(all_heights) if all_heights else None
+    overall_avg = round(sum(all_heights) / len(all_heights), 2) if all_heights else None
+    
+    return {
+        "athlete_id": athlete_id,
+        "athlete_name": athlete.get("name", ""),
+        "total_jumps": len(jump_records),
+        "analysis": {
+            "overall": {
+                "best_height_cm": overall_best,
+                "avg_height_cm": overall_avg,
+                "jump_count": len(jump_records)
+            },
+            "by_type": by_type
+        }
+    }
+
+
+@api_router.get("/jumps/report/{athlete_id}")
+async def get_jump_report(
+    athlete_id: str,
+    jump_type: str = "CMJ",
+    window_days: int = 14,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate a comprehensive jump performance report for an athlete.
+    
+    Returns:
+    - Readiness status (optimal, good, moderate, low, poor)
+    - Fatigue detection flag
+    - Trend analysis (vs baseline, vs career)
+    - Baseline metrics (best, rolling averages, CV%)
+    - Actionable recommendations
+    
+    Query Parameters:
+    - jump_type: Type of jump to analyze (CMJ, SJ, DJ, RJ). Default: CMJ
+    - window_days: Analysis window in days. Default: 14
+    """
+    # Verify athlete belongs to current user
+    athlete = await db.athletes.find_one({
+        "_id": ObjectId(athlete_id),
+        "coach_id": current_user["_id"]
+    })
+    if not athlete:
+        raise HTTPException(status_code=404, detail="Atleta não encontrado")
+    
+    # Get all jump records for athlete
+    jump_records = await db.jump_data.find({
+        "athlete_id": athlete_id,
+        "coach_id": current_user["_id"]
+    }).sort("jump_date", -1).to_list(1000)
+    
+    # Convert MongoDB records to dicts (handle ObjectId and datetime)
+    jumps = []
+    for record in jump_records:
+        record_dict = dict(record)
+        record_dict.pop("_id", None)
+        record_dict.pop("coach_id", None)
+        jumps.append(record_dict)
+    
+    # Generate report using jump_analysis module
+    report = generate_report(
+        jumps=jumps,
+        athlete_id=athlete_id,
+        athlete_name=athlete.get("name", ""),
+        jump_type=jump_type.upper(),
+        window_days=window_days
+    )
+    
+    return report
+
+
+@api_router.get("/jumps/compare")
+async def compare_athletes_jumps(
+    athlete_ids: str,
+    jump_type: str = "CMJ",
+    metric: str = "z_height",
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Compare jump performance across multiple athletes.
+    
+    Query Parameters:
+    - athlete_ids: Comma-separated athlete IDs (e.g., "id1,id2,id3")
+    - jump_type: Type of jump to compare (CMJ, SJ, DJ, RJ). Default: CMJ
+    - metric: Comparison metric (z_height, pct_best_height, pct_career_height). Default: z_height
+    
+    Returns ranked list with group statistics.
+    """
+    from jump_analysis import calculate_athlete_baseline
+    
+    # Parse athlete IDs
+    ids = [id.strip() for id in athlete_ids.split(",") if id.strip()]
+    
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="Pelo menos 2 atletas são necessários para comparação")
+    
+    if len(ids) > 20:
+        raise HTTPException(status_code=400, detail="Máximo de 20 atletas por comparação")
+    
+    # Collect data for all athletes
+    athlete_data = []
+    
+    for aid in ids:
+        # Verify athlete belongs to user
+        try:
+            athlete = await db.athletes.find_one({
+                "_id": ObjectId(aid),
+                "coach_id": current_user["_id"]
+            })
+        except Exception:
+            continue
+        
+        if not athlete:
+            continue
+        
+        # Get jump records
+        jump_records = await db.jump_data.find({
+            "athlete_id": aid,
+            "coach_id": current_user["_id"]
+        }).to_list(1000)
+        
+        if not jump_records:
+            continue
+        
+        # Convert to list of dicts
+        jumps = []
+        for record in jump_records:
+            record_dict = dict(record)
+            record_dict.pop("_id", None)
+            record_dict.pop("coach_id", None)
+            jumps.append(record_dict)
+        
+        # Calculate baseline
+        baseline = calculate_athlete_baseline(
+            jumps=jumps,
+            athlete_id=aid,
+            jump_type=jump_type.upper()
+        )
+        
+        athlete_data.append({
+            "athlete_id": aid,
+            "athlete_name": athlete.get("name", ""),
+            "baseline": baseline.to_dict(),
+            "jumps": jumps
+        })
+    
+    if len(athlete_data) < 2:
+        raise HTTPException(
+            status_code=400, 
+            detail="Dados insuficientes: pelo menos 2 atletas com dados de salto são necessários"
+        )
+    
+    # Run comparison
+    comparison = compare_athletes(
+        athlete_data=athlete_data,
+        metric=metric,
+        jump_type=jump_type.upper()
+    )
+    
+    # Add athlete names to results
+    name_map = {d["athlete_id"]: d["athlete_name"] for d in athlete_data}
+    for athlete in comparison.get("athletes", []):
+        athlete["athlete_name"] = name_map.get(athlete["athlete_id"], "")
+    
+    return {
+        "jump_type": jump_type.upper(),
+        "metric": metric,
+        "athlete_count": len(athlete_data),
+        "comparison": comparison
+    }
+
+
+# ============= ACCOUNT DELETION =============
+
+class AccountDeletionRequest(BaseModel):
+    """Request body for account deletion - receives subscription info from client"""
+    has_active_subscription: bool = False
+    expiration_date: Optional[str] = None  # ISO format date string
+
+class AccountDeletionResponse(BaseModel):
+    status: str
+    message: str
+    deletion_scheduled_for: Optional[str] = None
+
+@api_router.post("/account/request-deletion", response_model=AccountDeletionResponse)
+async def request_account_deletion(
+    request: AccountDeletionRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Request account deletion.
+    If user has active subscription/trial, account is marked PENDING.
+    If no active subscription, account is deleted immediately.
+    """
+    user_id = current_user["_id"]
+    
+    # Check if already pending or deleted
+    current_status = current_user.get("account_deletion_status", "ACTIVE")
+    if current_status == AccountDeletionStatus.PENDING.value:
+        deletion_scheduled = current_user.get("deletion_scheduled_for")
+        return AccountDeletionResponse(
+            status="PENDING",
+            message="Sua conta já está agendada para exclusão.",
+            deletion_scheduled_for=deletion_scheduled.isoformat() if deletion_scheduled else None
+        )
+    
+    if current_status == AccountDeletionStatus.DELETED.value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Esta conta já foi excluída."
+        )
+    
+    now = datetime.utcnow()
+    
+    # STEP 1: Mark as PENDING
+    update_data = {
+        "account_deletion_status": AccountDeletionStatus.PENDING.value,
+        "deletion_requested_at": now
+    }
+    
+    # STEP 2: Check subscription status from client
+    if request.has_active_subscription and request.expiration_date:
+        # CASE 2: Has active subscription or trial
+        try:
+            expiration = datetime.fromisoformat(request.expiration_date.replace('Z', '+00:00'))
+            # Remove timezone info for comparison
+            if expiration.tzinfo is not None:
+                expiration = expiration.replace(tzinfo=None)
+        except ValueError:
+            expiration = now  # If invalid date, delete immediately
+        
+        if expiration > now:
+            # Schedule deletion for expiration date
+            update_data["deletion_scheduled_for"] = expiration
+            
+            await db.users.update_one(
+                {"_id": ObjectId(user_id)},
+                {"$set": update_data}
+            )
+            
+            return AccountDeletionResponse(
+                status="PENDING",
+                message="Sua conta será excluída automaticamente ao final do período de assinatura.",
+                deletion_scheduled_for=expiration.isoformat()
+            )
+    
+    # CASE 1: No active subscription - delete immediately
+    await execute_permanent_deletion(user_id)
+    
+    return AccountDeletionResponse(
+        status="DELETED",
+        message="Sua conta foi excluída permanentemente.",
+        deletion_scheduled_for=None
+    )
+
+
+# RevenueCat Secret API Key (from environment)
+REVENUECAT_SECRET_KEY = os.environ.get('REVENUECAT_SECRET_KEY', '')
+
+
+async def delete_revenuecat_subscriber(app_user_id: str):
+    """
+    Delete subscriber from RevenueCat.
+    This function does not interrupt deletion if RevenueCat returns an error.
+    """
+    if not REVENUECAT_SECRET_KEY:
+        logging.warning(f"[RevenueCat] Secret API key not configured, skipping subscriber deletion for: {app_user_id}")
+        return
+    
+    url = f"https://api.revenuecat.com/v1/subscribers/{app_user_id}"
+    
+    headers = {
+        "Authorization": f"Bearer {REVENUECAT_SECRET_KEY}",
+        "Content-Type": "application/json"
+    }
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(url, headers=headers, timeout=30.0)
+            
+            if response.status_code in [200, 204]:
+                logging.info(f"[RevenueCat] Subscriber deleted successfully: {app_user_id}")
+            elif response.status_code == 404:
+                logging.info(f"[RevenueCat] Subscriber not found (already deleted or never existed): {app_user_id}")
+            else:
+                logging.warning(f"[RevenueCat] Deletion failed: {response.status_code} - {response.text}")
+    except Exception as e:
+        logging.error(f"[RevenueCat] Deletion exception for {app_user_id}: {str(e)}")
+    
+    # Always continue with database deletion regardless of RevenueCat response
+
+
+async def execute_permanent_deletion(user_id: str):
+    """
+    Execute permanent and irreversible deletion of all user data.
+    """
+    user_oid = ObjectId(user_id) if isinstance(user_id, str) else user_id
+    
+    # STEP 1: Delete subscriber from RevenueCat BEFORE removing from database
+    await delete_revenuecat_subscriber(user_id)
+    
+    # STEP 2: Delete all user-related data from database
+    # Athletes
+    await db.athletes.delete_many({"coach_id": user_id})
+    
+    # GPS sessions
+    await db.gps_sessions.delete_many({"coach_id": user_id})
+    
+    # Jump assessments
+    await db.jump_assessments.delete_many({"coach_id": user_id})
+    
+    # Body compositions
+    await db.body_compositions.delete_many({"coach_id": user_id})
+    
+    # Wellness data
+    await db.wellness.delete_many({"coach_id": user_id})
+    
+    # Wellness tokens
+    await db.wellness_tokens.delete_many({"coach_id": user_id})
+    
+    # VBT sessions
+    await db.vbt_sessions.delete_many({"coach_id": user_id})
+    
+    # Periodizations
+    await db.periodizations.delete_many({"coach_id": user_id})
+    
+    # Periodization weeks
+    await db.periodization_weeks.delete_many({"coach_id": user_id})
+    
+    # Subscriptions
+    await db.subscriptions.delete_many({"user_id": user_id})
+    
+    # Aliases
+    await db.athlete_aliases.delete_many({"coach_id": user_id})
+    
+    # Identity resolver data
+    await db.unresolved_athletes.delete_many({"coach_id": user_id})
+    
+    # Finally, mark user as DELETED (keeping minimal record for audit)
+    await db.users.update_one(
+        {"_id": user_oid},
+        {"$set": {
+            "account_deletion_status": AccountDeletionStatus.DELETED.value,
+            "deleted_at": datetime.utcnow(),
+            # Clear personal data
+            "name": "[DELETED]",
+            "hashed_password": "",
+            "registered_devices": [],
+            "pro_access_override": False
+        }}
+    )
+
+
+@api_router.get("/account/deletion-status")
+async def get_deletion_status(current_user: dict = Depends(get_current_user)):
+    """Get current account deletion status"""
+    deletion_scheduled = current_user.get("deletion_scheduled_for")
+    
+    return {
+        "account_deletion_status": current_user.get("account_deletion_status", "ACTIVE"),
+        "deletion_requested_at": current_user.get("deletion_requested_at").isoformat() if current_user.get("deletion_requested_at") else None,
+        "deletion_scheduled_for": deletion_scheduled.isoformat() if deletion_scheduled else None,
+        "deleted_at": current_user.get("deleted_at").isoformat() if current_user.get("deleted_at") else None
+    }
+
+
+@api_router.post("/account/process-pending-deletions")
+async def process_pending_deletions():
+    """
+    Process pending account deletions where deletion_scheduled_for <= now.
+    This endpoint should be called by a cron job.
+    """
+    now = datetime.utcnow()
+    
+    # Find users with PENDING status and scheduled deletion in the past
+    pending_users = await db.users.find({
+        "account_deletion_status": AccountDeletionStatus.PENDING.value,
+        "deletion_scheduled_for": {"$lte": now}
+    }).to_list(100)
+    
+    deleted_count = 0
+    
+    for user in pending_users:
+        user_id = str(user["_id"])
+        try:
+            await execute_permanent_deletion(user_id)
+            deleted_count += 1
+            logging.info(f"Permanently deleted user: {user_id}")
+        except Exception as e:
+            logging.error(f"Error deleting user {user_id}: {e}")
+    
+    return {
+        "processed": len(pending_users),
+        "deleted": deleted_count
+    }
+
+
+# Include the router in the main app
+app.include_router(api_router)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# ============= AUTOMATIC PENDING DELETIONS SCHEDULER =============
+
+async def process_pending_deletions_job():
+    """
+    Background job to process pending account deletions.
+    Executes every 1 hour.
+    """
+    while True:
+        try:
+            await asyncio.sleep(3600)  # Wait 1 hour
+            
+            now = datetime.utcnow()
+            logging.info(f"[DeletionScheduler] Running pending deletions check at {now.isoformat()}")
+            
+            # Find users with PENDING status and scheduled deletion in the past
+            pending_users = await db.users.find({
+                "account_deletion_status": AccountDeletionStatus.PENDING.value,
+                "deletion_scheduled_for": {"$lte": now}
+            }).to_list(100)
+            
+            deleted_count = 0
+            
+            for user in pending_users:
+                user_id = str(user["_id"])
+                try:
+                    await execute_permanent_deletion(user_id)
+                    deleted_count += 1
+                    logging.info(f"[DeletionScheduler] Permanently deleted user: {user_id}")
+                except Exception as e:
+                    logging.error(f"[DeletionScheduler] Error deleting user {user_id}: {e}")
+            
+            logging.info(f"[DeletionScheduler] Processed {len(pending_users)} pending, deleted {deleted_count}")
+            
+        except asyncio.CancelledError:
+            logging.info("[DeletionScheduler] Scheduler stopped")
+            break
+        except Exception as e:
+            logging.error(f"[DeletionScheduler] Job error: {e}")
+            await asyncio.sleep(60)  # Wait 1 minute before retrying on error
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks on application startup"""
+    # Validate REVENUECAT_SECRET_KEY is configured
+    if not REVENUECAT_SECRET_KEY:
+        logging.error("[STARTUP] REVENUECAT_SECRET_KEY not configured - account deletion will not remove RevenueCat subscribers")
+    else:
+        logging.info("[STARTUP] REVENUECAT_SECRET_KEY configured successfully")
+    
+    asyncio.create_task(process_pending_deletions_job())
+    logging.info("[DeletionScheduler] Started automatic pending deletions scheduler (runs every 1 hour)")
+    
+    # Populate EWMA load metrics if collection is empty
+    async def _populate_ewma():
+        try:
+            count = await db.athlete_load_metrics.count_documents({})
+            if count == 0:
+                logging.info("[LoadEngine] athlete_load_metrics empty — populating EWMA metrics...")
+                await load_engine.ensure_indexes()
+                await load_engine.populate_all_athletes()
+            else:
+                logging.info(f"[LoadEngine] athlete_load_metrics already has {count} documents")
+        except Exception as e:
+            logging.error(f"[LoadEngine] Population failed: {e}")
+    asyncio.create_task(_populate_ewma())
+
+
+@app.on_event("shutdown")
+async def shutdown_db_client():
+    client.close()
