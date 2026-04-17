@@ -62,8 +62,17 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Scroll horizontal
 - FlatList virtualizada + React.memo + keyExtractor estavel
 
+### Etapa 3: Grafico de carga (Stacked Bar) - CONCLUIDA
+- StackedBarChart.tsx com barras empilhadas por atleta (SVG nativo)
+- Camadas: Total Distance (base) + Z3 + Z4 + Z5
+- Seletores toggle para Z3/Z4/Z5 (ativar/desativar camadas dinamicamente)
+- Linha horizontal de media da equipe (tracejada)
+- Destaque visual Top 3 (verde) e Bottom 3 (vermelho)
+- Labels com iniciais dos atletas + valor em km
+- Scroll horizontal para +100 atletas
+- Todos useMemo, React.memo, componentes puros
+
 ### Proximas etapas previstas:
-- Etapa 3: Grafico de carga (Stacked Bar)
 - Etapa 4: Grafico de dispersao (Scatter Plot)
 - Etapa 5: Grafico neuromuscular (RSImod + fadiga)
 - Etapa 6: Refinamentos visuais e integracao final

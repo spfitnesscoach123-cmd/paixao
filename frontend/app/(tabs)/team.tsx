@@ -18,6 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTeamTableData } from '../../hooks/useTeamTableData';
 import { TeamTable } from '../../components/dashboard/TeamTable';
+import { StackedBarChart } from '../../components/dashboard/StackedBarChart';
 import type { TeamTableRowData } from '../../components/dashboard/types';
 
 const DATE_RANGES = [
@@ -205,6 +206,16 @@ export default function TeamDashboard() {
                 </Text>
               )}
             </View>
+          )}
+
+          {/* GRÁFICO DE BARRAS EMPILHADAS */}
+          {!hasNoData && (
+            <StackedBarChart
+              rows={tableData?.rows || []}
+              isLoading={tableLoading}
+              colors={colors}
+              locale={locale}
+            />
           )}
 
           {/* TABELA ANALÍTICA */}
