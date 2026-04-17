@@ -19,6 +19,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSession } from '../../contexts/SessionContext';
 import { VBTCameraContent } from '../athlete/[id]/vbt-camera';
+import PremiumGate from '../../components/PremiumGate';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -170,10 +171,12 @@ export default function StationVBT() {
       {/* VBT Camera Content — stays mounted, receives athleteId from state */}
       {activeAthleteId ? (
         <View style={styles.cameraContainer}>
-          <VBTCameraContent
-            stationAthleteId={activeAthleteId}
-            onSaveComplete={handleSaveComplete}
-          />
+          <PremiumGate featureName={locale === 'pt' ? 'VBT via Câmera' : 'VBT via Camera'}>
+            <VBTCameraContent
+              stationAthleteId={activeAthleteId}
+              onSaveComplete={handleSaveComplete}
+            />
+          </PremiumGate>
         </View>
       ) : (
         <View style={styles.emptyState}>

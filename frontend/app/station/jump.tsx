@@ -19,6 +19,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useSession } from '../../contexts/SessionContext';
 import { JumpCameraContent } from '../athlete/[id]/jump-camera';
+import PremiumGate from '../../components/PremiumGate';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -160,10 +161,12 @@ export default function StationJump() {
       {/* Jump Camera Content — stays mounted */}
       {activeAthleteId ? (
         <View style={styles.cameraContainer}>
-          <JumpCameraContent
-            stationAthleteId={activeAthleteId}
-            onSaveComplete={handleSaveComplete}
-          />
+          <PremiumGate featureName={locale === 'pt' ? 'Avaliação de Salto via Câmera' : 'Jump Assessment via Camera'}>
+            <JumpCameraContent
+              stationAthleteId={activeAthleteId}
+              onSaveComplete={handleSaveComplete}
+            />
+          </PremiumGate>
         </View>
       ) : (
         <View style={styles.emptyState}>
