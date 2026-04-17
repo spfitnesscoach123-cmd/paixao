@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import api from '../../services/api';
-import { useLanguage } from '../../contexts/LanguageContext';
-import type { TeamTableRowData } from '../dashboard/types';
+import api from '../services/api';
+import { useLanguage } from '../contexts/LanguageContext';
+import type { TeamTableRowData } from '../components/dashboard/types';
 
 interface TeamTableApiResponse {
   rows: TeamTableRowData[];

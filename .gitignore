@@ -82,322 +82,188 @@ android-sdk/
 **/test_credentials.md
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment files
-*.env
-*.env.*
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
 .credentials
 -e 
 # Environment and credential files
-.env
-.env.*
-*.env
 credentials.json
 *.pem
 *.key
