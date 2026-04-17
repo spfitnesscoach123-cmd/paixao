@@ -132,6 +132,19 @@ export default function AthletesScreen() {
                 <Text style={styles.hubCardDesc}>
                   {locale === 'pt' ? 'Velocity Based Training' : 'Velocity Based Training'}
                 </Text>
+                {/* Station Mode button */}
+                <TouchableOpacity
+                  style={styles.stationModeButton}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    session.setMode('hub');
+                    router.push('/station/vbt' as any);
+                  }}
+                  data-testid="hub-station-vbt"
+                >
+                  <Ionicons name="repeat" size={14} color="#3b82f6" />
+                  <Text style={styles.stationModeText}>Station Mode</Text>
+                </TouchableOpacity>
               </View>
               <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
             </LinearGradient>
@@ -532,6 +545,23 @@ const createStyles = (colors: any) => StyleSheet.create({
   hubCardDesc: {
     fontSize: 13,
     color: colors.text.secondary,
+  },
+  stationModeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 8,
+    backgroundColor: 'rgba(59, 130, 246, 0.12)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+  },
+  stationModeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#3b82f6',
+    letterSpacing: 0.3,
   },
   // Back button
   backButton: {

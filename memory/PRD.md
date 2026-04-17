@@ -102,13 +102,23 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 
 ### FASE 2 — Integration Points (CONCLUIDA)
 - `resetForNextAthlete()` implementado nos 3 modulos (VBT, Jump, Body Scan)
-- `canSwitchAthlete` lock derivado em cada modulo:
-  - VBT: `!vbtMutation.isPending && phase !== 'recording' && phase !== 'review'`
-  - Jump: `!submitMutation.isPending && uiPhase !== 'recording' && jumpCamera.phase !== 'countdown/recording'`
-  - Body Scan: `uiPhase !== 'scanning'`
+- `canSwitchAthlete` lock derivado em cada modulo
 - Switch sequencing: lock verificado → reset(hook) → limpa overlays → reset phase → limpa recordingRef
-- Prontos para consumo pelo Station Mode (Fase 3)
 
-### PROXIMA: GO/NO-GO GATE — stress tests (PENDENTE APROVACAO)
+### GO/NO-GO GATE (PASS — 6/6)
+- Backend Regression, Profile Mode, Fluxo A, Identity Integrity, Lock, Reset — todos PASS
+
+### FASE 3 — Station Mode VBT (CONCLUIDA)
+- `VBTCameraContent` aceita `stationAthleteId` prop + `onSaveComplete` callback
+- Nova rota `/station/vbt.tsx` — wrapper com inline athlete picker (header dropdown)
+- Camera permanece montada ao trocar atleta (zero remount)
+- Picker animado abre/fecha com lista de atletas + checkmark do atleta ativo
+- Badge "STATION" no header identifica modo
+- Botao "Station Mode" no card VBT do HUB
+- Pos-save: picker reabre automaticamente para proximo atleta
+- Botao X para sair → volta ao HUB
+- Profile Mode e Fluxo A preservados via fallback (useLocalSearchParams quando stationAthleteId ausente)
+
+### PROXIMA: FASE 4 — Regression completa (PENDENTE APROVACAO)
 
 ### FUTURO: FASE 2 → FASE 3 → FASE 4
