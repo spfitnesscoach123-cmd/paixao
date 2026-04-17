@@ -72,8 +72,18 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Scroll horizontal para +100 atletas
 - Todos useMemo, React.memo, componentes puros
 
+### Etapa 4: Grafico de dispersao (Scatter Plot) - CONCLUIDA
+- ScatterPlot.tsx com SVG nativo
+- X = total_distance, Y = sprint_count, cada atleta = 1 ponto
+- Cor baseada em fatigue_status (READY=verde, ATTENTION=amarelo, NOT_READY=vermelho)
+- Linhas medias de distancia e sprints criando 4 quadrantes
+- Quadrantes com preenchimento sutil (verde top-right, vermelho bottom-left)
+- Tooltip ao toque: nome, distancia, sprints
+- Eixos com ticks, labels e titulos
+- Legenda de status
+- React.memo + useMemo + useCallback
+
 ### Proximas etapas previstas:
-- Etapa 4: Grafico de dispersao (Scatter Plot)
 - Etapa 5: Grafico neuromuscular (RSImod + fadiga)
 - Etapa 6: Refinamentos visuais e integracao final
 
