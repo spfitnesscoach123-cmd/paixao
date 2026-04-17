@@ -18,8 +18,8 @@ import { PROTOCOLS, getProtocolSites } from '../../../engine/body-composition/pr
 import { SKINFOLD_LABELS, type Gender } from '../../../types/protocols';
 
 export default function ProtocolSelectScreen() {
-  const { id: athleteId, scanWeight, scanHeight } = useLocalSearchParams<{
-    id: string; scanWeight?: string; scanHeight?: string;
+  const { id: athleteId, scanWeight, scanHeight, returnPath } = useLocalSearchParams<{
+    id: string; scanWeight?: string; scanHeight?: string; returnPath?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -36,18 +36,19 @@ export default function ProtocolSelectScreen() {
 
   const handleNext = useCallback(() => {
     if (!selectedProtocol || !age || !weight || !height) return;
-    const params = {
+    const params: any = {
       protocolId: selectedProtocol,
       gender,
       age,
       weight,
       height,
     };
+    if (returnPath) params.returnPath = returnPath;
     router.push({
       pathname: `/athlete/${athleteId}/measurement`,
       params,
     });
-  }, [selectedProtocol, gender, age, weight, height, athleteId, router]);
+  }, [selectedProtocol, gender, age, weight, height, athleteId, router, returnPath]);
 
   const pt = locale === 'pt';
 

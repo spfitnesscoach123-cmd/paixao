@@ -43,9 +43,9 @@ export default function BodyScanScreen() {
   // PHASE 1A SAFETY: Freeze athleteId at scan start to prevent cross-athlete navigation
   const recordingAthleteIdRef = useRef<string | null>(null);
 
-  // PHASE 1B: Navigate back (respects returnPath from HUB)
+  // PHASE 1B/3: Navigate back (respects returnPath from HUB or Station)
   const navigateBack = () => {
-    if (returnPath === 'hub') {
+    if (returnPath === 'station' || returnPath === 'hub') {
       router.replace('/(tabs)/athletes' as any);
     } else {
       router.back();
@@ -160,9 +160,10 @@ export default function BodyScanScreen() {
       params: {
         scanWeight: athleteWeight,
         scanHeight: athleteHeight,
+        ...(returnPath ? { returnPath } : {}),
       },
     });
-  }, [bodyScan.result, athleteId, athleteWeight, athleteHeight, router]);
+  }, [bodyScan.result, athleteId, athleteWeight, athleteHeight, router, returnPath]);
 
   // ============================================================
   // RENDER: CONFIG

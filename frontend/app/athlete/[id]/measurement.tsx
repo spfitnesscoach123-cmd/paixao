@@ -71,7 +71,7 @@ if (!IS_WEB) {
 
 export default function MeasurementScreen() {
   const params = useLocalSearchParams<{
-    protocolId: string; gender: string; age: string; weight: string; height: string;
+    protocolId: string; gender: string; age: string; weight: string; height: string; returnPath?: string;
   }>();
   const { id: athleteId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -161,9 +161,9 @@ export default function MeasurementScreen() {
 
     router.push({
       pathname: `/athlete/${athleteId}/report`,
-      params: { report: JSON.stringify(report) },
+      params: { report: JSON.stringify(report), ...(params.returnPath ? { returnPath: params.returnPath } : {}) },
     });
-  }, [protocol, validation, measurements, gender, age, weight, height, athleteId, router]);
+  }, [protocol, validation, measurements, gender, age, weight, height, athleteId, router, params.returnPath]);
 
   if (!protocol) {
     return (

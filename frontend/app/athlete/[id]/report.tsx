@@ -91,7 +91,7 @@ function buildHeatmapValues(measurements: Record<string, number | undefined>): R
 }
 
 export default function ReportScreen() {
-  const { id: athleteId, report: reportStr } = useLocalSearchParams<{ id: string; report: string }>();
+  const { id: athleteId, report: reportStr, returnPath } = useLocalSearchParams<{ id: string; report: string; returnPath?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { locale } = useLanguage();
@@ -320,7 +320,15 @@ export default function ReportScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.primaryBtn, saved && { opacity: 0.6 }]}
-            onPress={saved ? () => router.replace(`/athlete/${athleteId}`) : handleSave}
+            onPress={saved ? () => {
+              if (returnPath === 'station') {
+                router.replace('/(tabs)/athletes' as any);
+              } else if (returnPath === 'hub') {
+                router.replace('/(tabs)/athletes' as any);
+              } else {
+                router.replace(`/athlete/${athleteId}`);
+              }
+            } : handleSave}
             disabled={saving}
             data-testid="report-done-btn"
           >

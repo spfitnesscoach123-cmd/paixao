@@ -126,6 +126,15 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - useJumpCamera hook INTACTO (0 modificacoes internas)
 - 10/10 integrity checks PASS
 
+### FASE 3C — Station Mode Body Scan (CONCLUIDA)
+- Chain returnPath propagation: body-scan → protocol-select → measurement → report
+- Nova rota `/station/body-scan.tsx` — picker de atletas (rosa #ec4899)
+- Botao "Station Mode" no card Body Composition (submenu Avaliacoes Fisicas)
+- report.tsx: navigateBack suporta returnPath='station' e 'hub'
+- useBodyScan hook INTACTO (0 modificacoes)
+- Nota: Body Scan Station Mode usa Fluxo A (navigation chain), nao camera persistente
+- 6/6 chain + integrity checks PASS
+
 ### FASE 4 — Regression Completa (CONCLUIDA — 47/47 PASS)
 - Backend: 18/18 endpoints OK
 - HUB UI: 5/5 elementos OK
