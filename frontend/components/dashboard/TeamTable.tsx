@@ -160,7 +160,13 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
       </View>
 
       {/* Table Header + Body wrapped in horizontal scroll */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        bounces={false}
+        directionalLockEnabled
+        nestedScrollEnabled
+      >
         <View>
           {/* HEADER */}
           <View style={[styles.headerRow, { borderBottomColor: colors.border.default }]}>
@@ -224,6 +230,8 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               estimatedItemSize={56}
+              scrollEnabled={false}
+              nestedScrollEnabled
             />
           </View>
         </View>
