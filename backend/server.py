@@ -8459,6 +8459,252 @@ async def get_team_dashboard(
     )
 
 
+
+# ============= TEAM TABLE (TABELA ANALÍTICA) =============
+
+class TeamTableRow(BaseModel):
+    athlete_id: str
+    name: str
+    position: str
+    total_distance: float = 0
+    z3: float = 0
+    z4: float = 0
+    z5: float = 0
+    sprint_count: int = 0
+    acc_dec: int = 0
+    rsimod: Optional[float] = None
+    rsimod_delta: Optional[float] = None
+    fatigue_index: Optional[float] = None
+    fatigue_status: str = "UNKNOWN"
+    readiness_status: str = "UNKNOWN"
+    weight: Optional[float] = None
+    body_fat: Optional[float] = None
+    lean_mass: Optional[float] = None
+
+class TeamTableResponse(BaseModel):
+    rows: List[TeamTableRow]
+    period_label: str
+
+@api_router.get("/dashboard/team-table", response_model=TeamTableResponse)
+async def get_team_table(
+    lang: str = "pt",
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user)
+):
+    """Aggregated table data for the analytical team table.
+    Merges GPS, Jump, BodyComp and Wellness into a single flat row per athlete.
+    NO metric recalculation — only read and merge."""
+    
+    user_id = current_user["_id"]
+    
+    date_range_days = {"today": 0, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_days.get(date_range, 7)
+    
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    
+    if filter_days == 0:
+        filter_start = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start = today - timedelta(days=filter_days)
+    filter_start_str = filter_start.strftime("%Y-%m-%d")
+    
+    period_labels = {
+        "today": "Hoje" if lang == "pt" else "Today",
+        "7d": "7 dias" if lang == "pt" else "7 days",
+        "14d": "14 dias" if lang == "pt" else "14 days",
+        "28d": "28 dias" if lang == "pt" else "28 days",
+        "90d": "90 dias" if lang == "pt" else "90 days",
+    }
+    
+    athletes = await db.athletes.find({"coach_id": user_id}).to_list(100)
+    if not athletes:
+        return TeamTableResponse(rows=[], period_label=period_labels.get(date_range, "7d"))
+    
+    athlete_ids = [str(a["_id"]) for a in athletes]
+    
+    # Bulk queries
+    all_gps = await db.gps_data.find({
+        "coach_id": user_id,
+        "date": {"$gte": filter_start_str}
+    }).to_list(5000)
+    
+    all_jumps = await db.jump_assessments.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    all_body = await db.body_compositions.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(200)
+    
+    all_wellness = await db.wellness.find({
+        "coach_id": user_id
+    }).sort("date", -1).to_list(500)
+    
+    # Index by athlete
+    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
+    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
+    
+    gps_by_athlete: Dict[str, list] = {}
+    for r in all_gps:
+        aid = r.get("athlete_id")
+        if aid:
+            gps_by_athlete.setdefault(aid, []).append(r)
+    
+    jump_by_athlete: Dict[str, list] = {}
+    for r in all_jumps:
+        aid = r.get("athlete_id")
+        if aid:
+            jump_by_athlete.setdefault(aid, []).append(r)
+    
+    body_by_athlete: Dict[str, dict] = {}
+    for r in all_body:
+        aid = r.get("athlete_id")
+        if aid and aid not in body_by_athlete:
+            body_by_athlete[aid] = r
+    
+    wellness_by_athlete: Dict[str, list] = {}
+    for r in all_wellness:
+        aid = r.get("athlete_id")
+        if aid:
+            wellness_by_athlete.setdefault(aid, []).append(r)
+    
+    rows = []
+    for athlete in athletes:
+        aid = str(athlete["_id"])
+        name = athlete.get("name", "")
+        position = athlete.get("position", "")
+        if not position or position == "Unknown":
+            position = "N/A"
+        
+        # --- GPS aggregation (same dedup logic as team dashboard) ---
+        total_dist = 0.0
+        z3_total = 0.0
+        z4_total = 0.0
+        z5_total = 0.0
+        sprint_total = 0
+        acc_dec_total = 0
+        
+        gps_records = gps_by_athlete.get(aid, [])
+        if gps_records:
+            grouped: Dict[str, Dict[str, list]] = {}
+            for rec in gps_records:
+                try:
+                    d = rec["date"]
+                    datetime.strptime(d, "%Y-%m-%d")
+                except:
+                    continue
+                sname = rec.get("session_name") or "default"
+                grouped.setdefault(d, {}).setdefault(sname, []).append(rec)
+            
+            for date_str, sessions_map in grouped.items():
+                for sname, records in sessions_map.items():
+                    session_total_rec = None
+                    period_recs = []
+                    for r in records:
+                        pname = (r.get("period_name") or "").lower()
+                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
+                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
+                        if is_sess and not is_period:
+                            if session_total_rec is None:
+                                session_total_rec = r
+                        else:
+                            period_recs.append(r)
+                    
+                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    for r in source:
+                        total_dist += r.get("total_distance", 0) or 0
+                        z3_total += r.get("high_intensity_distance", 0) or 0
+                        z4_total += r.get("high_speed_running", 0) or 0
+                        z5_total += r.get("sprint_distance", 0) or 0
+                        sprint_total += r.get("number_of_sprints", 0) or 0
+                        acc_dec_total += max(0, r.get("number_of_accelerations", 0) or 0) + max(0, r.get("number_of_decelerations", 0) or 0)
+        
+        # --- RSImod ---
+        rsimod_val = None
+        rsimod_delta_val = None
+        cmj_jumps = [j for j in jump_by_athlete.get(aid, []) if j.get("protocol") == "cmj"]
+        if cmj_jumps:
+            latest_rsi = cmj_jumps[0].get("rsi")
+            if latest_rsi and latest_rsi > 0:
+                rsimod_val = round(latest_rsi, 2)
+                if len(cmj_jumps) >= 2:
+                    prev_rsi = cmj_jumps[1].get("rsi")
+                    if prev_rsi and prev_rsi > 0:
+                        rsimod_delta_val = round(((latest_rsi - prev_rsi) / prev_rsi) * 100, 1)
+        
+        # --- Body Composition ---
+        weight_val = None
+        bf_val = None
+        lm_val = None
+        bc = body_by_athlete.get(aid)
+        if bc:
+            weight_val = bc.get("weight") or bc.get("peso")
+            bf_val = bc.get("body_fat_percentage")
+            lm_val = bc.get("lean_mass_kg") or bc.get("lean_mass")
+            if weight_val:
+                weight_val = round(float(weight_val), 1)
+            if bf_val:
+                bf_val = round(float(bf_val), 1)
+            if lm_val:
+                lm_val = round(float(lm_val), 1)
+        
+        # --- Wellness / Fatigue / Readiness ---
+        fatigue_idx = None
+        fatigue_st = "UNKNOWN"
+        readiness_st = "UNKNOWN"
+        
+        w_list = wellness_by_athlete.get(aid, [])
+        if w_list:
+            latest_w = w_list[0]
+            fatigue_raw = latest_w.get("fatigue", None)
+            if fatigue_raw is not None:
+                fatigue_idx = round(float(fatigue_raw) * 10, 1)
+                if fatigue_idx <= 30:
+                    fatigue_st = "READY"
+                elif fatigue_idx <= 60:
+                    fatigue_st = "ATTENTION"
+                else:
+                    fatigue_st = "NOT_READY"
+            
+            readiness_raw = latest_w.get("readiness_score")
+            if readiness_raw is not None:
+                r_pct = float(readiness_raw) * 10
+                if r_pct >= 70:
+                    readiness_st = "READY"
+                elif r_pct >= 40:
+                    readiness_st = "ATTENTION"
+                else:
+                    readiness_st = "NOT_READY"
+            elif fatigue_st != "UNKNOWN":
+                readiness_st = fatigue_st
+        
+        rows.append(TeamTableRow(
+            athlete_id=aid,
+            name=name,
+            position=position,
+            total_distance=round(total_dist, 0),
+            z3=round(z3_total, 0),
+            z4=round(z4_total, 0),
+            z5=round(z5_total, 0),
+            sprint_count=sprint_total,
+            acc_dec=acc_dec_total,
+            rsimod=rsimod_val,
+            rsimod_delta=rsimod_delta_val,
+            fatigue_index=fatigue_idx,
+            fatigue_status=fatigue_st,
+            readiness_status=readiness_st,
+            weight=weight_val,
+            body_fat=bf_val,
+            lean_mass=lm_val,
+        ))
+    
+    rows.sort(key=lambda r: r.total_distance, reverse=True)
+    
+    return TeamTableResponse(rows=rows, period_label=period_labels.get(date_range, "7d"))
+
+
+
 # ============= DASHBOARD OVERVIEW (VISÃO GERAL DA EQUIPE) =============
 
 @api_router.get("/dashboard/overview")

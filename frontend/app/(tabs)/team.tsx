@@ -6,23 +6,30 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  Pressable,
 } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTeamTableData } from '../../hooks/useTeamTableData';
+import { TeamTable } from '../../components/dashboard/TeamTable';
+import type { TeamTableRowData } from '../../components/dashboard/types';
 
-interface TeamDashboardResponse {
-  stats: {
-    total_athletes: number;
-  };
-  athletes: any[];
-  risk_distribution: { [key: string]: number };
-  position_summary: { [key: string]: any };
-  alerts: string[];
+const DATE_RANGES = [
+  { key: 'today', labelPt: 'Hoje', labelEn: 'Today' },
+  { key: '7d', labelPt: '7 dias', labelEn: '7 days' },
+  { key: '14d', labelPt: '14 dias', labelEn: '14 days' },
+  { key: '28d', labelPt: '28 dias', labelEn: '28 days' },
+  { key: '90d', labelPt: '90 dias', labelEn: '90 days' },
+];
+
+interface BasicTeamResponse {
+  stats: { total_athletes: number };
 }
 
 export default function TeamDashboard() {
@@ -30,30 +37,51 @@ export default function TeamDashboard() {
   const { t, locale } = useLanguage();
   const { colors } = useTheme();
   const [refreshing, setRefreshing] = React.useState(false);
+  const [selectedDateRange, setSelectedDateRange] = React.useState('7d');
+  const [dateModalVisible, setDateModalVisible] = React.useState(false);
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['team-dashboard'],
+  // Basic team query (for empty state detection)
+  const { data: basicData, isLoading: basicLoading, error: basicError, refetch: basicRefetch } = useQuery({
+    queryKey: ['team-dashboard-basic'],
     queryFn: async () => {
-      const response = await api.get<TeamDashboardResponse>(`/dashboard/team?lang=${locale}`);
+      const response = await api.get<BasicTeamResponse>(`/dashboard/team?lang=${locale}`);
       return response.data;
     },
   });
 
+  // Table data query
+  const { data: tableData, isLoading: tableLoading, refetch: tableRefetch } = useTeamTableData(selectedDateRange);
+
   useFocusEffect(
     React.useCallback(() => {
-      refetch();
-    }, [refetch])
+      basicRefetch();
+      tableRefetch();
+    }, [basicRefetch, tableRefetch])
   );
 
-  const onRefresh = async () => {
+  const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([basicRefetch(), tableRefetch()]);
     setRefreshing(false);
-  };
+  }, [basicRefetch, tableRefetch]);
+
+  const handleDateRangeSelect = React.useCallback((rangeKey: string) => {
+    setSelectedDateRange(rangeKey);
+    setDateModalVisible(false);
+  }, []);
+
+  const getCurrentDateRangeLabel = React.useCallback(() => {
+    const range = DATE_RANGES.find(r => r.key === selectedDateRange);
+    return range ? (locale === 'pt' ? range.labelPt : range.labelEn) : '7 dias';
+  }, [selectedDateRange, locale]);
+
+  const handleRowPress = React.useCallback((row: TeamTableRowData) => {
+    router.push(`/athlete/${row.athlete_id}`);
+  }, [router]);
 
   const styles = createStyles(colors);
 
-  if (isLoading) {
+  if (basicLoading) {
     return (
       <View style={styles.loadingContainer}>
         <Ionicons name="pulse" size={32} color={colors.accent.primary} />
@@ -64,21 +92,21 @@ export default function TeamDashboard() {
     );
   }
 
-  if (error || !data) {
+  if (basicError || !basicData) {
     return (
       <View style={styles.errorContainer}>
         <Ionicons name="warning" size={48} color={colors.status.error} />
         <Text style={styles.errorText}>
           {locale === 'pt' ? 'Erro ao carregar dados' : 'Error loading data'}
         </Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+        <TouchableOpacity style={styles.retryButton} onPress={() => basicRefetch()}>
           <Text style={styles.retryText}>{locale === 'pt' ? 'Tentar novamente' : 'Try again'}</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const hasNoData = data.stats.total_athletes === 0;
+  const hasNoData = basicData.stats.total_athletes === 0;
 
   return (
     <View style={styles.container}>
@@ -156,12 +184,118 @@ export default function TeamDashboard() {
             </View>
           )}
 
-          {/* CONTAINER BASE - Pronto para receber novos componentes */}
-          <View style={{ flex: 1 }} data-testid="team-dashboard-content">
-          </View>
+          {/* DATE FILTER */}
+          {!hasNoData && (
+            <View style={styles.filterRow}>
+              <TouchableOpacity
+                style={[styles.filterButton, { borderColor: colors.border.default, backgroundColor: colors.dark.card }]}
+                onPress={() => setDateModalVisible(true)}
+                data-testid="date-filter-button"
+              >
+                <Ionicons name="calendar-outline" size={16} color={colors.accent.primary} />
+                <Text style={[styles.filterButtonText, { color: colors.text.secondary }]}>
+                  {getCurrentDateRangeLabel()}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
+              </TouchableOpacity>
+
+              {tableData?.period_label && (
+                <Text style={[styles.periodLabel, { color: colors.text.tertiary }]}>
+                  {locale === 'pt' ? 'Período:' : 'Period:'} {tableData.period_label}
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* TABELA ANALÍTICA */}
+          {!hasNoData && (
+            <TeamTable
+              rows={tableData?.rows || []}
+              isLoading={tableLoading}
+              colors={colors}
+              locale={locale}
+              onRowPress={handleRowPress}
+            />
+          )}
 
         </ScrollView>
       </LinearGradient>
+
+      {/* Date Range Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={dateModalVisible}
+        onRequestClose={() => setDateModalVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setDateModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.dark.cardSolid }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {locale === 'pt' ? 'Selecionar Período' : 'Select Date Range'}
+              </Text>
+              <TouchableOpacity onPress={() => setDateModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            {DATE_RANGES.map((range) => (
+              <TouchableOpacity
+                key={range.key}
+                style={[
+                  styles.optionRow,
+                  {
+                    backgroundColor: selectedDateRange === range.key
+                      ? 'rgba(139, 92, 246, 0.1)'
+                      : colors.dark.secondary,
+                    borderColor: selectedDateRange === range.key
+                      ? colors.accent.primary
+                      : colors.border.default,
+                  },
+                ]}
+                onPress={() => handleDateRangeSelect(range.key)}
+                data-testid={`date-range-${range.key}`}
+              >
+                <View style={styles.optionContent}>
+                  <View
+                    style={[
+                      styles.radio,
+                      {
+                        borderColor: selectedDateRange === range.key
+                          ? colors.accent.primary
+                          : colors.text.tertiary,
+                      },
+                    ]}
+                  >
+                    {selectedDateRange === range.key && (
+                      <View style={[styles.radioInner, { backgroundColor: colors.accent.primary }]} />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      {
+                        color: selectedDateRange === range.key
+                          ? colors.text.primary
+                          : colors.text.secondary,
+                        fontWeight: selectedDateRange === range.key ? '600' : '500',
+                      },
+                    ]}
+                  >
+                    {locale === 'pt' ? range.labelPt : range.labelEn}
+                  </Text>
+                </View>
+                {selectedDateRange === range.key && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -285,5 +419,81 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  // Date Filter
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+  },
+  filterButtonText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  periodLabel: {
+    fontSize: 12,
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  optionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  optionText: {
+    fontSize: 15,
   },
 });
