@@ -1,47 +1,35 @@
 <analysis>**original_problem_statement**: 
-The user requested a strict diagnostic audit of the 3D Avatar rendering pipeline, followed by a complete implementation of interactive features (auto-rotation, drag, raycasting, adaptive camera) and UI unification across screens. Subsequently, the user reported deployment errors due to conflicting lockfiles and native module duplication. Finally, the user requested a critical diagnostic audit of the SL-CMJ (Single Leg Countermovement Jump) state machine, as the second jump is not being detected and the app gets stuck.
-
-**PRODUCT REQUIREMENTS**:
-1. 3D Avatar must be fully interactive (auto-rotation, drag to rotate, clickable body parts via raycasting).
-2. Avatar must have an adaptive camera (fit-to-model) to prevent clipping.
-3. Avatar must be consistently used across all relevant screens (measurement, report, profile assessments), replacing the old 2D SVG model.
-4. SL-CMJ jump assessment must correctly detect two consecutive jumps (one for each leg) and transition states properly.
+The user requested a strict diagnostic audit of the 3D Avatar rendering pipeline, followed by a complete implementation of interactive features (auto-rotation, drag, raycasting, adaptive camera) and UI unification across screens. Furthermore, the user requested a fix for the SL-CMJ (Single Leg Countermovement Jump) state machine where the second jump was not being detected. Finally, the user requested the visual removal of the SL-CMJ protocol from the entire app (while preserving the internal logic) and layout adjustments to the Assessment screen to properly display the 3D Avatar above the Donut chart in a vertical layout.
 
 **User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in **Portuguese** only).
 
 **what currently exists?** 
-A React Native Expo app + FastAPI backend. The 3D Avatar has been fully upgraded with PanResponder for drag interaction, raycasting fixed to use layout coordinates, and an adaptive camera. Deployment issues related to  and duplicated  have been permanently fixed via  and yarn . The jump assessment feature (SL-CMJ) has a bug where the state machine fails to detect the second jump.
+A React Native Expo app + FastAPI backend. The 3D Avatar has been fully upgraded, successfully rendering meshes from a newly uploaded . The Avatar3D handles raycasting and heatmap colorization by safely replacing full materials (a fix for  WebGL limitations). The SL-CMJ jump assessment state machine was successfully fixed using synchronous  updates, but per the user's explicit request, all SL-CMJ UI components have been visually hidden across the app. The Assessment UI layout has been updated to stack the Avatar above the Donut chart for better visibility on mobile screens.
 
 **Last working item**:
-    - Last item agent was working: Performing a strict diagnostic audit of the SL-CMJ (Single Leg Countermovement Jump) state machine in  and  to identify why the second jump is not detected.
-    - Status: IN PROGRESS
-    - Agent Testing Done: N/A (Auditing only)
-    - Which testing method agent to use? N/A (Diagnostic analysis)
+    - Last item agent was working: Adjusting the Assessment layout () to show the 3D Avatar on top and the Donut chart below (vertical layout), fixing text overflow inside cards, and removing on-screen debug overlays from .
+    - Status: USER VERIFICATION PENDING
+    - Agent Testing Done: N
+    - Which testing method agent to use? Screenshot tool or manual user validation via TestFlight.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  Issue 1: SL-CMJ State Machine Failure (P0)
-     - Attempted fixes: None yet (User explicitly forbade code changes during the audit phase). Agent reviewed , , and .
-     - Next debug checklist: Deliver the diagnostic audit as requested by the user. Analyze the state transitions (, ), takeoff detection logic, landing frame accumulation, and frame splitting logic to pinpoint the exact failure point.
-     - Why fix this issue and what will be achieved?: Allows athletes to successfully complete the Single Leg Countermovement Jump assessment (which requires two jumps).
-     - Status: IN PROGRESS
+  Issue 1: Durnin & Womersley NaN bug (P0)
+     - Attempted fixes: None
+     - Next debug checklist: Check body composition calculation logic where Durnin & Womersley formula is applied. Look for divide-by-zero or missing/null variables in the math.
+     - Why fix this issue and what will be achieved with the fix?: Prevents app crashes or invalid NaN data being saved during body composition assessments.
+     - Status: NOT STARTED
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: Frontend
      - Blocked on other issue: None
 
-**In progress Task List**:
-  Task 1: Deliver SL-CMJ Diagnostic Audit (P0)
-     - Where to resume: The agent has gathered context from the jump detection files and is ready to send the diagnostic report to the user via the  tool.
-     - What will be achieved with this?: Provides the user with a precise understanding of the SL-CMJ failure before any code changes are authorized.
-     - Status: IN PROGRESS
-     - Should Test frontend/backend/both after fix?: N/A
-     - Blocked on something: Waiting to output the audit to the user.
+**In progress Task List**: 
+None.
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P0) Implement the fix for the SL-CMJ state machine based on the audit results (once authorized by the user).
-    - (P0) Fix Durnin & Womersley NaN bug (mentioned in previous PRD updates).
-    - (P1) Test Avatar3D on a physical device after the recent deploy to verify raycasting, rotation, and camera fixes.
+    - (P1) Test SL-CMJ on a physical device (The state machine fix was applied to  but needs real-world validation, although it is currently visually hidden from the UI).
+    - (P1) Fix Durnin & Womersley NaN bug.
     
     Future Tasks:
     - Implement new, modern UI for VBT and Jump Camera recording screens.
@@ -50,11 +38,11 @@ A React Native Expo app + FastAPI backend. The 3D Avatar has been fully upgraded
     - Link Body Scan (MediaPipe) to the 3D model.
 
 **Completed work in this session**
-- Delivered Diagnostic Audit for 3D Avatar (DONE)
-- Implemented Avatar3D full interactivity (drag, auto-rotation, adaptive camera) (DONE)
-- Replaced old SVG avatar with Avatar3D in  (DONE)
-- Fixed Avatar3D raycasting coordinate system to use  instead of GL drawing buffer (DONE)
-- Fixed EAS deployment issues: removed , added , updated , and changed  to use  protocol (DONE)
+- Fixed SL-CMJ State Machine by using synchronous  instead of  for  (). (DONE)
+- Integrated new GLB model  and fixed Three.js mesh detection by checking  instead of  (expo-three bug) (). (DONE)
+- Fixed Avatar3D heatmap rendering for Expo WebGL by completely cloning and replacing materials instead of relying on  mutations. (DONE)
+- Visually removed SL-CMJ protocol from the entire UI while preserving all internal logic (, , etc). (DONE)
+- Removed Avatar3D debug overlays/alerts and fixed vertical layout (Avatar above Donut chart) in Assessment view (). (DONE)
 
 **Earlier issues found/mentioned but not fixed**
    - Issue 1: JSI Worklets vs JS Bridge
@@ -64,80 +52,60 @@ A React Native Expo app + FastAPI backend. The 3D Avatar has been fully upgraded
      - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
-  - Expo native GL rendering and Three.js peer dependencies. (Fixed in previous forks by locking  to 0.166.1).
-  - Recurrence count: 3+
-  - Status: RESOLVED
+  - Issue recurrence in previous fork:  failing to detect meshes in  when traversing GLB files.
+  - Recurrence count: 4
+  - Status: RESOLVED (Fixed by checking  instead of ).
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- React Native Expo, Three.js, Raycasting (Normalized Device Coordinates), Expo EAS Build, Kubernetes Deployments, State Machines (Jump Detection).
+- React Native Expo, Three.js (expo-gl, expo-three), Raycasting (Normalized Device Coordinates), Expo EAS Build, State Machines (Refs vs React State for frame-by-frame processing).
 
 **key DB schema**
   - N/A
 
 **changes in tech stack**
-  - Added  to prevent  generation.
-  - Switched local module dependency from  to  to prevent duplicate native modules in EAS build.
+  - None.
 
 **All files of reference** 
--  (Rewritten for drag, auto-rotate, fit-camera, and fixed raycasting)
--  (Updated to use Avatar3D)
-- 
-- 
--  (Target of current audit)
--  (Target of current audit)
-- 
-- 
-- 
-- 
+-  (Major changes for GLB parsing,  checks, material replacement, click detection).
+-  (Layout changed to column, flex wrapping fixed).
+-  (Sync refs implemented for SL-CMJ state fix).
+-  (SL-CMJ removed visually).
+-  (SL-CMJ removed visually).
+-  (New model file).
+-  (Updated with changelog).
 
 **Areas that need refactoring**: 
-- MediaPipe pipeline to use JSI worklets instead of JS bridge.
+- MediaPipe pipeline to use JSI worklets instead of JS bridge for performance.
 
 **key api endpoints**
 - N/A
 
 **Critical Info for New Agent** 
 - **LANGUAGE REQUIREMENT:** You MUST reply exclusively in **Portuguese**.
-- **CURRENT DIRECTIVE:** The user has requested a STRICT DIAGNOSTIC AUDIT of the SL-CMJ jump detection logic. You are **PROHIBITED** from suggesting code changes or fixing the issue right now. You must provide a frame-by-frame analysis of variables (, , , etc.) and identify exactly where the state machine fails. The previous agent read the files and was about to send this audit via .
-- **DEPENDENCY STRICTNESS:** Do NOT run . The project uses yarn install v1.22.22
-[1/4] Resolving packages...
-success Already up-to-date.
-$ npx patch-package
-patch-package 8.0.1
-Applying patches...
-No patch files found
-Done in 0.95s.. Ensure  is never generated.
+-  operates under  WebGL limitations. When traversing nodes loaded via  GLTFLoader,  is often undefined. ALWAYS use  to detect meshes. For applying heatmaps, you must clone and replace the entire material (e.g., ) rather than mutating  or .
+- The SL-CMJ assessment is functionally fixed but **VISUALLY HIDDEN** across the app per the user's explicit strict instructions. Do not unhide it or alter its internal logic in .
 
 **documents and test reports created in this job** 
   - 
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Requests definitive fix for raycasting using layout coordinates.
-- **Agent**: Implements fix in  and tests.
-- **User**: Shares deployment error logs ( failing due to native module duplication).
-- **Agent**: Removes , runs yarn install.
-- **User**: Asks about deployment flow.
-- **Agent**: Explains GitHub to EAS Build flow.
-- **User**: Shares identical deployment errors from the cloud.
-- **Agent**: Realizes runtime fixes didn't persist. Adds , updates , changes  to  for .
-- **User**: Shares more logs (warnings only).
-- **Agent**: Confirms it's clean and safe to deploy.
-- **User**: Asks how to find Avatar3D console logs on Mac.
-- **Agent**: Explains Mac Console filtering.
-- **User (PENDING)**: Requests CRITICAL AUDIT of SL-CMJ state machine. Forbids code suggestions. Demands exact diagnostic of variables and frames to find why the second jump fails.
+- **User**: Requests removal of all visual references to SL-CMJ without touching internal logic.
+- **Agent**: Implements the visual removal in 6 files and tests.
+- **User**: Confirms Avatar3D meshes appear correctly on TestFlight. Requests removal of Avatar debug overlay/alerts, and asks to fix layout in Assessment page (Avatar above the chart for mobile visibility, text formatting inside cards).
+- **Agent**: Removes debug tools, updates  to vertical layout (), and wraps text content.
 
 **Project Health Check:**
-- Broken: SL-CMJ jump detection (fails to detect second jump).
+- Broken: Durnin & Womersley NaN bug.
 - Mocked: None
 
 **3rd Party Integrations** 
 - MediaPipeTasksVision (Native SDK)
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Used screenshot testing for UI verification).
+  - Testing agent used after significant changes: NO (Manual TS/Bash checks, User validates on physical device via TestFlight).
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
   - Known regressions: None
@@ -147,11 +115,11 @@ User:
 Password: 
 
 **What agent forgot to execute**
-The agent read the jump detection files but hasn't yet compiled and sent the diagnostic audit back to the user.
+The agent did not start debugging the Durnin & Womersley NaN bug mentioned as a priority in the previous sessions.
 
 **Debugging checklist for current issue**
-    Issue: SL-CMJ State Machine Failure
-    Files to check: 
-    - 
-    - 
-    Action: Deliver the requested diagnostic audit. Analyze how  transitions. Check if  is being set incorrectly. Check  and  returns. Deliver findings to the user WITHOUT proposing a fix.</analysis>
+    Issue: Durnin & Womersley NaN bug
+    Frontend files to check: 
+    -  (or equivalent math utility file handling D&W formula).
+    - Look for  of negative or zero values.
+    - Check where  is converted to .</analysis>

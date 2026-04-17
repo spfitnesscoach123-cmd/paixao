@@ -9,7 +9,7 @@ import requests
 import os
 import uuid
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://slcmj-audit.preview.emergentagent.com')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://avatar-render-audit.preview.emergentagent.com')
 
 # Test credentials
 TEST_EMAIL = "silasf@ymail.com"
