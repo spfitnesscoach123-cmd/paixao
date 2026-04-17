@@ -152,7 +152,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
           <Avatar3DComponent
             autoRotate={true}
             heatmapValues={heatmapValues}
-            style={{ height: 260 }}
+            style={{ height: 280, width: '100%' }}
           />
         ) : (
           <Svg width={200} height={300} viewBox="0 0 200 300">
@@ -564,7 +564,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   bodyModelContainer: {
-    alignItems: 'center',
+    width: '100%',
+    minHeight: 280,
   },
   viewToggle: {
     flexDirection: 'row',

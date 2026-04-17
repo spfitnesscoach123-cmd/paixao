@@ -320,7 +320,7 @@ export default function ReportScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.primaryBtn, saved && { opacity: 0.6 }]}
-            onPress={saved ? () => router.push(`/athlete/${athleteId}`) : handleSave}
+            onPress={saved ? () => router.replace(`/athlete/${athleteId}`) : handleSave}
             disabled={saving}
             data-testid="report-done-btn"
           >

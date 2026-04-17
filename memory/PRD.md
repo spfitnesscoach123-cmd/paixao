@@ -106,6 +106,10 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - FlashList com estimatedItemSize, React.memo, useMemo, useCallback
 - Componentes modulares: TeamTable, TeamTableRow, ZoneBar, MiniBar, FatigueBar
 
+
+### Bug Fixes aplicados nesta sessao:
+- Avatar3D na Assessment: container `bodyModelContainer` corrigido (removido `alignItems: 'center'`, adicionado `width: 100%` + `minHeight: 280`). Avatar3D style atualizado para `height: 280, width: '100%'`
+- Navegacao empilhando: `router.push` → `router.replace` no botao "Concluir" do report.tsx, evitando stack duplicado
 ### Proximas etapas previstas:
 - Etapa 6: Refinamentos visuais e integracao final
 
