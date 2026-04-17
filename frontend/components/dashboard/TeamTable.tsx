@@ -2,12 +2,12 @@ import React from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { TeamTableRowItem } from './TeamTableRow';
 import type { TeamTableRowData, SortKey, SortDir } from './types';
@@ -123,6 +123,11 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
 
   return (
     <View style={[styles.container, { backgroundColor: colors.dark.cardSolid, borderColor: colors.border.default }]} data-testid="team-analytics-table">
+      {/* Section Title */}
+      <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+        {locale === 'pt' ? 'Tabela Analítica' : 'Analytics Table'}
+      </Text>
+
       {/* Column Toggle */}
       <View style={styles.toggleRow}>
         {TOGGLE_COLS.map(col => (
@@ -213,20 +218,14 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
           </View>
 
           {/* ROWS */}
-          <FlatList
-            data={sortedRows}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            initialNumToRender={15}
-            maxToRenderPerBatch={10}
-            windowSize={5}
-            removeClippedSubviews
-            getItemLayout={(_data, index) => ({
-              length: 56,
-              offset: 56 * index,
-              index,
-            })}
-          />
+          <View style={{ minHeight: Math.min(sortedRows.length * 56, 560) }}>
+            <FlashList
+              data={sortedRows}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              estimatedItemSize={56}
+            />
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -253,6 +252,13 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 13,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   toggleRow: {
     flexDirection: 'row',

@@ -95,6 +95,17 @@ Aplicativo de gerenciamento de carga para treinadores esportivos. React Native E
 - Labels com iniciais, legenda de barras vs linha
 - Scroll horizontal, React.memo + useMemo
 
+### Etapa 6: Tabela analitica (ultimo bloco) - CONCLUIDA
+- Upgrade de FlatList para FlashList (@shopify/flash-list) para performance superior
+- Titulo de secao "Tabela Analitica" adicionado
+- 8 colunas completas: Atleta, Distancia, Zonas, Sprint, ACC/DEC, RSImod, Fadiga, Body Comp
+- Ordenacao por qualquer coluna (asc/desc)
+- Toggle de colunas (Zonas, Sprint, ACC/DEC)
+- Scroll horizontal suave
+- Tap na linha → navega para perfil do atleta
+- FlashList com estimatedItemSize, React.memo, useMemo, useCallback
+- Componentes modulares: TeamTable, TeamTableRow, ZoneBar, MiniBar, FatigueBar
+
 ### Proximas etapas previstas:
 - Etapa 6: Refinamentos visuais e integracao final
 
