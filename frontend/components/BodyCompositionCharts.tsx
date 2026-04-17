@@ -150,7 +150,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
         {/* Avatar 3D (native) or SVG fallback (web) */}
         {Avatar3DComponent && !IS_WEB ? (
           <Avatar3DComponent
-            autoRotate={true}
+            autoRotate={false}
             heatmapValues={heatmapValues}
             style={{ height: 280, width: '100%' }}
           />

@@ -219,7 +219,7 @@ export default function MeasurementScreen() {
               onPartSelect={handleMeshSelect}
               highlightedPart={highlightedMesh}
               heatmapValues={heatmapValues}
-              autoRotate={true}
+              autoRotate={false}
               style={{ height: 380 }}
             />
           ) : (
