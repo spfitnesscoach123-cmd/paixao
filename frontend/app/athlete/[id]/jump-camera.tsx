@@ -580,6 +580,24 @@ function JumpCameraContent() {
     });
   }, [athleteId, selectedProtocol, selectedDate, jumpCamera.metrics, jumpCamera.slCmjLeg1, jumpCamera.slCmjLeg2, submitMutation, locale, queryClient, router]);
 
+  // PHASE 2: canSwitchAthlete lock — true only when safe to switch
+  const canSwitchAthlete = !submitMutation.isPending && uiPhase !== 'recording' && jumpCamera.phase !== 'countdown' && jumpCamera.phase !== 'recording';
+  
+  // PHASE 2: Reset all athlete-specific state for next athlete (preserves camera + pipeline)
+  const resetForNextAthlete = () => {
+    // 1. Reset jump engine state (calibration, frames, metrics, timers)
+    jumpCamera.reset();
+    // 2. Clear visual overlays
+    setOverlayKeypoints([]);
+    hipYHistoryRef.current = [];
+    frameCountRef.current = 0;
+    isProcessingFrameRef.current = false;
+    // 3. Reset UI phase (back to recording — scanner will recalibrate automatically)
+    setUiPhase('recording');
+    // 4. Clear frozen athlete ref
+    recordingAthleteIdRef.current = null;
+  };
+
   // ============================================================
   // handleStartCamera - Initiates the progressive initialization
   // ============================================================

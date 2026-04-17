@@ -100,7 +100,15 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - `navigateBack()` function nos 3 modulos: respeita `returnPath=hub` para voltar ao HUB
 - Fluxo A funcional: HUB → selecionar atleta → modulo → save → volta ao HUB
 
-### PROXIMA: FASE 2 — Integration Points (PENDENTE APROVACAO)
-- resetForNextAthlete, lock, switch sequencing
+### FASE 2 — Integration Points (CONCLUIDA)
+- `resetForNextAthlete()` implementado nos 3 modulos (VBT, Jump, Body Scan)
+- `canSwitchAthlete` lock derivado em cada modulo:
+  - VBT: `!vbtMutation.isPending && phase !== 'recording' && phase !== 'review'`
+  - Jump: `!submitMutation.isPending && uiPhase !== 'recording' && jumpCamera.phase !== 'countdown/recording'`
+  - Body Scan: `uiPhase !== 'scanning'`
+- Switch sequencing: lock verificado → reset(hook) → limpa overlays → reset phase → limpa recordingRef
+- Prontos para consumo pelo Station Mode (Fase 3)
+
+### PROXIMA: GO/NO-GO GATE — stress tests (PENDENTE APROVACAO)
 
 ### FUTURO: FASE 2 → FASE 3 → FASE 4

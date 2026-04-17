@@ -1068,6 +1068,28 @@ function VBTCameraContent() {
     vbtMutation.mutate(vbtData);
   };
 
+  // PHASE 2: canSwitchAthlete lock — true only when safe to switch
+  const canSwitchAthlete = !vbtMutation.isPending && phase !== 'recording' && phase !== 'review';
+  
+  // PHASE 2: Reset all athlete-specific state for next athlete (preserves camera + config)
+  const resetForNextAthlete = () => {
+    // 1. Reset tracking state (velocity, reps, protection system, recorder)
+    resetTracking();
+    // 2. Clear recording timer
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    setRecordingTime(0);
+    // 3. Clear visual overlays
+    setCoachMarkerPosition(null);
+    setDetectedKeypoints(new Map());
+    // 4. Reset phase (preserve config, go to pointSelection since camera stays mounted)
+    setPhase('pointSelection');
+    // 5. Clear frozen athlete ref
+    recordingAthleteIdRef.current = null;
+  };
+
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;

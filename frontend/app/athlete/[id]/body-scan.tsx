@@ -68,6 +68,22 @@ export default function BodyScanScreen() {
     minValidFrames: 45,
   });
 
+  // PHASE 2: canSwitchAthlete lock — true only when safe to switch
+  const canSwitchAthlete = uiPhase !== 'scanning';
+  
+  // PHASE 2: Reset all athlete-specific state for next athlete
+  const resetForNextAthlete = () => {
+    // 1. Reset body scan hook (frames, result, validation, progress)
+    bodyScan.reset();
+    // 2. Reset UI phase back to config
+    setUiPhase('config');
+    // 3. Disable camera
+    setCameraActive(false);
+    setScannerReady(false);
+    // 4. Clear frozen athlete ref
+    recordingAthleteIdRef.current = null;
+  };
+
   // Transicao automatica para results quando completo
   useEffect(() => {
     if (bodyScan.phase === 'complete') {
