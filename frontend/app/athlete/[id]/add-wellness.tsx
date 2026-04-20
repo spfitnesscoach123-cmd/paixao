@@ -181,7 +181,7 @@ export default function AddWellness() {
         </View>
 
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={24} color="#2563eb" />
+          <Ionicons name="information-circle" size={24} color="#2FB6FF" />
           <Text style={styles.infoText}>
             {t('wellness.scoresAutoCalculated')}
           </Text>
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     borderRadius: 12,
     height: 56,
     justifyContent: 'center',

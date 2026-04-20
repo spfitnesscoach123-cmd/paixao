@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
 const ZONE_COLORS = {
-  z3: '#3b82f6',
+  z3: '#2FB6FF',
   z4: '#f59e0b',
   z5: '#ef4444',
 };

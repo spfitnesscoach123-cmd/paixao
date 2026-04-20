@@ -10,9 +10,9 @@ import {
 import Svg, { Rect, Line, Circle, Polyline, Text as SvgText } from 'react-native-svg';
 import type { TeamTableRowData } from './types';
 
-const RSI_COLOR = '#8b5cf6';
+const RSI_COLOR = '#7CFF3A';
 const FATIGUE_COLOR = '#ef4444';
-const BASELINE_RSI_COLOR = '#a78bfa';
+const BASELINE_RSI_COLOR = '#7BD4FF';
 const BASELINE_FAT_COLOR = '#f87171';
 
 interface Props {

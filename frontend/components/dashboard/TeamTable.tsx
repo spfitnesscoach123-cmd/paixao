@@ -137,7 +137,7 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
               styles.toggleBtn,
               {
                 backgroundColor: visibleCols[col.key]
-                  ? 'rgba(139, 92, 246, 0.15)'
+                  ? 'rgba(124, 255, 58, 0.15)'
                   : colors.dark.secondary,
                 borderColor: visibleCols[col.key]
                   ? colors.accent.primary

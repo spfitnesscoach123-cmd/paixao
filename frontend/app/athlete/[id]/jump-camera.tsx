@@ -941,7 +941,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
             onPress={handleStartCamera}
             data-testid="start-capture-btn"
           >
-            <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.startButtonGradient}>
+            <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.startButtonGradient}>
               <Ionicons name="camera" size={24} color="#ffffff" />
               <Text style={styles.startButtonText}>{t.startCapture}</Text>
             </LinearGradient>
@@ -1216,7 +1216,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                             ? '#22c55e' 
                             : jumpCamera.scannerState.confidenceScore >= 0.65 
                               ? '#eab308' 
-                              : '#3b82f6',
+                              : '#2FB6FF',
                       }
                     ]} 
                   />
@@ -1226,7 +1226,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                 <View style={styles.scannerStatusContainer}>
                   {jumpCamera.scannerState.phase === 'collecting' && (
                     <>
-                      <ActivityIndicator size="small" color="#3b82f6" />
+                      <ActivityIndicator size="small" color="#2FB6FF" />
                       <Text style={styles.scannerStatusText}>{t.scannerCollecting}</Text>
                       <Text style={styles.scannerHintText}>{t.scannerStandStill}</Text>
                     </>
@@ -1601,7 +1601,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                 disabled={submitMutation.isPending || !!jumpCamera.error}
                 data-testid="save-assessment-btn"
               >
-                <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.saveButtonGradient}>
+                <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.saveButtonGradient}>
                   {submitMutation.isPending ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
@@ -1763,12 +1763,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   tipsCard: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.2)',
+    borderColor: 'rgba(47, 182, 255, 0.2)',
   },
   tipsTitle: {
     fontSize: 14,
@@ -2305,13 +2305,13 @@ const styles = StyleSheet.create({
   },
   metricCardHighlight: {
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.4)',
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    borderColor: 'rgba(124, 255, 58, 0.4)',
+    backgroundColor: 'rgba(124, 255, 58, 0.08)',
   },
   metricValueLarge: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#8b5cf6',
+    color: '#7CFF3A',
   },
   // SL-CMJ dual jump results
   dualJumpCard: {
@@ -2320,7 +2320,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.2)',
+    borderColor: 'rgba(47, 182, 255, 0.2)',
   },
   dualJumpTitle: {
     fontSize: 14,
@@ -2394,12 +2394,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(124, 255, 58, 0.3)',
     alignItems: 'center',
   },
   legOptionActive: {
-    borderColor: '#8b5cf6',
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    borderColor: '#7CFF3A',
+    backgroundColor: 'rgba(124, 255, 58, 0.15)',
   },
   legOptionText: {
     fontSize: 14,
@@ -2407,7 +2407,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   legOptionTextActive: {
-    color: '#8b5cf6',
+    color: '#7CFF3A',
   },
   // SL-CMJ real-time feedback
   slcmjFeedback: {
@@ -2432,7 +2432,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(124, 255, 58, 0.3)',
     borderRadius: 10,
   },
   scientificDetailsText: {

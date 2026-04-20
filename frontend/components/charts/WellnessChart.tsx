@@ -46,11 +46,11 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
       
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#2563eb' }]} />
+          <View style={[styles.legendDot, { backgroundColor: '#2FB6FF' }]} />
           <Text style={styles.legendText}>Wellness ({avgWellness.toFixed(1)})</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#8b5cf6' }]} />
+          <View style={[styles.legendDot, { backgroundColor: '#7CFF3A' }]} />
           <Text style={styles.legendText}>Prontidão ({avgReadiness.toFixed(1)})</Text>
         </View>
       </View>
@@ -60,8 +60,8 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
         data2={readinessData}
         width={Dimensions.get('window').width - 64}
         height={220}
-        color="#2563eb"
-        color2="#8b5cf6"
+        color="#2FB6FF"
+        color2="#7CFF3A"
         thickness={3}
         curved
         spacing={40}
@@ -73,8 +73,8 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
         yAxisTextStyle={styles.axisText}
         xAxisLabelTextStyle={styles.axisText}
         hideDataPoints={false}
-        dataPointsColor="#2563eb"
-        dataPointsColor2="#8b5cf6"
+        dataPointsColor="#2FB6FF"
+        dataPointsColor2="#7CFF3A"
         dataPointsRadius={4}
         rulesColor="#e5e7eb"
         rulesType="solid"

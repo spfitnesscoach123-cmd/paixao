@@ -1798,7 +1798,7 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
                     <View style={styles.vbtTopRight} data-testid="vbt-drop-badge">
                       <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
                       <Text style={[styles.vbtTopValue, {
-                        color: isCalibrating ? '#3b82f6' : getDropInterpolatedColor(velocityDrop),
+                        color: isCalibrating ? '#2FB6FF' : getDropInterpolatedColor(velocityDrop),
                       }]}>
                         {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
                       </Text>
@@ -1897,7 +1897,7 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
                       <View style={styles.vbtTopRight}>
                         <Text style={styles.vbtTopLabel}>{labels.velocityDrop}</Text>
                         <Text style={[styles.vbtTopValue, {
-                          color: isCalibrating ? '#3b82f6' : getDropInterpolatedColor(velocityDrop),
+                          color: isCalibrating ? '#2FB6FF' : getDropInterpolatedColor(velocityDrop),
                         }]}>
                           {isCalibrating ? '--' : (velocityDrop > 0 ? `-${velocityDrop.toFixed(1)}%` : '0%')}
                         </Text>
@@ -2108,7 +2108,7 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
               disabled={vbtMutation.isPending}
               data-testid="save-vbt-data-btn"
             >
-              <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.saveButtonGradient}>
+              <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.saveButtonGradient}>
                 {vbtMutation.isPending ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
@@ -3048,7 +3048,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(124, 255, 58, 0.2)',
     borderWidth: 2,
     borderColor: colors.accent.primary,
     justifyContent: 'center',

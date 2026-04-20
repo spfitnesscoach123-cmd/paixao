@@ -152,7 +152,7 @@ const fallbackStyles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(124, 255, 58, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -175,7 +175,7 @@ const fallbackStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(124, 255, 58, 0.3)',
   },
   messageTitle: {
     fontSize: 20,

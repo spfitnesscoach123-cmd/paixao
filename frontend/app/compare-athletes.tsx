@@ -20,15 +20,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
 
 const ATHLETE_COLORS = [
-  '#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
-  '#06b6d4', '#84cc16', '#f97316', '#6366f1'
+  '#7CFF3A', '#2FB6FF', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
+  '#06b6d4', '#84cc16', '#f97316', '#2FB6FF'
 ];
 
 const POSITION_COLORS: { [key: string]: string } = {
   'Goleiro': '#f59e0b',
-  'Zagueiro': '#3b82f6',
+  'Zagueiro': '#2FB6FF',
   'Lateral': '#06b6d4',
-  'Volante': '#8b5cf6',
+  'Volante': '#7CFF3A',
   'Meio-campo': '#10b981',
   'Atacante': '#ef4444',
   'Meia': '#ec4899',
@@ -742,7 +742,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   athleteChipSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(124, 255, 58, 0.2)',
     borderColor: colors.accent.primary,
   },
   athleteChipText: {
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   positionChipSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: 'rgba(124, 255, 58, 0.15)',
   },
   positionDot: {
     width: 10,
@@ -841,7 +841,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
   },
   quadrantBottomRight: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
   },
   quadrantLabel: {
     fontSize: 10,
@@ -905,7 +905,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,

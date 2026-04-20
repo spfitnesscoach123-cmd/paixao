@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   unmatchSection: {
     marginBottom: 20,
     padding: 16,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border.default,

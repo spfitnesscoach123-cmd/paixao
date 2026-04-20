@@ -41,15 +41,15 @@ const COLORS = {
   green: '#10b981',
   yellow: '#f59e0b',
   red: '#ef4444',
-  blue: '#3b82f6',
-  purple: '#8b5cf6',
+  blue: '#2FB6FF',
+  purple: '#7CFF3A',
   cyan: '#22d3ee',
   orange: '#f97316',
   greenAlpha: 'rgba(16,185,129,0.25)',
   yellowAlpha: 'rgba(245,158,11,0.25)',
   redAlpha: 'rgba(239,68,68,0.25)',
-  blueAlpha: 'rgba(59,130,246,0.25)',
-  purpleAlpha: 'rgba(139,92,246,0.25)',
+  blueAlpha: 'rgba(47, 182, 255,0.25)',
+  purpleAlpha: 'rgba(124, 255, 58,0.25)',
 };
 
 // LMPI Classification — mirrors backend thresholds exactly (>=70 optimal, >=40 moderate, <40 high)
@@ -240,7 +240,7 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
         <G>
           <Rect x={pad.left} y={pad.top} width={midX - pad.left} height={midY - pad.top} fill="rgba(16,185,129,0.06)" />
           <Rect x={midX} y={pad.top} width={pad.left + cW - midX} height={midY - pad.top} fill="rgba(245,158,11,0.06)" />
-          <Rect x={pad.left} y={midY} width={midX - pad.left} height={pad.top + cH - midY} fill="rgba(59,130,246,0.06)" />
+          <Rect x={pad.left} y={midY} width={midX - pad.left} height={pad.top + cH - midY} fill="rgba(47, 182, 255,0.06)" />
           <Rect x={midX} y={midY} width={pad.left + cW - midX} height={pad.top + cH - midY} fill="rgba(239,68,68,0.06)" />
         </G>
       )}
@@ -283,7 +283,7 @@ const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { d
         <G key={wi}>
           {wk.days.map((d, di) => {
             const intensity = d.value / maxVal;
-            const color = intensity > 0.7 ? COLORS.green : intensity > 0.4 ? COLORS.blue : intensity > 0.1 ? 'rgba(59,130,246,0.3)' : 'rgba(255,255,255,0.04)';
+            const color = intensity > 0.7 ? COLORS.green : intensity > 0.4 ? COLORS.blue : intensity > 0.1 ? 'rgba(47, 182, 255,0.3)' : 'rgba(255,255,255,0.04)';
             return (
               <Rect key={di} x={16 + di * (cellSize + 4)} y={20 + wi * rowH} width={cellSize} height={cellSize - 4} rx={4} fill={color} opacity={0.8} />
             );
@@ -1448,7 +1448,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   
   // Filters
   filtersContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginTop: 8 },
-  filterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(139,92,246,0.08)', borderWidth: 1, borderColor: 'rgba(139,92,246,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  filterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124, 255, 58,0.08)', borderWidth: 1, borderColor: 'rgba(124, 255, 58,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   filterBtnText: { flex: 1, color: colors.text.primary, fontSize: 11, fontWeight: '500' },
   
   // Layer menu
@@ -1463,7 +1463,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   contentContainer: { padding: 16 },
   
   // Cards
-  card: { backgroundColor: 'rgba(21,28,50,0.8)', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(139,92,246,0.1)' },
+  card: { backgroundColor: 'rgba(21,28,50,0.8)', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(124, 255, 58,0.1)' },
   cardTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
   cardSubtitle: { fontSize: 10, color: colors.text.tertiary, marginBottom: 4 },
   

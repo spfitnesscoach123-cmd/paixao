@@ -430,7 +430,11 @@
     "darkMode": "Modo Escuro",
     "lightMode": "Modo Claro",
     "profileUpdated": "Perfil atualizado com sucesso",
-    "emailCannotBeChanged": "O email não pode ser alterado"
+    "emailCannotBeChanged": "O email não pode ser alterado",
+    "appearance": "Aparência",
+    "autoMode": "Automático",
+    "themeSubtitle": "Personalize a aparência do app",
+    "systemDefault": "Seguir sistema"
   },
   "role": {
     "howAccess": "Como você deseja acessar?",

@@ -172,9 +172,9 @@ export function ScannerOverlay({
 
   // Cor principal baseada no estado
   const stateColor = isCapturing ? '#22c55e'
-    : allOk ? '#3b82f6'
+    : allOk ? '#2FB6FF'
     : hasBody ? '#f59e0b'
-    : '#8b5cf6';
+    : '#7CFF3A';
 
   // Icone do estado
   const stateIcon = phase === 'processing' ? 'hourglass'
@@ -246,7 +246,7 @@ export function ScannerOverlay({
                     top: y1,
                     width: length,
                     transform: [{ rotate: `${angle}deg` }],
-                    backgroundColor: isCapturing ? '#22c55e' : '#3b82f6',
+                    backgroundColor: isCapturing ? '#22c55e' : '#2FB6FF',
                     opacity: avgVis * (isCapturing ? 0.9 : 0.6),
                   },
                 ]}
@@ -359,7 +359,7 @@ export function ScannerOverlay({
       {phase === 'processing' && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingCard}>
-            <Ionicons name="pulse" size={32} color="#8b5cf6" />
+            <Ionicons name="pulse" size={32} color="#7CFF3A" />
             <Text style={styles.processingTitle}>Processando</Text>
             <Text style={styles.processingSubtitle}>Calculando proporcoes corporais...</Text>
           </View>
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: CORNER_SIZE,
     height: CORNER_SIZE,
-    borderColor: '#3b82f6',
+    borderColor: '#2FB6FF',
   },
   cornerTL: {
     top: CORNER_OFFSET,
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(124, 255, 58, 0.3)',
     gap: 8,
   },
   processingTitle: {

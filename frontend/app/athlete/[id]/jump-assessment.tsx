@@ -165,7 +165,7 @@ const RSIGauge = ({ rsi, protocol, locale }: { rsi: number; protocol: string; lo
           return <Line x1={cx} y1={cy} x2={tip.x} y2={tip.y} stroke={color} strokeWidth="3" strokeLinecap="round" />;
         })()}
         <Circle cx={cx} cy={cy} r="6" fill={color} />
-        <Circle cx={cx} cy={cy} r="3" fill="#0a0e1a" />
+        <Circle cx={cx} cy={cy} r="3" fill="#081C3A" />
         {/* Value text */}
         <SvgText x={cx} y={cy - 25} textAnchor="middle" fill={color} fontSize="36" fontWeight="bold">{rsi.toFixed(2)}</SvgText>
         <SvgText x={cx} y={cy - 8} textAnchor="middle" fill={color} fontSize="13" fontWeight="600">{label}</SvgText>
@@ -251,9 +251,9 @@ const AsymmetryCard = ({ data, locale }: { data: any; locale: string }) => {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
           <Text style={{ fontSize: 11, color: colors.text.secondary, width: 42, textAlign: 'right' }}>{locale === 'pt' ? 'Esq' : 'L'} {left.toFixed(unit === 'cm' ? 1 : 2)}</Text>
           <View style={{ flex: 1, height: 16, flexDirection: 'row', borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' }}>
-            <View style={{ width: `${(left / max) * 50}%`, backgroundColor: '#6366f1', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }} />
+            <View style={{ width: `${(left / max) * 50}%`, backgroundColor: '#2FB6FF', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }} />
             <View style={{ flex: 1 }} />
-            <View style={{ width: `${(right / max) * 50}%`, backgroundColor: '#8b5cf6', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
+            <View style={{ width: `${(right / max) * 50}%`, backgroundColor: '#7CFF3A', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
           </View>
           <Text style={{ fontSize: 11, color: colors.text.secondary, width: 42 }}>{right.toFixed(unit === 'cm' ? 1 : 2)} {locale === 'pt' ? 'Dir' : 'R'}</Text>
         </View>
@@ -393,8 +393,8 @@ const RSIEvolutionChart = ({ history, protocol, locale }: { history: any[]; prot
             <Stop offset="1" stopColor={colors.accent.primary} stopOpacity="0.02" />
           </SvgLinearGradient>
           <SvgLinearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#a78bfa" />
-            <Stop offset="1" stopColor="#6366f1" />
+            <Stop offset="0" stopColor="#7BD4FF" />
+            <Stop offset="1" stopColor="#2FB6FF" />
           </SvgLinearGradient>
         </Defs>
         {/* Grid */}
@@ -418,7 +418,7 @@ const RSIEvolutionChart = ({ history, protocol, locale }: { history: any[]; prot
           return (
             <G key={i}>
               {isLast && <Circle cx={getX(i)} cy={getY(h.rsi)} r="8" fill={colors.accent.primary} opacity={0.25} />}
-              <Circle cx={getX(i)} cy={getY(h.rsi)} r={isLast ? 5 : 3} fill={isLast ? colors.accent.primary : 'rgba(139,92,246,0.6)'} stroke={isLast ? '#fff' : 'transparent'} strokeWidth={isLast ? 2 : 0} />
+              <Circle cx={getX(i)} cy={getY(h.rsi)} r={isLast ? 5 : 3} fill={isLast ? colors.accent.primary : 'rgba(124, 255, 58,0.6)'} stroke={isLast ? '#fff' : 'transparent'} strokeWidth={isLast ? 2 : 0} />
             </G>
           );
         })}
@@ -842,7 +842,7 @@ const s = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 16,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  dateDropdownItemActive: { backgroundColor: 'rgba(139,92,246,0.1)' },
+  dateDropdownItemActive: { backgroundColor: 'rgba(124, 255, 58,0.1)' },
   dateDropdownItemText: { fontSize: 14, color: colors.text.secondary },
   dateDropdownItemTextActive: { color: colors.accent.primary, fontWeight: '600' },
 

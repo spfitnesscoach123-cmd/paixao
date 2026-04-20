@@ -354,7 +354,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
     const position = ((normalizedBMI - minBMI) / (maxBMI - minBMI)) * 100;
     
     const getBMIColor = () => {
-      if (bmiValue < 18.5) return '#3b82f6'; // Underweight - blue
+      if (bmiValue < 18.5) return '#2FB6FF'; // Underweight - blue
       if (bmiValue < 25) return '#10b981'; // Normal - green
       if (bmiValue < 30) return '#f59e0b'; // Overweight - yellow
       return '#ef4444'; // Obese - red
@@ -373,7 +373,7 @@ export const BodyCompositionCharts: React.FC<BodyCompositionChartsProps> = ({ da
         
         {/* BMI Scale Bar */}
         <View style={styles.bmiScale}>
-          <View style={[styles.bmiSegment, { backgroundColor: '#3b82f6', flex: 18.5 - 15 }]} />
+          <View style={[styles.bmiSegment, { backgroundColor: '#2FB6FF', flex: 18.5 - 15 }]} />
           <View style={[styles.bmiSegment, { backgroundColor: '#10b981', flex: 25 - 18.5 }]} />
           <View style={[styles.bmiSegment, { backgroundColor: '#f59e0b', flex: 30 - 25 }]} />
           <View style={[styles.bmiSegment, { backgroundColor: '#ef4444', flex: 40 - 30 }]} />

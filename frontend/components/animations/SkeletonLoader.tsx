@@ -45,7 +45,7 @@ export const SkeletonBar: React.FC<SkeletonLoaderProps> = ({
           width: width as any,
           height,
           borderRadius,
-          backgroundColor: 'rgba(139, 92, 246, 0.12)',
+          backgroundColor: 'rgba(124, 255, 58, 0.12)',
           opacity,
         },
         style,
@@ -128,7 +128,7 @@ const skStyles = StyleSheet.create({
     borderRadius: 14,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.08)',
+    borderColor: 'rgba(124, 255, 58, 0.08)',
   },
   chartSkeleton: {
     backgroundColor: 'rgba(21, 28, 50, 0.6)',
@@ -136,7 +136,7 @@ const skStyles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.08)',
+    borderColor: 'rgba(124, 255, 58, 0.08)',
   },
   listItem: {
     flexDirection: 'row',

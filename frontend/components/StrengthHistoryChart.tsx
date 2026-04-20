@@ -171,7 +171,7 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
           
           <View style={[
             styles.statCard, 
-            { borderColor: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' }
+            { borderColor: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#2FB6FF' : '#10b981' }
           ]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
               <Text style={styles.statLabel}>{labels.rsi}</Text>
@@ -183,12 +183,12 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
               />
             </View>
             <Text style={[styles.statValue, { 
-              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' 
+              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#2FB6FF' : '#10b981' 
             }]}>
               {stats.currentRsi.toFixed(2)}
             </Text>
             <Text style={[styles.rsiClassification, { 
-              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#3b82f6' : '#10b981' 
+              color: stats.currentRsi < 1.0 ? '#ef4444' : stats.currentRsi < 2.0 ? '#f59e0b' : stats.currentRsi < 3.0 ? '#2FB6FF' : '#10b981' 
             }]}>
               {stats.currentRsi < 1.0 
                 ? (locale === 'pt' ? 'Baixo' : 'Low')
@@ -264,8 +264,8 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
         <Svg width={chartWidth} height={chartHeight}>
           <Defs>
             <LinearGradient id="powerGradient" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-              <Stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+              <Stop offset="0%" stopColor="#2FB6FF" stopOpacity="0.3" />
+              <Stop offset="100%" stopColor="#2FB6FF" stopOpacity="0" />
             </LinearGradient>
           </Defs>
 
@@ -287,7 +287,7 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
           <Polyline
             points={powerPath}
             fill="none"
-            stroke="#6366f1"
+            stroke="#2FB6FF"
             strokeWidth={2.5}
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -322,7 +322,7 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
               cx={xScale(i)}
               cy={powerYScale(value)}
               r={4}
-              fill="#6366f1"
+              fill="#2FB6FF"
             />
           ))}
 
@@ -351,7 +351,7 @@ export const StrengthHistoryChart: React.FC<StrengthHistoryChartProps> = ({ athl
         {/* Legend */}
         <View style={styles.legend}>
           <View style={styles.legendItem}>
-            <View style={[styles.legendLine, { backgroundColor: '#6366f1' }]} />
+            <View style={[styles.legendLine, { backgroundColor: '#2FB6FF' }]} />
             <Text style={styles.legendText}>{labels.power}</Text>
           </View>
           <View style={styles.legendItem}>

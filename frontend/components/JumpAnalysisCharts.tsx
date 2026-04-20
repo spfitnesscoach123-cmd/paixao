@@ -388,7 +388,7 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
                       styles.barFill,
                       { 
                         width: `${Math.min((data.protocols.sl_cmj.right.jump_height_cm / Math.max(data.protocols.sl_cmj.right.jump_height_cm, data.protocols.sl_cmj.left.jump_height_cm)) * 100, 100)}%`,
-                        backgroundColor: asymmetry.jump_height.dominant_leg === 'right' ? '#f59e0b' : '#a78bfa'
+                        backgroundColor: asymmetry.jump_height.dominant_leg === 'right' ? '#f59e0b' : '#7BD4FF'
                       }
                     ]} />
                   </View>
@@ -401,7 +401,7 @@ export const JumpAnalysisCharts: React.FC<JumpAnalysisChartsProps> = ({ athleteI
                       styles.barFill,
                       { 
                         width: `${Math.min((data.protocols.sl_cmj.left.jump_height_cm / Math.max(data.protocols.sl_cmj.right.jump_height_cm, data.protocols.sl_cmj.left.jump_height_cm)) * 100, 100)}%`,
-                        backgroundColor: asymmetry.jump_height.dominant_leg === 'left' ? '#f59e0b' : '#a78bfa'
+                        backgroundColor: asymmetry.jump_height.dominant_leg === 'left' ? '#f59e0b' : '#7BD4FF'
                       }
                     ]} />
                   </View>

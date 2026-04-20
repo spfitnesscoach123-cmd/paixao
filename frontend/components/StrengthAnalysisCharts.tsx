@@ -267,7 +267,7 @@ export const StrengthAnalysisCharts: React.FC<StrengthAnalysisChartsProps> = ({ 
                         style={{ 
                           height: '100%', 
                           width: `${Math.min(100, (metric.previous_value || 0) / Math.max(metric.value, metric.previous_value || 1) * 100)}%`,
-                          backgroundColor: 'rgba(139, 92, 246, 0.4)',
+                          backgroundColor: 'rgba(124, 255, 58, 0.4)',
                           borderRadius: 4
                         }} 
                       />
@@ -535,11 +535,11 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
   },
   insightsCard: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.2)',
+    borderColor: 'rgba(47, 182, 255, 0.2)',
   },
   insightsHeader: {
     flexDirection: 'row',

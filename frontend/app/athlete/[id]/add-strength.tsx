@@ -1002,7 +1002,7 @@ export default function AddStrengthAssessment() {
                 onPress={handleSubmitVBT}
                 disabled={vbtMutation.isPending}
               >
-                <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.vbtSubmitGradient}>
+                <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.vbtSubmitGradient}>
                   {vbtMutation.isPending ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
@@ -1161,11 +1161,11 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   referenceCard: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
   },
   referenceTitle: {
     fontSize: 12,
@@ -1354,7 +1354,7 @@ const styles = StyleSheet.create({
   inputMethodInfo: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
     padding: 10,
     marginTop: 12,

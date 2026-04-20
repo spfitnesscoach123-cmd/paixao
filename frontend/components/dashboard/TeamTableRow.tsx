@@ -65,7 +65,7 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
       <View style={styles.colMetric}>
         <Text style={[styles.metricValue, { color: colors.text.primary }]}>{distKm}</Text>
         <Text style={[styles.metricUnit, { color: colors.text.tertiary }]}>km</Text>
-        <MiniBar value={row.total_distance} maxValue={maxDistance} color="#3b82f6" />
+        <MiniBar value={row.total_distance} maxValue={maxDistance} color="#2FB6FF" />
       </View>
 
       {/* COL 3: ZONES (stacked bar) */}
@@ -73,7 +73,7 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
         <View style={styles.colZones}>
           <ZoneBar z3={row.z3} z4={row.z4} z5={row.z5} />
           <View style={styles.zoneLabels}>
-            <Text style={[styles.zoneLabelText, { color: '#3b82f6' }]}>{(row.z3 / 1000).toFixed(1)}</Text>
+            <Text style={[styles.zoneLabelText, { color: '#2FB6FF' }]}>{(row.z3 / 1000).toFixed(1)}</Text>
             <Text style={[styles.zoneLabelText, { color: '#f59e0b' }]}>{(row.z4 / 1000).toFixed(1)}</Text>
             <Text style={[styles.zoneLabelText, { color: '#ef4444' }]}>{(row.z5 / 1000).toFixed(1)}</Text>
           </View>
@@ -84,7 +84,7 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
       {visibleCols.sprint && (
         <View style={styles.colSmall}>
           <Text style={[styles.metricValue, { color: colors.text.primary }]}>{row.sprint_count}</Text>
-          <MiniBar value={row.sprint_count} maxValue={maxSprints} color="#8b5cf6" />
+          <MiniBar value={row.sprint_count} maxValue={maxSprints} color="#7CFF3A" />
         </View>
       )}
 
@@ -92,7 +92,7 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
       {visibleCols.accDec && (
         <View style={styles.colSmall}>
           <Text style={[styles.metricValue, { color: colors.text.primary }]}>{row.acc_dec}</Text>
-          <MiniBar value={row.acc_dec} maxValue={maxAccDec} color="#6366f1" />
+          <MiniBar value={row.acc_dec} maxValue={maxAccDec} color="#2FB6FF" />
         </View>
       )}
 

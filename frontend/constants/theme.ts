@@ -1,188 +1,201 @@
-// Theme Configuration - Dark and Light Modes
-// Default: Dark Mode
+// LoadManager Pro - Design System
+// Palette derived from the official logo (Azul Marinho + Verde Performance + Azul Safira)
+// Theme tokens are kept with legacy keys for backwards compatibility with existing components.
+// Supported modes: 'dark' | 'light'
 
 export type ThemeMode = 'dark' | 'light';
 
-// Dark Theme Colors (Current default)
+// ---------------------------------------------------------------------------
+// BRAND CONSTANTS (extracted from the logo)
+// ---------------------------------------------------------------------------
+export const BRAND = {
+  navyDeep:       '#081C3A', // App background (dominant)
+  navyShield:     '#123A63', // Cards / surfaces / headings text (light mode)
+  greenPerf:      '#7CFF3A', // Primary green (logo bars / arrow)
+  greenTech:      '#53E65D', // Secondary green (gradient step / hover)
+  blueSapphire:   '#2FB6FF', // Accent blue (top of shield / AI / links)
+  white:          '#F4F7FB', // Primary text on dark
+  // Derived/support tokens
+  greenDeep:      '#4FCC1F', // Pressed state for primary green
+  blueSapphireLt: '#7BD4FF', // Lighter sapphire variant
+  navyElevated:   '#1B4C80', // Elevated surface tint (hover/active card)
+} as const;
+
+// ---------------------------------------------------------------------------
+// DARK THEME (default / logo-aligned)
+// ---------------------------------------------------------------------------
 export const darkColors = {
-  // Backgrounds - Dark blue to black
+  // Backgrounds
   dark: {
-    primary: '#0a0e1a',
-    secondary: '#0f1629',
-    tertiary: '#151c32',
-    card: 'rgba(21, 28, 50, 0.9)',
-    cardSolid: '#151c32',
+    primary:   BRAND.navyDeep,                    // main screen bg
+    secondary: '#0C2548',                          // one shade above primary
+    tertiary:  '#0F2F59',                          // nested area
+    card:      'rgba(18, 58, 99, 0.72)',          // cards with soft transparency
+    cardSolid: BRAND.navyShield,                   // solid card variant
   },
-  
-  // Main accent colors - Violet to Blue
+
+  // Accent (primary CTA = brand green)
   accent: {
-    primary: '#8b5cf6',
-    secondary: '#7c3aed',
-    tertiary: '#6366f1',
-    blue: '#3b82f6',
-    light: '#a78bfa',
+    primary:   BRAND.greenPerf,                    // CTA / active / toggles ON
+    secondary: BRAND.greenTech,                    // hover / complementary
+    tertiary:  BRAND.blueSapphire,                 // AI / secondary emphasis
+    blue:      BRAND.blueSapphire,                 // links / focus / info
+    light:     BRAND.blueSapphireLt,               // soft accent
   },
-  
+
   // Gradients
   gradients: {
-    primary: ['#8b5cf6', '#3b82f6'] as [string, string],
-    secondary: ['#7c3aed', '#2563eb'] as [string, string],
-    accent: ['#a78bfa', '#6366f1'] as [string, string],
-    button: ['#8b5cf6', '#6366f1'] as [string, string],
-    card: ['rgba(139, 92, 246, 0.15)', 'rgba(59, 130, 246, 0.05)'] as [string, string],
-    dark: ['#0f1629', '#0a0e1a'] as [string, string],
-    background: ['#0a0e1a', '#0f1629'] as [string, string],
+    primary:    [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
+    secondary:  [BRAND.greenTech,   BRAND.blueSapphire] as [string, string],
+    accent:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    button:     [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
+    card:       ['rgba(124, 255, 58, 0.10)', 'rgba(47, 182, 255, 0.04)'] as [string, string],
+    dark:       [BRAND.navyDeep,    '#0C2548']          as [string, string],
+    background: [BRAND.navyDeep,    '#0C2548']          as [string, string],
   },
-  
-  // Highlight colors
+
+  // Highlight / data-viz accents
   highlight: {
-    cyan: '#22d3ee',
-    green: '#10b981',
-    emerald: '#34d399',
+    cyan:    BRAND.blueSapphire,
+    green:   BRAND.greenPerf,
+    emerald: BRAND.greenTech,
   },
-  
-  // Text colors
+
+  // Text
   text: {
-    primary: '#f1f5f9',
-    secondary: '#94a3b8',
-    tertiary: '#64748b',
-    disabled: '#475569',
+    primary:   BRAND.white,
+    secondary: 'rgba(244, 247, 251, 0.70)',
+    tertiary:  'rgba(244, 247, 251, 0.50)',
+    disabled:  'rgba(244, 247, 251, 0.30)',
   },
-  
-  // Status colors
+
+  // Status
   status: {
-    success: '#10b981',
-    warning: '#f59e0b',
-    error: '#ef4444',
-    info: '#8b5cf6',
+    success: BRAND.greenPerf,
+    warning: '#F5B941',
+    error:   '#FF4D6D',
+    info:    BRAND.blueSapphire,
   },
-  
-  // Border colors
+
+  // Borders
   border: {
-    default: 'rgba(139, 92, 246, 0.2)',
-    active: '#8b5cf6',
-    glow: 'rgba(139, 92, 246, 0.4)',
+    default: 'rgba(124, 255, 58, 0.20)',           // per spec
+    active:  BRAND.greenPerf,
+    glow:    'rgba(124, 255, 58, 0.45)',
   },
-  
-  // Input backgrounds
+
+  // Inputs
   input: {
-    background: '#0f1629',
-    border: 'rgba(139, 92, 246, 0.3)',
-    placeholder: '#64748b',
+    background: 'rgba(18, 58, 99, 0.55)',
+    border:     'rgba(124, 255, 58, 0.30)',
+    placeholder: 'rgba(244, 247, 251, 0.45)',
   },
 };
 
-// Light Theme Colors
+// ---------------------------------------------------------------------------
+// LIGHT THEME (logo-aligned)
+// ---------------------------------------------------------------------------
 export const lightColors = {
-  // Backgrounds - Clean white/gray
+  // Backgrounds
   dark: {
-    primary: '#ffffff',
-    secondary: '#f8fafc',
-    tertiary: '#f1f5f9',
-    card: 'rgba(255, 255, 255, 0.95)',
-    cardSolid: '#ffffff',
+    primary:   BRAND.white,                        // clean ice-white bg
+    secondary: '#EAF0F7',
+    tertiary:  '#DDE6F0',
+    card:      'rgba(255, 255, 255, 0.92)',        // translucent white cards
+    cardSolid: '#FFFFFF',
   },
-  
-  // Main accent colors - Same violet/blue
+
   accent: {
-    primary: '#7c3aed',
-    secondary: '#6d28d9',
-    tertiary: '#4f46e5',
-    blue: '#2563eb',
-    light: '#a78bfa',
+    primary:   BRAND.greenPerf,
+    secondary: BRAND.greenTech,
+    tertiary:  BRAND.blueSapphire,
+    blue:      BRAND.blueSapphire,
+    light:     BRAND.blueSapphireLt,
   },
-  
-  // Gradients
+
   gradients: {
-    primary: ['#7c3aed', '#2563eb'] as [string, string],
-    secondary: ['#6d28d9', '#1d4ed8'] as [string, string],
-    accent: ['#8b5cf6', '#4f46e5'] as [string, string],
-    button: ['#7c3aed', '#4f46e5'] as [string, string],
-    card: ['rgba(124, 58, 237, 0.08)', 'rgba(37, 99, 235, 0.03)'] as [string, string],
-    dark: ['#f8fafc', '#ffffff'] as [string, string],
-    background: ['#ffffff', '#f8fafc'] as [string, string],
+    primary:    [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
+    secondary:  [BRAND.greenTech,   BRAND.blueSapphire] as [string, string],
+    accent:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    button:     [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
+    card:       ['rgba(124, 255, 58, 0.08)', 'rgba(47, 182, 255, 0.04)'] as [string, string],
+    dark:       ['#EAF0F7',         BRAND.white]        as [string, string],
+    background: [BRAND.white,       '#EAF0F7']          as [string, string],
   },
-  
-  // Highlight colors
+
   highlight: {
-    cyan: '#0891b2',
-    green: '#059669',
-    emerald: '#10b981',
+    cyan:    BRAND.blueSapphire,
+    green:   BRAND.greenPerf,
+    emerald: BRAND.greenTech,
   },
-  
-  // Text colors
+
   text: {
-    primary: '#1e293b',
-    secondary: '#475569',
-    tertiary: '#64748b',
-    disabled: '#94a3b8',
+    primary:   BRAND.navyShield,
+    secondary: 'rgba(18, 58, 99, 0.72)',
+    tertiary:  'rgba(18, 58, 99, 0.55)',
+    disabled:  'rgba(18, 58, 99, 0.35)',
   },
-  
-  // Status colors
+
   status: {
-    success: '#059669',
-    warning: '#d97706',
-    error: '#dc2626',
-    info: '#7c3aed',
+    success: '#22A72C',
+    warning: '#D48A0C',
+    error:   '#D13B55',
+    info:    BRAND.blueSapphire,
   },
-  
-  // Border colors
+
   border: {
-    default: 'rgba(124, 58, 237, 0.15)',
-    active: '#7c3aed',
-    glow: 'rgba(124, 58, 237, 0.25)',
+    default: BRAND.greenPerf,                      // per spec: card borders green
+    active:  BRAND.greenPerf,
+    glow:    'rgba(124, 255, 58, 0.35)',
   },
-  
-  // Input backgrounds
+
   input: {
-    background: '#f8fafc',
-    border: 'rgba(124, 58, 237, 0.2)',
-    placeholder: '#94a3b8',
+    background: '#FFFFFF',
+    border:     'rgba(18, 58, 99, 0.20)',
+    placeholder: 'rgba(18, 58, 99, 0.45)',
   },
 };
 
-// Get colors based on theme mode
-export const getColors = (mode: ThemeMode) => {
-  return mode === 'dark' ? darkColors : lightColors;
-};
+// ---------------------------------------------------------------------------
+// API
+// ---------------------------------------------------------------------------
+export const getColors = (mode: ThemeMode) => (mode === 'dark' ? darkColors : lightColors);
 
-// Legacy export for backward compatibility (uses dark theme)
+// Legacy export (keeps older imports working; defaults to dark)
 export const colors = darkColors;
 
-// Shadows for both themes
 export const getShadows = (mode: ThemeMode) => {
   const isDark = mode === 'dark';
   return {
     card: {
-      shadowColor: isDark ? '#8b5cf6' : '#000',
+      shadowColor: isDark ? BRAND.greenPerf : '#000',
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: isDark ? 0.3 : 0.1,
+      shadowOpacity: isDark ? 0.22 : 0.10,
       shadowRadius: 16,
       elevation: 8,
     },
     cardSubtle: {
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.4 : 0.08,
+      shadowOpacity: isDark ? 0.35 : 0.08,
       shadowRadius: 8,
       elevation: 4,
     },
     glow: {
-      shadowColor: '#8b5cf6',
+      shadowColor: BRAND.greenPerf,
       shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isDark ? 0.6 : 0.3,
+      shadowOpacity: isDark ? 0.55 : 0.30,
       shadowRadius: 20,
       elevation: 12,
     },
     button: {
-      shadowColor: '#8b5cf6',
+      shadowColor: BRAND.greenPerf,
       shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: isDark ? 0.5 : 0.25,
+      shadowOpacity: isDark ? 0.45 : 0.25,
       shadowRadius: 16,
       elevation: 8,
     },
   };
 };
 
-// Legacy shadows export
 export const shadows = getShadows('dark');

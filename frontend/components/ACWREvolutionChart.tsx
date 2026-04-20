@@ -58,7 +58,7 @@ export const ACWREvolutionChart: React.FC<ACWRChartProps> = ({ athleteId }) => {
       case 'high': return '#ef4444';
       case 'moderate': return '#f59e0b';
       case 'optimal': return '#10b981';
-      case 'low': return '#3b82f6';
+      case 'low': return '#2FB6FF';
       default: return colors.text.tertiary;
     }
   };
@@ -170,8 +170,8 @@ export const ACWREvolutionChart: React.FC<ACWRChartProps> = ({ athleteId }) => {
           thickness3={1}
           hideDataPoints2
           hideDataPoints3
-          startFillColor="rgba(139, 92, 246, 0.2)"
-          endFillColor="rgba(139, 92, 246, 0.01)"
+          startFillColor="rgba(124, 255, 58, 0.2)"
+          endFillColor="rgba(124, 255, 58, 0.01)"
           startOpacity={0.4}
           endOpacity={0.1}
           noOfSections={4}
@@ -230,7 +230,7 @@ export const ACWREvolutionChart: React.FC<ACWRChartProps> = ({ athleteId }) => {
             <Text style={styles.zoneText}>0.8-1.3 {t('analysis.optimal')}</Text>
           </View>
           <View style={styles.zoneItem}>
-            <View style={[styles.zoneDot, { backgroundColor: '#3b82f6' }]} />
+            <View style={[styles.zoneDot, { backgroundColor: '#2FB6FF' }]} />
             <Text style={styles.zoneText}>&lt;0.8 {t('analysis.low')}</Text>
           </View>
         </View>
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
   },
   periodButtonActive: {
     backgroundColor: colors.accent.primary,
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     gap: 4,
   },
   metricButtonActive: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderRadius: 12,
     padding: 12,
   },

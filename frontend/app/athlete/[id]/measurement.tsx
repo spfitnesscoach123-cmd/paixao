@@ -204,7 +204,7 @@ export default function MeasurementScreen() {
 
         {/* Instrucao */}
         <View style={styles.instructionBadge}>
-          <Ionicons name="hand-left" size={16} color="#a78bfa" />
+          <Ionicons name="hand-left" size={16} color="#7BD4FF" />
           <Text style={styles.instructionText}>
             {pt
               ? 'Toque nas regioes destacadas do avatar para inserir as medidas'
@@ -242,7 +242,7 @@ export default function MeasurementScreen() {
                     <G key={site}>
                       <Circle
                         cx={pos.x} cy={pos.y} r={filled ? 8 : 6}
-                        fill={filled ? '#22c55e' : '#8b5cf6'}
+                        fill={filled ? '#22c55e' : '#7CFF3A'}
                         opacity={0.9}
                         onPress={() => setModalSite(site)}
                       />
@@ -278,7 +278,7 @@ export default function MeasurementScreen() {
                   <Ionicons
                     name={filled ? 'checkmark-circle' : 'ellipse-outline'}
                     size={18}
-                    color={filled ? '#22c55e' : '#8b5cf6'}
+                    color={filled ? '#22c55e' : '#7CFF3A'}
                   />
                   <Text style={styles.pickerOptionText}>
                     {pt ? SKINFOLD_LABELS[site].pt : SKINFOLD_LABELS[site].en}
@@ -365,15 +365,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '700', color: colors.text.primary },
   subtitle: { fontSize: 13, color: colors.accent.primary, fontWeight: '600' },
-  instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(139,92,246,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(124, 255, 58,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
   instructionText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 16 },
   avatarContainer: { backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', marginBottom: 16, minHeight: 380 },
   svgContainer: { alignItems: 'center', paddingVertical: 30 },
-  pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#8b5cf6', gap: 6 },
-  pickerTitle: { fontSize: 13, fontWeight: '600', color: '#a78bfa', marginBottom: 4 },
+  pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#7CFF3A', gap: 6 },
+  pickerTitle: { fontSize: 13, fontWeight: '600', color: '#7BD4FF', marginBottom: 4 },
   pickerOption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
   pickerOptionText: { flex: 1, fontSize: 14, color: colors.text.primary },
   pickerValue: { fontSize: 13, color: '#22c55e', fontWeight: '600' },

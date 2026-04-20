@@ -232,9 +232,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(99, 102, 241, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
   },
   filterButtonActive: {
     backgroundColor: colors.accent.primary,

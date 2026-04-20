@@ -149,7 +149,7 @@ export default function ProtocolSelectScreen() {
 
             {/* Botao */}
             <TouchableOpacity style={styles.nextBtn} onPress={handleNext} data-testid="protocol-next-btn">
-              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.nextBtnGradient}>
+              <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.nextBtnGradient}>
                 <Text style={styles.nextBtnText}>{pt ? 'Iniciar Medicoes' : 'Start Measurements'}</Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </LinearGradient>
@@ -165,26 +165,26 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.text.secondary, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   protocolCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: colors.border.default },
-  protocolCardSelected: { borderColor: '#8b5cf6' },
+  protocolCardSelected: { borderColor: '#7CFF3A' },
   protocolRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.border.default, justifyContent: 'center', alignItems: 'center' },
-  radioSelected: { borderColor: '#8b5cf6' },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#8b5cf6' },
+  radioSelected: { borderColor: '#7CFF3A' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7CFF3A' },
   protocolName: { fontSize: 15, fontWeight: '600', color: colors.text.primary },
-  protocolNameSelected: { color: '#a78bfa' },
+  protocolNameSelected: { color: '#7BD4FF' },
   protocolDesc: { fontSize: 12, color: colors.text.secondary, marginTop: 2 },
   sitesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingLeft: 34 },
-  siteBadge: { backgroundColor: 'rgba(139,92,246,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  siteText: { fontSize: 11, color: '#a78bfa', fontWeight: '500' },
+  siteBadge: { backgroundColor: 'rgba(124, 255, 58,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  siteText: { fontSize: 11, color: '#7BD4FF', fontWeight: '500' },
   genderRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   genderBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.dark.card, borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: colors.border.default },
-  genderBtnActive: { borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.15)' },
+  genderBtnActive: { borderColor: '#7CFF3A', backgroundColor: 'rgba(124, 255, 58,0.15)' },
   genderText: { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
-  genderTextActive: { color: '#a78bfa' },
+  genderTextActive: { color: '#7BD4FF' },
   inputsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 12, color: colors.text.secondary, marginBottom: 4 },

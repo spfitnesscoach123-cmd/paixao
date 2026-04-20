@@ -153,7 +153,7 @@ function AddGPSContent() {
               style={[
                 styles.activityTypeButton,
                 activityType === 'training' && styles.activityTypeButtonActive,
-                activityType === 'training' && { backgroundColor: '#3b82f6' }
+                activityType === 'training' && { backgroundColor: '#2FB6FF' }
               ]}
               onPress={() => setActivityType('training')}
             >
@@ -375,7 +375,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     borderRadius: 12,
     height: 56,
     justifyContent: 'center',

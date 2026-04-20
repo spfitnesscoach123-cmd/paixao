@@ -32,7 +32,7 @@ const DAY_CLASSIFICATIONS = [
   { id: 'MD-2', label: 'MD-2', color: '#eab308', description: '2 dias antes' },
   { id: 'MD-3', label: 'MD-3', color: '#22c55e', description: '3 dias antes' },
   { id: 'MD-4', label: 'MD-4', color: '#14b8a6', description: '4 dias antes' },
-  { id: 'MD-5', label: 'MD-5', color: '#3b82f6', description: '5 dias antes' },
+  { id: 'MD-5', label: 'MD-5', color: '#2FB6FF', description: '5 dias antes' },
   { id: 'D.O', label: 'D.O', color: '#6b7280', description: 'Day Off' },
 ];
 
@@ -596,10 +596,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 8,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: 'rgba(124, 255, 58, 0.15)',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(124, 255, 58, 0.3)',
   },
   headerBackText: {
     fontSize: 14,

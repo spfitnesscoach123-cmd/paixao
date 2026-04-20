@@ -152,7 +152,7 @@ function UploadGPSContent() {
 
       <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
         <View style={styles.infoCard}>
-          <Ionicons name="information-circle" size={48} color="#2563eb" />
+          <Ionicons name="information-circle" size={48} color="#2FB6FF" />
           <Text style={styles.infoTitle}>Formato do Arquivo</Text>
           <Text style={styles.infoText}>
             O arquivo CSV deve conter colunas com dados GPS do Catapult, incluindo:
@@ -174,10 +174,10 @@ function UploadGPSContent() {
           disabled={isProcessing}
         >
           {isProcessing ? (
-            <ActivityIndicator color="#2563eb" />
+            <ActivityIndicator color="#2FB6FF" />
           ) : (
             <>
-              <Ionicons name="document" size={24} color="#2563eb" />
+              <Ionicons name="document" size={24} color="#2FB6FF" />
               <Text style={styles.pickButtonText}>Selecionar Arquivo CSV</Text>
             </>
           )}
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -292,14 +292,14 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 20,
     borderWidth: 2,
-    borderColor: '#2563eb',
+    borderColor: '#2FB6FF',
     borderStyle: 'dashed',
     gap: 12,
   },
   pickButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2563eb',
+    color: '#2FB6FF',
   },
   fileCard: {
     backgroundColor: '#ffffff',

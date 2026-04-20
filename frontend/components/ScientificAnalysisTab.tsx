@@ -414,7 +414,7 @@ const GPSSummaryChart = ({ data, locale }: { data: any, locale: string }) => {
   return (
     <View style={chartStyles.summaryGrid}>
       <View style={chartStyles.summaryItem}>
-        <Ionicons name="walk" size={24} color="#3b82f6" />
+        <Ionicons name="walk" size={24} color="#2FB6FF" />
         <Text style={chartStyles.summaryValue}>{(data.avg_distance_m / 1000).toFixed(1)} km</Text>
         <Text style={chartStyles.summaryLabel}>{locale === 'pt' ? 'Dist. Média' : 'Avg Distance'}</Text>
       </View>
@@ -444,8 +444,8 @@ const WellnessSummaryChart = ({ data, locale }: { data: any, locale: string }) =
   const latest = data.latest;
   const metrics = [
     { label: locale === 'pt' ? 'Bem-estar' : 'Wellness', value: latest.wellness_score, max: 10, color: '#10b981' },
-    { label: locale === 'pt' ? 'Prontidão' : 'Readiness', value: latest.readiness_score, max: 10, color: '#3b82f6' },
-    { label: locale === 'pt' ? 'Sono' : 'Sleep', value: latest.sleep_quality, max: 10, color: '#8b5cf6' },
+    { label: locale === 'pt' ? 'Prontidão' : 'Readiness', value: latest.readiness_score, max: 10, color: '#2FB6FF' },
+    { label: locale === 'pt' ? 'Sono' : 'Sleep', value: latest.sleep_quality, max: 10, color: '#7CFF3A' },
     { label: locale === 'pt' ? 'Fadiga' : 'Fatigue', value: 10 - latest.fatigue, max: 10, color: '#f59e0b' },
     { label: locale === 'pt' ? 'Humor' : 'Mood', value: latest.mood, max: 10, color: '#ec4899' },
   ];
@@ -499,7 +499,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
 
   const rsiColor = (cls: string) => {
     const map: Record<string, string> = { excellent: '#22c55e', very_good: '#10b981', good: '#84cc16', average: '#f59e0b', below_average: '#f97316', poor: '#ef4444' };
-    return map[cls] || '#8b5cf6';
+    return map[cls] || '#7CFF3A';
   };
 
   // RSImod classification based on numeric value (overrides backend classification)
@@ -589,7 +589,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
                       style={{
                         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
                         paddingVertical: 10, paddingHorizontal: 14,
-                        backgroundColor: isAct ? 'rgba(139,92,246,0.1)' : 'transparent',
+                        backgroundColor: isAct ? 'rgba(124, 255, 58,0.1)' : 'transparent',
                         borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
                       }}
                       data-testid={`sci-date-item-${d}`}
@@ -754,7 +754,7 @@ const JumpProtocolSection = ({ athleteId, locale }: { athleteId: string; locale:
                   <Polyline points={pts} fill="none" stroke={colors.accent.primary} strokeWidth="4" opacity={0.25} strokeLinecap="round" strokeLinejoin="round" />
                   <Polyline points={pts} fill="none" stroke={colors.accent.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   {rev.map((h: any, i: number) => (
-                    <Circle key={i} cx={gX(i)} cy={gY(h.rsi)} r={i === rev.length - 1 ? 4 : 2} fill={i === rev.length - 1 ? colors.accent.primary : 'rgba(139,92,246,0.5)'} />
+                    <Circle key={i} cx={gX(i)} cy={gY(h.rsi)} r={i === rev.length - 1 ? 4 : 2} fill={i === rev.length - 1 ? colors.accent.primary : 'rgba(124, 255, 58,0.5)'} />
                   ))}
                 </Svg>
               </View>
@@ -993,8 +993,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       {analysis.gps_summary && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-              <Ionicons name="location" size={22} color="#3b82f6" />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
+              <Ionicons name="location" size={22} color="#2FB6FF" />
             </View>
             <View>
               <Text style={styles.cardTitle}>
@@ -1015,8 +1015,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       {analysis.acwr_analysis && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
-              <Ionicons name="trending-up" size={22} color="#8b5cf6" />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
+              <Ionicons name="trending-up" size={22} color="#7CFF3A" />
             </View>
             <View>
               <Text style={styles.cardTitle}>ACWR</Text>
@@ -1121,8 +1121,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       {analysis.body_composition && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
-              <Ionicons name="body" size={22} color="#6366f1" />
+            <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
+              <Ionicons name="body" size={22} color="#2FB6FF" />
             </View>
             <View>
               <Text style={styles.cardTitle}>
@@ -1141,7 +1141,7 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
       {analysis.scientific_insights && (
         <View style={styles.insightsCard}>
           <LinearGradient 
-            colors={['rgba(139, 92, 246, 0.15)', 'rgba(59, 130, 246, 0.1)']} 
+            colors={['rgba(124, 255, 58, 0.15)', 'rgba(47, 182, 255, 0.1)']} 
             style={styles.insightsGradient}
           >
             <View style={styles.insightsHeader}>

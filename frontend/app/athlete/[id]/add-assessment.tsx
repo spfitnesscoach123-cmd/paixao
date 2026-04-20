@@ -133,7 +133,7 @@ export default function AddAssessment() {
           <Ionicons
             name="barbell"
             size={32}
-            color={assessmentType === 'strength' ? '#ffffff' : '#8b5cf6'}
+            color={assessmentType === 'strength' ? '#ffffff' : '#7CFF3A'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'strength' && styles.typeButtonTextActive]}>
             Força
@@ -147,7 +147,7 @@ export default function AddAssessment() {
           <Ionicons
             name="heart"
             size={32}
-            color={assessmentType === 'aerobic' ? '#ffffff' : '#8b5cf6'}
+            color={assessmentType === 'aerobic' ? '#ffffff' : '#7CFF3A'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'aerobic' && styles.typeButtonTextActive]}>
             Aeróbico
@@ -161,7 +161,7 @@ export default function AddAssessment() {
           <Ionicons
             name="body"
             size={32}
-            color={assessmentType === 'body_composition' ? '#ffffff' : '#8b5cf6'}
+            color={assessmentType === 'body_composition' ? '#ffffff' : '#7CFF3A'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'body_composition' && styles.typeButtonTextActive]}>
             Composição
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     paddingTop: 48,
     paddingBottom: 16,
     paddingHorizontal: 16,
@@ -481,19 +481,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#8b5cf6',
+    borderColor: '#7CFF3A',
     padding: 16,
     alignItems: 'center',
     gap: 8,
   },
   typeButtonActive: {
-    backgroundColor: '#8b5cf6',
-    borderColor: '#8b5cf6',
+    backgroundColor: '#7CFF3A',
+    borderColor: '#7CFF3A',
   },
   typeButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8b5cf6',
+    color: '#7CFF3A',
   },
   typeButtonTextActive: {
     color: '#ffffff',
@@ -522,7 +522,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   button: {
-    backgroundColor: '#2563eb',
+    backgroundColor: '#2FB6FF',
     borderRadius: 12,
     height: 56,
     justifyContent: 'center',

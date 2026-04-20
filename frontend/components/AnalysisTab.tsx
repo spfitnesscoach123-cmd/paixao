@@ -74,7 +74,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
   const getRiskColor = (riskLevel?: string) => {
     switch (riskLevel) {
       case 'low':
-        return '#3b82f6';
+        return '#2FB6FF';
       case 'optimal':
         return '#10b981';
       case 'moderate':
@@ -173,7 +173,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
                 <Ionicons name="bar-chart" size={22} color={colors.accent.primary} />
               </View>
               <View>
@@ -264,8 +264,8 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
-                <Ionicons name="trending-up" size={22} color="#3b82f6" />
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
+                <Ionicons name="trending-up" size={22} color="#2FB6FF" />
               </View>
               <Text style={styles.cardTitle}>{t('analysis.acwrSimple')}</Text>
             </View>
@@ -347,7 +347,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
                 <Ionicons name="sparkles" size={22} color={colors.accent.primary} />
               </View>
               <Text style={styles.cardTitle}>{t('analysis.aiInsights')}</Text>
@@ -389,7 +389,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
           {analysis.ai_insights.recommendations.length > 0 && (
             <View style={styles.insightSection}>
               <Text style={styles.insightTitle}>
-                <Ionicons name="bulb" size={18} color="#3b82f6" /> {t('analysis.recommendations')}
+                <Ionicons name="bulb" size={18} color="#2FB6FF" /> {t('analysis.recommendations')}
               </Text>
               {analysis.ai_insights.recommendations.map((rec, index) => (
                 <View key={index} style={styles.insightItem}>
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     padding: 8,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderRadius: 8,
   },
   card: {
@@ -567,11 +567,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   metricCard: {
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    backgroundColor: 'rgba(124, 255, 58, 0.08)',
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
+    borderColor: 'rgba(124, 255, 58, 0.2)',
   },
   metricHeader: {
     flexDirection: 'row',
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
   },
   acwrItem: {
     flex: 1,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     padding: 14,
     alignItems: 'center',
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   // AI Insights Styles
   summaryBox: {
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,

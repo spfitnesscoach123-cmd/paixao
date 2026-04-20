@@ -115,7 +115,7 @@ export default function AthleteCharts() {
                   title={labels.sessions}
                   value={stats.totalSessions}
                   icon="calendar"
-                  color="#2563eb"
+                  color="#2FB6FF"
                 />
               </View>
               <View style={styles.statCardWrapper}>
@@ -155,7 +155,7 @@ export default function AthleteCharts() {
               data={gpsData}
               metric="total_distance"
               title={labels.totalDistance}
-              color="#2563eb"
+              color="#2FB6FF"
             />
             
             <GPSChart
@@ -176,7 +176,7 @@ export default function AthleteCharts() {
               data={gpsData}
               metric="number_of_sprints"
               title={labels.numberOfSprints}
-              color="#8b5cf6"
+              color="#7CFF3A"
             />
           </>
         )}
@@ -199,7 +199,7 @@ export default function AthleteCharts() {
                   title={labels.avgReadiness}
                   value={`${wellnessStats.avgReadiness}/10`}
                   icon="checkmark-circle"
-                  color="#2563eb"
+                  color="#2FB6FF"
                 />
               </View>
               <View style={styles.statCardWrapper}>
@@ -207,7 +207,7 @@ export default function AthleteCharts() {
                   title={labels.avgSleep}
                   value={`${wellnessStats.avgSleep}h`}
                   icon="moon"
-                  color="#8b5cf6"
+                  color="#7CFF3A"
                 />
               </View>
             </View>

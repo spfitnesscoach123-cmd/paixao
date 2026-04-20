@@ -225,12 +225,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     paddingHorizontal: 12,
     marginHorizontal: 8,
     borderRadius: 10,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
+    borderColor: 'rgba(124, 255, 58, 0.2)',
   },
   stationBadge: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#2FB6FF',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -268,7 +268,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginBottom: 4,
   },
   pickerItemActive: {
-    backgroundColor: 'rgba(139, 92, 246, 0.12)',
+    backgroundColor: 'rgba(124, 255, 58, 0.12)',
   },
   pickerPhoto: {
     width: 32,
@@ -280,7 +280,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 10,

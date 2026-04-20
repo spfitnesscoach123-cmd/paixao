@@ -12,7 +12,7 @@ import type { TeamTableRowData } from './types';
 
 const ZONE_COLORS = {
   base: '#1e3a5f',
-  z3: '#3b82f6',
+  z3: '#2FB6FF',
   z4: '#f59e0b',
   z5: '#ef4444',
 };

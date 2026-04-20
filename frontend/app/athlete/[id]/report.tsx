@@ -189,9 +189,9 @@ export default function ReportScreen() {
     { label: pt ? '% Gordura' : 'Body Fat %', value: `${c.bodyFatPercent}%`, icon: 'flame', color: c.bodyFatPercent > 25 ? '#ef4444' : c.bodyFatPercent > 18 ? '#eab308' : '#22c55e' },
     { label: pt ? 'Massa Gorda' : 'Fat Mass', value: `${c.fatMass} kg`, icon: 'scale', color: '#f59e0b' },
     { label: pt ? 'Massa Magra' : 'Lean Mass', value: `${c.leanMass} kg`, icon: 'fitness', color: '#22c55e' },
-    { label: pt ? 'Agua Corporal' : 'Body Water', value: `${c.waterEstimate} kg`, icon: 'water', color: '#3b82f6' },
-    { label: pt ? 'Massa Ossea' : 'Bone Mass', value: `${c.boneEstimate} kg`, icon: 'bonfire', color: '#a78bfa' },
-    { label: pt ? 'IMC' : 'BMI', value: `${c.imc}`, icon: 'analytics', color: '#6366f1' },
+    { label: pt ? 'Agua Corporal' : 'Body Water', value: `${c.waterEstimate} kg`, icon: 'water', color: '#2FB6FF' },
+    { label: pt ? 'Massa Ossea' : 'Bone Mass', value: `${c.boneEstimate} kg`, icon: 'bonfire', color: '#7BD4FF' },
+    { label: pt ? 'IMC' : 'BMI', value: `${c.imc}`, icon: 'analytics', color: '#2FB6FF' },
   ];
 
   return (
@@ -211,7 +211,7 @@ export default function ReportScreen() {
 
         {/* Protocol badge */}
         <View style={styles.protocolBadge}>
-          <Ionicons name="document-text" size={16} color="#a78bfa" />
+          <Ionicons name="document-text" size={16} color="#7BD4FF" />
           <Text style={styles.protocolBadgeText}>{p.protocolName}</Text>
           <Text style={styles.protocolBadgeSub}>{p.sumOfFolds}mm total</Text>
         </View>
@@ -355,10 +355,10 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
-  protocolBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(139,92,246,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
-  protocolBadgeText: { fontSize: 13, fontWeight: '600', color: '#a78bfa', flex: 1 },
+  protocolBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(124, 255, 58,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  protocolBadgeText: { fontSize: 13, fontWeight: '600', color: '#7BD4FF', flex: 1 },
   protocolBadgeSub: { fontSize: 12, color: colors.text.tertiary },
   classCard: { backgroundColor: colors.dark.card, borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: colors.border.default },
   classLabel: { fontSize: 12, color: colors.text.secondary, textTransform: 'uppercase', letterSpacing: 0.5 },

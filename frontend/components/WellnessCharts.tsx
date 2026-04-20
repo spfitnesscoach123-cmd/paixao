@@ -96,7 +96,7 @@ export const WellnessCharts: React.FC<WellnessChartsProps> = ({ data }) => {
     // Fadiga, Estresse, Dor: menor é melhor (verde para baixo, vermelho para alto)
     // Cores invertidas: quanto MENOR o valor, MELHOR (mais verde)
     { key: 'fatigue', label: t('wellness.fatigue') || 'Fadiga', color: '#ef4444', data: sortedData.map(d => d.fatigue), invertedColors: true },
-    { key: 'sleep_quality', label: t('wellness.sleepQuality') || 'Sono', color: '#3b82f6', data: sortedData.map(d => d.sleep_quality), invertedColors: false },
+    { key: 'sleep_quality', label: t('wellness.sleepQuality') || 'Sono', color: '#2FB6FF', data: sortedData.map(d => d.sleep_quality), invertedColors: false },
     { key: 'mood', label: t('wellness.mood') || 'Humor', color: '#10b981', data: sortedData.map(d => d.mood), invertedColors: false },
     { key: 'muscle_soreness', label: t('wellness.muscleSoreness') || 'Dor', color: '#f59e0b', data: sortedData.map(d => d.muscle_soreness), invertedColors: true },
   ];

@@ -17,6 +17,7 @@ import Constants from 'expo-constants';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import ThemeSelector from '../../components/ThemeSelector';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -99,7 +100,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => setShowLanguageModal(true)}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="language-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <View>
@@ -125,12 +126,15 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Theme / Appearance selector - placed directly below "Conta" card per design spec */}
+        <ThemeSelector />
+
         <View style={[styles.section, { backgroundColor: colors.dark.card }]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('settings.subscriptionTools')}</Text>
           
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(139, 92, 246, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
                 <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
               <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.manageSubscription')}</Text>
@@ -154,7 +158,7 @@ export default function ProfileScreen() {
           
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/privacy-policy')}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(99, 102, 241, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent.tertiary} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.privacyPolicy')}</Text>
@@ -164,7 +168,7 @@ export default function ProfileScreen() {
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/terms-of-use')}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(59, 130, 246, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="document-text-outline" size={22} color={colors.accent.blue} />
               </View>
               <Text style={styles.menuItemText}>{t('auth.termsOfUse')}</Text>
@@ -178,7 +182,7 @@ export default function ProfileScreen() {
           
           <View style={styles.menuItem}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(167, 139, 250, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(123, 212, 255, 0.2)' }]}>
                 <Ionicons name="information-circle-outline" size={22} color={colors.accent.secondary} />
               </View>
               <View>
@@ -392,7 +396,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   },
   languageItemActive: {
     borderColor: colors.accent.primary,
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    backgroundColor: 'rgba(124, 255, 58, 0.1)',
   },
   languageFlag: {
     fontSize: 28,

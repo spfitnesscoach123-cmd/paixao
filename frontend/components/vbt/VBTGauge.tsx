@@ -55,7 +55,7 @@ const interpolateHex = (c1: string, c2: string, t: number): string => {
  *   30%+ → #D50000 (red)
  */
 const getDropColor = (drop: number, calibrating: boolean): string => {
-  if (calibrating) return '#3b82f6';
+  if (calibrating) return '#2FB6FF';
   if (drop <= 0) return '#00C853';
   if (drop < 15) return interpolateHex('#00C853', '#FF6D00', drop / 15);
   if (drop < 30) return interpolateHex('#FF6D00', '#D50000', (drop - 15) / 15);

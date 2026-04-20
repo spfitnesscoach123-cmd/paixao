@@ -24,7 +24,7 @@
       "versionCode": 98,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000F1F"
+        "backgroundColor": "#081C3A"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -48,7 +48,7 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000000"
+          "backgroundColor": "#081C3A"
         }
       ],
       [

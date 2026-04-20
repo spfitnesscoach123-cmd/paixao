@@ -190,7 +190,7 @@ export default function BodyScanScreen() {
 
           {/* Icon */}
           <View style={styles.iconContainer}>
-            <LinearGradient colors={['#8b5cf6', '#3b82f6']} style={styles.iconGradient}>
+            <LinearGradient colors={['#7CFF3A', '#2FB6FF']} style={styles.iconGradient}>
               <Ionicons name="body" size={48} color="#ffffff" />
             </LinearGradient>
             <Text style={styles.subtitle}>
@@ -447,7 +447,7 @@ export default function BodyScanScreen() {
               onPress={handleUseResults}
               data-testid="body-scan-use-results-btn"
             >
-              <LinearGradient colors={['#8b5cf6', '#6d28d9']} style={styles.primaryButtonGradient}>
+              <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.primaryButtonGradient}>
                 <Ionicons name="checkmark" size={20} color="#ffffff" />
                 <Text style={styles.primaryButtonText}>{t.useResults}</Text>
               </LinearGradient>
@@ -475,7 +475,7 @@ export default function BodyScanScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0e1a',
+    backgroundColor: '#081C3A',
   },
   scrollContent: {
     paddingHorizontal: 16,
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    backgroundColor: 'rgba(124, 255, 58, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -732,7 +732,7 @@ const styles = StyleSheet.create({
   },
   metricItem: {
     width: (SCREEN_W - 72) / 2,
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    backgroundColor: 'rgba(124, 255, 58, 0.08)',
     borderRadius: 10,
     padding: 12,
   },

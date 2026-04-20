@@ -98,7 +98,7 @@ const PremiumGate: React.FC<PremiumGateProps> = ({
   return (
     <View style={styles.container}>
       <LinearGradient
-        colors={['rgba(99, 102, 241, 0.1)', 'rgba(99, 102, 241, 0.05)']}
+        colors={['rgba(47, 182, 255, 0.1)', 'rgba(47, 182, 255, 0.05)']}
         style={styles.gradient}
       >
         {/* Ícone de bloqueio */}
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },

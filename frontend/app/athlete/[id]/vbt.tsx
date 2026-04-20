@@ -476,7 +476,7 @@ function VBTPageContent() {
   
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#7c3aed', '#4f46e5']} style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={['#53E65D', '#2FB6FF']} style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity 
           onPress={() => router.back()} 
           style={styles.backButton}
@@ -717,7 +717,7 @@ function VBTPageContent() {
                 onPress={handleSubmit}
                 disabled={createMutation.isPending}
               >
-                <LinearGradient colors={['#7c3aed', '#4f46e5']} style={styles.submitGradient}>
+                <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.submitGradient}>
                   {createMutation.isPending ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (

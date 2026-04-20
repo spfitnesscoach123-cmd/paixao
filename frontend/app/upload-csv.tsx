@@ -10,9 +10,9 @@ import api from '../services/api';
 const C = {
   bg: '#0a0e17', card: '#111827', cardAlt: '#1a2236', border: '#1e293b',
   text: '#e2e8f0', textSec: '#94a3b8', textTer: '#475569',
-  accent: '#8b5cf6', accentSec: '#6d28d9', green: '#10b981', greenBg: 'rgba(16,185,129,0.12)',
+  accent: '#7CFF3A', accentSec: '#53E65D', green: '#10b981', greenBg: 'rgba(16,185,129,0.12)',
   red: '#ef4444', redBg: 'rgba(239,68,68,0.12)', yellow: '#f59e0b', yellowBg: 'rgba(245,158,11,0.12)',
-  blue: '#3b82f6', blueBg: 'rgba(59,130,246,0.12)',
+  blue: '#2FB6FF', blueBg: 'rgba(47, 182, 255,0.12)',
 };
 
 type Step = 'upload' | 'review' | 'mapping' | 'importing' | 'done';

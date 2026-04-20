@@ -350,7 +350,7 @@
   },
   "comparison": {
     "title": "Dynamic Comparisons",
-    "compareMode": "Compare Mode",
+    "compareMode": "Comparison Mode",
     "betweenAthletes": "Between Athletes",
     "sessions": "Sessions",
     "positionGroups": "Position Groups",
@@ -365,7 +365,7 @@
     "highVolume": "High Vol.",
     "lowIntensity": "Low Int.",
     "highIntensity": "High Int.",
-    "statsSummary": "Statistics Summary",
+    "statsSummary": "Statistical Summary",
     "avgTotalDist": "Avg Total Dist.",
     "avgHighInt": "Avg High Int.",
     "highestDist": "Highest Distance",
@@ -430,35 +430,16 @@
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
     "profileUpdated": "Profile updated successfully",
-    "emailCannotBeChanged": "Email cannot be changed"
+    "emailCannotBeChanged": "Email cannot be changed",
+    "appearance": "Appearance",
+    "autoMode": "Automatic",
+    "themeSubtitle": "Customize the app appearance",
+    "systemDefault": "Follow system"
   },
   "features": {
     "aiAnalysis": "AI Analysis",
     "acwrFatigue": "ACWR & Fatigue",
     "comparisons": "Comparisons"
-  },
-  "comparison": {
-    "title": "Dynamic Comparisons",
-    "compareMode": "Comparison Mode",
-    "betweenAthletes": "Between Athletes",
-    "sessions": "Sessions",
-    "positionGroups": "Position Groups",
-    "period": "Period",
-    "days7": "7 days",
-    "days30": "30 days",
-    "selectAthletes": "Select Athletes",
-    "selectAthlete": "Select an Athlete",
-    "selectPositions": "Select Positions",
-    "quadrantAnalysis": "Quadrant Analysis",
-    "lowVolume": "Low Vol.",
-    "highVolume": "High Vol.",
-    "lowIntensity": "Low Int.",
-    "highIntensity": "High Int.",
-    "statsSummary": "Statistical Summary",
-    "avgTotalDist": "Avg Total Dist.",
-    "avgHighInt": "Avg High Int.",
-    "highestDist": "Highest Distance",
-    "highestInt": "Highest High Int."
   },
   "role": {
     "howAccess": "How would you like to access?",
