@@ -76,19 +76,21 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
   const circumference = Math.PI * radius;
   const progress = Math.min(animVal / max, 1);
   const dashArray = progress * circumference;
+  // Sanitize label for use as SVG id — strip spaces and special chars to keep url(#id) valid
+  const safeId = `gauge-${label.replace(/[^a-zA-Z0-9]/g, '')}`;
   
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={size} height={size / 2 + 20}>
         <Defs>
-          <SvgLinearGradient id={`gauge-${label}`} x1="0" y1="0" x2="1" y2="0">
+          <SvgLinearGradient id={safeId} x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor={color} stopOpacity="0.6" />
             <Stop offset="1" stopColor={color} stopOpacity="1" />
           </SvgLinearGradient>
         </Defs>
         <G rotation="180" origin={`${size/2}, ${size/2}`}>
           <Circle cx={size/2} cy={size/2} r={radius} stroke={colors.border.default} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${circumference} ${circumference*2}`} />
-          <Circle cx={size/2} cy={size/2} r={radius} stroke={`url(#gauge-${label})`} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${dashArray} ${circumference*2}`} />
+          <Circle cx={size/2} cy={size/2} r={radius} stroke={`url(#${safeId})`} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${dashArray} ${circumference*2}`} />
         </G>
         <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill={colors.text.primary} fontSize={22} fontWeight="bold">{typeof value === 'number' ? animVal.toFixed(animVal < 10 ? 1 : 0) : '--'}</SvgText>
         <SvgText x={size/2} y={size/2 + 14} textAnchor="middle" fill={colors.text.secondary} fontSize={10}>{label}</SvgText>
