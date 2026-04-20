@@ -666,7 +666,7 @@ function Avatar3DInner({
     >
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="#7CFF3A" />
+          <ActivityIndicator size="large" color="#2FB6FF" />
           <Text style={styles.loadingText}>Carregando modelo 3D...</Text>
         </View>
       )}

@@ -25,6 +25,7 @@ import { BodyCompositionCharts } from '../../components/BodyCompositionCharts';
 import { ACWRBadge, ACWRLegend, getACWRClassification } from '../../components/ACWRBadge';
 import { colors } from '../../constants/theme';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Interface for grouped session data
 interface GroupedSession {
@@ -53,6 +54,9 @@ interface SelectedPeriod {
 }
 
 export default function AthleteDetails() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -702,7 +706,7 @@ export default function AthleteDetails() {
                 style={styles.actionButtonLarge}
                 onPress={() => router.push(`/athlete/${id}/add-strength`)}
               >
-                <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.actionButtonGradient}>
+                <LinearGradient colors={['#7BD4FF', '#2FB6FF']} style={styles.actionButtonGradient}>
                   <View style={styles.actionButtonIconRow}>
                     <Ionicons name="barbell" size={24} color="#ffffff" />
                     <Ionicons name="speedometer" size={20} color="rgba(255,255,255,0.8)" />
@@ -765,7 +769,7 @@ export default function AthleteDetails() {
                     <Ionicons 
                       name={item.assessment_type === 'strength' ? 'barbell' : item.assessment_type === 'aerobic' ? 'heart' : 'body'} 
                       size={20} 
-                      color="#7CFF3A" 
+                      color="#2FB6FF" 
                     />
                     <Text style={styles.dataDate}>{item.date}</Text>
                     <View style={styles.typeBadge}>
@@ -869,7 +873,7 @@ export default function AthleteDetails() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.primary,
@@ -956,25 +960,25 @@ const styles = StyleSheet.create({
     gap: 10,
     backgroundColor: colors.dark.secondary,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(124, 255, 58, 0.15)',
+    borderBottomColor: 'rgba(47, 182, 255, 0.15)',
   },
   navButton: {
     width: '47%' as any,
     flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(124, 255, 58, 0.08)',
+    backgroundColor: 'rgba(47, 182, 255, 0.08)',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.2)',
+    borderColor: 'rgba(47, 182, 255, 0.2)',
     gap: 10,
   },
   navButtonActive: {
-    backgroundColor: 'rgba(124, 255, 58, 0.22)',
+    backgroundColor: 'rgba(47, 182, 255, 0.22)',
     borderColor: colors.accent.primary,
-    shadowColor: '#7CFF3A',
+    shadowColor: '#2FB6FF',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -984,7 +988,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1136,7 +1140,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   typeBadge: {
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1245,7 +1249,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   periodBadge: {
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1258,7 +1262,7 @@ const styles = StyleSheet.create({
   },
   // Session-based styles
   sessionSummary: {
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -1282,7 +1286,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
   },
   sessionHeaderLeft: {
     flexDirection: 'row',
@@ -1314,7 +1318,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   periodCountBadge: {
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
@@ -1343,7 +1347,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1363,7 +1367,7 @@ const styles = StyleSheet.create({
   },
   periodsContainer: {
     borderTopWidth: 1,
-    borderTopColor: 'rgba(124, 255, 58, 0.2)',
+    borderTopColor: 'rgba(47, 182, 255, 0.2)',
     padding: 16,
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
   },
@@ -1382,7 +1386,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   periodItem: {
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 10,
     padding: 12,
     marginBottom: 8,
@@ -1391,7 +1395,7 @@ const styles = StyleSheet.create({
   },
   periodItemSelected: {
     borderColor: colors.accent.primary,
-    backgroundColor: 'rgba(124, 255, 58, 0.25)',
+    backgroundColor: 'rgba(47, 182, 255, 0.25)',
   },
   periodHeader: {
     marginBottom: 8,
@@ -1431,7 +1435,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(124, 255, 58, 0.15)',
+    borderTopColor: 'rgba(47, 182, 255, 0.15)',
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   classifierLabel: {
@@ -1453,9 +1457,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
     gap: 6,
   },
   classifierButtonActive: {

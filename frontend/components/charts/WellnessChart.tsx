@@ -50,7 +50,7 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
           <Text style={styles.legendText}>Wellness ({avgWellness.toFixed(1)})</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#7CFF3A' }]} />
+          <View style={[styles.legendDot, { backgroundColor: '#2FB6FF' }]} />
           <Text style={styles.legendText}>Prontidão ({avgReadiness.toFixed(1)})</Text>
         </View>
       </View>
@@ -61,7 +61,7 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
         width={Dimensions.get('window').width - 64}
         height={220}
         color="#2FB6FF"
-        color2="#7CFF3A"
+        color2="#2FB6FF"
         thickness={3}
         curved
         spacing={40}
@@ -74,7 +74,7 @@ export const WellnessChart: React.FC<WellnessChartProps> = ({ data }) => {
         xAxisLabelTextStyle={styles.axisText}
         hideDataPoints={false}
         dataPointsColor="#2FB6FF"
-        dataPointsColor2="#7CFF3A"
+        dataPointsColor2="#2FB6FF"
         dataPointsRadius={4}
         rulesColor="#e5e7eb"
         rulesType="solid"

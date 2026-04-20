@@ -24,6 +24,7 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { SKINFOLD_LABELS, type FullReport, type SkinfoldSite } from '../../../types/protocols';
 import api from '../../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: SW } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
@@ -91,6 +92,9 @@ function buildHeatmapValues(measurements: Record<string, number | undefined>): R
 }
 
 export default function ReportScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id: athleteId, report: reportStr, returnPath } = useLocalSearchParams<{ id: string; report: string; returnPath?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -351,13 +355,13 @@ export default function ReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(47, 182, 255,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
-  protocolBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(124, 255, 58,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  protocolBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(47, 182, 255,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
   protocolBadgeText: { fontSize: 13, fontWeight: '600', color: '#7BD4FF', flex: 1 },
   protocolBadgeSub: { fontSize: 12, color: colors.text.tertiary },
   classCard: { backgroundColor: colors.dark.card, borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 16, borderWidth: 1, borderColor: colors.border.default },

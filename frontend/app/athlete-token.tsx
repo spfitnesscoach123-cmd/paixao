@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function AthleteToken() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const { t } = useLanguage();
   const [token, setToken] = useState('');
@@ -159,7 +163,7 @@ export default function AthleteToken() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -186,7 +190,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,

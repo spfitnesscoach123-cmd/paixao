@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { format } from 'date-fns';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -545,6 +546,9 @@ const VelocityLossChart = ({ data, locale }: { data: Array<{ set: number; veloci
 };
 
 export default function AddStrengthAssessment() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -1002,7 +1006,7 @@ export default function AddStrengthAssessment() {
                 onPress={handleSubmitVBT}
                 disabled={vbtMutation.isPending}
               >
-                <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.vbtSubmitGradient}>
+                <LinearGradient colors={['#7BD4FF', '#2FB6FF']} style={styles.vbtSubmitGradient}>
                   {vbtMutation.isPending ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
@@ -1059,7 +1063,7 @@ export default function AddStrengthAssessment() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

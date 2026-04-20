@@ -33,3 +33,13 @@
 - **Logo replacement**: Replaced `assets/logo.png` (used by Login and Role-Select) with the new official LoadManager Pro circular logo. Regenerated `icon.png`, `adaptive-icon.png`, `splash-image.png`, and `favicon.png` from the same source.
 - **App chrome**: Updated `app.json` splash/adaptive backgroundColor from `#000000`/`#000F1F` to brand navy `#081C3A`.
 - **i18n**: Added `settings.appearance`, `settings.autoMode`, `settings.themeSubtitle`, `settings.systemDefault` to `pt.json` and `en.json`.
+
+## 2026-04-20 (14:15) — Palette Iteration + Light Mode Refactor
+- **Primary color swap**: verde `#7CFF3A` → azul safira `#2FB6FF` (topo do escudo). Aplicado em tokens (`darkColors.accent.primary`, gradients, borders) e em ~36 arquivos com hardcoded hex via sed. Verde agora serve apenas como `status.success` / `accent.tertiary`.
+- **Light Mode cards**: cards em light theme passaram de translúcidos (`rgba(255,255,255,0.92)`) para branco sólido (`#FFFFFF`) com borda sutil safira (`rgba(47,182,255,0.25)`) — melhor legibilidade do conteúdo.
+- **Theme-reactive refactor**: 24 telas adicionais convertidas de `const styles = StyleSheet.create({...colors.dark.*...})` (estático, travado em dark) para padrão `createStyles(colors)` + `useMemo(() => createStyles(colors), [colors])`. Agora respondem ao light/dark/auto em runtime.
+  - Inclui: `athlete/[id].tsx`, `add-athlete.tsx`, `register.tsx`, `forgot-password.tsx`, `upload-catapult.tsx`, `compare-athletes.tsx`, `athlete-wellness.tsx`, `generate-wellness-token.tsx`, `generate-wellness-link.tsx`, `athlete-token.tsx` e outras.
+- **Shadows**: todas as sombras de card/glow/button agora usam safira como cor base (antes: verde).
+- **Script de refactor** `/tmp/theme_refactor.py` criado (idempotente, com guard para evitar duplicidade).
+
+**Telas ainda em dark fixo** (não detectadas pelo patcher por heurística conservadora ou estrutura de componente atípica): algumas telas do athlete sub-flow, componentes compartilhados como `PremiumGate`, `ACWRBadge`, `JumpAnalysisCharts`, `ScientificAnalysisTab` — podem requerer pass adicional manual em próxima iteração se o usuário quiser coverage 100%.

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -45,6 +45,7 @@ import { VBTGauge } from '../../../components/vbt/VBTGauge';
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
 // Replaces @thinksys/react-native-mediapipe with direct MediaPipe Tasks Vision integration
 import { MediaPipeCamera, MEDIAPIPE_AVAILABLE } from '../../../services/pose/MediaPipeCamera';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;
@@ -74,6 +75,9 @@ interface CameraConfig {
  * O PremiumGate bloqueia o acesso se nenhuma das condições for atendida.
  */
 export default function VBTCameraPage() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'VBT via Câmera' : 'VBT via Camera';
@@ -2108,7 +2112,7 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
               disabled={vbtMutation.isPending}
               data-testid="save-vbt-data-btn"
             >
-              <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.saveButtonGradient}>
+              <LinearGradient colors={['#7BD4FF', '#2FB6FF']} style={styles.saveButtonGradient}>
                 {vbtMutation.isPending ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
@@ -2164,7 +2168,7 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -3048,7 +3052,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     borderWidth: 2,
     borderColor: colors.accent.primary,
     justifyContent: 'center',

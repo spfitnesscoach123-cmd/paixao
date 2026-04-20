@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Redirect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../contexts/AuthContext';
 import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ROLE_SELECTED_KEY = 'role_selected';
 
 export default function Index() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { isAuthenticated, isLoading } = useAuth();
   const [redirectTo, setRedirectTo] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(true);
@@ -61,7 +65,7 @@ export default function Index() {
   return <Redirect href={redirectTo as any} />;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,12 @@ import * as Clipboard from 'expo-clipboard';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function GenerateWellnessLink() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const { t } = useLanguage();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -248,7 +252,7 @@ export default function GenerateWellnessLink() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

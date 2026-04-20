@@ -134,7 +134,7 @@ export default function ProfileScreen() {
           
           <TouchableOpacity style={[styles.menuItem, { backgroundColor: colors.dark.card }]} onPress={() => router.push('/subscription')}>
             <View style={styles.menuItemContent}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="diamond-outline" size={22} color={colors.accent.primary} />
               </View>
               <Text style={[styles.menuItemText, { color: colors.text.primary }]}>{t('settings.manageSubscription')}</Text>
@@ -396,7 +396,7 @@ const createProfileStyles = (colors: any) => StyleSheet.create({
   },
   languageItemActive: {
     borderColor: colors.accent.primary,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
   },
   languageFlag: {
     fontSize: 28,

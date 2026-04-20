@@ -267,7 +267,7 @@ export const StrengthAnalysisCharts: React.FC<StrengthAnalysisChartsProps> = ({ 
                         style={{ 
                           height: '100%', 
                           width: `${Math.min(100, (metric.previous_value || 0) / Math.max(metric.value, metric.previous_value || 1) * 100)}%`,
-                          backgroundColor: 'rgba(124, 255, 58, 0.4)',
+                          backgroundColor: 'rgba(47, 182, 255, 0.4)',
                           borderRadius: 4
                         }} 
                       />

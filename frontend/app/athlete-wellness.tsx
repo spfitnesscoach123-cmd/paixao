@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import Slider from '@react-native-community/slider';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface Athlete {
   id: string;
@@ -33,6 +34,9 @@ interface Feedback {
 }
 
 export default function AthleteWellness() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { token } = useLocalSearchParams<{ token: string }>();
   const router = useRouter();
   const { t } = useLanguage();
@@ -416,7 +420,7 @@ export default function AthleteWellness() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

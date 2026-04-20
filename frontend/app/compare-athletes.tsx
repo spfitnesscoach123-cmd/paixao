@@ -18,9 +18,10 @@ import { Athlete, GPSData } from '../types';
 import { colors } from '../constants/theme';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const ATHLETE_COLORS = [
-  '#7CFF3A', '#2FB6FF', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
+  '#2FB6FF', '#2FB6FF', '#10b981', '#f59e0b', '#ef4444', '#ec4899',
   '#06b6d4', '#84cc16', '#f97316', '#2FB6FF'
 ];
 
@@ -28,7 +29,7 @@ const POSITION_COLORS: { [key: string]: string } = {
   'Goleiro': '#f59e0b',
   'Zagueiro': '#2FB6FF',
   'Lateral': '#06b6d4',
-  'Volante': '#7CFF3A',
+  'Volante': '#2FB6FF',
   'Meio-campo': '#10b981',
   'Atacante': '#ef4444',
   'Meia': '#ec4899',
@@ -47,6 +48,9 @@ interface QuadrantData {
 }
 
 export default function CompareAthletes() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const { t } = useLanguage();
@@ -615,7 +619,7 @@ export default function CompareAthletes() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -742,7 +746,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   athleteChipSelected: {
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     borderColor: colors.accent.primary,
   },
   athleteChipText: {
@@ -779,7 +783,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   positionChipSelected: {
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
   },
   positionDot: {
     width: 10,
@@ -905,7 +909,7 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,

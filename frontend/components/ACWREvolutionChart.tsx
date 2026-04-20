@@ -170,8 +170,8 @@ export const ACWREvolutionChart: React.FC<ACWRChartProps> = ({ athleteId }) => {
           thickness3={1}
           hideDataPoints2
           hideDataPoints3
-          startFillColor="rgba(124, 255, 58, 0.2)"
-          endFillColor="rgba(124, 255, 58, 0.01)"
+          startFillColor="rgba(47, 182, 255, 0.2)"
+          endFillColor="rgba(47, 182, 255, 0.01)"
           startOpacity={0.4}
           endOpacity={0.1}
           noOfSections={4}
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
   },
   periodButtonActive: {
     backgroundColor: colors.accent.primary,
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     gap: 4,
   },
   metricButtonActive: {
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     padding: 12,
   },

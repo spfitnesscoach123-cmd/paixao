@@ -9,7 +9,7 @@
  * State machine controlada por useBodyScan.
  */
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -30,10 +30,14 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { useBodyScan } from '../../../hooks/useBodyScan';
 import { CameraScanner } from '../../../components/body-composition/CameraScanner';
 import { ScannerOverlay } from '../../../components/body-composition/ScannerOverlay';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function BodyScanScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id: athleteId, returnPath } = useLocalSearchParams<{ id: string; returnPath?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -190,7 +194,7 @@ export default function BodyScanScreen() {
 
           {/* Icon */}
           <View style={styles.iconContainer}>
-            <LinearGradient colors={['#7CFF3A', '#2FB6FF']} style={styles.iconGradient}>
+            <LinearGradient colors={['#2FB6FF', '#2FB6FF']} style={styles.iconGradient}>
               <Ionicons name="body" size={48} color="#ffffff" />
             </LinearGradient>
             <Text style={styles.subtitle}>
@@ -447,7 +451,7 @@ export default function BodyScanScreen() {
               onPress={handleUseResults}
               data-testid="body-scan-use-results-btn"
             >
-              <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.primaryButtonGradient}>
+              <LinearGradient colors={['#2FB6FF', '#7BD4FF']} style={styles.primaryButtonGradient}>
                 <Ionicons name="checkmark" size={20} color="#ffffff" />
                 <Text style={styles.primaryButtonText}>{t.useResults}</Text>
               </LinearGradient>
@@ -472,7 +476,7 @@ export default function BodyScanScreen() {
 // STYLES
 // ============================================================
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#081C3A',
@@ -498,7 +502,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -732,7 +736,7 @@ const styles = StyleSheet.create({
   },
   metricItem: {
     width: (SCREEN_W - 72) / 2,
-    backgroundColor: 'rgba(124, 255, 58, 0.08)',
+    backgroundColor: 'rgba(47, 182, 255, 0.08)',
     borderRadius: 10,
     padding: 12,
   },

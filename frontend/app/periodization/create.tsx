@@ -22,6 +22,7 @@ import PremiumGate from '../../components/PremiumGate';
 import api from '../../services/api';
 import { format, addDays, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -78,6 +79,9 @@ interface WeeklyPrescription {
  * FEATURE PREMIUM - Requer trial ou assinatura ativa
  */
 export default function CreatePeriodizationScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'Periodização' : 'Periodization';
@@ -575,7 +579,7 @@ function CreatePeriodizationContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -596,10 +600,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     padding: 8,
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
   },
   headerBackText: {
     fontSize: 14,

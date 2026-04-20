@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     marginBottom: 16,
     paddingVertical: 12,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
   },
   statItem: {

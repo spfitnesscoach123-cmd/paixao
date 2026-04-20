@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,7 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import PremiumGate from '../../../components/PremiumGate';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -380,6 +381,9 @@ const VelocityLossChart = ({ data }: { data: Array<{ set: number; velocity: numb
  * FEATURE PREMIUM - Requer trial ou assinatura ativa
  */
 export default function VBTPage() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'Dados VBT' : 'VBT Data';
@@ -476,7 +480,7 @@ function VBTPageContent() {
   
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#53E65D', '#2FB6FF']} style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={['#7BD4FF', '#2FB6FF']} style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity 
           onPress={() => router.back()} 
           style={styles.backButton}
@@ -717,7 +721,7 @@ function VBTPageContent() {
                 onPress={handleSubmit}
                 disabled={createMutation.isPending}
               >
-                <LinearGradient colors={['#53E65D', '#2FB6FF']} style={styles.submitGradient}>
+                <LinearGradient colors={['#7BD4FF', '#2FB6FF']} style={styles.submitGradient}>
                   {createMutation.isPending ? (
                     <ActivityIndicator color="#ffffff" />
                   ) : (
@@ -735,7 +739,7 @@ function VBTPageContent() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.primary,

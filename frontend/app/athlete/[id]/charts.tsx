@@ -10,8 +10,12 @@ import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function AthleteCharts() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { t, locale } = useLanguage();
@@ -176,7 +180,7 @@ export default function AthleteCharts() {
               data={gpsData}
               metric="number_of_sprints"
               title={labels.numberOfSprints}
-              color="#7CFF3A"
+              color="#2FB6FF"
             />
           </>
         )}
@@ -207,7 +211,7 @@ export default function AthleteCharts() {
                   title={labels.avgSleep}
                   value={`${wellnessStats.avgSleep}h`}
                   icon="moon"
-                  color="#7CFF3A"
+                  color="#2FB6FF"
                 />
               </View>
             </View>
@@ -237,7 +241,7 @@ export default function AthleteCharts() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.primary,

@@ -174,7 +174,7 @@ export function ScannerOverlay({
   const stateColor = isCapturing ? '#22c55e'
     : allOk ? '#2FB6FF'
     : hasBody ? '#f59e0b'
-    : '#7CFF3A';
+    : '#2FB6FF';
 
   // Icone do estado
   const stateIcon = phase === 'processing' ? 'hourglass'
@@ -359,7 +359,7 @@ export function ScannerOverlay({
       {phase === 'processing' && (
         <View style={styles.processingOverlay}>
           <View style={styles.processingCard}>
-            <Ionicons name="pulse" size={32} color="#7CFF3A" />
+            <Ionicons name="pulse" size={32} color="#2FB6FF" />
             <Text style={styles.processingTitle}>Processando</Text>
             <Text style={styles.processingSubtitle}>Calculando proporcoes corporais...</Text>
           </View>
@@ -709,7 +709,7 @@ const styles = StyleSheet.create({
     padding: 28,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
     gap: 8,
   },
   processingTitle: {

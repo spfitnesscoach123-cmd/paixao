@@ -34,22 +34,22 @@ export const darkColors = {
     cardSolid: BRAND.navyShield,                   // solid card variant
   },
 
-  // Accent (primary CTA = brand green)
+  // Accent (primary CTA = brand SAPPHIRE BLUE — top of shield)
   accent: {
-    primary:   BRAND.greenPerf,                    // CTA / active / toggles ON
-    secondary: BRAND.greenTech,                    // hover / complementary
-    tertiary:  BRAND.blueSapphire,                 // AI / secondary emphasis
+    primary:   BRAND.blueSapphire,                 // CTA / active / toggles ON
+    secondary: BRAND.blueSapphireLt,               // hover / complementary
+    tertiary:  BRAND.greenPerf,                    // tertiary accent (green)
     blue:      BRAND.blueSapphire,                 // links / focus / info
     light:     BRAND.blueSapphireLt,               // soft accent
   },
 
   // Gradients
   gradients: {
-    primary:    [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
-    secondary:  [BRAND.greenTech,   BRAND.blueSapphire] as [string, string],
-    accent:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
-    button:     [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
-    card:       ['rgba(124, 255, 58, 0.10)', 'rgba(47, 182, 255, 0.04)'] as [string, string],
+    primary:    [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    secondary:  [BRAND.blueSapphire, BRAND.greenPerf]      as [string, string],
+    accent:     [BRAND.blueSapphireLt, BRAND.blueSapphire] as [string, string],
+    button:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    card:       ['rgba(47, 182, 255, 0.10)', 'rgba(124, 255, 58, 0.04)'] as [string, string],
     dark:       [BRAND.navyDeep,    '#0C2548']          as [string, string],
     background: [BRAND.navyDeep,    '#0C2548']          as [string, string],
   },
@@ -79,15 +79,15 @@ export const darkColors = {
 
   // Borders
   border: {
-    default: 'rgba(124, 255, 58, 0.20)',           // per spec
-    active:  BRAND.greenPerf,
-    glow:    'rgba(124, 255, 58, 0.45)',
+    default: 'rgba(47, 182, 255, 0.25)',           // sapphire-tinted
+    active:  BRAND.blueSapphire,
+    glow:    'rgba(47, 182, 255, 0.45)',
   },
 
   // Inputs
   input: {
     background: 'rgba(18, 58, 99, 0.55)',
-    border:     'rgba(124, 255, 58, 0.30)',
+    border:     'rgba(47, 182, 255, 0.32)',
     placeholder: 'rgba(244, 247, 251, 0.45)',
   },
 };
@@ -101,24 +101,24 @@ export const lightColors = {
     primary:   BRAND.white,                        // clean ice-white bg
     secondary: '#EAF0F7',
     tertiary:  '#DDE6F0',
-    card:      'rgba(255, 255, 255, 0.92)',        // translucent white cards
+    card:      '#FFFFFF',                          // solid white cards for readability
     cardSolid: '#FFFFFF',
   },
 
   accent: {
-    primary:   BRAND.greenPerf,
-    secondary: BRAND.greenTech,
-    tertiary:  BRAND.blueSapphire,
+    primary:   BRAND.blueSapphire,
+    secondary: BRAND.blueSapphireLt,
+    tertiary:  BRAND.greenPerf,
     blue:      BRAND.blueSapphire,
     light:     BRAND.blueSapphireLt,
   },
 
   gradients: {
-    primary:    [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
-    secondary:  [BRAND.greenTech,   BRAND.blueSapphire] as [string, string],
-    accent:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
-    button:     [BRAND.greenPerf,   BRAND.greenTech]    as [string, string],
-    card:       ['rgba(124, 255, 58, 0.08)', 'rgba(47, 182, 255, 0.04)'] as [string, string],
+    primary:    [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    secondary:  [BRAND.blueSapphire, BRAND.greenPerf]      as [string, string],
+    accent:     [BRAND.blueSapphireLt, BRAND.blueSapphire] as [string, string],
+    button:     [BRAND.blueSapphire, BRAND.blueSapphireLt] as [string, string],
+    card:       ['rgba(47, 182, 255, 0.06)', 'rgba(124, 255, 58, 0.03)'] as [string, string],
     dark:       ['#EAF0F7',         BRAND.white]        as [string, string],
     background: [BRAND.white,       '#EAF0F7']          as [string, string],
   },
@@ -144,9 +144,9 @@ export const lightColors = {
   },
 
   border: {
-    default: BRAND.greenPerf,                      // per spec: card borders green
-    active:  BRAND.greenPerf,
-    glow:    'rgba(124, 255, 58, 0.35)',
+    default: 'rgba(47, 182, 255, 0.25)',           // subtle sapphire border
+    active:  BRAND.blueSapphire,
+    glow:    'rgba(47, 182, 255, 0.35)',
   },
 
   input: {
@@ -168,7 +168,7 @@ export const getShadows = (mode: ThemeMode) => {
   const isDark = mode === 'dark';
   return {
     card: {
-      shadowColor: isDark ? BRAND.greenPerf : '#000',
+      shadowColor: isDark ? BRAND.blueSapphire : '#000',
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: isDark ? 0.22 : 0.10,
       shadowRadius: 16,
@@ -182,14 +182,14 @@ export const getShadows = (mode: ThemeMode) => {
       elevation: 4,
     },
     glow: {
-      shadowColor: BRAND.greenPerf,
+      shadowColor: BRAND.blueSapphire,
       shadowOffset: { width: 0, height: 0 },
       shadowOpacity: isDark ? 0.55 : 0.30,
       shadowRadius: 20,
       elevation: 12,
     },
     button: {
-      shadowColor: BRAND.greenPerf,
+      shadowColor: BRAND.blueSapphire,
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: isDark ? 0.45 : 0.25,
       shadowRadius: 16,

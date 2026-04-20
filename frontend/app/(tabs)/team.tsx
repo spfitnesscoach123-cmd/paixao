@@ -282,7 +282,7 @@ export default function TeamDashboard() {
                   styles.optionRow,
                   {
                     backgroundColor: selectedDateRange === range.key
-                      ? 'rgba(124, 255, 58, 0.1)'
+                      ? 'rgba(47, 182, 255, 0.1)'
                       : colors.dark.secondary,
                     borderColor: selectedDateRange === range.key
                       ? colors.accent.primary

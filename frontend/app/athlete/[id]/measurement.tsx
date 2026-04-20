@@ -7,6 +7,7 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
+import { useTheme } from '../../contexts/ThemeContext';
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Platform,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -70,6 +71,9 @@ if (!IS_WEB) {
 }
 
 export default function MeasurementScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const params = useLocalSearchParams<{
     protocolId: string; gender: string; age: string; weight: string; height: string; returnPath?: string;
   }>();
@@ -242,7 +246,7 @@ export default function MeasurementScreen() {
                     <G key={site}>
                       <Circle
                         cx={pos.x} cy={pos.y} r={filled ? 8 : 6}
-                        fill={filled ? '#22c55e' : '#7CFF3A'}
+                        fill={filled ? '#22c55e' : '#2FB6FF'}
                         opacity={0.9}
                         onPress={() => setModalSite(site)}
                       />
@@ -278,7 +282,7 @@ export default function MeasurementScreen() {
                   <Ionicons
                     name={filled ? 'checkmark-circle' : 'ellipse-outline'}
                     size={18}
-                    color={filled ? '#22c55e' : '#7CFF3A'}
+                    color={filled ? '#22c55e' : '#2FB6FF'}
                   />
                   <Text style={styles.pickerOptionText}>
                     {pt ? SKINFOLD_LABELS[site].pt : SKINFOLD_LABELS[site].en}
@@ -361,18 +365,18 @@ export default function MeasurementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(47, 182, 255,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 18, fontWeight: '700', color: colors.text.primary },
   subtitle: { fontSize: 13, color: colors.accent.primary, fontWeight: '600' },
-  instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(124, 255, 58,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
+  instructionBadge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(47, 182, 255,0.1)', borderRadius: 10, padding: 10, marginBottom: 12 },
   instructionText: { flex: 1, fontSize: 12, color: colors.text.secondary, lineHeight: 16 },
   avatarContainer: { backgroundColor: colors.dark.card, borderRadius: 16, borderWidth: 1, borderColor: colors.border.default, overflow: 'hidden', marginBottom: 16, minHeight: 380 },
   svgContainer: { alignItems: 'center', paddingVertical: 30 },
-  pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#7CFF3A', gap: 6 },
+  pickerOverlay: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#2FB6FF', gap: 6 },
   pickerTitle: { fontSize: 13, fontWeight: '600', color: '#7BD4FF', marginBottom: 4 },
   pickerOption: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, paddingHorizontal: 4 },
   pickerOptionText: { flex: 1, fontSize: 14, color: colors.text.primary },

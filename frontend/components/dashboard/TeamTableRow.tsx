@@ -84,7 +84,7 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
       {visibleCols.sprint && (
         <View style={styles.colSmall}>
           <Text style={[styles.metricValue, { color: colors.text.primary }]}>{row.sprint_count}</Text>
-          <MiniBar value={row.sprint_count} maxValue={maxSprints} color="#7CFF3A" />
+          <MiniBar value={row.sprint_count} maxValue={maxSprints} color="#2FB6FF" />
         </View>
       )}
 

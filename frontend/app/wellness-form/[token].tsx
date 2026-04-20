@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { Picker } from '@react-native-picker/picker';
 import Slider from '@react-native-community/slider';
 import api from '../../services/api';
 import { colors } from '../../constants/theme';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // App Store URLs - Replace with your actual app URLs when published
 const APP_STORE_URL = 'https://apps.apple.com/app/load-manager/id0000000000';
@@ -152,7 +153,7 @@ const fallbackStyles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(124, 255, 58, 0.2)',
+    backgroundColor: 'rgba(47, 182, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -175,7 +176,7 @@ const fallbackStyles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 32,
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
   },
   messageTitle: {
     fontSize: 20,
@@ -263,6 +264,9 @@ const fallbackStyles = StyleSheet.create({
 });
 
 export default function WellnessForm() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { token } = useLocalSearchParams<{ token: string }>();
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -546,7 +550,7 @@ export default function WellnessForm() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },

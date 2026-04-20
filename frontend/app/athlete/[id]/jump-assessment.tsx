@@ -253,7 +253,7 @@ const AsymmetryCard = ({ data, locale }: { data: any; locale: string }) => {
           <View style={{ flex: 1, height: 16, flexDirection: 'row', borderRadius: 4, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.06)' }}>
             <View style={{ width: `${(left / max) * 50}%`, backgroundColor: '#2FB6FF', borderTopLeftRadius: 4, borderBottomLeftRadius: 4 }} />
             <View style={{ flex: 1 }} />
-            <View style={{ width: `${(right / max) * 50}%`, backgroundColor: '#7CFF3A', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
+            <View style={{ width: `${(right / max) * 50}%`, backgroundColor: '#2FB6FF', borderTopRightRadius: 4, borderBottomRightRadius: 4 }} />
           </View>
           <Text style={{ fontSize: 11, color: colors.text.secondary, width: 42 }}>{right.toFixed(unit === 'cm' ? 1 : 2)} {locale === 'pt' ? 'Dir' : 'R'}</Text>
         </View>
@@ -418,7 +418,7 @@ const RSIEvolutionChart = ({ history, protocol, locale }: { history: any[]; prot
           return (
             <G key={i}>
               {isLast && <Circle cx={getX(i)} cy={getY(h.rsi)} r="8" fill={colors.accent.primary} opacity={0.25} />}
-              <Circle cx={getX(i)} cy={getY(h.rsi)} r={isLast ? 5 : 3} fill={isLast ? colors.accent.primary : 'rgba(124, 255, 58,0.6)'} stroke={isLast ? '#fff' : 'transparent'} strokeWidth={isLast ? 2 : 0} />
+              <Circle cx={getX(i)} cy={getY(h.rsi)} r={isLast ? 5 : 3} fill={isLast ? colors.accent.primary : 'rgba(47, 182, 255,0.6)'} stroke={isLast ? '#fff' : 'transparent'} strokeWidth={isLast ? 2 : 0} />
             </G>
           );
         })}
@@ -842,7 +842,7 @@ const s = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 16,
     borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.04)',
   },
-  dateDropdownItemActive: { backgroundColor: 'rgba(124, 255, 58,0.1)' },
+  dateDropdownItemActive: { backgroundColor: 'rgba(47, 182, 255,0.1)' },
   dateDropdownItemText: { fontSize: 14, color: colors.text.secondary },
   dateDropdownItemTextActive: { color: colors.accent.primary, fontWeight: '600' },
 

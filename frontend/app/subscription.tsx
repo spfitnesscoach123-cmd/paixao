@@ -5,7 +5,7 @@
  * Mostra status atual, funcionalidades e opções de compra/cancelamento
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,6 +23,7 @@ import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { formatPrice } from '../services/revenuecat';
+import { useTheme } from '../contexts/ThemeContext';
 
 // ============================================
 // TIPOS E CONSTANTES
@@ -138,6 +139,9 @@ const FEATURE_SECTIONS: FeatureSection[] = [
 // ============================================
 
 export default function Subscription() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const { locale } = useLanguage();
   const {
@@ -505,7 +509,7 @@ export default function Subscription() {
 // ESTILOS
 // ============================================
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.dark.primary,

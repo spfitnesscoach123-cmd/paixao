@@ -4,7 +4,7 @@
  * Fluxo: Selecionar protocolo -> Informar genero/idade/peso/altura -> Ir para medicoes
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, TextInput,
 } from 'react-native';
@@ -16,8 +16,12 @@ import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { PROTOCOLS, getProtocolSites } from '../../../engine/body-composition/protocolEngine';
 import { SKINFOLD_LABELS, type Gender } from '../../../types/protocols';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export default function ProtocolSelectScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const { id: athleteId, scanWeight, scanHeight, returnPath } = useLocalSearchParams<{
     id: string; scanWeight?: string; scanHeight?: string; returnPath?: string;
   }>();
@@ -149,7 +153,7 @@ export default function ProtocolSelectScreen() {
 
             {/* Botao */}
             <TouchableOpacity style={styles.nextBtn} onPress={handleNext} data-testid="protocol-next-btn">
-              <LinearGradient colors={['#7CFF3A', '#53E65D']} style={styles.nextBtnGradient}>
+              <LinearGradient colors={['#2FB6FF', '#7BD4FF']} style={styles.nextBtnGradient}>
                 <Text style={styles.nextBtnText}>{pt ? 'Iniciar Medicoes' : 'Start Measurements'}</Text>
                 <Ionicons name="arrow-forward" size={20} color="#fff" />
               </LinearGradient>
@@ -161,28 +165,28 @@ export default function ProtocolSelectScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1 },
   scroll: { paddingHorizontal: 16, paddingBottom: 40 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(124, 255, 58,0.15)', justifyContent: 'center', alignItems: 'center' },
+  backBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(47, 182, 255,0.15)', justifyContent: 'center', alignItems: 'center' },
   title: { fontSize: 20, fontWeight: '700', color: colors.text.primary },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: colors.text.secondary, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   protocolCard: { backgroundColor: colors.dark.card, borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: colors.border.default },
-  protocolCardSelected: { borderColor: '#7CFF3A' },
+  protocolCardSelected: { borderColor: '#2FB6FF' },
   protocolRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.border.default, justifyContent: 'center', alignItems: 'center' },
-  radioSelected: { borderColor: '#7CFF3A' },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7CFF3A' },
+  radioSelected: { borderColor: '#2FB6FF' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#2FB6FF' },
   protocolName: { fontSize: 15, fontWeight: '600', color: colors.text.primary },
   protocolNameSelected: { color: '#7BD4FF' },
   protocolDesc: { fontSize: 12, color: colors.text.secondary, marginTop: 2 },
   sitesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingLeft: 34 },
-  siteBadge: { backgroundColor: 'rgba(124, 255, 58,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  siteBadge: { backgroundColor: 'rgba(47, 182, 255,0.12)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   siteText: { fontSize: 11, color: '#7BD4FF', fontWeight: '500' },
   genderRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   genderBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: colors.dark.card, borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: colors.border.default },
-  genderBtnActive: { borderColor: '#7CFF3A', backgroundColor: 'rgba(124, 255, 58,0.15)' },
+  genderBtnActive: { borderColor: '#2FB6FF', backgroundColor: 'rgba(47, 182, 255,0.15)' },
   genderText: { fontSize: 14, fontWeight: '600', color: colors.text.secondary },
   genderTextActive: { color: '#7BD4FF' },
   inputsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },

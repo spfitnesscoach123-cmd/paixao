@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,12 @@ import api from '../services/api';
 import { parseCatapultCSV, validateCatapultCSV } from '../utils/csvParser';
 import { Athlete } from '../types';
 import { colors } from '../constants/theme';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function UploadCatapultCSV() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -409,7 +413,7 @@ export default function UploadCatapultCSV() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -551,7 +555,7 @@ const styles = StyleSheet.create({
   unmatchSection: {
     marginBottom: 20,
     padding: 16,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border.default,

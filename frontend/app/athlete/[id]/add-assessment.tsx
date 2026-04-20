@@ -133,7 +133,7 @@ export default function AddAssessment() {
           <Ionicons
             name="barbell"
             size={32}
-            color={assessmentType === 'strength' ? '#ffffff' : '#7CFF3A'}
+            color={assessmentType === 'strength' ? '#ffffff' : '#2FB6FF'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'strength' && styles.typeButtonTextActive]}>
             Força
@@ -147,7 +147,7 @@ export default function AddAssessment() {
           <Ionicons
             name="heart"
             size={32}
-            color={assessmentType === 'aerobic' ? '#ffffff' : '#7CFF3A'}
+            color={assessmentType === 'aerobic' ? '#ffffff' : '#2FB6FF'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'aerobic' && styles.typeButtonTextActive]}>
             Aeróbico
@@ -161,7 +161,7 @@ export default function AddAssessment() {
           <Ionicons
             name="body"
             size={32}
-            color={assessmentType === 'body_composition' ? '#ffffff' : '#7CFF3A'}
+            color={assessmentType === 'body_composition' ? '#ffffff' : '#2FB6FF'}
           />
           <Text style={[styles.typeButtonText, assessmentType === 'body_composition' && styles.typeButtonTextActive]}>
             Composição
@@ -481,19 +481,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#7CFF3A',
+    borderColor: '#2FB6FF',
     padding: 16,
     alignItems: 'center',
     gap: 8,
   },
   typeButtonActive: {
-    backgroundColor: '#7CFF3A',
-    borderColor: '#7CFF3A',
+    backgroundColor: '#2FB6FF',
+    borderColor: '#2FB6FF',
   },
   typeButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#7CFF3A',
+    color: '#2FB6FF',
   },
   typeButtonTextActive: {
     color: '#ffffff',

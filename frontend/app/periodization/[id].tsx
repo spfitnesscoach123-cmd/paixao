@@ -158,13 +158,13 @@ function PeriodizationDetailContent() {
             h2 { color: #6b7280; font-size: 16px; font-weight: normal; margin-top: 0; }
             .info { color: #374151; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background: #7CFF3A; color: white; padding: 12px 8px; text-align: center; font-size: 11px; }
+            th { background: #2FB6FF; color: white; padding: 12px 8px; text-align: center; font-size: 11px; }
             th:first-child { text-align: left; }
             td { padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center; font-size: 12px; }
             td:first-child { text-align: left; font-weight: 500; }
             tr:nth-child(even) { background: #f9fafb; }
             .header-row { display: flex; justify-content: space-between; align-items: center; }
-            .badge { display: inline-block; background: #7CFF3A; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+            .badge { display: inline-block; background: #2FB6FF; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
           </style>
         </head>
         <body>
@@ -295,7 +295,7 @@ function PeriodizationDetailContent() {
                 key={day.date}
                 style={[
                   styles.daySelectorItem,
-                  isSelected && { borderColor: classification?.color, borderWidth: 2, backgroundColor: 'rgba(124, 255, 58, 0.1)' },
+                  isSelected && { borderColor: classification?.color, borderWidth: 2, backgroundColor: 'rgba(47, 182, 255, 0.1)' },
                 ]}
                 onPress={() => handleDaySelect(day.date)}
               >
@@ -573,10 +573,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: 8,
     paddingVertical: 10,
     paddingHorizontal: 14,
-    backgroundColor: 'rgba(124, 255, 58, 0.15)',
+    backgroundColor: 'rgba(47, 182, 255, 0.15)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.3)',
+    borderColor: 'rgba(47, 182, 255, 0.3)',
   },
   headerBackText: {
     fontSize: 14,
@@ -709,7 +709,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     maxWidth: 120,
     paddingVertical: 12,
     paddingHorizontal: 12,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     justifyContent: 'center',
   },
   tableHeaderText: {
@@ -723,7 +723,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     flex: 0.7,
     paddingVertical: 12,
     paddingHorizontal: 8,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     justifyContent: 'center',
   },
   tableMetricHeaderText: {
@@ -868,7 +868,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   weeklyTargetItem: {
     width: (screenWidth - 80) / 4,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
     padding: 8,
     alignItems: 'center',

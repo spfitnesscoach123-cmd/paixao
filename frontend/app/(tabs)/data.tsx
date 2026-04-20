@@ -42,14 +42,14 @@ const COLORS = {
   yellow: '#f59e0b',
   red: '#ef4444',
   blue: '#2FB6FF',
-  purple: '#7CFF3A',
+  purple: '#2FB6FF',
   cyan: '#22d3ee',
   orange: '#f97316',
   greenAlpha: 'rgba(16,185,129,0.25)',
   yellowAlpha: 'rgba(245,158,11,0.25)',
   redAlpha: 'rgba(239,68,68,0.25)',
   blueAlpha: 'rgba(47, 182, 255,0.25)',
-  purpleAlpha: 'rgba(124, 255, 58,0.25)',
+  purpleAlpha: 'rgba(47, 182, 255,0.25)',
 };
 
 // LMPI Classification — mirrors backend thresholds exactly (>=70 optimal, >=40 moderate, <40 high)
@@ -1448,7 +1448,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   
   // Filters
   filtersContainer: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginTop: 8 },
-  filterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(124, 255, 58,0.08)', borderWidth: 1, borderColor: 'rgba(124, 255, 58,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  filterBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(47, 182, 255,0.08)', borderWidth: 1, borderColor: 'rgba(47, 182, 255,0.15)', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
   filterBtnText: { flex: 1, color: colors.text.primary, fontSize: 11, fontWeight: '500' },
   
   // Layer menu
@@ -1463,7 +1463,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   contentContainer: { padding: 16 },
   
   // Cards
-  card: { backgroundColor: 'rgba(21,28,50,0.8)', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(124, 255, 58,0.1)' },
+  card: { backgroundColor: 'rgba(21,28,50,0.8)', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(47, 182, 255,0.1)' },
   cardTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
   cardSubtitle: { fontSize: 10, color: colors.text.tertiary, marginBottom: 4 },
   

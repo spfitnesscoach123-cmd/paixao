@@ -95,7 +95,7 @@ export default function AthletesScreen() {
               end={{ x: 1, y: 1 }}
               style={styles.hubCardGradient}
             >
-              <View style={[styles.hubCardIcon, { backgroundColor: 'rgba(124, 255, 58, 0.15)' }]}>
+              <View style={[styles.hubCardIcon, { backgroundColor: 'rgba(47, 182, 255, 0.15)' }]}>
                 <Ionicons name="people" size={28} color={colors.accent.primary} />
               </View>
               <View style={styles.hubCardInfo}>
@@ -656,7 +656,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderWidth: 1,
     borderColor: colors.border.default,
     justifyContent: 'center',
@@ -682,7 +682,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(124, 255, 58, 0.12)',
+    backgroundColor: 'rgba(47, 182, 255, 0.12)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,

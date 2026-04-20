@@ -173,7 +173,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="bar-chart" size={22} color={colors.accent.primary} />
               </View>
               <View>
@@ -347,7 +347,7 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({ athleteId }) => {
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardTitleRow}>
-              <View style={[styles.iconBox, { backgroundColor: 'rgba(124, 255, 58, 0.2)' }]}>
+              <View style={[styles.iconBox, { backgroundColor: 'rgba(47, 182, 255, 0.2)' }]}>
                 <Ionicons name="sparkles" size={22} color={colors.accent.primary} />
               </View>
               <Text style={styles.cardTitle}>{t('analysis.aiInsights')}</Text>
@@ -499,7 +499,7 @@ const styles = StyleSheet.create({
   },
   refreshButton: {
     padding: 8,
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 8,
   },
   card: {
@@ -567,11 +567,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   metricCard: {
-    backgroundColor: 'rgba(124, 255, 58, 0.08)',
+    backgroundColor: 'rgba(47, 182, 255, 0.08)',
     borderRadius: 12,
     padding: 14,
     borderWidth: 1,
-    borderColor: 'rgba(124, 255, 58, 0.2)',
+    borderColor: 'rgba(47, 182, 255, 0.2)',
   },
   metricHeader: {
     flexDirection: 'row',
@@ -765,7 +765,7 @@ const styles = StyleSheet.create({
   },
   // AI Insights Styles
   summaryBox: {
-    backgroundColor: 'rgba(124, 255, 58, 0.1)',
+    backgroundColor: 'rgba(47, 182, 255, 0.1)',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
