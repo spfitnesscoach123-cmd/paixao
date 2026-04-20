@@ -10,7 +10,7 @@ import { WellnessChart } from '../../../components/charts/WellnessChart';
 import { StatCard } from '../../../components/charts/StatCard';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function AthleteCharts() {
   const { colors } = useTheme();

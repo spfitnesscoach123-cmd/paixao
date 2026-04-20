@@ -21,7 +21,7 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import PremiumGate from '../../../components/PremiumGate';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 const { width: screenWidth } = Dimensions.get('window');
 

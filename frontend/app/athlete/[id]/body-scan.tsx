@@ -30,7 +30,7 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { useBodyScan } from '../../../hooks/useBodyScan';
 import { CameraScanner } from '../../../components/body-composition/CameraScanner';
 import { ScannerOverlay } from '../../../components/body-composition/ScannerOverlay';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 

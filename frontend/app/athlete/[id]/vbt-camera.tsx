@@ -45,7 +45,7 @@ import { VBTGauge } from '../../../components/vbt/VBTGauge';
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
 // Replaces @thinksys/react-native-mediapipe with direct MediaPipe Tasks Vision integration
 import { MediaPipeCamera, MEDIAPIPE_AVAILABLE } from '../../../services/pose/MediaPipeCamera';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const GRAVITY = 9.81;

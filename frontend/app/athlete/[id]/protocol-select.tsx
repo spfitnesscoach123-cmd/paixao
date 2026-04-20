@@ -16,7 +16,7 @@ import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { PROTOCOLS, getProtocolSites } from '../../../engine/body-composition/protocolEngine';
 import { SKINFOLD_LABELS, type Gender } from '../../../types/protocols';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function ProtocolSelectScreen() {
   const { colors } = useTheme();

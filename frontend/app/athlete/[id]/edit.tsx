@@ -21,7 +21,7 @@ import api from '../../../services/api';
 import { Athlete } from '../../../types';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 export default function EditAthlete() {
   const { colors } = useTheme();

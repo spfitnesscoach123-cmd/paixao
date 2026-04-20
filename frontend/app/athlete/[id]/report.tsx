@@ -24,7 +24,7 @@ import { useLanguage } from '../../../contexts/LanguageContext';
 import { SKINFOLD_LABELS, type FullReport, type SkinfoldSite } from '../../../types/protocols';
 import api from '../../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../../contexts/ThemeContext';
 
 const { width: SW } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';

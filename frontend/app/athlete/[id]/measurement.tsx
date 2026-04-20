@@ -7,9 +7,9 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import {
-import { useTheme } from '../../contexts/ThemeContext';
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Platform,
 } from 'react-native';
+import { useTheme } from '../../../contexts/ThemeContext';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
