@@ -78,9 +78,6 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
  * PREMIUM FEATURE
  */
 export default function JumpCameraPage() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const { locale } = useLanguage();
   const featureName = locale === 'pt' ? 'Avaliacao de Salto via Camera' : 'Jump Assessment via Camera';
   
@@ -104,6 +101,8 @@ interface JumpCameraContentProps {
 }
 
 export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCameraContentProps = {}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const params = useLocalSearchParams<{ id: string; returnPath?: string }>();
   // PHASE 3: Station Mode uses injected athleteId; Profile/Hub uses URL param
   const athleteId = stationAthleteId || params.id;

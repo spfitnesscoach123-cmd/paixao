@@ -75,9 +75,6 @@ interface CameraConfig {
  * O PremiumGate bloqueia o acesso se nenhuma das condições for atendida.
  */
 export default function VBTCameraPage() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'VBT via Câmera' : 'VBT via Camera';
@@ -106,6 +103,8 @@ interface VBTCameraContentProps {
 }
 
 export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCameraContentProps = {}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const params = useLocalSearchParams<{ id: string; returnPath?: string }>();
   // PHASE 3: Station Mode uses injected athleteId; Profile/Hub uses URL param
   const athleteId = stationAthleteId || params.id;

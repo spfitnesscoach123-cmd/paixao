@@ -381,9 +381,6 @@ const VelocityLossChart = ({ data }: { data: Array<{ set: number; velocity: numb
  * FEATURE PREMIUM - Requer trial ou assinatura ativa
  */
 export default function VBTPage() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'Dados VBT' : 'VBT Data';
@@ -396,6 +393,8 @@ export default function VBTPage() {
 }
 
 function VBTPageContent() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id: athleteId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();

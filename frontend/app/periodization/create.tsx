@@ -81,9 +81,6 @@ interface WeeklyPrescription {
  * FEATURE PREMIUM - Requer trial ou assinatura ativa
  */
 export default function CreatePeriodizationScreen() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
-
   const { locale } = useLanguage();
   
   const featureName = locale === 'pt' ? 'Periodização' : 'Periodization';
@@ -96,6 +93,8 @@ export default function CreatePeriodizationScreen() {
 }
 
 function CreatePeriodizationContent() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { locale } = useLanguage();
   const router = useRouter();
   const queryClient = useQueryClient();
