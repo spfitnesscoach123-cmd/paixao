@@ -1463,7 +1463,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   contentContainer: { padding: 16 },
   
   // Cards
-  card: { backgroundColor: 'rgba(21,28,50,0.8)', borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(47, 182, 255,0.1)' },
+  card: { backgroundColor: colors.dark.card, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border.default },
   cardTitle: { fontSize: 14, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
   cardSubtitle: { fontSize: 10, color: colors.text.tertiary, marginBottom: 4 },
   
