@@ -27,13 +27,15 @@ import { useTheme } from '../../contexts/ThemeContext';
 const { width: screenWidth } = Dimensions.get('window');
 
 // Day classifications
+// Visual order (per UX spec): MD first, then MD-5 → MD-1 so operators fill top-down
+// matching the natural week flow (first day of the week is usually MD-5).
 const DAY_CLASSIFICATIONS = [
   { id: 'MD', label: 'MD', color: '#ef4444', description: 'Match Day' },
-  { id: 'MD-1', label: 'MD-1', color: '#f97316', description: 'Dia antes do jogo' },
-  { id: 'MD-2', label: 'MD-2', color: '#eab308', description: '2 dias antes' },
-  { id: 'MD-3', label: 'MD-3', color: '#22c55e', description: '3 dias antes' },
-  { id: 'MD-4', label: 'MD-4', color: '#14b8a6', description: '4 dias antes' },
   { id: 'MD-5', label: 'MD-5', color: '#2FB6FF', description: '5 dias antes' },
+  { id: 'MD-4', label: 'MD-4', color: '#14b8a6', description: '4 dias antes' },
+  { id: 'MD-3', label: 'MD-3', color: '#22c55e', description: '3 dias antes' },
+  { id: 'MD-2', label: 'MD-2', color: '#eab308', description: '2 dias antes' },
+  { id: 'MD-1', label: 'MD-1', color: '#f97316', description: 'Dia antes do jogo' },
   { id: 'D.O', label: 'D.O', color: '#6b7280', description: 'Day Off' },
 ];
 

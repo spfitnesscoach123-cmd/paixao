@@ -266,6 +266,39 @@ function PeriodizationDetailContent() {
     },
   });
 
+  // Recalculate peaks from all GAME sessions (useful after classifying sessions)
+  const recalcPeaksMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/periodization/recalculate-peaks');
+      return response.data;
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['periodization-calculated', id] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-peak-values'] });
+      Alert.alert(
+        locale === 'pt' ? 'Base Atualizada' : 'Base Updated',
+        locale === 'pt'
+          ? `${data.athletes_updated} atleta(s) tiveram a base atualizada a partir de ${data.athletes_processed} sessão(ões) classificada(s) como Jogo.`
+          : `${data.athletes_updated} athlete(s) had peaks updated from ${data.athletes_processed} GAME sessions.`
+      );
+    },
+    onError: (error: any) => {
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        error.response?.data?.detail || 'Failed to recalculate peaks'
+      );
+    },
+  });
+
+  // Detect if no peak values exist yet (operator hasn't classified any GAME session)
+  const hasAnyPeakValues = useMemo(() => {
+    if (!calculations?.athletes) return false;
+    return calculations.athletes.some((a: any) => {
+      const pv = a.peak_values || {};
+      return Object.values(pv).some((v: any) => Number(v) > 0);
+    });
+  }, [calculations]);
+
   const handleDelete = () => {
     Alert.alert(
       locale === 'pt' ? 'Confirmar exclusão' : 'Confirm deletion',
@@ -333,6 +366,39 @@ function PeriodizationDetailContent() {
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Info banner + action when no peak values exist yet */}
+        {!hasAnyPeakValues && (
+          <View style={styles.peakBanner} data-testid="no-peaks-banner">
+            <Ionicons name="information-circle" size={20} color={colors.accent.primary} />
+            <View style={{ flex: 1, marginLeft: 10 }}>
+              <Text style={styles.peakBannerTitle}>
+                {locale === 'pt' ? 'Base não disponível' : 'Base not available'}
+              </Text>
+              <Text style={styles.peakBannerText}>
+                {locale === 'pt'
+                  ? 'A tabela usa como base os picos por métrica das sessões classificadas como Jogo. Classifique ao menos uma sessão em Periodização > Classificar Atividade e depois clique em "Recalcular Base".'
+                  : 'The table uses per-metric peaks from sessions classified as Game. Classify at least one session in Periodization > Classify Activity, then click "Recalculate Base".'}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.recalcBtn}
+          onPress={() => recalcPeaksMutation.mutate()}
+          disabled={recalcPeaksMutation.isPending}
+          data-testid="recalc-peaks-btn"
+        >
+          {recalcPeaksMutation.isPending ? (
+            <ActivityIndicator size="small" color={colors.accent.primary} />
+          ) : (
+            <Ionicons name="refresh" size={16} color={colors.accent.primary} />
+          )}
+          <Text style={styles.recalcBtnText}>
+            {locale === 'pt' ? 'Recalcular Base (Jogos)' : 'Recalculate Base (Games)'}
+          </Text>
+        </TouchableOpacity>
 
         {/* UNIFIED Table - shows weekly OR daily based on selection */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -698,6 +764,45 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     minWidth: '100%',
+  },
+  peakBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    marginBottom: 10,
+    backgroundColor: 'rgba(47, 182, 255, 0.08)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+  },
+  peakBannerTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text.primary,
+    marginBottom: 3,
+  },
+  peakBannerText: {
+    fontSize: 11,
+    color: colors.text.secondary,
+    lineHeight: 16,
+  },
+  recalcBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.accent.primary,
+    backgroundColor: 'rgba(47, 182, 255, 0.10)',
+  },
+  recalcBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.accent.primary,
   },
   tableRow: {
     flexDirection: 'row',

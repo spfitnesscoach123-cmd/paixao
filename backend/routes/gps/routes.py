@@ -36,6 +36,7 @@ except ImportError:
 
 from gps_import import GPSCSVParser, GPSDataNormalizer, Manufacturer, parse_gps_csv, consolidate_session, METRIC_CATEGORIES
 from identity_resolver import IdentityResolver
+from routes.periodization.routes import extract_gps_metrics_from_session, update_athlete_peak_values
 
 router = APIRouter(tags=["GPS Data"])
 
@@ -373,17 +374,10 @@ async def update_session_activity_type(
             athlete_name=athlete_name
         )
     
-    # Recalculate load metrics for the affected athlete/date
-    try:
-        session_date = session_records[0].get("date")
-        if session_date:
-            await load_engine.recalculate_from_date(
-                athlete_id=data.athlete_id,
-                coach_id=coach_id_str,
-                start_date=session_date
-            )
-    except Exception as e:
-        logging.warning(f"[LoadEngine] Failed to recalculate after activity-type update: {e}")
+    # NOTE: Game/Training classification affects ONLY the Periodization module.
+    # We intentionally DO NOT trigger load_engine.recalculate_from_date here —
+    # ACWR, monotony, strain and other global load metrics are engine-wide and
+    # must remain untouched by this UX action. Avoids ~15s blocking on the UI.
     
     return {
         "message": "Activity type updated successfully",
@@ -391,7 +385,7 @@ async def update_session_activity_type(
         "activity_type": data.activity_type,
         "records_updated": result.modified_count,
         "peak_values_updated": peak_updated,
-        "metrics_recalculated": True
+        "metrics_recalculated": False
     }
 
 
@@ -504,20 +498,11 @@ async def classify_session_for_all_athletes(
             except Exception as e:
                 print(f"Error updating peaks for athlete {athlete_id}: {e}")
     
-    # Recalculate load metrics for ALL affected athletes
-    recalc_count = 0
-    session_date = session_records[0].get("date") if session_records else None
-    if session_date:
-        for athlete_id in athlete_ids:
-            try:
-                await load_engine.recalculate_from_date(
-                    athlete_id=athlete_id,
-                    coach_id=coach_id,
-                    start_date=session_date
-                )
-                recalc_count += 1
-            except Exception as e:
-                logging.warning(f"[LoadEngine] Failed to recalculate after classify-all for {athlete_id}: {e}")
+    # NOTE: Game/Training classification affects ONLY the Periodization module.
+    # We intentionally DO NOT trigger load_engine.recalculate_from_date here —
+    # global load metrics (ACWR, monotony, strain) must stay untouched by this
+    # UX action. This also removes the previous ~15-20s blocking loop over
+    # every athlete that used to happen on each classify click.
     
     return {
         "success": True,
@@ -526,7 +511,7 @@ async def classify_session_for_all_athletes(
         "records_updated": result.modified_count,
         "athletes_affected": len(athlete_ids),
         "peaks_updated": len(peaks_updated),
-        "metrics_recalculated": recalc_count
+        "metrics_recalculated": 0
     }
 
 
