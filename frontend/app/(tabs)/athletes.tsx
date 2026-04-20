@@ -258,7 +258,7 @@ export default function AthletesScreen() {
               <View style={styles.hubCardInfo}>
                 <Text style={styles.hubCardTitle}>Jump Assessment</Text>
                 <Text style={styles.hubCardDesc}>
-                  {locale === 'pt' ? 'CMJ, SL-CMJ, RSI e fadiga' : 'CMJ, SL-CMJ, RSI & fatigue'}
+                  {locale === 'pt' ? 'CMJ, RSImod e Índice de Fadiga' : 'CMJ, RSImod & Fatigue Index'}
                 </Text>
                 {/* Station Mode button */}
                 <TouchableOpacity

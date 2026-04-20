@@ -2100,9 +2100,11 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
               }}
               data-testid="record-again-btn"
             >
-              <Ionicons name="refresh" size={20} color={colors.accent.primary} />
+              <Ionicons name={returnPath === 'station' ? 'arrow-forward-circle' : 'refresh'} size={20} color={colors.accent.primary} />
               <Text style={styles.recordAgainText}>
-                {locale === 'pt' ? 'Gravar Novamente' : 'Record Again'}
+                {returnPath === 'station'
+                  ? (locale === 'pt' ? 'Próximo Teste' : 'Next Test')
+                  : (locale === 'pt' ? 'Gravar Novamente' : 'Record Again')}
               </Text>
             </TouchableOpacity>
             

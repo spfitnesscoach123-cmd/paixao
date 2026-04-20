@@ -1618,7 +1618,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.tryAgainButton}
+                style={returnPath === 'station' ? styles.nextTestButton : styles.tryAgainButton}
                 onPress={() => {
                   setCameraReady(false);
                   setMediapipeReady(false);
@@ -1629,8 +1629,16 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                 }}
                 data-testid="repeat-test-btn"
               >
-                <Ionicons name="refresh" size={20} color={colors.text.secondary} />
-                <Text style={styles.tryAgainText}>{t.repeatTest}</Text>
+                <Ionicons
+                  name={returnPath === 'station' ? 'arrow-forward-circle' : 'refresh'}
+                  size={20}
+                  color={returnPath === 'station' ? colors.accent.primary : colors.text.secondary}
+                />
+                <Text style={returnPath === 'station' ? styles.nextTestText : styles.tryAgainText}>
+                  {returnPath === 'station'
+                    ? (locale === 'pt' ? 'Próximo Teste' : 'Next Test')
+                    : t.repeatTest}
+                </Text>
               </TouchableOpacity>
             </>
           ) : (
@@ -2215,6 +2223,23 @@ const createStyles = (colors: any) => StyleSheet.create({
   tryAgainText: {
     fontSize: 14,
     color: colors.text.secondary,
+  },
+  // Station Mode: prominent "Next Test" button — matches VBT visual pattern
+  nextTestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accent.primary,
+    marginTop: 8,
+  },
+  nextTestText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.accent.primary,
   },
   errorBanner: {
     alignItems: 'center',
