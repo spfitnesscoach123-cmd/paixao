@@ -55,7 +55,7 @@ const COLORS = {
 // LMPI Classification — mirrors backend thresholds exactly (>=70 optimal, >=40 moderate, <40 high)
 const getLmpiClassification = (lmpi: number | null | undefined, validity: string | undefined, locale: string) => {
   if (validity === 'invalid' || lmpi == null) {
-    return { label: locale === 'pt' ? 'Sem dados' : 'No data', color: '#64748b', bgColor: 'rgba(100,116,139,0.2)' };
+    return { label: locale === 'pt' ? 'Sem dados' : 'No data', color: colors.text.tertiary, bgColor: 'rgba(100,116,139,0.2)' };
   }
   const suffix = validity === 'partial' ? '*' : '';
   if (lmpi >= 70) {
@@ -70,6 +70,7 @@ const getLmpiClassification = (lmpi: number | null | undefined, validity: string
 
 // Gauge Component
 const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: number; max?: number; label: string; color: string; size?: number }) => {
+  const { colors } = useTheme();
   const animVal = useAnimatedValue(typeof value === 'number' && !isNaN(value) ? value : 0, { duration: 900 });
   const radius = (size - 16) / 2;
   const circumference = Math.PI * radius;
@@ -86,11 +87,11 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
           </SvgLinearGradient>
         </Defs>
         <G rotation="180" origin={`${size/2}, ${size/2}`}>
-          <Circle cx={size/2} cy={size/2} r={radius} stroke="rgba(255,255,255,0.08)" strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${circumference} ${circumference*2}`} />
+          <Circle cx={size/2} cy={size/2} r={radius} stroke={colors.border.default} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${circumference} ${circumference*2}`} />
           <Circle cx={size/2} cy={size/2} r={radius} stroke={`url(#gauge-${label})`} strokeWidth={10} fill="none" strokeLinecap="round" strokeDasharray={`${dashArray} ${circumference*2}`} />
         </G>
-        <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill="#f1f5f9" fontSize={22} fontWeight="bold">{typeof value === 'number' ? animVal.toFixed(animVal < 10 ? 1 : 0) : '--'}</SvgText>
-        <SvgText x={size/2} y={size/2 + 14} textAnchor="middle" fill="#94a3b8" fontSize={10}>{label}</SvgText>
+        <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill={colors.text.primary} fontSize={22} fontWeight="bold">{typeof value === 'number' ? animVal.toFixed(animVal < 10 ? 1 : 0) : '--'}</SvgText>
+        <SvgText x={size/2} y={size/2 + 14} textAnchor="middle" fill={colors.text.secondary} fontSize={10}>{label}</SvgText>
       </Svg>
     </View>
   );
@@ -116,6 +117,7 @@ const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number
 
 // Line Chart Component (multi-line support)
 const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: { data: number[]; color: string; dashed?: boolean }[]; labels?: string[]; height?: number; showArea?: boolean }) => {
+  const { colors } = useTheme();
   const animProgress = useChartAnimation({ duration: 1000, delay: 200, deps: lines.map(l => l.data) });
   const w = CHART_WIDTH;
   const padding = { top: 10, bottom: 24, left: 4, right: 4 };
@@ -132,7 +134,7 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
       {/* Grid lines */}
       {[0, 0.25, 0.5, 0.75, 1].map((pct, i) => {
         const y = padding.top + chartH * (1 - pct);
-        return <Line key={i} x1={padding.left} y1={y} x2={w - padding.right} y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />;
+        return <Line key={i} x1={padding.left} y1={y} x2={w - padding.right} y2={y} stroke={colors.border.default} strokeWidth={1} />;
       })}
       
       {lines.map((line, li) => {
@@ -177,7 +179,7 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
       {labels && labels.map((lbl, i) => {
         if (labels.length > 10 && i % Math.ceil(labels.length / 6) !== 0 && i !== labels.length - 1) return null;
         const x = padding.left + (i / Math.max(labels.length - 1, 1)) * chartW;
-        return <SvgText key={i} x={x} y={height - 4} textAnchor="middle" fill="#64748b" fontSize={8}>{lbl}</SvgText>;
+        return <SvgText key={i} x={x} y={height - 4} textAnchor="middle" fill={colors.text.tertiary} fontSize={8}>{lbl}</SvgText>;
       })}
     </Svg>
   );
@@ -185,6 +187,7 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
 
 // Donut Chart
 const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, centerSubtext }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; centerText?: string; centerSubtext?: string }) => {
+  const { colors } = useTheme();
   const animProgress = useChartAnimation({ duration: 800, delay: 300, deps: segments.map(s => s.value) });
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -203,8 +206,8 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
             return <Circle key={i} cx={size/2} cy={size/2} r={radius} stroke={seg.color} strokeWidth={strokeWidth} fill="none" strokeDasharray={`${dash} ${circumference}`} strokeDashoffset={currentOffset} strokeLinecap="round" />;
           })}
         </G>
-        {centerText && <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill="#f1f5f9" fontSize={18} fontWeight="bold">{centerText}</SvgText>}
-        {centerSubtext && <SvgText x={size/2} y={size/2 + 12} textAnchor="middle" fill="#94a3b8" fontSize={9}>{centerSubtext}</SvgText>}
+        {centerText && <SvgText x={size/2} y={size/2 - 4} textAnchor="middle" fill={colors.text.primary} fontSize={18} fontWeight="bold">{centerText}</SvgText>}
+        {centerSubtext && <SvgText x={size/2} y={size/2 + 12} textAnchor="middle" fill={colors.text.secondary} fontSize={9}>{centerSubtext}</SvgText>}
       </Svg>
     </View>
   );
@@ -212,6 +215,7 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
 
 // Scatter/Quadrant Chart
 const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { points: { x: number; y: number; name: string; color: string }[]; xLabel: string; yLabel: string; xMid?: number; yMid?: number; height?: number }) => {
+  const { colors } = useTheme();
   const w = CHART_WIDTH;
   const pad = { top: 10, bottom: 28, left: 30, right: 10 };
   const cW = w - pad.left - pad.right;
@@ -232,8 +236,8 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
   return (
     <Svg width={w} height={height}>
       {/* Quadrant lines */}
-      {midX !== undefined && <Line x1={midX} y1={pad.top} x2={midX} y2={pad.top + cH} stroke="rgba(255,255,255,0.12)" strokeWidth={1} strokeDasharray="4,4" />}
-      {midY !== undefined && <Line x1={pad.left} y1={midY} x2={pad.left + cW} y2={midY} stroke="rgba(255,255,255,0.12)" strokeWidth={1} strokeDasharray="4,4" />}
+      {midX !== undefined && <Line x1={midX} y1={pad.top} x2={midX} y2={pad.top + cH} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
+      {midY !== undefined && <Line x1={pad.left} y1={midY} x2={pad.left + cW} y2={midY} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
       
       {/* Zone backgrounds */}
       {midX !== undefined && midY !== undefined && (
@@ -258,14 +262,15 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
       })}
       
       {/* Axis labels */}
-      <SvgText x={w / 2} y={height - 4} textAnchor="middle" fill="#64748b" fontSize={9}>{xLabel}</SvgText>
-      <SvgText x={8} y={height / 2} textAnchor="middle" fill="#64748b" fontSize={9} rotation="-90" origin={`8, ${height/2}`}>{yLabel}</SvgText>
+      <SvgText x={w / 2} y={height - 4} textAnchor="middle" fill={colors.text.tertiary} fontSize={9}>{xLabel}</SvgText>
+      <SvgText x={8} y={height / 2} textAnchor="middle" fill={colors.text.tertiary} fontSize={9} rotation="-90" origin={`8, ${height/2}`}>{yLabel}</SvgText>
     </Svg>
   );
 };
 
 // Heatmap (weekly)
 const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { dow: number; value: number; date: string }[] }[]; height?: number }) => {
+  const { colors } = useTheme();
   const w = CHART_WIDTH;
   const cellSize = Math.min((w - 40) / 7, 36);
   const rowH = cellSize + 4;
@@ -276,7 +281,7 @@ const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { d
     <Svg width={w} height={data.length * rowH + 24}>
       {/* Day headers */}
       {dayLabels.map((lbl, i) => (
-        <SvgText key={i} x={16 + i * (cellSize + 4) + cellSize / 2} y={12} textAnchor="middle" fill="#64748b" fontSize={9}>{lbl}</SvgText>
+        <SvgText key={i} x={16 + i * (cellSize + 4) + cellSize / 2} y={12} textAnchor="middle" fill={colors.text.tertiary} fontSize={9}>{lbl}</SvgText>
       ))}
       
       {data.map((wk, wi) => (
@@ -288,7 +293,7 @@ const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { d
               <Rect key={di} x={16 + di * (cellSize + 4)} y={20 + wi * rowH} width={cellSize} height={cellSize - 4} rx={4} fill={color} opacity={0.8} />
             );
           })}
-          <SvgText x={w - 4} y={20 + wi * rowH + cellSize / 2} textAnchor="end" fill="#64748b" fontSize={8}>S{wk.week + 1}</SvgText>
+          <SvgText x={w - 4} y={20 + wi * rowH + cellSize / 2} textAnchor="end" fill={colors.text.tertiary} fontSize={8}>S{wk.week + 1}</SvgText>
         </G>
       ))}
     </Svg>
@@ -297,6 +302,7 @@ const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { d
 
 // Radar Chart
 const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: string[]; size?: number }) => {
+  const { colors } = useTheme();
   const cx = size / 2;
   const cy = size / 2;
   const r = (size - 40) / 2;
@@ -316,13 +322,13 @@ const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: 
       {rings.map((rv, i) => {
         const pts = Array.from({ length: n }, (_, j) => getPoint(j, rv));
         const d = pts.map((p, j) => `${j === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
-        return <Path key={i} d={d} stroke="rgba(255,255,255,0.08)" strokeWidth={1} fill="none" />;
+        return <Path key={i} d={d} stroke={colors.border.default} strokeWidth={1} fill="none" />;
       })}
       
       {/* Axes */}
       {Array.from({ length: n }, (_, i) => {
         const p = getPoint(i, 1);
-        return <Line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />;
+        return <Line key={i} x1={cx} y1={cy} x2={p.x} y2={p.y} stroke={colors.border.default} strokeWidth={1} />;
       })}
       
       {/* Data polygon */}
@@ -341,7 +347,7 @@ const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: 
       {/* Labels */}
       {labels.map((lbl, i) => {
         const p = getPoint(i, 1.2);
-        return <SvgText key={i} x={p.x} y={p.y + 3} textAnchor="middle" fill="#94a3b8" fontSize={8}>{lbl}</SvgText>;
+        return <SvgText key={i} x={p.x} y={p.y + 3} textAnchor="middle" fill={colors.text.secondary} fontSize={8}>{lbl}</SvgText>;
       })}
     </Svg>
   );
@@ -349,14 +355,15 @@ const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: 
 
 // Horizontal Bar
 const HorizontalBar = ({ value, max, label, color }: { value: number; max: number; label: string; color: string }) => {
+  const { colors } = useTheme();
   const pct = useAnimatedValue(Math.min(value / max, 1) * 100, { duration: 700, delay: 400 });
   return (
     <View style={{ marginBottom: 8 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 3 }}>
-        <Text style={{ color: '#94a3b8', fontSize: 11 }}>{label}</Text>
-        <Text style={{ color: '#f1f5f9', fontSize: 11, fontWeight: '600' }}>{typeof value === 'number' ? value.toFixed(1) : '--'}</Text>
+        <Text style={{ color: colors.text.secondary, fontSize: 11 }}>{label}</Text>
+        <Text style={{ color: colors.text.primary, fontSize: 11, fontWeight: '600' }}>{typeof value === 'number' ? value.toFixed(1) : '--'}</Text>
       </View>
-      <View style={{ height: 6, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+      <View style={{ height: 6, backgroundColor: colors.border.default, borderRadius: 3 }}>
         <View style={{ height: 6, width: `${pct}%`, backgroundColor: color, borderRadius: 3 }} />
       </View>
     </View>
@@ -578,7 +585,7 @@ export default function DataScreen() {
             <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load'}</Text>
             <Pressable data-testid="acute-chronic-info-tooltip" onPress={() => Alert.alert(locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load', locale === 'pt' ? 'Acute (7d): média de carga dos últimos 7 dias.\nChronic (28d): média de carga dos últimos 28 dias.\nACWR: razão Acute/Chronic — valores entre 0.8 e 1.3 indicam zona ótima.\nMonotony: variabilidade da carga (< 2.0 ideal).\nStrain: carga acumulada × monotonia.\n\nEstes indicadores refletem dados atuais (7/28d) e não são afetados pelo filtro de data.' : 'Acute (7d): average load over last 7 days.\nChronic (28d): average load over last 28 days.\nACWR: Acute/Chronic ratio — values between 0.8 and 1.3 indicate optimal zone.\nMonotony: load variability (< 2.0 ideal).\nStrain: cumulative load × monotony.\n\nThese indicators reflect current data (7/28d) and are not affected by the date filter.')}>
               <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>i</Text>
+                <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
               </View>
             </Pressable>
           </View>
@@ -765,7 +772,7 @@ export default function DataScreen() {
               <Text style={{ color: lmpiClass.color, fontSize: 13, fontWeight: '700', letterSpacing: 0.3 }}>{lmpiClass.label}</Text>
             </View>
             {lmpiValidity === 'partial' && (
-              <Text data-testid="lmpi-partial-indicator" style={{ color: '#94a3b8', fontSize: 10, marginTop: 4 }}>
+              <Text data-testid="lmpi-partial-indicator" style={{ color: colors.text.secondary, fontSize: 10, marginTop: 4 }}>
                 {locale === 'pt' ? '* Dados parciais (apenas carga)' : '* Partial data (load only)'}
               </Text>
             )}
@@ -803,8 +810,8 @@ export default function DataScreen() {
                 {availDonutSegs.map((s, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s.color, marginRight: 6 }} />
-                    <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>{s.label}</Text>
-                    <Text style={{ color: '#f1f5f9', fontSize: 11, fontWeight: '600' }}>{s.value}</Text>
+                    <Text style={{ color: colors.text.secondary, fontSize: 11, flex: 1 }}>{s.label}</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: 11, fontWeight: '600' }}>{s.value}</Text>
                   </View>
                 ))}
               </View>
@@ -819,7 +826,7 @@ export default function DataScreen() {
               <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Melhor Condição (LMPI)' : 'Athletes by Condition (LMPI)'}</Text>
               <Pressable data-testid="lmpi-info-tooltip" onPress={() => Alert.alert('LMPI', locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta.' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition.')}>
                 <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>i</Text>
+                  <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
                 </View>
               </Pressable>
             </View>
@@ -905,7 +912,7 @@ export default function DataScreen() {
           </View>
           {wellness != null && (
             <View style={{ alignItems: 'center', marginTop: 6 }}>
-              <Text style={{ color: '#94a3b8', fontSize: 11 }}>{locale === 'pt' ? 'Wellness Médio' : 'Avg Wellness'}: {wellness?.toFixed(1) || '--'}/10</Text>
+              <Text style={{ color: colors.text.secondary, fontSize: 11 }}>{locale === 'pt' ? 'Wellness Médio' : 'Avg Wellness'}: {wellness?.toFixed(1) || '--'}/10</Text>
             </View>
           )}
         </View>
@@ -946,8 +953,8 @@ export default function DataScreen() {
                 {availSegs.map((s, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
                     <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: s.color, marginRight: 6 }} />
-                    <Text style={{ color: '#94a3b8', fontSize: 11, flex: 1 }}>{s.label}</Text>
-                    <Text style={{ color: '#f1f5f9', fontSize: 11, fontWeight: '600' }}>{s.value}</Text>
+                    <Text style={{ color: colors.text.secondary, fontSize: 11, flex: 1 }}>{s.label}</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: 11, fontWeight: '600' }}>{s.value}</Text>
                   </View>
                 ))}
               </View>
@@ -1075,11 +1082,11 @@ export default function DataScreen() {
             <Text style={styles.cardTitle}>{locale === 'pt' ? 'VBT por Exercício' : 'VBT by Exercise'}</Text>
             <View style={{ marginTop: 8 }}>
               {Object.entries(vbtMetrics.exercises).map(([ex, data]: [string, any], i: number) => (
-                <View key={ex} style={{ marginBottom: 12, borderBottomWidth: i < Object.keys(vbtMetrics.exercises).length - 1 ? 1 : 0, borderBottomColor: 'rgba(255,255,255,0.06)', paddingBottom: 8 }}>
-                  <Text style={{ color: '#f1f5f9', fontSize: 12, fontWeight: '600', marginBottom: 4 }}>{ex}</Text>
+                <View key={ex} style={{ marginBottom: 12, borderBottomWidth: i < Object.keys(vbtMetrics.exercises).length - 1 ? 1 : 0, borderBottomColor: colors.border.default, paddingBottom: 8 }}>
+                  <Text style={{ color: colors.text.primary, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>{ex}</Text>
                   <View style={{ flexDirection: 'row', gap: 12 }}>
-                    <Text style={{ color: '#94a3b8', fontSize: 11 }}>MV: {data.mean_velocity?.toFixed(2) || '--'} m/s</Text>
-                    <Text style={{ color: '#94a3b8', fontSize: 11 }}>PV: {data.peak_velocity?.toFixed(2) || '--'} m/s</Text>
+                    <Text style={{ color: colors.text.secondary, fontSize: 11 }}>MV: {data.mean_velocity?.toFixed(2) || '--'} m/s</Text>
+                    <Text style={{ color: colors.text.secondary, fontSize: 11 }}>PV: {data.peak_velocity?.toFixed(2) || '--'} m/s</Text>
                     {data.fatigue_pct != null && <Text style={{ color: data.fatigue_pct > 15 ? COLORS.red : COLORS.green, fontSize: 11 }}>Loss: {data.fatigue_pct.toFixed(1)}%</Text>}
                   </View>
                 </View>
@@ -1136,9 +1143,9 @@ export default function DataScreen() {
             <Text style={styles.cardTitle}>ACWR vs Wellness</Text>
             <QuadrantChart points={quadrantPoints} xLabel="ACWR" yLabel="Wellness" xMid={1.3} yMid={5} height={200} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green, marginRight: 4 }} /><Text style={{ color: '#94a3b8', fontSize: 9 }}>{locale === 'pt' ? 'Ótimo' : 'Optimal'}</Text></View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.yellow, marginRight: 4 }} /><Text style={{ color: '#94a3b8', fontSize: 9 }}>{locale === 'pt' ? 'Atenção' : 'Attention'}</Text></View>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.red, marginRight: 4 }} /><Text style={{ color: '#94a3b8', fontSize: 9 }}>{locale === 'pt' ? 'Alto Risco' : 'High Risk'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Ótimo' : 'Optimal'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.yellow, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Atenção' : 'Attention'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.red, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Alto Risco' : 'High Risk'}</Text></View>
             </View>
           </View>
         )}
@@ -1453,7 +1460,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   
   // Layer menu
   layerMenu: { marginTop: 12, maxHeight: 44 },
-  layerTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  layerTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8, backgroundColor: colors.dark.tertiary, borderWidth: 1, borderColor: colors.border.default },
   layerTabActive: { backgroundColor: colors.accent.primary, borderColor: colors.accent.primary },
   layerTabText: { fontSize: 11, color: colors.text.tertiary, fontWeight: '500' },
   layerTabTextActive: { color: '#fff', fontWeight: '700' },
@@ -1468,16 +1475,16 @@ const createStyles = (colors: any) => StyleSheet.create({
   cardSubtitle: { fontSize: 10, color: colors.text.tertiary, marginBottom: 4 },
   
   // Metric pills
-  metricPill: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  metricPill: { alignItems: 'center', backgroundColor: colors.dark.tertiary, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   metricPillLabel: { fontSize: 9, color: colors.text.tertiary, marginBottom: 2 },
   metricPillValue: { fontSize: 16, fontWeight: 'bold', color: colors.text.primary },
   
   // Tables
   table: { marginTop: 8 },
-  tableHeader: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
+  tableHeader: { flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.border.default },
   tableHeaderText: { fontSize: 10, color: colors.text.tertiary, fontWeight: '600' },
   tableRow: { flexDirection: 'row', paddingVertical: 8, alignItems: 'center' },
-  tableRowAlt: { backgroundColor: 'rgba(255,255,255,0.02)' },
+  tableRowAlt: { backgroundColor: colors.dark.secondary },
   tableCell: { fontSize: 11, color: colors.text.primary },
   
   // Insight card
@@ -1488,7 +1495,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', padding: 32 },
   modalContent: { backgroundColor: colors.dark.tertiary, borderRadius: 16, padding: 20, maxHeight: '80%' },
   modalTitle: { fontSize: 16, fontWeight: 'bold', color: colors.text.primary, marginBottom: 16 },
-  modalOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  modalOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border.default },
   modalOptionText: { fontSize: 14, color: colors.text.primary },
   modalOptionActive: { color: colors.accent.primary, fontWeight: '700' },
   modalOptionSubtext: { fontSize: 11, color: colors.text.tertiary, marginTop: 2 },
@@ -1510,11 +1517,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     gap: 10,
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomColor: colors.border.default,
   },
   pdfCheckbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: colors.border.default,
     alignItems: 'center' as const, justifyContent: 'center' as const,
   },
   pdfCheckboxChecked: {
@@ -1522,6 +1529,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   pdfLayerLabel: { fontSize: 14, color: colors.text.tertiary, fontWeight: '500' as const, flex: 1 },
   pdfModalActions: { flexDirection: 'row' as const, justifyContent: 'flex-end' as const, gap: 10, marginTop: 20 },
-  pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: 'rgba(255,255,255,0.06)' },
+  pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.border.default },
   pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },
 });

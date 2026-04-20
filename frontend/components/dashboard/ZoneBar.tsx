@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { useTheme } from '../../contexts/ThemeContext';
 
 const ZONE_COLORS = {
   z3: '#2FB6FF',
@@ -14,9 +15,10 @@ interface ZoneBarProps {
 }
 
 export const ZoneBar = React.memo(function ZoneBar({ z3, z4, z5 }: ZoneBarProps) {
+  const { colors } = useTheme();
   const total = z3 + z4 + z5;
   if (total === 0) {
-    return <View style={styles.emptyBar} />;
+    return <View style={[styles.emptyBar, { backgroundColor: colors.dark.tertiary }]} />;
   }
 
   const pZ3 = (z3 / total) * 100;
@@ -24,7 +26,7 @@ export const ZoneBar = React.memo(function ZoneBar({ z3, z4, z5 }: ZoneBarProps)
   const pZ5 = (z5 / total) * 100;
 
   return (
-    <View style={styles.bar}>
+    <View style={[styles.bar, { backgroundColor: colors.dark.tertiary }]}>
       {pZ3 > 0 && (
         <View style={[styles.segment, { width: `${pZ3}%`, backgroundColor: ZONE_COLORS.z3 }]} />
       )}
