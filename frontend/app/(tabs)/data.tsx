@@ -215,9 +215,10 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
   );
 };
 
-// Scatter/Quadrant Chart
+// Scatter/Quadrant Chart — clickable points reveal tooltip with athlete name + values
 const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { points: { x: number; y: number; name: string; color: string }[]; xLabel: string; yLabel: string; xMid?: number; yMid?: number; height?: number }) => {
   const { colors } = useTheme();
+  const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
   const w = CHART_WIDTH;
   const pad = { top: 10, bottom: 28, left: 30, right: 10 };
   const cW = w - pad.left - pad.right;
@@ -234,39 +235,91 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
   
   const midX = xMid !== undefined ? pad.left + ((xMid - xMin) / xRange) * cW : undefined;
   const midY = yMid !== undefined ? pad.top + cH * (1 - (yMid - yMin) / yRange) : undefined;
+
+  const selected = selectedIdx !== null ? points[selectedIdx] : null;
   
   return (
-    <Svg width={w} height={height}>
-      {/* Quadrant lines */}
-      {midX !== undefined && <Line x1={midX} y1={pad.top} x2={midX} y2={pad.top + cH} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
-      {midY !== undefined && <Line x1={pad.left} y1={midY} x2={pad.left + cW} y2={midY} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
-      
-      {/* Zone backgrounds */}
-      {midX !== undefined && midY !== undefined && (
-        <G>
-          <Rect x={pad.left} y={pad.top} width={midX - pad.left} height={midY - pad.top} fill="rgba(16,185,129,0.06)" />
-          <Rect x={midX} y={pad.top} width={pad.left + cW - midX} height={midY - pad.top} fill="rgba(245,158,11,0.06)" />
-          <Rect x={pad.left} y={midY} width={midX - pad.left} height={pad.top + cH - midY} fill="rgba(47, 182, 255,0.06)" />
-          <Rect x={midX} y={midY} width={pad.left + cW - midX} height={pad.top + cH - midY} fill="rgba(239,68,68,0.06)" />
-        </G>
-      )}
-      
-      {/* Points */}
-      {points.map((p, i) => {
-        const cx = pad.left + ((p.x - xMin) / xRange) * cW;
-        const cy = pad.top + cH * (1 - (p.y - yMin) / yRange);
-        return (
-          <G key={i}>
-            <Circle cx={cx} cy={cy} r={6} fill={p.color} opacity={0.8} />
-            <Circle cx={cx} cy={cy} r={3} fill="#fff" opacity={0.6} />
+    <View style={{ width: w, height, position: 'relative' }}>
+      <Svg width={w} height={height}>
+        {/* Quadrant lines */}
+        {midX !== undefined && <Line x1={midX} y1={pad.top} x2={midX} y2={pad.top + cH} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
+        {midY !== undefined && <Line x1={pad.left} y1={midY} x2={pad.left + cW} y2={midY} stroke={colors.border.default} strokeWidth={1} strokeDasharray="4,4" />}
+        
+        {/* Zone backgrounds */}
+        {midX !== undefined && midY !== undefined && (
+          <G>
+            <Rect x={pad.left} y={pad.top} width={midX - pad.left} height={midY - pad.top} fill="rgba(16,185,129,0.06)" />
+            <Rect x={midX} y={pad.top} width={pad.left + cW - midX} height={midY - pad.top} fill="rgba(245,158,11,0.06)" />
+            <Rect x={pad.left} y={midY} width={midX - pad.left} height={pad.top + cH - midY} fill="rgba(47, 182, 255,0.06)" />
+            <Rect x={midX} y={midY} width={pad.left + cW - midX} height={pad.top + cH - midY} fill="rgba(239,68,68,0.06)" />
           </G>
-        );
-      })}
-      
-      {/* Axis labels */}
-      <SvgText x={w / 2} y={height - 4} textAnchor="middle" fill={colors.text.tertiary} fontSize={9}>{xLabel}</SvgText>
-      <SvgText x={8} y={height / 2} textAnchor="middle" fill={colors.text.tertiary} fontSize={9} rotation="-90" origin={`8, ${height/2}`}>{yLabel}</SvgText>
-    </Svg>
+        )}
+        
+        {/* Points (clickable) */}
+        {points.map((p, i) => {
+          const cx = pad.left + ((p.x - xMin) / xRange) * cW;
+          const cy = pad.top + cH * (1 - (p.y - yMin) / yRange);
+          const isSelected = selectedIdx === i;
+          return (
+            <G key={i}>
+              {isSelected && (
+                <Circle cx={cx} cy={cy} r={12} fill="none" stroke={p.color} strokeWidth={1.5} opacity={0.6} />
+              )}
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={isSelected ? 8 : 6}
+                fill={p.color}
+                opacity={isSelected ? 1 : 0.85}
+                onPress={() => setSelectedIdx(prev => (prev === i ? null : i))}
+              />
+              <Circle cx={cx} cy={cy} r={3} fill="#fff" opacity={0.7} />
+            </G>
+          );
+        })}
+        
+        {/* Axis labels */}
+        <SvgText x={w / 2} y={height - 4} textAnchor="middle" fill={colors.text.tertiary} fontSize={9}>{xLabel}</SvgText>
+        <SvgText x={8} y={height / 2} textAnchor="middle" fill={colors.text.tertiary} fontSize={9} rotation="-90" origin={`8, ${height/2}`}>{yLabel}</SvgText>
+      </Svg>
+
+      {/* Tooltip overlay — same pattern as Team Dashboard HSR chart */}
+      {selected && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            bottom: 32,
+            right: 10,
+            backgroundColor: colors.dark.secondary,
+            borderColor: selected.color,
+            borderWidth: 1,
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            minWidth: 170,
+          }}
+          activeOpacity={0.9}
+          onPress={() => setSelectedIdx(null)}
+          data-testid="quadrant-tooltip"
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected.color }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, flex: 1 }} numberOfLines={1}>
+              {selected.name}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+              {xLabel}: {selected.x.toFixed(2)}
+            </Text>
+            <Text style={{ fontSize: 11, color: colors.text.tertiary }}>|</Text>
+            <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+              {yLabel}: {selected.y >= 1000 ? (selected.y / 1000).toFixed(2) + 'k' : selected.y.toFixed(1)}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 };
 
