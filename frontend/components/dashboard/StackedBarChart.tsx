@@ -6,19 +6,26 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  Modal,
+  useWindowDimensions,
 } from 'react-native';
-import Svg, { Rect, Line, Text as SvgText } from 'react-native-svg';
+import Svg, { Rect, Line, Text as SvgText, G, Circle } from 'react-native-svg';
+import { Ionicons } from '@expo/vector-icons';
 import type { TeamTableRowData } from './types';
 
+// Colors harmonized with app palette (sapphire primary + green perf + amber/red warnings)
 const ZONE_COLORS = {
-  base: '#1e3a5f',
-  z3: '#2FB6FF',
-  z4: '#f59e0b',
-  z5: '#ef4444',
+  base: '#1B4C80',  // navy elevated — base Total Distance
+  z3: '#2FB6FF',    // sapphire
+  z4: '#7BD4FF',    // sapphire light (HSR)
+  z5: '#F5B941',    // warm accent (sprint intensity)
 };
 
-const TOP_COLOR = '#10b981';
-const BOTTOM_COLOR = '#ef4444';
+const TOP_COLOR = '#7CFF3A';     // green performance (logo)
+const BOTTOM_COLOR = '#FF4D6D';  // error red
+
+// Minimum visual height to keep Z5 perceptible when TD dominates the scale
+const MIN_SEGMENT_PX = 4;
 
 interface Props {
   rows: TeamTableRowData[];
@@ -36,6 +43,8 @@ export const StackedBarChart = React.memo(function StackedBarChart({
   const [layerZ3, setLayerZ3] = React.useState(true);
   const [layerZ4, setLayerZ4] = React.useState(true);
   const [layerZ5, setLayerZ5] = React.useState(true);
+  const [tooltipVisible, setTooltipVisible] = React.useState(false);
+  const { width: winWidth } = useWindowDimensions();
 
   const toggleZ3 = React.useCallback(() => setLayerZ3(v => !v), []);
   const toggleZ4 = React.useCallback(() => setLayerZ4(v => !v), []);
@@ -48,7 +57,7 @@ export const StackedBarChart = React.memo(function StackedBarChart({
       .sort((a, b) => b.total_distance - a.total_distance);
   }, [rows]);
 
-  // Calculate max stacked value and team average
+  // Calculate max stacked value and team average (DATA UNCHANGED)
   const { maxVal, teamAvg, top3Ids, bottom3Ids } = React.useMemo(() => {
     if (chartData.length === 0) return { maxVal: 1, teamAvg: 0, top3Ids: new Set<string>(), bottom3Ids: new Set<string>() };
 
@@ -97,11 +106,11 @@ export const StackedBarChart = React.memo(function StackedBarChart({
     );
   }
 
-  // Chart dimensions
-  const BAR_WIDTH = 32;
-  const BAR_GAP = 6;
+  // Responsive chart dimensions
+  const BAR_WIDTH = winWidth >= 900 ? 44 : winWidth >= 600 ? 38 : 32;
+  const BAR_GAP = winWidth >= 900 ? 10 : 6;
   const LABEL_HEIGHT = 40;
-  const CHART_HEIGHT = 180;
+  const CHART_HEIGHT = winWidth >= 900 ? 260 : 200;
   const LEFT_PAD = 4;
   const chartWidth = LEFT_PAD + chartData.length * (BAR_WIDTH + BAR_GAP);
   const svgHeight = CHART_HEIGHT + LABEL_HEIGHT;
@@ -114,36 +123,26 @@ export const StackedBarChart = React.memo(function StackedBarChart({
       style={[styles.container, { backgroundColor: colors.dark.cardSolid, borderColor: colors.border.default }]}
       data-testid="stacked-bar-chart"
     >
-      {/* Header */}
-      <Text style={[styles.title, { color: colors.text.primary }]}>
-        {locale === 'pt' ? 'Carga por Atleta' : 'Load per Athlete'}
-      </Text>
+      {/* Header with info icon */}
+      <View style={styles.headerRow}>
+        <Text style={[styles.title, { color: colors.text.primary }]}>
+          {locale === 'pt' ? 'Carga por Atleta' : 'Load per Athlete'}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setTooltipVisible(true)}
+          data-testid="stacked-chart-info"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="information-circle-outline" size={18} color={colors.text.tertiary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Zone Toggles */}
       <View style={styles.toggleRow}>
-        <ToggleChip
-          label="Z3"
-          active={layerZ3}
-          color={ZONE_COLORS.z3}
-          onPress={toggleZ3}
-          borderColor={colors.border.default}
-        />
-        <ToggleChip
-          label="Z4"
-          active={layerZ4}
-          color={ZONE_COLORS.z4}
-          onPress={toggleZ4}
-          borderColor={colors.border.default}
-        />
-        <ToggleChip
-          label="Z5"
-          active={layerZ5}
-          color={ZONE_COLORS.z5}
-          onPress={toggleZ5}
-          borderColor={colors.border.default}
-        />
+        <ToggleChip label="Z3" active={layerZ3} color={ZONE_COLORS.z3} onPress={toggleZ3} borderColor={colors.border.default} />
+        <ToggleChip label="Z4 (HSR)" active={layerZ4} color={ZONE_COLORS.z4} onPress={toggleZ4} borderColor={colors.border.default} />
+        <ToggleChip label="Z5 (Sprint)" active={layerZ5} color={ZONE_COLORS.z5} onPress={toggleZ5} borderColor={colors.border.default} />
 
-        {/* Legend dots */}
         <View style={styles.legendSpacer} />
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: TOP_COLOR }]} />
@@ -158,25 +157,42 @@ export const StackedBarChart = React.memo(function StackedBarChart({
       {/* Chart */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
         <Svg width={chartWidth} height={svgHeight}>
-          {/* Average line */}
+          {/* Average highlighted band */}
+          <Rect
+            x={0}
+            y={avgY - 1}
+            width={chartWidth}
+            height={2}
+            fill={colors.accent.primary}
+            opacity={0.18}
+          />
           <Line
             x1={0}
             y1={avgY}
             x2={chartWidth}
             y2={avgY}
             stroke={colors.accent.primary}
-            strokeWidth={1}
-            strokeDasharray="4,4"
-            opacity={0.6}
+            strokeWidth={2}
+            strokeDasharray="6,3"
+            opacity={1}
+          />
+          {/* Average label badge */}
+          <Rect
+            x={chartWidth - 70}
+            y={avgY - 16}
+            width={66}
+            height={14}
+            rx={3}
+            fill={colors.accent.primary}
+            opacity={0.92}
           />
           <SvgText
-            x={chartWidth - 4}
-            y={avgY - 4}
-            textAnchor="end"
-            fill={colors.accent.primary}
+            x={chartWidth - 37}
+            y={avgY - 5}
+            textAnchor="middle"
+            fill="#081C3A"
             fontSize={9}
-            fontWeight="600"
-            opacity={0.8}
+            fontWeight="700"
           >
             {locale === 'pt' ? 'Média' : 'Avg'} {(teamAvg / 1000).toFixed(1)}km
           </SvgText>
@@ -189,47 +205,35 @@ export const StackedBarChart = React.memo(function StackedBarChart({
 
             // Stack segments bottom-up: base -> z3 -> z4 -> z5
             const baseH = (row.total_distance / maxVal) * CHART_HEIGHT;
-            const z3H = layerZ3 ? (row.z3 / maxVal) * CHART_HEIGHT : 0;
-            const z4H = layerZ4 ? (row.z4 / maxVal) * CHART_HEIGHT : 0;
-            const z5H = layerZ5 ? (row.z5 / maxVal) * CHART_HEIGHT : 0;
+            let z3H = layerZ3 ? (row.z3 / maxVal) * CHART_HEIGHT : 0;
+            let z4H = layerZ4 ? (row.z4 / maxVal) * CHART_HEIGHT : 0;
+            let z5H = layerZ5 ? (row.z5 / maxVal) * CHART_HEIGHT : 0;
+
+            // Visual normalization: enforce min height for Z4/Z5 when data > 0
+            // so high-intensity segments stay perceptible even when TD dominates the scale.
+            // DATA is NOT altered — only the painted segment has a visual floor.
+            if (layerZ4 && row.z4 > 0 && z4H < MIN_SEGMENT_PX) z4H = MIN_SEGMENT_PX;
+            if (layerZ5 && row.z5 > 0 && z5H < MIN_SEGMENT_PX) z5H = MIN_SEGMENT_PX;
+            if (layerZ3 && row.z3 > 0 && z3H < MIN_SEGMENT_PX / 2) z3H = MIN_SEGMENT_PX / 2;
 
             let cursor = CHART_HEIGHT;
-
             const segments: { y: number; h: number; color: string }[] = [];
 
-            // Base distance
             cursor -= baseH;
             segments.push({ y: cursor, h: baseH, color: ZONE_COLORS.base });
 
-            // Z3
-            if (z3H > 0) {
-              cursor -= z3H;
-              segments.push({ y: cursor, h: z3H, color: ZONE_COLORS.z3 });
-            }
+            if (z3H > 0) { cursor -= z3H; segments.push({ y: cursor, h: z3H, color: ZONE_COLORS.z3 }); }
+            if (z4H > 0) { cursor -= z4H; segments.push({ y: cursor, h: z4H, color: ZONE_COLORS.z4 }); }
+            if (z5H > 0) { cursor -= z5H; segments.push({ y: cursor, h: z5H, color: ZONE_COLORS.z5 }); }
 
-            // Z4
-            if (z4H > 0) {
-              cursor -= z4H;
-              segments.push({ y: cursor, h: z4H, color: ZONE_COLORS.z4 });
-            }
-
-            // Z5
-            if (z5H > 0) {
-              cursor -= z5H;
-              segments.push({ y: cursor, h: z5H, color: ZONE_COLORS.z5 });
-            }
-
-            // Highlight border color
             const borderCol = isTop ? TOP_COLOR : isBottom ? BOTTOM_COLOR : 'none';
 
-            // Short name (first name or initials)
             const shortName = row.name.length > 5
               ? row.name.split(' ').map(w => w[0]).join('').slice(0, 3)
               : row.name;
 
             return (
               <React.Fragment key={row.athlete_id}>
-                {/* Highlight border */}
                 {borderCol !== 'none' && (
                   <Rect
                     x={x - 1.5}
@@ -240,11 +244,10 @@ export const StackedBarChart = React.memo(function StackedBarChart({
                     fill="none"
                     stroke={borderCol}
                     strokeWidth={1.5}
-                    opacity={0.7}
+                    opacity={0.85}
                   />
                 )}
 
-                {/* Stacked segments */}
                 {segments.map((seg, si) => (
                   <Rect
                     key={si}
@@ -254,29 +257,27 @@ export const StackedBarChart = React.memo(function StackedBarChart({
                     height={Math.max(seg.h, 0.5)}
                     rx={si === segments.length - 1 ? 3 : 0}
                     fill={seg.color}
-                    opacity={0.9}
+                    opacity={0.92}
                   />
                 ))}
 
-                {/* Value label on top */}
                 <SvgText
                   x={x + BAR_WIDTH / 2}
                   y={cursor - 4}
                   textAnchor="middle"
                   fill={colors.text.secondary}
-                  fontSize={8}
+                  fontSize={9}
                   fontWeight="600"
                 >
                   {(row.total_distance / 1000).toFixed(1)}
                 </SvgText>
 
-                {/* Name label at bottom */}
                 <SvgText
                   x={x + BAR_WIDTH / 2}
                   y={CHART_HEIGHT + 14}
                   textAnchor="middle"
                   fill={isTop ? TOP_COLOR : isBottom ? BOTTOM_COLOR : colors.text.tertiary}
-                  fontSize={8}
+                  fontSize={9}
                   fontWeight={isTop || isBottom ? '700' : '500'}
                 >
                   {shortName}
@@ -286,6 +287,19 @@ export const StackedBarChart = React.memo(function StackedBarChart({
           })}
         </Svg>
       </ScrollView>
+
+      {/* Info Tooltip Modal */}
+      <InfoTooltip
+        visible={tooltipVisible}
+        onClose={() => setTooltipVisible(false)}
+        colors={colors}
+        title={locale === 'pt' ? 'Carga por Atleta' : 'Load per Athlete'}
+        body={
+          locale === 'pt'
+            ? 'Distância total (barra base, metros) somada a Z3, Z4 (HSR) e Z5 (Sprint) de cada atleta. Os 3 melhores e piores são destacados. A linha tracejada indica a média do grupo no período.'
+            : 'Total distance (base bar, meters) stacked with Z3, Z4 (HSR) and Z5 (Sprint) per athlete. Top 3 and bottom 3 are highlighted. The dashed line shows the team average for the period.'
+        }
+      />
     </View>
   );
 });
@@ -323,12 +337,45 @@ const ToggleChip = React.memo(function ToggleChip({
   );
 });
 
+// Info tooltip modal (shared style)
+export const InfoTooltip = React.memo(function InfoTooltip({
+  visible,
+  onClose,
+  colors,
+  title,
+  body,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  colors: any;
+  title: string;
+  body: string;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={onClose}>
+        <View style={[styles.modalCard, { backgroundColor: colors.dark.cardSolid, borderColor: colors.accent.primary }]}>
+          <View style={styles.modalHeader}>
+            <Ionicons name="information-circle" size={20} color={colors.accent.primary} />
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
+          </View>
+          <Text style={[styles.modalBody, { color: colors.text.secondary }]}>{body}</Text>
+          <TouchableOpacity onPress={onClose} style={[styles.modalBtn, { backgroundColor: colors.accent.primary }]}>
+            <Text style={styles.modalBtnText}>OK</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+});
+
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     borderWidth: 1,
     padding: 14,
     marginBottom: 16,
+    width: '100%',
   },
   loadingWrap: {
     height: 180,
@@ -343,10 +390,15 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 13,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   title: {
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 10,
   },
   toggleRow: {
     flexDirection: 'row',
@@ -390,5 +442,45 @@ const styles = StyleSheet.create({
   legendLabel: {
     fontSize: 9,
     fontWeight: '500',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 18,
+    maxWidth: 420,
+    width: '100%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  modalBody: {
+    fontSize: 13,
+    lineHeight: 19,
+    marginBottom: 14,
+  },
+  modalBtn: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  modalBtnText: {
+    color: '#081C3A',
+    fontWeight: '700',
+    fontSize: 13,
   },
 });

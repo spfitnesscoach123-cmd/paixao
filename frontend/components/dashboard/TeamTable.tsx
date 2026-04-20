@@ -10,6 +10,7 @@ import {
 import { FlashList } from '@shopify/flash-list';
 import { Ionicons } from '@expo/vector-icons';
 import { TeamTableRowItem } from './TeamTableRow';
+import { InfoTooltip } from './StackedBarChart';
 import type { TeamTableRowData, SortKey, SortDir } from './types';
 
 const TOGGLE_COLS = [
@@ -29,6 +30,7 @@ interface Props {
 export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props) {
   const [sortKey, setSortKey] = React.useState<SortKey>('total_distance');
   const [sortDir, setSortDir] = React.useState<SortDir>('desc');
+  const [tooltipVisible, setTooltipVisible] = React.useState(false);
   const [visibleCols, setVisibleCols] = React.useState<Record<string, boolean>>({
     zones: true,
     sprint: true,
@@ -123,10 +125,19 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
 
   return (
     <View style={[styles.container, { backgroundColor: colors.dark.cardSolid, borderColor: colors.border.default }]} data-testid="team-analytics-table">
-      {/* Section Title */}
-      <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
-        {locale === 'pt' ? 'Tabela Analítica' : 'Analytics Table'}
-      </Text>
+      {/* Section Title with info icon */}
+      <View style={styles.titleRow}>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>
+          {locale === 'pt' ? 'Tabela Analítica' : 'Analytics Table'}
+        </Text>
+        <TouchableOpacity
+          onPress={() => setTooltipVisible(true)}
+          data-testid="team-table-info"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="information-circle-outline" size={18} color={colors.text.tertiary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Column Toggle */}
       <View style={styles.toggleRow}>
@@ -178,14 +189,16 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.colMetric} onPress={() => handleSort('total_distance')} data-testid="sort-distance">
-              <Text style={[styles.headerText, { color: colors.text.secondary }]}>Dist.</Text>
+              <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                {locale === 'pt' ? 'Dist. (km)' : 'Dist. (km)'}
+              </Text>
               <SortIcon colKey="total_distance" />
             </TouchableOpacity>
 
             {visibleCols.zones && (
               <TouchableOpacity style={styles.colZones} onPress={() => handleSort('z3')} data-testid="sort-zones">
                 <Text style={[styles.headerText, { color: colors.text.secondary }]}>
-                  {locale === 'pt' ? 'Zonas' : 'Zones'}
+                  {locale === 'pt' ? 'Zonas (m)' : 'Zones (m)'}
                 </Text>
                 <SortIcon colKey="z3" />
               </TouchableOpacity>
@@ -193,26 +206,30 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
 
             {visibleCols.sprint && (
               <TouchableOpacity style={styles.colSmall} onPress={() => handleSort('sprint_count')} data-testid="sort-sprint">
-                <Text style={[styles.headerText, { color: colors.text.secondary }]}>SPR</Text>
+                <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                  {locale === 'pt' ? 'SPR (n)' : 'SPR (n)'}
+                </Text>
                 <SortIcon colKey="sprint_count" />
               </TouchableOpacity>
             )}
 
             {visibleCols.accDec && (
               <TouchableOpacity style={styles.colSmall} onPress={() => handleSort('acc_dec')} data-testid="sort-accdec">
-                <Text style={[styles.headerText, { color: colors.text.secondary }]}>A/D</Text>
+                <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                  {locale === 'pt' ? 'A/D (n)' : 'A/D (n)'}
+                </Text>
                 <SortIcon colKey="acc_dec" />
               </TouchableOpacity>
             )}
 
             <TouchableOpacity style={styles.colRsi} onPress={() => handleSort('rsimod')} data-testid="sort-rsi">
-              <Text style={[styles.headerText, { color: colors.text.secondary }]}>RSI</Text>
+              <Text style={[styles.headerText, { color: colors.text.secondary }]}>RSImod</Text>
               <SortIcon colKey="rsimod" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.colFatigue} onPress={() => handleSort('fatigue_index')} data-testid="sort-fatigue">
               <Text style={[styles.headerText, { color: colors.text.secondary }]}>
-                {locale === 'pt' ? 'Fadiga' : 'Fatigue'}
+                {locale === 'pt' ? 'Fadiga (%)' : 'Fatigue (%)'}
               </Text>
               <SortIcon colKey="fatigue_index" />
             </TouchableOpacity>
@@ -236,6 +253,18 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
           </View>
         </View>
       </ScrollView>
+
+      <InfoTooltip
+        visible={tooltipVisible}
+        onClose={() => setTooltipVisible(false)}
+        colors={colors}
+        title={locale === 'pt' ? 'Tabela Analítica' : 'Analytics Table'}
+        body={
+          locale === 'pt'
+            ? 'Linhas por atleta com métricas agregadas do período:\n\n• Dist. (km) — distância total percorrida\n• Zonas (m) — distância em Z3 / Z4 / Z5 em metros\n• SPR (n) — número de sprints (picos > 25.2 km/h)\n• A/D (n) — número de acelerações/desacelerações significativas\n• RSImod — Reactive Strength Index modificado (adim.)\n• Fadiga (%) — índice de fadiga SNC\n• Composição corporal — %Gordura / Massa magra (kg)\n\nClique nos cabeçalhos para ordenar. Use as chips no topo para mostrar/ocultar colunas.'
+            : 'Rows per athlete with aggregated period metrics:\n\n• Dist. (km) — total distance covered\n• Zones (m) — distance in Z3 / Z4 / Z5 in meters\n• SPR (n) — sprint count (peaks > 25.2 km/h)\n• A/D (n) — significant accel/decel events\n• RSImod — modified Reactive Strength Index (unitless)\n• Fatigue (%) — CNS fatigue index\n• Body composition — body fat % / lean mass (kg)\n\nTap column headers to sort. Use chips at the top to show/hide columns.'
+        }
+      />
     </View>
   );
 }
@@ -264,7 +293,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
-    paddingHorizontal: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
     paddingTop: 12,
     paddingBottom: 4,
   },
