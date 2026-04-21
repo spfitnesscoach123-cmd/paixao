@@ -19,6 +19,13 @@ import { InfoTooltip } from '../../components/dashboard/StackedBarChart';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 64;
+const DASHBOARD_MAX_WIDTH = 1100;
+
+// Responsive chart width: caps at DASHBOARD_MAX_WIDTH on wide screens
+const useChartWidth = () => {
+  const { width } = useWindowDimensions();
+  return Math.min(width, DASHBOARD_MAX_WIDTH) - 64;
+};
 
 // ============ LAYER DEFINITIONS ============
 const LAYERS = [
