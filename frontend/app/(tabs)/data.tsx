@@ -1883,8 +1883,3 @@ const createStyles = (colors: any) => StyleSheet.create({
   pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.border.default },
   pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },
 });
-e: 14, color: colors.text.tertiary, fontWeight: '500' as const, flex: 1 },
-  pdfModalActions: { flexDirection: 'row' as const, justifyContent: 'flex-end' as const, gap: 10, marginTop: 20 },
-  pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.border.default },
-  pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },
-});

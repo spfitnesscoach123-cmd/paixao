@@ -6,9 +6,7 @@ import api from '../services/api';
 import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 import { ComprehensiveAnalysis } from '../types';
 import { colors } from '../constants/theme';
-import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 import { useLanguage } from '../contexts/LanguageContext';
-import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 import { ACWREvolutionChart } from './ACWREvolutionChart';
 
 interface ACWRDetailedMetric {

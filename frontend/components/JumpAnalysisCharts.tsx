@@ -7,9 +7,7 @@ import { useRouter } from 'expo-router';
 import api from '../services/api';
 import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 import { colors } from '../constants/theme';
-import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 import { useLanguage } from '../contexts/LanguageContext';
-import { FadeInView, SkeletonDashboard, AnimatedMetric } from './animations';
 
 const { width: screenWidth } = Dimensions.get('window');
 const isSmallScreen = screenWidth < 375;

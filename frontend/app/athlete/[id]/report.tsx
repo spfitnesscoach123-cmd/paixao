@@ -113,25 +113,25 @@ export default function ReportScreen() {
     body_composition: {
       title: pt ? 'Composicao Corporal' : 'Body Composition',
       body: pt
-        ? 'O sistema captura medidas via scan (dobras cutaneas, perimetros) e cruza com o protocolo selecionado no exame (ex.: Jackson & Pollock, Durnin & Womersley, Faulkner, Yuhasz). Aplica a equacao de densidade corporal → converte em % de gordura via Siri ou Brozek. Massa magra = peso × (1 − %G). Valores normais de %G variam por sexo, idade e populacao — atletas tendem a ficar abaixo da media sedentaria.',
+        ? 'O sistema captura medidas via scan (dobras cutaneas, perimetros) e cruza com o protocolo selecionado no exame (ex.: Jackson & Pollock, Durnin & Womersley, Faulkner, Yuhasz). Aplica a equacao de densidade corporal → converte em % de gordura via Siri ou Brozek. Massa magra = peso × (1 − %G). Valores normais de %G variam por sexo, idade e populacao — atletas tendem a ficar abaixo da media sedentaria.'
         : 'The system captures measurements via scan (skinfolds, girths) and cross-references them with the protocol selected in the exam (e.g., Jackson & Pollock, Durnin & Womersley, Faulkner, Yuhasz). It applies the body-density equation → converts to body-fat % via Siri or Brozek. Lean mass = weight × (1 − %F). Normal body-fat ranges depend on sex, age and population — athletes typically fall below sedentary averages.',
     },
     symmetry: {
       title: pt ? 'Simetria' : 'Symmetry',
       body: pt
-        ? 'Diferenca percentual entre segmentos (tronco vs membros, superior vs inferior), calculada a partir das medidas capturadas no scan. Valores < 10% = equilibrio; 10–20% = atencao; > 20% = assimetria relevante (risco de lesao unilateral ou gap de treinamento). Use para orientar intervencoes de fortalecimento direcionado.',
+        ? 'Diferenca percentual entre segmentos (tronco vs membros, superior vs inferior), calculada a partir das medidas capturadas no scan. Valores < 10% = equilibrio; 10–20% = atencao; > 20% = assimetria relevante (risco de lesao unilateral ou gap de treinamento). Use para orientar intervencoes de fortalecimento direcionado.'
         : 'Percentage difference between segments (trunk vs limbs, upper vs lower), computed from the measurements captured in the scan. Values < 10% = balanced; 10–20% = caution; > 20% = relevant asymmetry (unilateral injury risk or training gap). Use to guide targeted strengthening interventions.',
     },
     insights: {
       title: pt ? 'Insights' : 'Insights',
       body: pt
-        ? 'Comentarios automaticos derivados do cruzamento das metricas (%G, massa magra, simetria) com faixas de referencia do protocolo selecionado. Sao heuristicas informativas para guiar a interpretacao — nao substituem avaliacao clinica. Servem como ponto de partida para conversas sobre nutricao, treino e recuperacao.',
+        ? 'Comentarios automaticos derivados do cruzamento das metricas (%G, massa magra, simetria) com faixas de referencia do protocolo selecionado. Sao heuristicas informativas para guiar a interpretacao — nao substituem avaliacao clinica. Servem como ponto de partida para conversas sobre nutricao, treino e recuperacao.'
         : 'Automatic comments derived from cross-referencing metrics (%F, lean mass, symmetry) with reference ranges from the selected protocol. These are informative heuristics to guide interpretation — not a substitute for clinical assessment. They serve as starting points for conversations about nutrition, training and recovery.',
     },
     skinfolds: {
       title: pt ? 'Dobras Cutaneas' : 'Skinfold Measurements',
       body: pt
-        ? 'Medidas brutas (em mm) de cada ponto anatomico capturado no scan. Estas sao as entradas da equacao do protocolo — a soma ponderada delas alimenta a estimativa de densidade corporal. Desvios grandes em um ponto isolado podem indicar erro de medida ou padrao de deposicao especifico; mantenha os mesmos avaliadores e tecnica ao longo do tempo.',
+        ? 'Medidas brutas (em mm) de cada ponto anatomico capturado no scan. Estas sao as entradas da equacao do protocolo — a soma ponderada delas alimenta a estimativa de densidade corporal. Desvios grandes em um ponto isolado podem indicar erro de medida ou padrao de deposicao especifico; mantenha os mesmos avaliadores e tecnica ao longo do tempo.'
         : 'Raw measurements (in mm) for each anatomical site captured in the scan. These are the inputs of the protocol equation — their weighted sum feeds the body-density estimate. Large deviations at an isolated site can indicate measurement error or a specific deposition pattern; keep the same evaluators and technique across time.',
     },
   }), [pt]);
