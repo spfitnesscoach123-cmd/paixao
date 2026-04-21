@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ export default function ProfileScreen() {
   const { colors } = useTheme();
   const router = useRouter();
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const pendingLocaleRef = useRef<string | null>(null);
   
   // Get app version from native build (works with EAS autoIncrement)
   const appVersion = Constants.nativeAppVersion || Constants.expoConfig?.version || '1.0.0';
@@ -50,13 +51,23 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleLanguageSelect = async (code: string) => {
-    // Fix race condition iOS Modal dismiss × LanguageProvider cascade × refetch storm.
-    // Order: close modal FIRST, wait for native slide animation (≈275ms on iOS),
-    // THEN trigger setLocale which fans out ~67 re-renders + ~9 query refetches.
+  const handleLanguageSelect = (code: string) => {
+    if (code === locale) {
+      setShowLanguageModal(false);
+      return;
+    }
+
+    pendingLocaleRef.current = code;
     setShowLanguageModal(false);
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await setLocale(code);
+  };
+
+  const handleModalDismiss = () => {
+    const pending = pendingLocaleRef.current;
+
+    if (pending) {
+      pendingLocaleRef.current = null;
+      setLocale(pending);
+    }
   };
 
   const handleOpenEditProfile = () => {
@@ -216,6 +227,7 @@ export default function ProfileScreen() {
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowLanguageModal(false)}
+        onDismiss={handleModalDismiss}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
