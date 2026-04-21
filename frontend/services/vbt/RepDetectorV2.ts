@@ -40,6 +40,12 @@ export interface RepDetectorV2Config {
   maxRepDuration: number;            // Abort if rep takes too long (ms)
   startDirection: 'down' | 'up';     // Eccentric-first or concentric-first
   minPhaseDisplacement: number;      // Min displacement per phase (normalized 0-1)
+  // Plateau trigger — OR complement to reversal-based completion.
+  // Restores V1's velocity-drop/stationary completion paths that V2 lost,
+  // fixing the off-by-one where rep N was only committed when rep N+1 began.
+  plateauConfirmMs: number;             // Sustained window required (Invariant 5)
+  plateauVelocityThreshold: number;     // Vel below = plateau armed (Invariant 4a)
+  plateauDisplacementEpsilon: number;   // Max phaseDisplacement growth in window (Invariant 4b)
 }
 
 export interface RepDetectorV2Result {
@@ -55,6 +61,12 @@ const DEFAULT_CONFIG: RepDetectorV2Config = {
   maxRepDuration: 10000,
   startDirection: 'down',
   minPhaseDisplacement: 0.03,  // 3% of screen — lower than MovementDetector's 8% to allow partial tracking
+  // Plateau trigger defaults (see checkPlateau). Values chosen so that:
+  //  • top-hold (noise-only displacement) fires within 400ms
+  //  • grinder sticking point (bar still moving ~0.03+/400ms) does NOT fire
+  plateauConfirmMs: 400,
+  plateauVelocityThreshold: 0.15,
+  plateauDisplacementEpsilon: 0.015,
 };
 
 export class RepDetectorV2 {
@@ -80,6 +92,10 @@ export class RepDetectorV2 {
 
   // Stored rep data
   private lastCompletedRep: RepDataV2 | null = null;
+
+  // Plateau trigger state (reset on every phase transition)
+  private plateauStartTime = 0;
+  private plateauStartDisplacement = 0;
 
   constructor(config: Partial<RepDetectorV2Config> = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -164,9 +180,17 @@ export class RepDetectorV2 {
     if (elapsed < this.config.minPhaseDuration) return false;
 
     if (this.config.startDirection === 'up') {
-      // Concentric-first: eccentric completes the rep
-      if (dir !== 'down' && this.eccentricDisplacement >= this.config.minPhaseDisplacement) {
-        return this.complete(now);
+      // Concentric-first: eccentric completes the rep.
+      // Invariant 2: displacement gate is mandatory for BOTH completion paths.
+      if (this.eccentricDisplacement >= this.config.minPhaseDisplacement) {
+        // Plateau trigger (OR complement to reversal) — off-by-one fix.
+        if (this.checkPlateau(vel, disp, now)) {
+          return this.complete(now);
+        }
+        // Existing reversal trigger — preserved unchanged.
+        if (dir !== 'down') {
+          return this.complete(now);
+        }
       }
     } else {
       // Eccentric-first: transition to concentric when direction flips
@@ -200,9 +224,17 @@ export class RepDetectorV2 {
         this.eccentricVelocities = vel > 0 ? [vel] : [];
       }
     } else {
-      // Eccentric-first: concentric completes the rep
-      if (dir !== 'up' && this.concentricDisplacement >= this.config.minPhaseDisplacement) {
-        return this.complete(now);
+      // Eccentric-first: concentric completes the rep.
+      // Invariant 2: displacement gate is mandatory for BOTH completion paths.
+      if (this.concentricDisplacement >= this.config.minPhaseDisplacement) {
+        // Plateau trigger (OR complement to reversal) — off-by-one fix.
+        if (this.checkPlateau(vel, disp, now)) {
+          return this.complete(now);
+        }
+        // Existing reversal trigger — preserved unchanged.
+        if (dir !== 'up') {
+          return this.complete(now);
+        }
       }
     }
     return false;
@@ -246,6 +278,52 @@ export class RepDetectorV2 {
   private transition(next: RepPhaseV2, now: number): void {
     this.phase = next;
     this.phaseStartTime = now;
+    // Reset plateau tracker on any phase change — no dirty-time carry-over
+    this.plateauStartTime = 0;
+    this.plateauStartDisplacement = 0;
+  }
+
+  /**
+   * Plateau trigger — OR complement to reversal-based completion.
+   *
+   * Off-by-one fix: V1 completed on velocity-drop OR stationary OR reversal.
+   * V2 only kept reversal, so rep N was committed when rep N+1's descent was
+   * confirmed — producing "1 physical rep = 0 counted". This helper restores
+   * the missing completion path, tightly gated by DUAL signal (Invariant 4):
+   *
+   *   armed  = velocity below plateauVelocityThreshold
+   *   stable = phaseDisplacement growth ≤ plateauDisplacementEpsilon
+   *   time   = both held for ≥ plateauConfirmMs (Invariant 5: ≥400ms)
+   *
+   * Timer resets if either signal breaks (no dirty-time accumulation).
+   * Caller MUST gate on minPhaseDisplacement + minPhaseDuration (Invariants 2, 3).
+   */
+  private checkPlateau(vel: number, disp: number, now: number): boolean {
+    // Invariant 4a: velocity must be low to arm the window
+    if (vel >= this.config.plateauVelocityThreshold) {
+      this.plateauStartTime = 0;
+      this.plateauStartDisplacement = 0;
+      return false;
+    }
+
+    // Arm the window with the current displacement snapshot
+    if (this.plateauStartTime === 0) {
+      this.plateauStartTime = now;
+      this.plateauStartDisplacement = disp;
+      return false;
+    }
+
+    // Invariant 4b: displacement must stay stagnant across the window
+    const displacementGrowth = disp - this.plateauStartDisplacement;
+    if (displacementGrowth > this.config.plateauDisplacementEpsilon) {
+      // Bar is still moving — restart window from here (no dirty-time)
+      this.plateauStartTime = now;
+      this.plateauStartDisplacement = disp;
+      return false;
+    }
+
+    // Dual signal sustained — confirm after plateauConfirmMs
+    return (now - this.plateauStartTime) >= this.config.plateauConfirmMs;
   }
 
   private clearPhaseData(): void {
@@ -282,6 +360,8 @@ export class RepDetectorV2 {
     this.concentricStartTime = 0;
     this.lastRepTime = 0;
     this.lastCompletedRep = null;
+    this.plateauStartTime = 0;
+    this.plateauStartDisplacement = 0;
     this.clearPhaseData();
   }
 }
