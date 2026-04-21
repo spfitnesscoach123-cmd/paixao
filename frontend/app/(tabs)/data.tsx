@@ -1,7 +1,8 @@
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl,
-  Dimensions, Animated, Modal, Pressable, Platform, ActivityIndicator, Alert
+  Dimensions, Animated, Modal, Pressable, Platform, ActivityIndicator, Alert,
+  useWindowDimensions
 } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -101,6 +102,7 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
 
 // Mini Bar Chart
 const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number[]; color: string; height?: number; barWidth?: number }) => {
+  const CHART_WIDTH = useChartWidth();
   const animProgress = useChartAnimation({ duration: 700, delay: 100, deps: data });
   const max = Math.max(...data, 1);
   const w = Math.min(data.length * (barWidth + 3), CHART_WIDTH - 20);
@@ -120,6 +122,7 @@ const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number
 // Line Chart Component (multi-line support)
 const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: { data: number[]; color: string; dashed?: boolean }[]; labels?: string[]; height?: number; showArea?: boolean }) => {
   const { colors } = useTheme();
+  const CHART_WIDTH = useChartWidth();
   const animProgress = useChartAnimation({ duration: 1000, delay: 200, deps: lines.map(l => l.data) });
   const w = CHART_WIDTH;
   const padding = { top: 10, bottom: 24, left: 4, right: 4 };
@@ -218,6 +221,7 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
 // Scatter/Quadrant Chart — clickable points reveal tooltip with athlete name + values
 const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { points: { x: number; y: number; name: string; color: string }[]; xLabel: string; yLabel: string; xMid?: number; yMid?: number; height?: number }) => {
   const { colors } = useTheme();
+  const CHART_WIDTH = useChartWidth();
   const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
   const w = CHART_WIDTH;
   const pad = { top: 10, bottom: 28, left: 30, right: 10 };
@@ -326,6 +330,7 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
 // Heatmap (weekly)
 const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { dow: number; value: number; date: string }[] }[]; height?: number }) => {
   const { colors } = useTheme();
+  const CHART_WIDTH = useChartWidth();
   const w = CHART_WIDTH;
   const cellSize = Math.min((w - 40) / 7, 36);
   const rowH = cellSize + 4;
@@ -431,13 +436,13 @@ const HorizontalBar = ({ value, max, label, color }: { value: number; max: numbe
 // Formula unchanged (backend): (1 − V_last / V_first) × 100
 const VelocityDeviationChart = ({ data, locale }: { data: Array<{ name: string; value: number }>; locale: string }) => {
   const { colors } = useTheme();
+  const chartWidth = useChartWidth();
   const AXIS_MIN = -30;
   const AXIS_MAX = 30;
   const AXIS_RANGE = AXIS_MAX - AXIS_MIN;
   const ROW_H = 42;
   const NAME_W = 46;
   const PAD_R = 12;
-  const chartWidth = Math.max(280, Math.min(SCREEN_WIDTH - 64, 560));
   const trackLeft = NAME_W;
   const trackRight = chartWidth - PAD_R;
   const trackWidth = trackRight - trackLeft;
@@ -1636,7 +1641,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   
   // Content
   contentScroll: { flex: 1 },
-  contentContainer: { padding: 16 },
+  contentContainer: { padding: 16, maxWidth: DASHBOARD_MAX_WIDTH, width: '100%', alignSelf: 'center' },
   
   // Cards
   card: { backgroundColor: colors.dark.card, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border.default },
@@ -1697,6 +1702,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     backgroundColor: colors.accent.primary, borderColor: colors.accent.primary,
   },
   pdfLayerLabel: { fontSize: 14, color: colors.text.tertiary, fontWeight: '500' as const, flex: 1 },
+  pdfModalActions: { flexDirection: 'row' as const, justifyContent: 'flex-end' as const, gap: 10, marginTop: 20 },
+  pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.border.default },
+  pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },
+});
+e: 14, color: colors.text.tertiary, fontWeight: '500' as const, flex: 1 },
   pdfModalActions: { flexDirection: 'row' as const, justifyContent: 'flex-end' as const, gap: 10, marginTop: 20 },
   pdfCancelBtn: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.border.default },
   pdfExportActionBtn: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6, paddingVertical: 10, paddingHorizontal: 18, borderRadius: 8, backgroundColor: colors.accent.primary },

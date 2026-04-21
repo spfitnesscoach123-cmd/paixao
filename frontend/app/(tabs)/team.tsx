@@ -394,6 +394,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   scrollContent: {
     padding: 16,
     paddingBottom: 32,
+    maxWidth: 1100,
+    width: '100%',
+    alignSelf: 'center',
   },
   csvImportButton: {
     marginBottom: 12,
