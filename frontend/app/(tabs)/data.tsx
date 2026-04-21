@@ -15,6 +15,7 @@ import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { AnimatedMetric, SkeletonDashboard, FadeInView, ChartEntryView, AnimatedCard, useChartAnimation, useAnimatedValue } from '../../components/animations';
+import { InfoTooltip } from '../../components/dashboard/StackedBarChart';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CHART_WIDTH = SCREEN_WIDTH - 64;
@@ -99,6 +100,183 @@ const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: num
     </View>
   );
 };
+
+
+// ============ CARD INFO HEADER (tooltip pattern reused from TeamTable) ============
+// Pure UX layer — adds an (i) icon to every chart card that opens an explanatory modal.
+// Does NOT change any data, query, formula, or calculation. Tooltip content is derived
+// from the TOOLTIPS registry below, keyed by a stable id.
+const TOOLTIPS: Record<string, { pt: string; en: string }> = {
+  acwr_load: {
+    pt: 'Mostra a Carga Aguda (7d) vs Carga Crônica (28d). Alto em ambas indica volume consistente. Aguda muito acima da Crônica aumenta o risco de lesão. O equilíbrio entre elas é a base do ACWR — use para detectar picos de carga não acompanhados por adaptação crônica.',
+    en: 'Shows Acute Load (7d) vs Chronic Load (28d). High values in both indicate consistent volume. Acute well above Chronic increases injury risk. The balance between them is the basis of ACWR — use to detect load spikes not matched by chronic adaptation.',
+  },
+  total_distance: {
+    pt: 'Distância total percorrida ao longo do tempo (timeline). Quedas abruptas podem indicar descanso/lesão; subidas aceleradas podem sinalizar progressão agressiva. Útil para avaliar consistência de volume semanal.',
+    en: 'Total distance covered over time (timeline). Abrupt drops may indicate rest/injury; rapid rises may signal aggressive progression. Useful to assess weekly volume consistency.',
+  },
+  acwr_timeline: {
+    pt: 'Evolução do ACWR (razão Aguda/Crônica). Zona ótima: 0.8 – 1.3. Acima de 1.5 indica pico de carga e alto risco. Abaixo de 0.8 indica subcarga. Útil para acompanhar adaptação ao longo do microciclo.',
+    en: 'ACWR ratio evolution (Acute/Chronic). Optimal zone: 0.8 – 1.3. Above 1.5 indicates load spike and high risk. Below 0.8 indicates undertraining. Useful to track adaptation across the microcycle.',
+  },
+  acwr_vs_load: {
+    pt: 'Quadrante relacionando ACWR × Carga Crônica. Ideal: alta carga crônica + ACWR controlado (~1.0). Quadrante de risco: ACWR alto + carga crônica baixa (pico em atleta desadaptado).',
+    en: 'Quadrant relating ACWR × Chronic Load. Ideal: high chronic load + controlled ACWR (~1.0). Risk quadrant: high ACWR + low chronic load (spike in undertrained athlete).',
+  },
+  velocity_zones: {
+    pt: 'Distribuição da distância em zonas de velocidade (Z1–Z5). Mais metros em Z4/Z5 indicam alta demanda neuromuscular. Equilibrar zonas baixas (recuperação/aeróbico) com picos de alta intensidade.',
+    en: 'Distance distribution across velocity zones (Z1–Z5). More meters in Z4/Z5 indicate high neuromuscular demand. Balance low zones (recovery/aerobic) with high-intensity peaks.',
+  },
+  weekly_heatmap: {
+    pt: 'Heatmap mostra intensidade diária ao longo das semanas. Útil para detectar padrões: dias de pico consistentes, blocos de repouso, sobrecarga em semanas específicas.',
+    en: 'Heatmap showing daily intensity across weeks. Useful to detect patterns: consistent peak days, rest blocks, overload in specific weeks.',
+  },
+  load_ranking: {
+    pt: 'Ranking dos atletas por carga total. Identifica quem está acumulando mais volume. Útil para comparar demanda individual vs média da equipe e calibrar prescrição.',
+    en: 'Athletes ranking by total load. Identifies who is accumulating the most volume. Useful to compare individual demand vs team average and calibrate prescription.',
+  },
+  lmpi: {
+    pt: 'LoadManager Performance Indicator — score composto (0–100) que agrega carga, prontidão, neuromuscular, risco e composição corporal. ≥80 ótimo, 60–79 bom, 40–59 atenção, <40 crítico. É o indicador holístico do atleta.',
+    en: 'LoadManager Performance Indicator — composite score (0–100) aggregating load, readiness, neuromuscular, risk and body composition. ≥80 optimal, 60–79 good, 40–59 caution, <40 critical. Holistic athlete indicator.',
+  },
+  performance_profile: {
+    pt: 'Radar multidimensional comparando força, potência, endurance, velocidade e recuperação. Útil para identificar gaps — perfis desequilibrados sugerem foco direcionado na próxima periodização.',
+    en: 'Multidimensional radar comparing strength, power, endurance, speed and recovery. Useful to identify gaps — imbalanced profiles suggest targeted focus in the next periodization block.',
+  },
+  acwr_wellness: {
+    pt: 'Cruzamento entre ACWR (risco de carga) e Wellness (prontidão subjetiva). Alto ACWR + baixo Wellness = zona crítica. Baixo ACWR + alto Wellness = sub-solicitação. O equilíbrio é o alvo.',
+    en: 'Cross between ACWR (load risk) and Wellness (subjective readiness). High ACWR + low Wellness = critical zone. Low ACWR + high Wellness = under-utilization. Balance is the target.',
+  },
+  availability: {
+    pt: '% de atletas disponíveis para treino/jogo. Meta: ≥90%. Quedas indicam surto de lesões ou fadiga crônica — útil para contexto operacional imediato.',
+    en: '% of athletes available for training/game. Target: ≥90%. Drops indicate injury outbreak or chronic fatigue — useful for immediate operational context.',
+  },
+  lmpi_rankings: {
+    pt: 'Ranking dos atletas por LMPI. Quem está no topo tem condição geral ótima; no fim da lista demanda intervenção imediata (carga, sono, nutrição, mobilidade).',
+    en: 'Athletes ranking by LMPI. Top athletes have optimal overall condition; bottom of the list demands immediate intervention (load, sleep, nutrition, mobility).',
+  },
+  team_readiness: {
+    pt: 'Prontidão média da equipe com base em wellness diário. ≥4/5 é ideal. Quedas sustentadas indicam necessidade de deload coletivo.',
+    en: 'Team average readiness based on daily wellness. ≥4/5 is ideal. Sustained drops indicate need for collective deload.',
+  },
+  wellness_summary: {
+    pt: 'Resumo das dimensões: sono, dor, stress, fadiga, humor. Valores baixos em dor/fadiga = bom. Valores altos em sono/humor = bom. Identifica dimensão crítica da semana.',
+    en: 'Dimensions summary: sleep, pain, stress, fatigue, mood. Low values on pain/fatigue = good. High values on sleep/mood = good. Identifies the critical dimension of the week.',
+  },
+  wellness_evolution: {
+    pt: 'Evolução temporal do wellness médio. Tendência descendente = alerta de sobrecarga psico-física acumulada. Tendência estável ou crescente = adaptação saudável.',
+    en: 'Wellness average evolution over time. Downward trend = accumulated psycho-physical overload alert. Stable or rising trend = healthy adaptation.',
+  },
+  cumulative_load: {
+    pt: 'Carga acumulada período a período. Útil para ver se o volume total está dentro do planejado e se há semanas outliers acima da média.',
+    en: 'Period-by-period cumulative load. Useful to see if total volume is on plan and whether there are outlier weeks above average.',
+  },
+  low_readiness: {
+    pt: 'Lista de atletas com wellness abaixo do limiar. Priorize conversas individuais, possível redução de carga ou sessão regenerativa.',
+    en: 'Athletes with wellness below threshold. Prioritize 1-on-1 conversations, possible load reduction or regenerative session.',
+  },
+  neuro_status: {
+    pt: 'Neuro Score agregado (0–100) combinando RSImod, Velocity Loss e CMJ. ≥75 ótimo, 50–74 adequado, <50 alerta. Alto = potência preservada. Baixo = fadiga neuromuscular crítica.',
+    en: 'Aggregated Neuro Score (0–100) combining RSImod, Velocity Loss and CMJ. ≥75 optimal, 50–74 adequate, <50 alert. High = preserved power. Low = critical neuromuscular fatigue.',
+  },
+  rsimod_long: {
+    pt: 'RSImod longitudinal — Índice de Força Reativa modificado ao longo do tempo. ↑ = potência reativa crescente. ↓ abrupta = fadiga ou lesão. Baseline individual é mais relevante do que comparação cross-atleta.',
+    en: 'Longitudinal RSImod — modified Reactive Strength Index over time. ↑ = rising reactive power. Abrupt ↓ = fatigue or injury. Individual baseline is more relevant than cross-athlete comparison.',
+  },
+  rsimod_by_athlete: {
+    pt: 'Comparativo entre atletas (último RSImod vs baseline). Pontos abaixo da linha neutra = fadiga; acima = potenciação. A linha sombreada representa a zona normal de variação individual.',
+    en: 'Cross-athlete comparison (latest RSImod vs baseline). Dots below the neutral line = fatigue; above = potentiation. Shaded band represents normal individual variation.',
+  },
+  cmj_profile: {
+    pt: 'Perfil CMJ (altura, TTT, contato) por atleta. Queda em altura + aumento em TTT = fadiga. Manter o perfil equilibrado é chave para performance reativa.',
+    en: 'CMJ profile (height, TTT, contact time) per athlete. Drop in height + TTT increase = fatigue. Keeping the profile balanced is key for reactive performance.',
+  },
+  velocity_deviation: {
+    pt: 'Velocity Deviation Chart — divergente em torno de 0%. Esquerda (negativo) = potenciação (último set mais rápido que o primeiro). Direita (positivo) = fadiga (perda de velocidade entre sets). Fórmula: (1 − V_último/V_primeiro)×100.',
+    en: 'Velocity Deviation Chart — divergent around 0%. Left (negative) = potentiation (last set faster than first). Right (positive) = fatigue (velocity loss between sets). Formula: (1 − V_last/V_first)×100.',
+  },
+  vbt_by_exercise: {
+    pt: 'VBT detalhado por exercício (agachamento, supino, etc.). Compara velocity loss entre exercícios — sinaliza qual padrão motor está mais fadigado.',
+    en: 'VBT broken down by exercise (squat, bench, etc.). Compares velocity loss across exercises — flags which motor pattern is most fatigued.',
+  },
+  risk_score: {
+    pt: 'Score de Risco composto (0–100) com base em ACWR, wellness e histórico. ≥70 alto risco (intervenção), 40–69 moderado, <40 baixo. Use para triagem rápida antes de sessões intensas.',
+    en: 'Composite Risk Score (0–100) based on ACWR, wellness and history. ≥70 high risk (intervention), 40–69 moderate, <40 low. Use for quick triage before intense sessions.',
+  },
+  rsi_vs_acwr: {
+    pt: 'Cruzamento entre RSImod (potência reativa) e ACWR (carga relativa). Quadrante de risco: RSImod ↓ + ACWR ↑. Ideal: RSImod ↑ + ACWR ~1.0.',
+    en: 'Cross between RSImod (reactive power) and ACWR (relative load). Risk quadrant: RSImod ↓ + ACWR ↑. Ideal: RSImod ↑ + ACWR ~1.0.',
+  },
+  asymmetry_alert: {
+    pt: 'Alerta de assimetria em Single-Leg CMJ. Assimetria >15% entre membros = alto risco de lesão e indicativo de déficit neuromuscular unilateral. Priorizar correção.',
+    en: 'Asymmetry alert on Single-Leg CMJ. Asymmetry >15% between limbs = high injury risk and sign of unilateral neuromuscular deficit. Prioritize correction.',
+  },
+  risk_panel: {
+    pt: 'Painel consolidado de atletas em zona de risco (ACWR, wellness, assimetria, idade). Use para priorizar conversas e decisões de seleção antes de jogos.',
+    en: 'Consolidated panel of athletes in the risk zone (ACWR, wellness, asymmetry, age). Use to prioritize conversations and selection decisions before games.',
+  },
+};
+
+const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; subtitle?: string }) => {
+  const { colors } = useTheme();
+  const { locale } = useLanguage();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const [visible, setVisible] = useState(false);
+  // Allow caller to pass an already-translated title directly via the id registry OR a custom title via subtitle prop
+  const entry = (TOOLTIPS as any)[id] as { pt: string; en: string } | undefined;
+  const body = entry ? (locale === 'pt' ? entry.pt : entry.en) : '';
+  // Title map keyed by id — declared alongside TOOLTIPS for consistency
+  const TITLES: Record<string, { pt: string; en: string }> = {
+    acwr_load: { pt: 'Carga Aguda vs Crônica', en: 'Acute vs Chronic Load' },
+    total_distance: { pt: 'Distancia Total (Timeline)', en: 'Total Distance (Timeline)' },
+    acwr_timeline: { pt: 'ACWR Timeline', en: 'ACWR Timeline' },
+    acwr_vs_load: { pt: 'ACWR vs Carga', en: 'ACWR vs Load' },
+    velocity_zones: { pt: 'Zonas de Velocidade', en: 'Velocity Zones' },
+    weekly_heatmap: { pt: 'Heatmap Semanal', en: 'Weekly Heatmap' },
+    load_ranking: { pt: 'Ranking de Carga', en: 'Load Ranking' },
+    lmpi: { pt: 'Score LMPI', en: 'LMPI Score' },
+    performance_profile: { pt: 'Perfil de Performance', en: 'Performance Profile' },
+    acwr_wellness: { pt: 'ACWR vs Wellness', en: 'ACWR vs Wellness' },
+    availability: { pt: 'Disponibilidade', en: 'Availability' },
+    lmpi_rankings: { pt: 'Atletas com Melhor Condição (LMPI)', en: 'Athletes by Condition (LMPI)' },
+    team_readiness: { pt: 'Prontidão da Equipe', en: 'Team Readiness' },
+    wellness_summary: { pt: 'Wellness', en: 'Wellness' },
+    wellness_evolution: { pt: 'Evolução Wellness', en: 'Wellness Evolution' },
+    cumulative_load: { pt: 'Carga Acumulada', en: 'Cumulative Load' },
+    low_readiness: { pt: 'Baixa Prontidão', en: 'Low Readiness' },
+    neuro_status: { pt: 'Status Neuromuscular', en: 'Neuromuscular Status' },
+    rsimod_long: { pt: 'RSImod Longitudinal', en: 'RSImod Longitudinal' },
+    rsimod_by_athlete: { pt: 'RSImod por Atleta', en: 'RSImod by Athlete' },
+    cmj_profile: { pt: 'Perfil CMJ', en: 'CMJ Profile' },
+    velocity_deviation: { pt: 'Velocity Deviation Chart (%)', en: 'Velocity Deviation Chart (%)' },
+    vbt_by_exercise: { pt: 'VBT por Exercício', en: 'VBT by Exercise' },
+    risk_score: { pt: 'Score de Risco', en: 'Risk Score' },
+    rsi_vs_acwr: { pt: 'RSImod vs ACWR', en: 'RSImod vs ACWR' },
+    asymmetry_alert: { pt: 'Alerta de Assimetria (SL-CMJ)', en: 'Asymmetry Alert (SL-CMJ)' },
+    risk_panel: { pt: 'Painel de Risco', en: 'Risk Panel' },
+  };
+  const t = TITLES[id as string];
+  const title = t ? (locale === 'pt' ? t.pt : t.en) : '';
+  return (
+    <>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+        <View style={{ flex: 1, paddingRight: 8 }}>
+          <Text style={styles.cardTitle}>{title}</Text>
+          {subtitle ? <Text style={styles.cardSubtitle}>{subtitle}</Text> : null}
+        </View>
+        <TouchableOpacity
+          onPress={() => setVisible(true)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          data-testid={`card-info-${id}`}
+        >
+          <Ionicons name="information-circle-outline" size={18} color={colors.text.tertiary} />
+        </TouchableOpacity>
+      </View>
+      <InfoTooltip visible={visible} onClose={() => setVisible(false)} colors={colors} title={title} body={body} />
+    </>
+  );
+};
+
 
 // Mini Bar Chart
 const MiniBarChart = ({ data, color, height = 80, barWidth = 6 }: { data: number[]; color: string; height?: number; barWidth?: number }) => {
@@ -757,7 +935,7 @@ export default function DataScreen() {
         <FadeInView delay={0}>
         <View style={styles.card} data-testid="acute-chronic-card">
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load'}</Text>
+            <CardInfoHeader id="acwr_load" />
             <Pressable data-testid="acute-chronic-info-tooltip" onPress={() => Alert.alert(locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load', locale === 'pt' ? 'Acute (7d): média de carga dos últimos 7 dias.\nChronic (28d): média de carga dos últimos 28 dias.\nACWR: razão Acute/Chronic — valores entre 0.8 e 1.3 indicam zona ótima.\nMonotony: variabilidade da carga (< 2.0 ideal).\nStrain: carga acumulada × monotonia.\n\nEstes indicadores refletem dados atuais (7/28d) e não são afetados pelo filtro de data.' : 'Acute (7d): average load over last 7 days.\nChronic (28d): average load over last 28 days.\nACWR: Acute/Chronic ratio — values between 0.8 and 1.3 indicate optimal zone.\nMonotony: load variability (< 2.0 ideal).\nStrain: cumulative load × monotony.\n\nThese indicators reflect current data (7/28d) and are not affected by the date filter.')}>
               <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
@@ -781,7 +959,7 @@ export default function DataScreen() {
         {/* Load Timeline */}
         <FadeInView delay={120}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Distancia Total (Timeline)' : 'Total Distance (Timeline)'}</Text>
+          <CardInfoHeader id="total_distance" />
           <ChartEntryView delay={200} duration={600}>
           <View style={{ marginTop: 8 }}>
             <LineChart lines={[{ data: distances, color: COLORS.cyan }]} labels={dateLabels} showArea height={140} />
@@ -794,7 +972,7 @@ export default function DataScreen() {
         {mode === 'athlete' && acwrTimeline.length > 0 && (
           <FadeInView delay={200}>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>ACWR Timeline</Text>
+            <CardInfoHeader id="acwr_timeline" />
             <ChartEntryView delay={100} duration={600}>
             <View style={{ marginTop: 8 }}>
               <LineChart 
@@ -816,7 +994,7 @@ export default function DataScreen() {
         {mode !== 'athlete' && scatterPoints.length > 0 && (
           <FadeInView delay={250}>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>ACWR vs {locale === 'pt' ? 'Carga' : 'Load'}</Text>
+            <CardInfoHeader id="acwr_vs_load" />
             <ChartEntryView delay={100} duration={500}>
             <QuadrantChart points={scatterPoints} xLabel="ACWR" yLabel={locale === 'pt' ? 'Carga Aguda (m)' : 'Acute Load (m)'} xMid={1.3} height={180} />
             </ChartEntryView>
@@ -827,7 +1005,7 @@ export default function DataScreen() {
         {/* Velocity Zones */}
         <FadeInView delay={300}>
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Zonas de Velocidade' : 'Velocity Zones'}</Text>
+          <CardInfoHeader id="velocity_zones" />
           <ChartEntryView delay={100} duration={500}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
             <DonutChart 
@@ -856,7 +1034,7 @@ export default function DataScreen() {
         {heatmap.length > 0 && (
           <FadeInView delay={400}>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Heatmap Semanal' : 'Weekly Heatmap'}</Text>
+            <CardInfoHeader id="weekly_heatmap" />
             <ChartEntryView delay={100} duration={600}>
             <View style={{ marginTop: 8 }}>
               <WeeklyHeatmap data={heatmap} />
@@ -869,7 +1047,7 @@ export default function DataScreen() {
         {/* Load Ranking Table */}
         {mode !== 'athlete' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Ranking de Carga' : 'Load Ranking'}</Text>
+            <CardInfoHeader id="load_ranking" />
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
@@ -938,8 +1116,7 @@ export default function DataScreen() {
       <View>
         {/* LMPI Gauge */}
         <View style={styles.card} data-testid="lmpi-gauge-card">
-          <Text style={styles.cardTitle}>Score LMPI</Text>
-          <Text style={styles.cardSubtitle}>LoadManager Performance Indicator</Text>
+          <CardInfoHeader id="lmpi" subtitle="LoadManager Performance Indicator" />
           <View style={{ alignItems: 'center', marginTop: 8 }}>
             <GaugeChart value={lmpiValidity !== 'invalid' && lmpi != null ? lmpi : 0} max={100} label={lmpiValidity === 'invalid' ? '--' : 'LMPI'} color={lmpiClass.color} size={150} />
             {/* Classification Badge */}
@@ -961,7 +1138,7 @@ export default function DataScreen() {
         
         {/* Radar */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Perfil de Performance' : 'Performance Profile'}</Text>
+          <CardInfoHeader id="performance_profile" />
           <View style={{ alignItems: 'center', marginTop: 4 }}>
             <RadarChart values={radarValues} labels={['Load', 'Wellness', 'Neuro', 'Recovery', 'LMPI']} size={180} />
           </View>
@@ -970,7 +1147,7 @@ export default function DataScreen() {
         {/* Quadrant ACWR vs Wellness */}
         {mode !== 'athlete' && quadrantPoints.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>ACWR vs Wellness</Text>
+            <CardInfoHeader id="acwr_wellness" />
             <QuadrantChart points={quadrantPoints} xLabel="ACWR" yLabel="Wellness" xMid={1.3} yMid={5} height={200} />
           </View>
         )}
@@ -978,7 +1155,7 @@ export default function DataScreen() {
         {/* Availability Donut */}
         {mode !== 'athlete' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Disponibilidade' : 'Availability'}</Text>
+            <CardInfoHeader id="availability" />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
               <DonutChart segments={availDonutSegs} size={100} centerText={`${summary.available || 0}`} centerSubtext={locale === 'pt' ? 'disponíveis' : 'available'} />
               <View style={{ flex: 1 }}>
@@ -998,7 +1175,7 @@ export default function DataScreen() {
         {mode !== 'athlete' && (
           <View style={styles.card} data-testid="lmpi-rankings-table">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.cardTitle}>{locale === 'pt' ? 'Atletas com Melhor Condição (LMPI)' : 'Athletes by Condition (LMPI)'}</Text>
+              <CardInfoHeader id="lmpi_rankings" />
               <Pressable data-testid="lmpi-info-tooltip" onPress={() => Alert.alert('LMPI', locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta.' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition.')}>
                 <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
@@ -1081,7 +1258,7 @@ export default function DataScreen() {
       <View>
         {/* Readiness Gauge */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Prontidão da Equipe' : 'Team Readiness'}</Text>
+          <CardInfoHeader id="team_readiness" />
           <View style={{ alignItems: 'center', marginTop: 8 }}>
             <GaugeChart value={readiness || 0} max={100} label={locale === 'pt' ? 'Prontidão' : 'Readiness'} color={readiness && readiness > 60 ? COLORS.green : readiness && readiness > 40 ? COLORS.yellow : COLORS.red} size={140} />
           </View>
@@ -1094,7 +1271,7 @@ export default function DataScreen() {
         
         {/* Wellness Bars */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Wellness</Text>
+          <CardInfoHeader id="wellness_summary" />
           <View style={{ marginTop: 8 }}>
             <HorizontalBar value={hasWellnessData ? (wDet.sleep ?? 0) : 0} max={10} label={locale === 'pt' ? 'Sono' : 'Sleep'} color={COLORS.blue} />
             <HorizontalBar value={hasWellnessData && wDet.fatigue != null ? (10 - wDet.fatigue) : 0} max={10} label={locale === 'pt' ? 'Energia (inv. Fadiga)' : 'Energy (inv. Fatigue)'} color={COLORS.cyan} />
@@ -1107,21 +1284,21 @@ export default function DataScreen() {
         {/* Wellness timeline (athlete mode) */}
         {mode === 'athlete' && wellTimeline && wellTimeline.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Evolução Wellness' : 'Wellness Evolution'}</Text>
+            <CardInfoHeader id="wellness_evolution" />
             <LineChart lines={[{ data: wellTimeline.map((w: any) => w.score), color: COLORS.green }]} labels={wellTimeline.map((w: any) => w.date?.slice(5))} showArea height={140} />
           </View>
         )}
         
         {/* Cumulative Load */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Carga Acumulada' : 'Cumulative Load'}</Text>
+          <CardInfoHeader id="cumulative_load" />
           <LineChart lines={[{ data: cumulativeData, color: COLORS.cyan }]} labels={dateLabels} showArea height={140} />
         </View>
         
         {/* Availability donut */}
         {mode !== 'athlete' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Disponibilidade' : 'Availability'}</Text>
+            <CardInfoHeader id="availability" />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
               <DonutChart segments={availSegs} size={90} centerText={`${summary.available || 0}/${summary.total_athletes || 0}`} centerSubtext="" />
               <View style={{ flex: 1 }}>
@@ -1140,7 +1317,7 @@ export default function DataScreen() {
         {/* Low readiness table */}
         {mode !== 'athlete' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Baixa Prontidão' : 'Low Readiness'}</Text>
+            <CardInfoHeader id="low_readiness" />
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
@@ -1196,7 +1373,7 @@ export default function DataScreen() {
       <View>
         {/* Neuromuscular Gauge */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Status Neuromuscular' : 'Neuromuscular Status'}</Text>
+          <CardInfoHeader id="neuro_status" />
           <View style={{ alignItems: 'center', marginTop: 8 }}>
             <GaugeChart value={neuroScore} max={100} label="Neuro Score" color={neuroScore > 70 ? COLORS.green : neuroScore > 40 ? COLORS.yellow : COLORS.red} size={140} />
           </View>
@@ -1211,7 +1388,7 @@ export default function DataScreen() {
         {/* RSImod Timeline (athlete) or Bar comparison (team) */}
         {mode === 'athlete' && rsiTimeline && rsiTimeline.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>RSImod {locale === 'pt' ? 'Longitudinal' : 'Longitudinal'}</Text>
+            <CardInfoHeader id="rsimod_long" />
             <LineChart 
               lines={[
                 { data: rsiTimeline.map((d: any) => d.rsimod), color: COLORS.purple },
@@ -1223,7 +1400,7 @@ export default function DataScreen() {
           </View>
         ) : mode !== 'athlete' && athletesWithRsi.length > 0 ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>RSImod {locale === 'pt' ? 'por Atleta' : 'by Athlete'}</Text>
+            <CardInfoHeader id="rsimod_by_athlete" />
             <View style={{ marginTop: 8 }}>
               {athletesWithRsi.sort((a: any, b: any) => (b.rsimod || 0) - (a.rsimod || 0)).slice(0, 8).map((a: any, i: number) => (
                 <HorizontalBar key={a.id} value={a.rsimod || 0} max={0.6} label={a.name.split(' ').slice(0, 2).join(' ')} color={a.rsimod > 0.4 ? COLORS.green : a.rsimod > 0.25 ? COLORS.yellow : COLORS.red} />
@@ -1235,7 +1412,7 @@ export default function DataScreen() {
         {/* CMJ Radar (athlete mode) */}
         {mode === 'athlete' && jumpMetrics && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Perfil CMJ' : 'CMJ Profile'}</Text>
+            <CardInfoHeader id="cmj_profile" />
             <View style={{ alignItems: 'center' }}>
               <RadarChart values={radarVals} labels={['Height', 'RSImod', 'Flight T', 'Reactivity']} size={180} />
             </View>
@@ -1245,7 +1422,7 @@ export default function DataScreen() {
         {/* VBT Fatigue */}
         {vbtFatigueData.length > 0 && mode !== 'athlete' ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Velocity Deviation Chart (%)' : 'Velocity Deviation Chart (%)'}</Text>
+            <CardInfoHeader id="velocity_deviation" />
             <VelocityDeviationChart
               data={vbtFatigueData.sort((a, b) => b.value - a.value).slice(0, 30)}
               locale={locale}
@@ -1253,7 +1430,7 @@ export default function DataScreen() {
           </View>
         ) : mode === 'athlete' && vbtMetrics?.exercises ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'VBT por Exercício' : 'VBT by Exercise'}</Text>
+            <CardInfoHeader id="vbt_by_exercise" />
             <View style={{ marginTop: 8 }}>
               {Object.entries(vbtMetrics.exercises).map(([ex, data]: [string, any], i: number) => (
                 <View key={ex} style={{ marginBottom: 12, borderBottomWidth: i < Object.keys(vbtMetrics.exercises).length - 1 ? 1 : 0, borderBottomColor: colors.border.default, paddingBottom: 8 }}>
@@ -1305,7 +1482,7 @@ export default function DataScreen() {
       <View>
         {/* Risk Score Gauge */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>{locale === 'pt' ? 'Score de Risco' : 'Risk Score'}</Text>
+          <CardInfoHeader id="risk_score" />
           <View style={{ alignItems: 'center', marginTop: 8 }}>
             <GaugeChart value={riskScore || 0} max={100} label={locale === 'pt' ? 'Risco' : 'Risk'} color={riskScore && riskScore > 60 ? COLORS.red : riskScore && riskScore > 30 ? COLORS.yellow : COLORS.green} size={140} />
           </View>
@@ -1314,7 +1491,7 @@ export default function DataScreen() {
         {/* ACWR vs Wellness Quadrant */}
         {mode !== 'athlete' && quadrantPoints.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>ACWR vs Wellness</Text>
+            <CardInfoHeader id="acwr_wellness" />
             <QuadrantChart points={quadrantPoints} xLabel="ACWR" yLabel="Wellness" xMid={1.3} yMid={5} height={200} />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Ótimo' : 'Optimal'}</Text></View>
@@ -1327,7 +1504,7 @@ export default function DataScreen() {
         {/* RSImod vs ACWR Scatter */}
         {mode !== 'athlete' && rsiAcwrPoints.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>RSImod vs ACWR</Text>
+            <CardInfoHeader id="rsi_vs_acwr" />
             <QuadrantChart points={rsiAcwrPoints} xLabel="ACWR" yLabel="RSImod" xMid={1.3} height={180} />
           </View>
         )}
@@ -1335,7 +1512,7 @@ export default function DataScreen() {
         {/* SL-CMJ Asymmetry Risk — hidden from UI */}
         {false && asymmetryAthletes.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Alerta de Assimetria (SL-CMJ)' : 'Asymmetry Alert (SL-CMJ)'}</Text>
+            <CardInfoHeader id="asymmetry_alert" />
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
@@ -1356,7 +1533,7 @@ export default function DataScreen() {
         {/* Full Risk Table */}
         {mode !== 'athlete' && (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Painel de Risco' : 'Risk Panel'}</Text>
+            <CardInfoHeader id="risk_panel" />
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>

@@ -25,6 +25,7 @@ import { SKINFOLD_LABELS, type FullReport, type SkinfoldSite } from '../../../ty
 import api from '../../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../contexts/ThemeContext';
+import { InfoTooltip } from '../../../components/dashboard/StackedBarChart';
 
 const { width: SW } = Dimensions.get('window');
 const IS_WEB = Platform.OS === 'web';
@@ -104,6 +105,36 @@ export default function ReportScreen() {
 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Which section tooltip is open (null = none)
+  const [tooltipId, setTooltipId] = useState<string | null>(null);
+
+  // Tooltip content registry — explains HOW the metrics are derived (technical but clear)
+  const TOOLTIPS = useMemo(() => ({
+    body_composition: {
+      title: pt ? 'Composicao Corporal' : 'Body Composition',
+      body: pt
+        ? 'O sistema captura medidas via scan (dobras cutaneas, perimetros) e cruza com o protocolo selecionado no exame (ex.: Jackson & Pollock, Durnin & Womersley, Faulkner, Yuhasz). Aplica a equacao de densidade corporal → converte em % de gordura via Siri ou Brozek. Massa magra = peso × (1 − %G). Valores normais de %G variam por sexo, idade e populacao — atletas tendem a ficar abaixo da media sedentaria.',
+        : 'The system captures measurements via scan (skinfolds, girths) and cross-references them with the protocol selected in the exam (e.g., Jackson & Pollock, Durnin & Womersley, Faulkner, Yuhasz). It applies the body-density equation → converts to body-fat % via Siri or Brozek. Lean mass = weight × (1 − %F). Normal body-fat ranges depend on sex, age and population — athletes typically fall below sedentary averages.',
+    },
+    symmetry: {
+      title: pt ? 'Simetria' : 'Symmetry',
+      body: pt
+        ? 'Diferenca percentual entre segmentos (tronco vs membros, superior vs inferior), calculada a partir das medidas capturadas no scan. Valores < 10% = equilibrio; 10–20% = atencao; > 20% = assimetria relevante (risco de lesao unilateral ou gap de treinamento). Use para orientar intervencoes de fortalecimento direcionado.',
+        : 'Percentage difference between segments (trunk vs limbs, upper vs lower), computed from the measurements captured in the scan. Values < 10% = balanced; 10–20% = caution; > 20% = relevant asymmetry (unilateral injury risk or training gap). Use to guide targeted strengthening interventions.',
+    },
+    insights: {
+      title: pt ? 'Insights' : 'Insights',
+      body: pt
+        ? 'Comentarios automaticos derivados do cruzamento das metricas (%G, massa magra, simetria) com faixas de referencia do protocolo selecionado. Sao heuristicas informativas para guiar a interpretacao — nao substituem avaliacao clinica. Servem como ponto de partida para conversas sobre nutricao, treino e recuperacao.',
+        : 'Automatic comments derived from cross-referencing metrics (%F, lean mass, symmetry) with reference ranges from the selected protocol. These are informative heuristics to guide interpretation — not a substitute for clinical assessment. They serve as starting points for conversations about nutrition, training and recovery.',
+    },
+    skinfolds: {
+      title: pt ? 'Dobras Cutaneas' : 'Skinfold Measurements',
+      body: pt
+        ? 'Medidas brutas (em mm) de cada ponto anatomico capturado no scan. Estas sao as entradas da equacao do protocolo — a soma ponderada delas alimenta a estimativa de densidade corporal. Desvios grandes em um ponto isolado podem indicar erro de medida ou padrao de deposicao especifico; mantenha os mesmos avaliadores e tecnica ao longo do tempo.',
+        : 'Raw measurements (in mm) for each anatomical site captured in the scan. These are the inputs of the protocol equation — their weighted sum feeds the body-density estimate. Large deviations at an isolated site can indicate measurement error or a specific deposition pattern; keep the same evaluators and technique across time.',
+    },
+  }), [pt]);
 
   const report: FullReport | null = useMemo(() => {
     try {
@@ -261,7 +292,12 @@ export default function ReportScreen() {
         </View>
 
         {/* Metrics grid */}
-        <Text style={styles.sectionTitle}>{pt ? 'Composicao Corporal' : 'Body Composition'}</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{TOOLTIPS.body_composition.title}</Text>
+          <TouchableOpacity onPress={() => setTooltipId('body_composition')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} data-testid="report-info-body_composition">
+            <Ionicons name="information-circle-outline" size={16} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.metricsGrid}>
           {metrics.map((item, i) => (
             <View key={i} style={styles.metricCard} data-testid={`metric-${i}`}>
@@ -273,7 +309,12 @@ export default function ReportScreen() {
         </View>
 
         {/* Symmetry */}
-        <Text style={styles.sectionTitle}>{pt ? 'Simetria' : 'Symmetry'}</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{TOOLTIPS.symmetry.title}</Text>
+          <TouchableOpacity onPress={() => setTooltipId('symmetry')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} data-testid="report-info-symmetry">
+            <Ionicons name="information-circle-outline" size={16} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.symmetryCard}>
           <View style={styles.symmetryRow}>
             <Text style={styles.symmetryLabel}>{pt ? 'Tronco vs Membros' : 'Trunk vs Limbs'}</Text>
@@ -292,7 +333,12 @@ export default function ReportScreen() {
         </View>
 
         {/* Insights */}
-        <Text style={styles.sectionTitle}>{pt ? 'Insights' : 'Insights'}</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{TOOLTIPS.insights.title}</Text>
+          <TouchableOpacity onPress={() => setTooltipId('insights')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} data-testid="report-info-insights">
+            <Ionicons name="information-circle-outline" size={16} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.insightsCard}>
           {(pt ? s.insightsPt : s.insights).map((insight, i) => (
             <View key={i} style={styles.insightRow}>
@@ -303,7 +349,12 @@ export default function ReportScreen() {
         </View>
 
         {/* Measurements detail */}
-        <Text style={styles.sectionTitle}>{pt ? 'Dobras Cutaneas' : 'Skinfold Measurements'}</Text>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>{TOOLTIPS.skinfolds.title}</Text>
+          <TouchableOpacity onPress={() => setTooltipId('skinfolds')} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} data-testid="report-info-skinfolds">
+            <Ionicons name="information-circle-outline" size={16} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.measurementsCard}>
           {Object.entries(m).filter(([, v]) => v !== undefined && v > 0).map(([site, value]) => (
             <View key={site} style={styles.measurementRow}>
@@ -351,6 +402,16 @@ export default function ReportScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      {/* Tooltip modal — renders when a section info icon is tapped */}
+      {tooltipId && TOOLTIPS[tooltipId as keyof typeof TOOLTIPS] ? (
+        <InfoTooltip
+          visible={!!tooltipId}
+          onClose={() => setTooltipId(null)}
+          colors={colors}
+          title={TOOLTIPS[tooltipId as keyof typeof TOOLTIPS].title}
+          body={TOOLTIPS[tooltipId as keyof typeof TOOLTIPS].body}
+        />
+      ) : null}
     </LinearGradient>
   );
 }
@@ -375,6 +436,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   legendDot: { width: 10, height: 10, borderRadius: 5 },
   legendText: { fontSize: 11, color: colors.text.secondary },
   sectionTitle: { fontSize: 13, fontWeight: '600', color: colors.text.secondary, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 },
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 20 },
   metricCard: { width: Math.floor((SW - 32 - 16) / 3), backgroundColor: colors.dark.card, borderRadius: 12, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.border.default, marginBottom: 8 },
   metricValue: { fontSize: 18, fontWeight: '800', marginTop: 4 },
