@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import i18n, { loadSavedLanguage, saveLanguage, languages, isRTL } from '../i18n';
 
 interface LanguageContextType {
@@ -15,6 +15,9 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState(i18n.locale);
   const [isLoading, setIsLoading] = useState(true);
+  // Reentrancy guard: prevents concurrent setLocale executions that cascade
+  // re-renders across ~56 consumers and race against native UIView teardown.
+  const isChangingRef = useRef(false);
 
   useEffect(() => {
     initLanguage();
@@ -27,8 +30,17 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   };
 
   const setLocale = async (code: string) => {
-    await saveLanguage(code);
-    setLocaleState(code);
+    // Ignore reentrant calls while a previous switch is still resolving
+    // (AsyncStorage.setItem + i18n.locale mutation + setState cascade).
+    if (isChangingRef.current) return;
+    if (code === locale) return;
+    isChangingRef.current = true;
+    try {
+      await saveLanguage(code);
+      setLocaleState(code);
+    } finally {
+      isChangingRef.current = false;
+    }
   };
 
   // useCallback with locale dependency ensures t() triggers re-renders when locale changes

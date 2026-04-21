@@ -42,6 +42,10 @@ export default function TeamDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [selectedDateRange, setSelectedDateRange] = React.useState('7d');
   const [dateModalVisible, setDateModalVisible] = React.useState(false);
+  // Holds the user's intent between Modal dismiss tap and native
+  // UIViewController teardown completion. Mirrors the pattern used in
+  // profile.tsx for language switching to avoid native cascade races.
+  const pendingDateRangeRef = React.useRef<string | null>(null);
 
   // Basic team query (for empty state detection)
   const { data: basicData, isLoading: basicLoading, error: basicError, refetch: basicRefetch } = useQuery({
@@ -69,9 +73,22 @@ export default function TeamDashboard() {
   }, [basicRefetch, tableRefetch]);
 
   const handleDateRangeSelect = React.useCallback((rangeKey: string) => {
-    setSelectedDateRange(rangeKey);
+    // Defer the actual state change until after the Modal has finished
+    // its native dismiss animation, so the heavy chart refetch cascade
+    // does not run concurrently with the UIViewController teardown.
+    pendingDateRangeRef.current = rangeKey;
     setDateModalVisible(false);
   }, []);
+
+  const handleDateModalDismiss = React.useCallback(() => {
+    const pending = pendingDateRangeRef.current;
+    if (pending && pending !== selectedDateRange) {
+      pendingDateRangeRef.current = null;
+      setSelectedDateRange(pending);
+    } else {
+      pendingDateRangeRef.current = null;
+    }
+  }, [selectedDateRange]);
 
   const getCurrentDateRangeLabel = React.useCallback(() => {
     const range = DATE_RANGES.find(r => r.key === selectedDateRange);
@@ -260,6 +277,7 @@ export default function TeamDashboard() {
         transparent
         visible={dateModalVisible}
         onRequestClose={() => setDateModalVisible(false)}
+        onDismiss={handleDateModalDismiss}
       >
         <Pressable
           style={styles.modalOverlay}
