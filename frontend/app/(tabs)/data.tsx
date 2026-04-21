@@ -941,14 +941,7 @@ export default function DataScreen() {
         {/* Acute vs Chronic Gauges */}
         <FadeInView delay={0}>
         <View style={styles.card} data-testid="acute-chronic-card">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <CardInfoHeader id="acwr_load" />
-            <Pressable data-testid="acute-chronic-info-tooltip" onPress={() => Alert.alert(locale === 'pt' ? 'Carga Aguda vs Crônica' : 'Acute vs Chronic Load', locale === 'pt' ? 'Acute (7d): média de carga dos últimos 7 dias.\nChronic (28d): média de carga dos últimos 28 dias.\nACWR: razão Acute/Chronic — valores entre 0.8 e 1.3 indicam zona ótima.\nMonotony: variabilidade da carga (< 2.0 ideal).\nStrain: carga acumulada × monotonia.\n\nEstes indicadores refletem dados atuais (7/28d) e não são afetados pelo filtro de data.' : 'Acute (7d): average load over last 7 days.\nChronic (28d): average load over last 28 days.\nACWR: Acute/Chronic ratio — values between 0.8 and 1.3 indicate optimal zone.\nMonotony: load variability (< 2.0 ideal).\nStrain: cumulative load × monotony.\n\nThese indicators reflect current data (7/28d) and are not affected by the date filter.')}>
-              <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
-              </View>
-            </Pressable>
-          </View>
+          <CardInfoHeader id="acwr_load" />
           <ChartEntryView delay={100} duration={700}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
             <GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={110} />
