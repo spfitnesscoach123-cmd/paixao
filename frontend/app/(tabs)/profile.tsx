@@ -51,8 +51,12 @@ export default function ProfileScreen() {
   };
 
   const handleLanguageSelect = async (code: string) => {
-    await setLocale(code);
+    // Fix race condition iOS Modal dismiss × LanguageProvider cascade × refetch storm.
+    // Order: close modal FIRST, wait for native slide animation (≈275ms on iOS),
+    // THEN trigger setLocale which fans out ~67 re-renders + ~9 query refetches.
     setShowLanguageModal(false);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    await setLocale(code);
   };
 
   const handleOpenEditProfile = () => {
