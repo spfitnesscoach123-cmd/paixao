@@ -89,6 +89,11 @@ const formatDecimalInput = (value: string): string => {
   return value.replace(',', '.');
 };
 
+
+export default function AddStrengthAssessment() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
 // Load-Velocity Profile Chart Component - Responsive
 const LoadVelocityChart = ({ analysis }: { analysis: VBTAnalysis }) => {
   const { locale } = useLanguage();
@@ -544,10 +549,6 @@ const VelocityLossChart = ({ data, locale }: { data: Array<{ set: number; veloci
     </View>
   );
 };
-
-export default function AddStrengthAssessment() {
-  const { colors } = useTheme();
-  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
