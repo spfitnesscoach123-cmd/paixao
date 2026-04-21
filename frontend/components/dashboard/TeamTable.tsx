@@ -177,6 +177,7 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
         bounces={false}
         directionalLockEnabled
         nestedScrollEnabled
+        contentContainerStyle={{ minWidth: '100%' }}
       >
         <View>
           {/* HEADER */}
@@ -333,43 +334,44 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   colAthlete: {
-    width: 120,
+    flex: 1,
+    minWidth: 160,
     flexDirection: 'row',
     alignItems: 'center',
     paddingRight: 6,
   },
   colMetric: {
-    width: 70,
+    width: 88,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
   colZones: {
-    width: 90,
+    width: 118,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
   colSmall: {
-    width: 50,
+    width: 68,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
   colRsi: {
-    width: 65,
+    width: 82,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
   colFatigue: {
-    width: 60,
+    width: 82,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
   colBody: {
-    width: 65,
+    width: 82,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,

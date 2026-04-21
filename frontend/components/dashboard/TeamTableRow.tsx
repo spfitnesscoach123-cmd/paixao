@@ -156,7 +156,8 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   colAthlete: {
-    width: 120,
+    flex: 1,
+    minWidth: 160,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -179,12 +180,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   colMetric: {
-    width: 70,
+    width: 88,
     paddingHorizontal: 4,
     gap: 2,
   },
   colZones: {
-    width: 90,
+    width: 118,
     paddingHorizontal: 4,
     gap: 3,
   },
@@ -197,12 +198,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   colSmall: {
-    width: 50,
+    width: 68,
     paddingHorizontal: 4,
     gap: 2,
   },
   colRsi: {
-    width: 65,
+    width: 82,
     paddingHorizontal: 4,
   },
   rsiRow: {
@@ -215,7 +216,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   colFatigue: {
-    width: 60,
+    width: 82,
     paddingHorizontal: 4,
     gap: 3,
   },
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   colBody: {
-    width: 65,
+    width: 82,
     paddingHorizontal: 4,
   },
   bodyText: {
