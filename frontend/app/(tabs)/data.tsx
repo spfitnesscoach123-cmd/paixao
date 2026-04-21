@@ -425,6 +425,121 @@ const HorizontalBar = ({ value, max, label, color }: { value: number; max: numbe
   );
 };
 
+// ============ VELOCITY DEVIATION CHART ============
+// Divergent axis (−30% … +30%) with zero center. Left = Potentiation, Right = Fatigue.
+// One thin gradient track per athlete + discrete vertical tick marker at the athlete value.
+// Formula unchanged (backend): (1 − V_last / V_first) × 100
+const VelocityDeviationChart = ({ data, locale }: { data: Array<{ name: string; value: number }>; locale: string }) => {
+  const { colors } = useTheme();
+  const AXIS_MIN = -30;
+  const AXIS_MAX = 30;
+  const AXIS_RANGE = AXIS_MAX - AXIS_MIN;
+  const ROW_H = 42;
+  const NAME_W = 46;
+  const PAD_R = 12;
+  const chartWidth = Math.max(280, Math.min(SCREEN_WIDTH - 64, 560));
+  const trackLeft = NAME_W;
+  const trackRight = chartWidth - PAD_R;
+  const trackWidth = trackRight - trackLeft;
+  const valueToX = (v: number) => {
+    const c = Math.max(AXIS_MIN, Math.min(AXIS_MAX, v));
+    return trackLeft + ((c - AXIS_MIN) / AXIS_RANGE) * trackWidth;
+  };
+  const zeroX = valueToX(0);
+  const ticks = [-30, -20, -10, 0, 10, 20, 30];
+  const colorForValue = (v: number) => {
+    if (v <= -20) return '#10b981';
+    if (v <= -10) return '#84cc16';
+    if (v < 10) return colors.text.tertiary;
+    if (v < 20) return '#f97316';
+    return '#ef4444';
+  };
+  return (
+    <View style={{ marginTop: 4 }} data-testid="velocity-deviation-chart">
+      {/* Zone legend header */}
+      <Svg width={chartWidth} height={32}>
+        <SvgText x={trackLeft + trackWidth * 0.0833} y={10} fontSize={8} fill="#10b981" textAnchor="middle" fontWeight="700">
+          {locale === 'pt' ? 'Alta' : 'High'}
+        </SvgText>
+        <SvgText x={trackLeft + trackWidth * 0.0833} y={22} fontSize={8} fill="#10b981" textAnchor="middle" fontWeight="700">
+          {locale === 'pt' ? 'Potenciação' : 'Potentiation'}
+        </SvgText>
+        <SvgText x={trackLeft + trackWidth * 0.25} y={16} fontSize={8} fill={colors.text.secondary} textAnchor="middle">
+          {locale === 'pt' ? 'Moderada' : 'Moderate'}
+        </SvgText>
+        <SvgText x={zeroX} y={16} fontSize={8} fill={colors.text.secondary} textAnchor="middle">
+          {locale === 'pt' ? 'Neutro' : 'Neutral'}
+        </SvgText>
+        <SvgText x={trackLeft + trackWidth * 0.75} y={16} fontSize={8} fill={colors.text.secondary} textAnchor="middle">
+          {locale === 'pt' ? 'Moderada' : 'Moderate'}
+        </SvgText>
+        <SvgText x={trackLeft + trackWidth * 0.9167} y={10} fontSize={8} fill="#ef4444" textAnchor="middle" fontWeight="700">
+          {locale === 'pt' ? 'Alta' : 'High'}
+        </SvgText>
+        <SvgText x={trackLeft + trackWidth * 0.9167} y={22} fontSize={8} fill="#ef4444" textAnchor="middle" fontWeight="700">
+          {locale === 'pt' ? 'Fadiga' : 'Fatigue'}
+        </SvgText>
+      </Svg>
+      {/* Athlete rows */}
+      {data.map((d, i) => {
+        const isOutlierLeft = d.value < AXIS_MIN;
+        const isOutlierRight = d.value > AXIS_MAX;
+        const markerX = valueToX(d.value);
+        const markerColor = colorForValue(d.value);
+        const prefix = isOutlierLeft ? '≤' : isOutlierRight ? '≥' : '';
+        const clampedForLabel = isOutlierLeft ? AXIS_MIN : isOutlierRight ? AXIS_MAX : d.value;
+        const label = `${prefix}${d.value.toFixed(1)}%`;
+        // Label anchor & clamp to avoid overflow
+        let labelAnchor: 'start' | 'middle' | 'end' = 'middle';
+        let labelX = markerX;
+        if (markerX < trackLeft + 22) { labelAnchor = 'start'; labelX = markerX - 4; }
+        else if (markerX > trackRight - 22) { labelAnchor = 'end'; labelX = markerX + 4; }
+        return (
+          <Svg key={d.name + '-' + i} width={chartWidth} height={ROW_H}>
+            <Defs>
+              <SvgLinearGradient id={`vdev-grad-${i}`} x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#10b981" stopOpacity="0.9" />
+                <Stop offset="0.33" stopColor="#84cc16" stopOpacity="0.75" />
+                <Stop offset="0.5" stopColor={colors.text.tertiary} stopOpacity="0.45" />
+                <Stop offset="0.67" stopColor="#f97316" stopOpacity="0.75" />
+                <Stop offset="1" stopColor="#ef4444" stopOpacity="0.9" />
+              </SvgLinearGradient>
+            </Defs>
+            {/* Athlete name */}
+            <SvgText x={2} y={ROW_H / 2 + 4} fontSize={11} fill={colors.text.primary} fontWeight="600">
+              {d.name.length > 7 ? d.name.slice(0, 7) : d.name}
+            </SvgText>
+            {/* Gradient track (thin line) */}
+            <Rect x={trackLeft} y={ROW_H / 2 - 1.25} width={trackWidth} height={2.5} fill={`url(#vdev-grad-${i})`} rx={1.25} />
+            {/* Minor tick marks on the track */}
+            {ticks.map((t) => (
+              <Line key={`tk-${t}`} x1={valueToX(t)} y1={ROW_H / 2 - 3} x2={valueToX(t)} y2={ROW_H / 2 + 3} stroke={colors.text.tertiary} strokeOpacity={0.35} strokeWidth={0.5} />
+            ))}
+            {/* Zero dashed vertical reference */}
+            <Line x1={zeroX} y1={6} x2={zeroX} y2={ROW_H - 6} stroke={colors.text.tertiary} strokeOpacity={0.55} strokeWidth={0.8} strokeDasharray="2,2" />
+            {/* Athlete marker (vertical notch) */}
+            <Line x1={markerX} y1={ROW_H / 2 - 8} x2={markerX} y2={ROW_H / 2 + 8} stroke={markerColor} strokeWidth={2.5} strokeLinecap="round" />
+            {/* Small top cap on the marker for visibility */}
+            <Line x1={markerX - 3} y1={ROW_H / 2 - 8} x2={markerX + 3} y2={ROW_H / 2 - 8} stroke={markerColor} strokeWidth={2.5} strokeLinecap="round" />
+            {/* Value label below marker */}
+            <SvgText x={labelX} y={ROW_H - 2} fontSize={10} fill={markerColor} fontWeight="700" textAnchor={labelAnchor}>
+              {label}
+            </SvgText>
+          </Svg>
+        );
+      })}
+      {/* Axis footer */}
+      <Svg width={chartWidth} height={16}>
+        {ticks.map((t) => (
+          <SvgText key={`ax-${t}`} x={valueToX(t)} y={12} fontSize={9} fill={colors.text.secondary} textAnchor="middle">
+            {t > 0 ? `+${t}%` : `${t}%`}
+          </SvgText>
+        ))}
+      </Svg>
+    </View>
+  );
+};
+
 // ============ MAIN COMPONENT ============
 export default function DataScreen() {
   const { colors } = useTheme();
@@ -1125,12 +1240,11 @@ export default function DataScreen() {
         {/* VBT Fatigue */}
         {vbtFatigueData.length > 0 && mode !== 'athlete' ? (
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Perda Velocidade VBT' : 'VBT Velocity Loss'}</Text>
-            <View style={{ marginTop: 8 }}>
-              {vbtFatigueData.sort((a, b) => b.value - a.value).slice(0, 8).map((d, i) => (
-                <HorizontalBar key={i} value={d.value} max={25} label={d.name} color={d.value > 15 ? COLORS.red : d.value > 10 ? COLORS.yellow : COLORS.green} />
-              ))}
-            </View>
+            <Text style={styles.cardTitle}>{locale === 'pt' ? 'Velocity Deviation Chart (%)' : 'Velocity Deviation Chart (%)'}</Text>
+            <VelocityDeviationChart
+              data={vbtFatigueData.sort((a, b) => b.value - a.value).slice(0, 30)}
+              locale={locale}
+            />
           </View>
         ) : mode === 'athlete' && vbtMetrics?.exercises ? (
           <View style={styles.card}>
