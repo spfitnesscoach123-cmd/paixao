@@ -204,6 +204,16 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
   const [orientationResult, setOrientationResult] = useState<OrientationResult>({
     isValid: true, shoulderWidth: 0, hipWidth: 0, message: null,
   });
+
+  // Orientation hysteresis state: prevents flicker between valid/invalid near
+  // the boundary. Uses two-threshold hysteresis (enter @0.05, exit @0.08) via
+  // previousIsLateral arg in checkAthleteOrientation, plus a 3-frame
+  // confirmation window to suppress transient pose noise.
+  const orientationHysteresisRef = useRef({
+    isLateral: false,
+    pendingValue: false,
+    pendingCount: 0,
+  });
   
   // Refs for real-time tracking
   const countermovementStartTimeRef = useRef<number | null>(null);
@@ -682,7 +692,32 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
       setFrameCount(prev => prev + 1);
       
       // P0.1: Track orientation during scanning (visual feedback, doesn't block here)
-      const orientation = checkAthleteOrientation(landmarks);
+      // Hysteresis: stricter threshold to enter lateral, looser to exit.
+      // 3-frame confirmation to suppress transient pose noise.
+      const h = orientationHysteresisRef.current;
+      const rawOrientation = checkAthleteOrientation(landmarks, h.isLateral);
+      const rawIsValid = rawOrientation.isValid;
+
+      if (rawIsValid === h.isLateral) {
+        // Raw reading agrees with current confirmed state — reset pending
+        h.pendingCount = 0;
+      } else if (rawIsValid === h.pendingValue) {
+        // Raw reading agrees with pending flip — accumulate
+        h.pendingCount++;
+        if (h.pendingCount >= 3) {
+          h.isLateral = rawIsValid;
+          h.pendingCount = 0;
+        }
+      } else {
+        // New direction of flip — start accumulating
+        h.pendingValue = rawIsValid;
+        h.pendingCount = 1;
+      }
+
+      // Expose the CONFIRMED state (not the raw per-frame value)
+      const orientation: OrientationResult = h.isLateral
+        ? { isValid: true, shoulderWidth: rawOrientation.shoulderWidth, hipWidth: rawOrientation.hipWidth, message: null }
+        : { isValid: false, shoulderWidth: rawOrientation.shoulderWidth, hipWidth: rawOrientation.hipWidth, message: rawOrientation.message || 'Posicione-se de lado para a camera' };
       setOrientationResult(orientation);
       
       const elapsed = Date.now() - (scannerStartTimeRef.current || Date.now());

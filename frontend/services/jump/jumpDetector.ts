@@ -42,6 +42,7 @@ const {
   COUNTERMOVEMENT_THRESHOLD,
   SMOOTHING_WINDOW,
   ORIENTATION_MIN_WIDTH,
+  ORIENTATION_EXIT_WIDTH,
 } = JUMP_DETECTION_CONFIG;
 
 // ============================================================
@@ -770,9 +771,15 @@ export function extractJumpLandmarks(
  * Check athlete orientation — LATERAL (side profile) is REQUIRED.
  * Small shoulder/hip widths = overlapping = lateral = VALID.
  * Large widths = frontal (facing camera) = INVALID.
+ *
+ * Hysteresis (optional param): when previousIsLateral is true, the athlete
+ * stays "lateral" until widths exceed the looser EXIT threshold. When false,
+ * the athlete must satisfy the stricter MIN (enter) threshold to become
+ * lateral. This eliminates scanner flicker around boundary values.
  */
 export function checkAthleteOrientation(
-  landmarks: JumpPoseLandmarks
+  landmarks: JumpPoseLandmarks,
+  previousIsLateral: boolean = false,
 ): OrientationResult {
   const { leftShoulder, rightShoulder, leftHip, rightHip } = landmarks;
 
@@ -784,12 +791,13 @@ export function checkAthleteOrientation(
   const shoulderWidth = Math.abs(leftShoulder.x - rightShoulder.x);
   const hipWidth = Math.abs(leftHip.x - rightHip.x);
 
-  // Lateral (side profile): both widths below threshold (overlapping landmarks)
-  const isLateral = shoulderWidth < ORIENTATION_MIN_WIDTH && hipWidth < ORIENTATION_MIN_WIDTH;
+  // Hysteresis: stricter threshold to enter lateral, looser to exit
+  const threshold = previousIsLateral ? ORIENTATION_EXIT_WIDTH : ORIENTATION_MIN_WIDTH;
+  const isLateral = shoulderWidth < threshold && hipWidth < threshold;
 
   if (!isLateral) {
     console.log('[JUMP_DETECTOR] Orientation INVALID (frontal): shoulderW=' + shoulderWidth.toFixed(4) +
-      ' hipW=' + hipWidth.toFixed(4) + ' threshold=' + ORIENTATION_MIN_WIDTH);
+      ' hipW=' + hipWidth.toFixed(4) + ' threshold=' + threshold);
     return {
       isValid: false,
       shoulderWidth,

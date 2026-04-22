@@ -179,7 +179,7 @@ export const JUMP_DETECTION_CONFIG = {
   
   // Event detection
   MIN_FLIGHT_TIME_MS: 80,            // Minimum valid flight time
-  MAX_FLIGHT_TIME_MS: 2000,          // Maximum valid flight time
+  MAX_FLIGHT_TIME_MS: 1200,          // Maximum valid flight time (~123 cm — above world record, absurd values rejected)
   MIN_TAKEOFF_FRAMES: 2,             // Frames needed to confirm takeoff
   MIN_LANDING_FRAMES: 2,             // Frames needed to confirm landing (symmetric with takeoff)
   
@@ -211,8 +211,12 @@ export const JUMP_DETECTION_CONFIG = {
   // Frame processing
   TARGET_FPS: 30,                    // Target frame rate
   
-  // Orientation validation — lateral (side profile) required
-  ORIENTATION_MIN_WIDTH: 0.05,       // Max shoulder/hip X-distance to consider "lateral" (side profile)
+  // Orientation validation — lateral (side profile) required.
+  // Hysteresis: stricter threshold to ENTER lateral state, looser to EXIT,
+  // plus 3-frame confirmation in caller. Eliminates scanner flicker without
+  // degrading detection quality at decision points.
+  ORIENTATION_MIN_WIDTH: 0.05,       // ENTER lateral: both widths must be < 0.05
+  ORIENTATION_EXIT_WIDTH: 0.08,      // EXIT lateral: either width > 0.08 breaks lateral state
 
   // SL-CMJ continuous pipeline
   MAX_RECORDING_DURATION_SLCMJ_MS: 15000, // Max recording for SL-CMJ (2 jumps + interval)
