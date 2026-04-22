@@ -102,6 +102,7 @@ export interface UseJumpCameraResult {
   metrics: JumpMetrics | null;
   events: JumpEvents | null;
   error: string | null;
+  frames: JumpFrameData[];  // Exposed for results-screen timeline graph & debug modal (read-only)
   
   // SL-CMJ dual jump
   slCmjLeg1: SlCmjLegResult | null;
@@ -1094,6 +1095,7 @@ export function useJumpCamera(config: UseJumpCameraConfig): UseJumpCameraResult 
     metrics,
     events,
     error,
+    frames: recordingFramesRef.current,
     
     // SL-CMJ dual jump
     slCmjLeg1,

@@ -64,6 +64,8 @@ import {
 import { useJumpCamera } from '../../../services/jump/useJumpCamera';
 import { OverlayLayer } from '../../../components/jump/OverlayLayer';
 import { JumpGraph } from '../../../components/jump/JumpGraph';
+import { JumpTimelineGraph } from '../../../components/jump/JumpTimelineGraph';
+import { JumpDebugModal } from '../../../components/jump/JumpDebugModal';
 import { format } from 'date-fns';
 
 // MediaPipe via Vision Camera + native frame processor plugin (detectPose)
@@ -167,6 +169,9 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
   
   // Hip Y history for JumpGraph (CMJ only)
   const hipYHistoryRef = useRef<number[]>([]);
+
+  // Debug overlay visibility (Jump Debug modal — opt-in via ⚙️ icon)
+  const [debugModalVisible, setDebugModalVisible] = useState(false);
   
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
@@ -1477,7 +1482,14 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
               <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.title}>{t.results}</Text>
-            <View style={{ width: 40 }} />
+            <TouchableOpacity
+              onPress={() => setDebugModalVisible(true)}
+              style={styles.backButton}
+              data-testid="results-debug-btn"
+              accessibilityLabel="Debug overlay"
+            >
+              <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
+            </TouchableOpacity>
           </View>
           
           {jumpCamera.metrics ? (
@@ -1492,6 +1504,14 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                   {JUMP_PROTOCOL_INFO[selectedProtocol]?.[locale === 'pt' ? 'namePt' : 'name'] || selectedProtocol.toUpperCase()}
                 </Text>
               </View>
+
+              {/* Timeline graph (inline, additive, below banner) */}
+              <JumpTimelineGraph
+                frames={jumpCamera.frames}
+                events={jumpCamera.events}
+                baseline={jumpCamera.groundCalibration.standingHipY}
+                targetFps={30}
+              />
               
               {/* Primary Metrics Cards */}
               <View style={styles.metricsGrid}>
@@ -1672,6 +1692,17 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
             </>
           )}
         </ScrollView>
+
+        {/* Debug overlay — modal rendered last to float above ScrollView */}
+        <JumpDebugModal
+          visible={debugModalVisible}
+          onClose={() => setDebugModalVisible(false)}
+          frames={jumpCamera.frames}
+          events={jumpCamera.events}
+          metrics={jumpCamera.metrics}
+          groundCalibration={jumpCamera.groundCalibration}
+          protocol={cameraProtocol as any}
+        />
       </LinearGradient>
     );
   }
