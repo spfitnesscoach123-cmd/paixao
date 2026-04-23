@@ -127,8 +127,8 @@ const TOOLTIPS: Record<string, { pt: string; en: string }> = {
     en: 'ACWR ratio evolution (Acute/Chronic). Optimal zone: 0.8 – 1.3. Above 1.5 indicates load spike and high risk. Below 0.8 indicates undertraining. Useful to track adaptation across the microcycle.',
   },
   acwr_vs_load: {
-    pt: 'Quadrante relacionando ACWR × Carga Crônica. Ideal: alta carga crônica + ACWR controlado (~1.0). Quadrante de risco: ACWR alto + carga crônica baixa (pico em atleta desadaptado).',
-    en: 'Quadrant relating ACWR × Chronic Load. Ideal: high chronic load + controlled ACWR (~1.0). Risk quadrant: high ACWR + low chronic load (spike in undertrained athlete).',
+    pt: 'ACWR atual do atleta e posicionamento em zona de carga. Toque em um ponto para ver o nome e o valor exato.',
+    en: 'Current athlete ACWR and positioning across the load zones. Tap a point to see the athlete name and exact value.',
   },
   velocity_zones: {
     pt: 'Distribuição da distância em zonas de velocidade (Z1–Z5). Mais metros em Z4/Z5 indicam alta demanda neuromuscular. Equilibrar zonas baixas (recuperação/aeróbico) com picos de alta intensidade.',
@@ -159,8 +159,8 @@ const TOOLTIPS: Record<string, { pt: string; en: string }> = {
     en: '% of athletes available for training/game. Target: ≥90%. Drops indicate injury outbreak or chronic fatigue — useful for immediate operational context.',
   },
   lmpi_rankings: {
-    pt: 'Ranking dos atletas por LMPI. Quem está no topo tem condição geral ótima; no fim da lista demanda intervenção imediata (carga, sono, nutrição, mobilidade).',
-    en: 'Athletes ranking by LMPI. Top athletes have optimal overall condition; bottom of the list demands immediate intervention (load, sleep, nutrition, mobility).',
+    pt: 'Tabela dos atletas com menor LMPI no período selecionado. O LMPI (0–100) é um score composto que agrega carga, prontidão (wellness), neuromuscular, risco e composição corporal. Limiares: ≥70 condição alta, 40–69 moderada, <40 baixa. Use esta tabela para priorizar acompanhamento individual.',
+    en: 'Table of athletes with the lowest LMPI in the selected period. LMPI (0–100) is a composite score aggregating load, readiness (wellness), neuromuscular, risk and body composition. Thresholds: ≥70 high condition, 40–69 moderate, <40 low. Use this table to prioritize individual follow-up.',
   },
   team_readiness: {
     pt: 'Prontidão média da equipe com base em wellness diário. ≥4/5 é ideal. Quedas sustentadas indicam necessidade de deload coletivo.',
@@ -237,7 +237,7 @@ const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; 
     acwr_load: { pt: 'Carga Aguda vs Crônica', en: 'Acute vs Chronic Load' },
     total_distance: { pt: 'Distancia Total (Timeline)', en: 'Total Distance (Timeline)' },
     acwr_timeline: { pt: 'ACWR Timeline', en: 'ACWR Timeline' },
-    acwr_vs_load: { pt: 'ACWR vs Carga', en: 'ACWR vs Load' },
+    acwr_vs_load: { pt: 'Zona de Carga ACWR', en: 'ACWR Load Zone' },
     velocity_zones: { pt: 'Zonas de Velocidade', en: 'Velocity Zones' },
     weekly_heatmap: { pt: 'Heatmap Semanal', en: 'Weekly Heatmap' },
     load_ranking: { pt: 'Ranking de Carga', en: 'Load Ranking' },
@@ -444,13 +444,20 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
           </G>
         )}
         
-        {/* Points (clickable) */}
+        {/* Points (clickable — cross-platform: web uses onClick, native uses onPress) */}
         {points.map((p, i) => {
           const cx = pad.left + ((p.x - xMin) / xRange) * cW;
           const cy = pad.top + cH * (1 - (p.y - yMin) / yRange);
           const isSelected = selectedIdx === i;
+          const handlePress = () => setSelectedIdx(prev => (prev === i ? null : i));
+          const isWeb = Platform.OS === 'web';
+          const eventProps = isWeb
+            ? { onClick: handlePress, onPress: handlePress }
+            : { onPress: handlePress };
           return (
-            <G key={i}>
+            <G key={i} {...(eventProps as any)}>
+              {/* Invisible hit area — 18px radius — reliable click on web */}
+              <Circle cx={cx} cy={cy} r={18} fill="transparent" />
               {isSelected && (
                 <Circle cx={cx} cy={cy} r={12} fill="none" stroke={p.color} strokeWidth={1.5} opacity={0.6} />
               )}
@@ -460,7 +467,6 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
                 r={isSelected ? 8 : 6}
                 fill={p.color}
                 opacity={isSelected ? 1 : 0.85}
-                onPress={() => setSelectedIdx(prev => (prev === i ? null : i))}
               />
               <Circle cx={cx} cy={cy} r={3} fill="#fff" opacity={0.7} />
             </G>
@@ -511,6 +517,205 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
     </View>
   );
 };
+
+// ===================================================================
+// ACWR Deviation Chart — horizontal axis with colored zones + athlete dots
+// ===================================================================
+// Zones (clinical ACWR convention):
+//   <0.8  → red (undertraining)
+//   0.8–1.3 → green (sweet spot)
+//   1.3–1.5 → orange (caution)
+//   >1.5  → red (danger)
+// Each athlete is plotted as a dot positioned by ACWR value.
+// Reference line at ACWR=1.0 (physiological equilibrium).
+// Cross-platform click handling (web: onClick, native: onPress) for MacBook support.
+// PURELY VISUAL — consumes same `scatterPoints` data, no recalculation.
+const AcwrDeviationChart = ({
+  points,
+  height = 150,
+}: {
+  points: { x: number; name: string; color: string }[]; // x = ACWR
+  height?: number;
+}) => {
+  const { colors } = useTheme();
+  const CHART_WIDTH = useChartWidth();
+  const { locale } = useLanguage();
+  const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
+  const isWeb = Platform.OS === 'web';
+
+  const w = CHART_WIDTH;
+  const pad = { top: 28, bottom: 40, left: 18, right: 18 };
+  const cW = w - pad.left - pad.right;
+  const cH = height - pad.top - pad.bottom;
+
+  // Fixed ACWR display range
+  const xMin = 0.5;
+  const xMax = 2.0;
+  const xRange = xMax - xMin;
+  const toX = (v: number) => pad.left + ((Math.max(xMin, Math.min(xMax, v)) - xMin) / xRange) * cW;
+
+  // Axis tick marks
+  const ticks = [0.8, 1.0, 1.3, 1.5];
+
+  // Zone boundaries (in ACWR units)
+  const zones = [
+    { from: xMin, to: 0.8, color: 'rgba(239,68,68,0.22)' },   // red
+    { from: 0.8, to: 1.3, color: 'rgba(16,185,129,0.28)' },   // green
+    { from: 1.3, to: 1.5, color: 'rgba(245,158,11,0.28)' },   // orange
+    { from: 1.5, to: xMax, color: 'rgba(239,68,68,0.22)' },   // red
+  ];
+
+  const barY = pad.top + 6;
+  const barH = 14;
+  const axisY = pad.top + cH - 6;
+
+  const selected = selectedIdx !== null ? points[selectedIdx] : null;
+
+  const handlePointPress = (i: number) => {
+    setSelectedIdx(prev => (prev === i ? null : i));
+  };
+
+  // Cross-platform click handler factory — web uses onClick on a wrapping <g> inside SVG
+  // which `react-native-svg-web` forwards as a DOM event
+  const pointEventProps = (i: number) =>
+    isWeb
+      ? { onClick: () => handlePointPress(i), onPress: () => handlePointPress(i) }
+      : { onPress: () => handlePointPress(i) };
+
+  return (
+    <View style={{ width: w, height, position: 'relative' }} data-testid="acwr-deviation-chart">
+      <Svg width={w} height={height}>
+        <Defs>
+          <SvgLinearGradient id="acwrZoneGrad" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#ef4444" stopOpacity="0.55" />
+            <Stop offset="0.2" stopColor="#10b981" stopOpacity="0.55" />
+            <Stop offset="0.53" stopColor="#10b981" stopOpacity="0.55" />
+            <Stop offset="0.67" stopColor="#f59e0b" stopOpacity="0.55" />
+            <Stop offset="0.8" stopColor="#ef4444" stopOpacity="0.55" />
+            <Stop offset="1" stopColor="#ef4444" stopOpacity="0.55" />
+          </SvgLinearGradient>
+        </Defs>
+
+        {/* Continuous gradient bar (green centre → red extremes) */}
+        <Rect x={pad.left} y={barY} width={cW} height={barH} rx={barH / 2} fill="url(#acwrZoneGrad)" />
+
+        {/* Explicit zone separator ticks */}
+        {[0.8, 1.3, 1.5].map((v) => (
+          <Line
+            key={`sep-${v}`}
+            x1={toX(v)} y1={barY - 3}
+            x2={toX(v)} y2={barY + barH + 3}
+            stroke={colors.border.default}
+            strokeWidth={1}
+            opacity={0.6}
+          />
+        ))}
+
+        {/* Reference line at ACWR = 1.0 (equilibrium) */}
+        <Line
+          x1={toX(1.0)} y1={pad.top - 4}
+          x2={toX(1.0)} y2={axisY + 6}
+          stroke={colors.text.secondary}
+          strokeWidth={1}
+          strokeDasharray="3,3"
+          opacity={0.7}
+        />
+        <SvgText x={toX(1.0)} y={pad.top - 8} textAnchor="middle" fill={colors.text.secondary} fontSize={9}>
+          1.0
+        </SvgText>
+
+        {/* Athlete dots plotted on the bar */}
+        {points.map((p, i) => {
+          const cx = toX(p.x);
+          const cy = barY + barH / 2;
+          const isSelected = selectedIdx === i;
+          return (
+            <G key={`pt-${i}`} {...(pointEventProps(i) as any)}>
+              {/* Invisible large hit area (18px radius) — easier click/tap */}
+              <Circle cx={cx} cy={cy} r={18} fill="transparent" />
+              {isSelected && (
+                <Circle cx={cx} cy={cy} r={12} fill="none" stroke={p.color} strokeWidth={1.5} opacity={0.7} />
+              )}
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={isSelected ? 7 : 5.5}
+                fill={p.color}
+                stroke="#ffffff"
+                strokeWidth={1.5}
+                opacity={isSelected ? 1 : 0.95}
+              />
+            </G>
+          );
+        })}
+
+        {/* Axis ticks + labels */}
+        {ticks.map((v) => (
+          <G key={`tick-${v}`}>
+            <Line x1={toX(v)} y1={axisY - 3} x2={toX(v)} y2={axisY + 3} stroke={colors.text.tertiary} strokeWidth={1} />
+            <SvgText x={toX(v)} y={axisY + 14} textAnchor="middle" fill={colors.text.tertiary} fontSize={10}>
+              {v.toFixed(1)}
+            </SvgText>
+          </G>
+        ))}
+
+        {/* Axis label */}
+        <SvgText x={w / 2} y={height - 4} textAnchor="middle" fill={colors.text.tertiary} fontSize={9}>
+          ACWR
+        </SvgText>
+      </Svg>
+
+      {/* Tooltip overlay — same pattern as QuadrantChart, but single-axis */}
+      {selected && (
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 8,
+            backgroundColor: colors.dark.secondary,
+            borderColor: selected.color,
+            borderWidth: 1,
+            borderRadius: 8,
+            paddingHorizontal: 10,
+            paddingVertical: 6,
+            minWidth: 150,
+          }}
+          activeOpacity={0.9}
+          onPress={() => setSelectedIdx(null)}
+          data-testid="acwr-deviation-tooltip"
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: selected.color }} />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.text.primary, flex: 1 }} numberOfLines={1}>
+              {selected.name}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, color: colors.text.secondary }}>
+            ACWR: {selected.x.toFixed(2)}
+          </Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Zone legend below axis */}
+      <View style={{ position: 'absolute', bottom: 2, left: pad.left, right: pad.right, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 2 }} pointerEvents="none">
+        <Text style={{ fontSize: 9, color: '#ef4444', fontWeight: '600' }}>
+          {locale === 'pt' ? '< 0.8' : '< 0.8'}
+        </Text>
+        <Text style={{ fontSize: 9, color: '#10b981', fontWeight: '600' }}>
+          {locale === 'pt' ? '0.8 – 1.3' : '0.8 – 1.3'}
+        </Text>
+        <Text style={{ fontSize: 9, color: '#f59e0b', fontWeight: '600' }}>
+          {locale === 'pt' ? '1.3 – 1.5' : '1.3 – 1.5'}
+        </Text>
+        <Text style={{ fontSize: 9, color: '#ef4444', fontWeight: '600' }}>
+          {locale === 'pt' ? '> 1.5' : '> 1.5'}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+
 
 // Heatmap (weekly)
 const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { dow: number; value: number; date: string }[] }[]; height?: number }) => {
@@ -990,13 +1195,13 @@ export default function DataScreen() {
           </FadeInView>
         )}
         
-        {/* Scatter - Team/Position mode */}
+        {/* Deviation Chart — Team/Position mode (ACWR zone positioning) */}
         {mode !== 'athlete' && scatterPoints.length > 0 && (
           <FadeInView delay={250}>
           <View style={styles.card}>
             <CardInfoHeader id="acwr_vs_load" />
             <ChartEntryView delay={100} duration={500}>
-            <QuadrantChart points={scatterPoints} xLabel="ACWR" yLabel={locale === 'pt' ? 'Carga Aguda (m)' : 'Acute Load (m)'} xMid={1.3} height={180} />
+            <AcwrDeviationChart points={scatterPoints} height={150} />
             </ChartEntryView>
           </View>
           </FadeInView>
@@ -1174,14 +1379,7 @@ export default function DataScreen() {
         {/* Athlete LMPI Condition Table */}
         {mode !== 'athlete' && (
           <View style={styles.card} data-testid="lmpi-rankings-table">
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <CardInfoHeader id="lmpi_rankings" />
-              <Pressable data-testid="lmpi-info-tooltip" onPress={() => Alert.alert('LMPI', locale === 'pt' ? 'Score baseado no Load Monitoring Performance Index (LMPI), refletindo a condição atual do atleta.' : 'Score based on Load Monitoring Performance Index (LMPI), reflecting current athlete condition.')}>
-                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(100,116,139,0.25)', alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: colors.text.secondary, fontSize: 11, fontWeight: '700' }}>i</Text>
-                </View>
-              </Pressable>
-            </View>
+            <CardInfoHeader id="lmpi_rankings" />
             <View style={styles.table}>
               <View style={styles.tableHeader}>
                 <Text style={[styles.tableHeaderText, { flex: 2 }]}>{locale === 'pt' ? 'Atleta' : 'Athlete'}</Text>
