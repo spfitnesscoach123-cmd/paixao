@@ -38,6 +38,7 @@ export const ScatterPlot = React.memo(function ScatterPlot({
 }: Props) {
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [tooltipVisible, setTooltipVisible] = React.useState(false);
+  const [containerWidth, setContainerWidth] = React.useState<number | null>(null);
   const { width: winWidth } = useWindowDimensions();
   const pulseAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -59,9 +60,11 @@ export const ScatterPlot = React.memo(function ScatterPlot({
     return () => pulseAnim.removeListener(id);
   }, [pulseAnim]);
 
-  // Responsive chart sizing
-  const CHART_W = Math.min(winWidth - 48, 900);
-  const CHART_H = winWidth >= 900 ? 360 : 220;
+  // Responsive chart sizing — use measured container width (true full-width), not window
+  // Fallback to winWidth-48 when not measured yet (initial paint).
+  const effectiveW = containerWidth ?? Math.min(winWidth - 48, 1600);
+  const CHART_W = Math.max(320, effectiveW - 24); // 24px = horizontal card padding (12px each side)
+  const CHART_H = effectiveW >= 900 ? 380 : effectiveW >= 600 ? 300 : 220;
   const PLOT_W = CHART_W - PAD.left - PAD.right;
   const PLOT_H = CHART_H - PAD.top - PAD.bottom;
 
@@ -141,6 +144,10 @@ export const ScatterPlot = React.memo(function ScatterPlot({
     <View
       style={[styles.container, { backgroundColor: colors.dark.cardSolid, borderColor: colors.border.default }]}
       data-testid="scatter-plot"
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w && Math.abs(w - (containerWidth ?? 0)) > 1) setContainerWidth(w);
+      }}
     >
       <View style={styles.headerRow}>
         <Text style={[styles.title, { color: colors.text.primary }]}>
@@ -169,7 +176,8 @@ export const ScatterPlot = React.memo(function ScatterPlot({
         ))}
       </View>
 
-      <Svg width={CHART_W} height={CHART_H}>
+      <View style={{ width: '100%', alignItems: 'center' }}>
+        <Svg width={CHART_W} height={CHART_H}>
         <Rect
           x={PAD.left}
           y={PAD.top}
@@ -307,6 +315,7 @@ export const ScatterPlot = React.memo(function ScatterPlot({
           );
         })}
       </Svg>
+      </View>
 
       {/* Tooltip */}
       {selectedRow && (

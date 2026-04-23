@@ -170,7 +170,9 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
         ))}
       </View>
 
-      {/* Table Header + Body wrapped in horizontal scroll */}
+      {/* Table Header + Body wrapped in horizontal scroll.
+          minWidth: '100%' on inner View ensures table stretches full card width when it fits,
+          and scrolls horizontally when it doesn't (colAthlete flex:1 absorbs extra space). */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -179,7 +181,7 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
         nestedScrollEnabled
         contentContainerStyle={{ minWidth: '100%' }}
       >
-        <View>
+        <View style={{ minWidth: '100%' }}>
           {/* HEADER */}
           <View style={[styles.headerRow, { borderBottomColor: colors.border.default }]}>
             <TouchableOpacity style={styles.colAthlete} onPress={() => handleSort('name')} data-testid="sort-name">
@@ -282,6 +284,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
+    width: '100%',
   },
   loadingWrap: {
     borderRadius: 12,
