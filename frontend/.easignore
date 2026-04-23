@@ -1,7 +1,24 @@
-# Exclude test/cache files from EAS build
+# EAS Build ignore — mobile-only, exclude backend and test artifacts
 .pytest_cache/
 __pycache__/
 *.pyc
 tests/
 node_modules/
 .expo/
+.metro-cache/
+
+# Backend (not needed for mobile IPA build)
+../backend/
+backend/
+
+# Local env/secrets (EAS reads env from its own secrets, not from .env)
+.env.local
+.env.development
+.env.test
+
+# Large/unnecessary assets
+**/*.zip
+**/*.tar
+**/*.tar.gz
+.git/
+.emergent/
