@@ -46,6 +46,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -170,8 +171,57 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
   // Hip Y history for JumpGraph (CMJ only)
   const hipYHistoryRef = useRef<number[]>([]);
 
-  // Debug overlay visibility (Jump Debug modal — opt-in via ⚙️ icon)
+  // Debug overlay visibility (Jump Debug modal — hidden; opened via secret gesture)
   const [debugModalVisible, setDebugModalVisible] = useState(false);
+
+  // Secret trigger state — long press (~1.5s) on "Jump Detected" banner, then 2 quick taps
+  const bannerLongPressedRef = useRef(false);
+  const bannerLongPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bannerTapCountRef = useRef(0);
+  const bannerTapWindowRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const BANNER_LONG_PRESS_MS = 1500;
+  const BANNER_TAP_WINDOW_MS = 1200;
+
+  const resetSecretTrigger = useCallback(() => {
+    bannerLongPressedRef.current = false;
+    bannerTapCountRef.current = 0;
+    if (bannerLongPressTimerRef.current) { clearTimeout(bannerLongPressTimerRef.current); bannerLongPressTimerRef.current = null; }
+    if (bannerTapWindowRef.current) { clearTimeout(bannerTapWindowRef.current); bannerTapWindowRef.current = null; }
+  }, []);
+
+  const handleBannerPressIn = useCallback(() => {
+    if (bannerLongPressTimerRef.current) clearTimeout(bannerLongPressTimerRef.current);
+    bannerLongPressTimerRef.current = setTimeout(() => {
+      bannerLongPressedRef.current = true;
+      bannerTapCountRef.current = 0;
+      try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+      if (bannerTapWindowRef.current) clearTimeout(bannerTapWindowRef.current);
+      bannerTapWindowRef.current = setTimeout(() => {
+        resetSecretTrigger();
+      }, BANNER_TAP_WINDOW_MS);
+    }, BANNER_LONG_PRESS_MS);
+  }, [resetSecretTrigger]);
+
+  const handleBannerPressOut = useCallback(() => {
+    if (bannerLongPressTimerRef.current) {
+      clearTimeout(bannerLongPressTimerRef.current);
+      bannerLongPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleBannerPress = useCallback(() => {
+    if (!bannerLongPressedRef.current) return;
+    bannerTapCountRef.current += 1;
+    if (bannerTapCountRef.current >= 2) {
+      resetSecretTrigger();
+      try { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } catch {}
+      setDebugModalVisible(true);
+    }
+  }, [resetSecretTrigger]);
+
+  useEffect(() => {
+    return () => { resetSecretTrigger(); };
+  }, [resetSecretTrigger]);
   
   // SAFETY: Frame processing guard to prevent simultaneous processing
   const isProcessingFrameRef = useRef(false);
@@ -231,6 +281,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
     tip1: locale === 'pt' ? 'Posicione a camera de lado (perfil)' : 'Position camera from the side (profile)',
     tip2: locale === 'pt' ? 'Certifique-se que os pes e quadril estao visiveis' : 'Make sure feet and hips are visible',
     tip3: locale === 'pt' ? 'Boa iluminacao melhora a precisao' : 'Good lighting improves accuracy',
+    tip4: locale === 'pt' ? 'Posicione a camera a 2-3m de distancia e a ~20-40cm do chao' : 'Position camera 2-3m away and ~20-40cm from the ground',
     activeLeg: locale === 'pt' ? 'Perna Ativa' : 'Active Leg',
     left: locale === 'pt' ? 'Esquerda' : 'Left',
     right: locale === 'pt' ? 'Direita' : 'Right',
@@ -897,6 +948,10 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
               <Ionicons name="sunny" size={16} color={colors.accent.primary} />
               <Text style={styles.tipText}>{t.tip3}</Text>
             </View>
+            <View style={styles.tipItem}>
+              <Ionicons name="resize" size={16} color={colors.accent.primary} />
+              <Text style={styles.tipText}>{t.tip4}</Text>
+            </View>
           </View>
           
           {/* SL-CMJ: Leg selection */}
@@ -1482,20 +1537,23 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
               <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.title}>{t.results}</Text>
-            <TouchableOpacity
-              onPress={() => setDebugModalVisible(true)}
-              style={styles.backButton}
-              data-testid="results-debug-btn"
-              accessibilityLabel="Debug overlay"
-            >
-              <Ionicons name="settings-outline" size={22} color={colors.text.primary} />
-            </TouchableOpacity>
+            <View style={{ width: 44 }} />
           </View>
           
           {jumpCamera.metrics ? (
             <>
-              {/* Success Banner */}
-              <View style={styles.successBanner}>
+              {/* Success Banner — also serves as SECRET debug trigger:
+                  long-press (~1.5s) then 2 quick taps opens debug overlay */}
+              <TouchableOpacity
+                activeOpacity={0.95}
+                onPressIn={handleBannerPressIn}
+                onPressOut={handleBannerPressOut}
+                onPress={handleBannerPress}
+                delayPressIn={0}
+                style={styles.successBanner}
+                data-testid="jump-detected-banner"
+                accessibilityLabel="Jump Detected"
+              >
                 <Ionicons name="checkmark-circle" size={48} color="#22c55e" />
                 <Text style={styles.successText}>
                   {locale === 'pt' ? 'Salto Detectado!' : 'Jump Detected!'}
@@ -1503,7 +1561,7 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
                 <Text style={styles.protocolBadge}>
                   {JUMP_PROTOCOL_INFO[selectedProtocol]?.[locale === 'pt' ? 'namePt' : 'name'] || selectedProtocol.toUpperCase()}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
               {/* Timeline graph (inline, additive, below banner) */}
               <JumpTimelineGraph
