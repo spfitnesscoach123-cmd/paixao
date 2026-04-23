@@ -228,11 +228,18 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
               <SortIcon colKey="rsimod" />
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.colFatigue} onPress={() => handleSort('fatigue_index')} data-testid="sort-fatigue">
+            <TouchableOpacity style={styles.colFatigue} onPress={() => handleSort('fatigue_index')} data-testid="sort-readiness">
+              <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                {locale === 'pt' ? 'Prontidão' : 'Readiness'}
+              </Text>
+              <SortIcon colKey="fatigue_index" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.colFatigue} onPress={() => handleSort('rsimod')} data-testid="sort-cmj-fatigue">
               <Text style={[styles.headerText, { color: colors.text.secondary }]}>
                 {locale === 'pt' ? 'Fadiga (%)' : 'Fatigue (%)'}
               </Text>
-              <SortIcon colKey="fatigue_index" />
+              <SortIcon colKey="rsimod" />
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.colBody} onPress={() => handleSort('body_fat')} data-testid="sort-body">
@@ -262,8 +269,8 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
         title={locale === 'pt' ? 'Tabela Analítica' : 'Analytics Table'}
         body={
           locale === 'pt'
-            ? 'Linhas por atleta com métricas agregadas do período:\n\n• Dist. (km) — distância total percorrida\n• Zonas (m) — distância em Z3 / Z4 / Z5 em metros\n• SPR (n) — número de sprints (picos > 25.2 km/h)\n• A/D (n) — número de acelerações/desacelerações significativas\n• RSImod — Reactive Strength Index modificado (adim.)\n• Fadiga (%) — índice de fadiga SNC\n• Composição corporal — %Gordura / Massa magra (kg)\n\nClique nos cabeçalhos para ordenar. Use as chips no topo para mostrar/ocultar colunas.'
-            : 'Rows per athlete with aggregated period metrics:\n\n• Dist. (km) — total distance covered\n• Zones (m) — distance in Z3 / Z4 / Z5 in meters\n• SPR (n) — sprint count (peaks > 25.2 km/h)\n• A/D (n) — significant accel/decel events\n• RSImod — modified Reactive Strength Index (unitless)\n• Fatigue (%) — CNS fatigue index\n• Body composition — body fat % / lean mass (kg)\n\nTap column headers to sort. Use chips at the top to show/hide columns.'
+            ? 'Linhas por atleta com métricas agregadas do período:\n\n• Dist. (km) — distância total percorrida\n• Zonas (m) — distância em Z3 / Z4 / Z5 em metros\n• SPR (n) — número de sprints (picos > 25.2 km/h)\n• A/D (n) — número de acelerações/desacelerações significativas\n• RSImod — Reactive Strength Index modificado (adim.)\n• Prontidão — derivada dos dados de wellness reportados pelo atleta (sono, recuperação, percepção).\n• Fadiga (%) — Índice de Fadiga Neuromuscular calculado a partir da variação do RSImod no CMJ em relação ao baseline (últimos 28d) do atleta.\n• Composição corporal — %Gordura / Massa magra (kg)\n\nClique nos cabeçalhos para ordenar. Use as chips no topo para mostrar/ocultar colunas.'
+            : 'Rows per athlete with aggregated period metrics:\n\n• Dist. (km) — total distance covered\n• Zones (m) — distance in Z3 / Z4 / Z5 in meters\n• SPR (n) — sprint count (peaks > 25.2 km/h)\n• A/D (n) — significant accel/decel events\n• RSImod — modified Reactive Strength Index (unitless)\n• Readiness — derived from athlete-reported wellness data (sleep, recovery, perception).\n• Fatigue (%) — Neuromuscular Fatigue Index computed from CMJ RSImod variation vs the athlete\'s 28-day baseline.\n• Body composition — body fat % / lean mass (kg)\n\nTap column headers to sort. Use chips at the top to show/hide columns.'
         }
       />
     </View>

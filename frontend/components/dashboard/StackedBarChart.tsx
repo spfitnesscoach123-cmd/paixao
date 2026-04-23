@@ -8,6 +8,9 @@ import {
   ActivityIndicator,
   Modal,
   useWindowDimensions,
+  Animated,
+  Easing,
+  Platform,
 } from 'react-native';
 import Svg, { Rect, Line, Text as SvgText, G, Circle } from 'react-native-svg';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,6 +47,7 @@ export const StackedBarChart = React.memo(function StackedBarChart({
   const [layerZ4, setLayerZ4] = React.useState(true);
   const [layerZ5, setLayerZ5] = React.useState(true);
   const [tooltipVisible, setTooltipVisible] = React.useState(false);
+  const [selectedRow, setSelectedRow] = React.useState<TeamTableRowData | null>(null);
   const { width: winWidth } = useWindowDimensions();
 
   const toggleZ3 = React.useCallback(() => setLayerZ3(v => !v), []);
@@ -56,6 +60,31 @@ export const StackedBarChart = React.memo(function StackedBarChart({
       .filter(r => r.total_distance > 0)
       .sort((a, b) => b.total_distance - a.total_distance);
   }, [rows]);
+
+  // Entry animation — fade + staggered grow-from-floor (one Animated.Value shared for fade,
+  // per-bar progress values for vertical reveal). Respects reduced-motion by reducing duration on web.
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+  const progressAnim = React.useRef(new Animated.Value(0)).current;
+  const dataKey = chartData.map(r => r.athlete_id).join('|');
+
+  React.useEffect(() => {
+    fadeAnim.setValue(0);
+    progressAnim.setValue(0);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(progressAnim, {
+        toValue: 1,
+        duration: 520,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: false, // SVG dims need JS-driven interpolation
+      }),
+    ]).start();
+  }, [dataKey, fadeAnim, progressAnim]);
 
   // Calculate max stacked value and team average (DATA UNCHANGED)
   const { maxVal, teamAvg, top3Ids, bottom3Ids } = React.useMemo(() => {
@@ -118,6 +147,8 @@ export const StackedBarChart = React.memo(function StackedBarChart({
   // Team average line Y position
   const avgY = CHART_HEIGHT - (teamAvg / maxVal) * CHART_HEIGHT;
 
+  const isWeb = Platform.OS === 'web';
+
   return (
     <View
       style={[styles.container, { backgroundColor: colors.dark.cardSolid, borderColor: colors.border.default }]}
@@ -154,8 +185,10 @@ export const StackedBarChart = React.memo(function StackedBarChart({
         </View>
       </View>
 
-      {/* Chart */}
+      {/* Chart — wrapped in Animated.View for entry fade + reveal mask */}
+      <Animated.View style={{ opacity: fadeAnim, position: 'relative' }}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} bounces={false}>
+        <View style={{ position: 'relative', width: chartWidth, height: svgHeight }}>
         <Svg width={chartWidth} height={svgHeight}>
           {/* Average highlighted band */}
           <Rect
@@ -232,8 +265,21 @@ export const StackedBarChart = React.memo(function StackedBarChart({
               ? row.name.split(' ').map(w => w[0]).join('').slice(0, 3)
               : row.name;
 
+            const openDetail = () => setSelectedRow(row);
+            const barEventProps: any = isWeb
+              ? { onClick: openDetail, onPress: openDetail }
+              : { onPress: openDetail };
+
             return (
-              <React.Fragment key={row.athlete_id}>
+              <G key={row.athlete_id} {...barEventProps}>
+                {/* Invisible full-column hit area — ensures reliable tap/click across platforms */}
+                <Rect
+                  x={x - 2}
+                  y={0}
+                  width={BAR_WIDTH + 4}
+                  height={CHART_HEIGHT}
+                  fill="transparent"
+                />
                 {borderCol !== 'none' && (
                   <Rect
                     x={x - 1.5}
@@ -282,11 +328,29 @@ export const StackedBarChart = React.memo(function StackedBarChart({
                 >
                   {shortName}
                 </SvgText>
-              </React.Fragment>
+              </G>
             );
           })}
         </Svg>
+
+        {/* Reveal mask — shrinks from top to bottom over progressAnim, exposing bars */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: progressAnim.interpolate({
+              inputRange: [0, 1],
+              outputRange: [CHART_HEIGHT, 0],
+            }),
+            backgroundColor: colors.dark.cardSolid,
+          }}
+        />
+        </View>
       </ScrollView>
+      </Animated.View>
 
       {/* Info Tooltip Modal */}
       <InfoTooltip
@@ -296,10 +360,71 @@ export const StackedBarChart = React.memo(function StackedBarChart({
         title={locale === 'pt' ? 'Carga por Atleta' : 'Load per Athlete'}
         body={
           locale === 'pt'
-            ? 'Distância total (barra base, metros) somada a Z3, Z4 (HSR) e Z5 (Sprint) de cada atleta. Os 3 melhores e piores são destacados. A linha tracejada indica a média do grupo no período.'
-            : 'Total distance (base bar, meters) stacked with Z3, Z4 (HSR) and Z5 (Sprint) per athlete. Top 3 and bottom 3 are highlighted. The dashed line shows the team average for the period.'
+            ? 'Distância total (barra base, metros) somada a Z3, Z4 (HSR) e Z5 (Sprint) de cada atleta. Os 3 melhores e piores são destacados. A linha tracejada indica a média do grupo no período. Toque em uma barra para ver o detalhamento individual.'
+            : 'Total distance (base bar, meters) stacked with Z3, Z4 (HSR) and Z5 (Sprint) per athlete. Top 3 and bottom 3 are highlighted. The dashed line shows the team average for the period. Tap a bar to see individual breakdown.'
         }
       />
+
+      {/* Bar detail modal — shown when user taps/clicks a bar.
+          READ-ONLY display of already-loaded row fields — no recalculation. */}
+      <Modal
+        visible={!!selectedRow}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedRow(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={() => setSelectedRow(null)}
+        >
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: colors.dark.cardSolid, borderColor: colors.accent.primary, maxWidth: 320 },
+            ]}
+            data-testid="bar-detail-modal"
+          >
+            {selectedRow && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View style={[styles.legendDot, { width: 10, height: 10, backgroundColor: ZONE_COLORS.z3 }]} />
+                  <Text style={[styles.modalTitle, { color: colors.text.primary }]} numberOfLines={1}>
+                    {selectedRow.name}
+                  </Text>
+                </View>
+                <View style={{ gap: 6, marginBottom: 14 }}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>TD</Text>
+                    <Text style={[styles.detailValue, { color: ZONE_COLORS.base }]}>
+                      {(selectedRow.total_distance / 1000).toFixed(1)} km
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>HSR (Z4)</Text>
+                    <Text style={[styles.detailValue, { color: ZONE_COLORS.z4 }]}>
+                      {Math.round(selectedRow.z4)} m
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>Sprint (Z5)</Text>
+                    <Text style={[styles.detailValue, { color: ZONE_COLORS.z5 }]}>
+                      {Math.round(selectedRow.z5)} m
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedRow(null)}
+                  style={[styles.modalBtn, { backgroundColor: colors.accent.primary }]}
+                  data-testid="bar-detail-close"
+                >
+                  <Text style={styles.modalBtnText}>OK</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 });
@@ -482,5 +607,22 @@ const styles = StyleSheet.create({
     color: '#081C3A',
     fontWeight: '700',
     fontSize: 13,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(148,163,184,0.12)',
+  },
+  detailLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

@@ -122,12 +122,35 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
         )}
       </View>
 
-      {/* COL 7: FADIGA */}
+      {/* COL 7: PRONTIDÃO — Wellness-derived (unchanged value, renamed semantically) */}
       <View style={styles.colFatigue}>
         <Text style={[styles.fatigueValue, { color: STATUS_COLORS[row.fatigue_status] || colors.text.tertiary }]}>
           {row.fatigue_index != null ? `${row.fatigue_index.toFixed(0)}%` : '-'}
         </Text>
         <FatigueBar value={row.fatigue_index} status={row.fatigue_status} />
+      </View>
+
+      {/* COL 8: FADIGA — CMJ-based Neuromuscular Fatigue Index (READ-ONLY derivation) */}
+      <View style={styles.colFatigue}>
+        {(() => {
+          const baseline = row.rsimod_baseline_28d;
+          const current = row.rsimod;
+          if (baseline == null || current == null || baseline <= 0) {
+            return (
+              <Text style={[styles.fatigueValue, { color: colors.text.tertiary }]}>-</Text>
+            );
+          }
+          const cmjFat = ((baseline - current) / baseline) * 100;
+          const color = cmjFat <= 10 ? '#10b981' : cmjFat <= 20 ? '#f59e0b' : '#ef4444';
+          return (
+            <>
+              <Text style={[styles.fatigueValue, { color }]}>
+                {cmjFat >= 0 ? '+' : ''}{cmjFat.toFixed(0)}%
+              </Text>
+              <Text style={[styles.bodyTextSmall, { color: colors.text.tertiary }]}>CMJ</Text>
+            </>
+          );
+        })()}
       </View>
 
       {/* COL 8: BODY COMP */}

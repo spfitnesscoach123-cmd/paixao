@@ -17,13 +17,24 @@ import { InfoTooltip } from './StackedBarChart';
 const RSI_COLOR = '#2FB6FF';           // same sapphire as Z3 in bar chart (consistency)
 const FATIGUE_COLOR = '#F5B941';       // warm amber — not conflicting red
 const BASELINE_RSI_COLOR = '#7BD4FF';  // sapphire light
-const BASELINE_FAT_COLOR = '#F5B941';
 
 interface Props {
   rows: TeamTableRowData[];
   isLoading: boolean;
   colors: any;
   locale: string;
+}
+
+/**
+ * CMJ-based Neuromuscular Fatigue Index (%)
+ * Formula: ((baseline - current) / baseline) × 100
+ * Positive → fatigue; Negative → potentiation; 0 → baseline equilibrium.
+ * READ-ONLY derivation from existing fields served by the API.
+ * Same formula used on the athlete profile (Jump Assessment / Strength & VBT).
+ */
+function computeCmjFatigue(rsimod: number | null, baseline: number | null): number | null {
+  if (rsimod == null || baseline == null || baseline <= 0) return null;
+  return ((baseline - rsimod) / baseline) * 100;
 }
 
 export const NeuromuscularChart = React.memo(function NeuromuscularChart({
@@ -33,27 +44,30 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
   locale,
 }: Props) {
   const [showRsiBaseline, setShowRsiBaseline] = React.useState(true);
-  const [showFatBaseline, setShowFatBaseline] = React.useState(true);
   const [tooltipVisible, setTooltipVisible] = React.useState(false);
   const { width: winWidth } = useWindowDimensions();
 
   const toggleRsiBase = React.useCallback(() => setShowRsiBaseline(v => !v), []);
-  const toggleFatBase = React.useCallback(() => setShowFatBaseline(v => !v), []);
 
+  // CMJ-based fatigue computed per athlete (READ-ONLY derivation)
   const chartData = React.useMemo(() => {
-    return rows.filter(r => r.rsimod != null || r.fatigue_index != null);
+    return rows
+      .map(r => ({ ...r, cmj_fatigue: computeCmjFatigue(r.rsimod, r.rsimod_baseline_28d) }))
+      .filter(r => r.rsimod != null || r.cmj_fatigue != null);
   }, [rows]);
 
-  const { maxRsi, maxFatigue } = React.useMemo(() => {
-    if (chartData.length === 0) return { maxRsi: 1, maxFatigue: 100 };
+  const { maxRsi } = React.useMemo(() => {
+    if (chartData.length === 0) return { maxRsi: 1 };
     let mxR = 0;
-    const mxF = 100;
     for (const r of chartData) {
       if (r.rsimod != null && r.rsimod > mxR) mxR = r.rsimod;
       if (r.rsimod_baseline_28d != null && r.rsimod_baseline_28d > mxR) mxR = r.rsimod_baseline_28d;
     }
-    return { maxRsi: Math.max(mxR * 1.2, 0.5), maxFatigue: mxF };
+    return { maxRsi: Math.max(mxR * 1.2, 0.5) };
   }, [chartData]);
+
+  // Fatigue axis: symmetric around 0, clamped to ±50% for plotting
+  const FAT_RANGE = 50; // −50% (potentiation) to +50% (fatigue)
 
   if (isLoading) {
     return (
@@ -73,7 +87,7 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
         </Text>
         <View style={styles.emptyWrap}>
           <Text style={[styles.emptyText, { color: colors.text.tertiary }]}>
-            {locale === 'pt' ? 'Sem dados de RSImod ou fadiga no período' : 'No RSImod or fatigue data in period'}
+            {locale === 'pt' ? 'Sem dados de RSImod no período' : 'No RSImod data in period'}
           </Text>
         </View>
       </View>
@@ -91,22 +105,29 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
   const chartWidth = PAD_LEFT + chartData.length * (BAR_W + GAP);
 
   const rsiToY = (v: number) => PAD_TOP + PLOT_H - (v / maxRsi) * PLOT_H;
-  const fatToY = (v: number) => PAD_TOP + PLOT_H - (v / maxFatigue) * PLOT_H;
+  // Symmetric fatigue axis: −FAT_RANGE at bottom, +FAT_RANGE at top
+  const fatToY = (v: number) => {
+    const clamped = Math.max(-FAT_RANGE, Math.min(FAT_RANGE, v));
+    // Map [-FAT_RANGE, FAT_RANGE] → [PAD_TOP + PLOT_H, PAD_TOP]  (positive fatigue → top of chart)
+    const norm = (clamped + FAT_RANGE) / (FAT_RANGE * 2);
+    return PAD_TOP + PLOT_H - norm * PLOT_H;
+  };
 
-  // Build fatigue line points
+  const zeroY = fatToY(0);
+
+  // Build CMJ-fatigue polyline
   const fatiguePoints = chartData
     .map((r, i) => {
-      if (r.fatigue_index == null) return null;
+      if (r.cmj_fatigue == null) return null;
       const x = PAD_LEFT + i * (BAR_W + GAP) + BAR_W / 2;
-      const y = fatToY(r.fatigue_index);
+      const y = fatToY(r.cmj_fatigue);
       return `${x},${y}`;
     })
     .filter(Boolean)
     .join(' ');
 
-  // Build baseline AREA bands as polygons (toggle-aware)
-  // RSI baseline band — from baseline Y to chart floor, tinted sapphire
-  const rsiBaselinePath = React.useMemo(() => {
+  // RSI baseline band polygon (unchanged)
+  const rsiBaselinePath = (() => {
     if (!showRsiBaseline) return null;
     const pts: string[] = [];
     const floorY = PAD_TOP + PLOT_H;
@@ -120,25 +141,7 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
     const first = pts[0].split(',')[0];
     const last = pts[pts.length - 1].split(',')[0];
     return `${first},${floorY} ${pts.join(' ')} ${last},${floorY}`;
-  }, [chartData, showRsiBaseline, BAR_W, GAP, PAD_TOP, PLOT_H, maxRsi]);
-
-  // Fatigue baseline band — thick ±5% band around baseline value
-  const fatBaselineBand = React.useMemo(() => {
-    if (!showFatBaseline) return null;
-    const top: string[] = [];
-    const bottom: string[] = [];
-    chartData.forEach((r, i) => {
-      if (r.fatigue_baseline_28d == null) return;
-      const x = PAD_LEFT + i * (BAR_W + GAP) + BAR_W / 2;
-      const band = 5; // ±5% visual shading
-      const yTop = fatToY(Math.min(100, r.fatigue_baseline_28d + band));
-      const yBot = fatToY(Math.max(0, r.fatigue_baseline_28d - band));
-      top.push(`${x},${yTop}`);
-      bottom.push(`${x},${yBot}`);
-    });
-    if (top.length < 2) return null;
-    return `${top.join(' ')} ${bottom.reverse().join(' ')}`;
-  }, [chartData, showFatBaseline, BAR_W, GAP, PAD_TOP, PLOT_H, maxFatigue]);
+  })();
 
   return (
     <View
@@ -167,13 +170,6 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
           onPress={toggleRsiBase}
           borderColor={colors.border.default}
         />
-        <ToggleChip
-          label={locale === 'pt' ? 'Fadiga baseline 28d' : 'Fatigue baseline 28d'}
-          active={showFatBaseline}
-          color={BASELINE_FAT_COLOR}
-          onPress={toggleFatBase}
-          borderColor={colors.border.default}
-        />
       </View>
 
       {/* Legend */}
@@ -185,7 +181,7 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
         <View style={styles.legendItem}>
           <View style={[styles.legendLine, { backgroundColor: FATIGUE_COLOR }]} />
           <Text style={[styles.legendLabel, { color: colors.text.tertiary }]}>
-            {locale === 'pt' ? 'Fadiga' : 'Fatigue'}
+            {locale === 'pt' ? 'Fadiga Neuromuscular (CMJ)' : 'Neuromuscular Fatigue (CMJ)'}
           </Text>
         </View>
       </View>
@@ -252,14 +248,17 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
             );
           })}
 
-          {/* Fatigue baseline AREA band (±5%) */}
-          {fatBaselineBand && (
-            <Polygon
-              points={fatBaselineBand}
-              fill={BASELINE_FAT_COLOR}
-              opacity={0.18}
-            />
-          )}
+          {/* Zero-fatigue reference line (neutral baseline) */}
+          <Line
+            x1={PAD_LEFT}
+            y1={zeroY}
+            x2={chartWidth}
+            y2={zeroY}
+            stroke={FATIGUE_COLOR}
+            strokeWidth={1}
+            strokeDasharray="3,3"
+            opacity={0.45}
+          />
 
           {/* Fatigue line (solid) */}
           {fatiguePoints.length > 0 && (
@@ -274,9 +273,9 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
 
           {/* Fatigue dots */}
           {chartData.map((r, i) => {
-            if (r.fatigue_index == null) return null;
+            if (r.cmj_fatigue == null) return null;
             const cx = PAD_LEFT + i * (BAR_W + GAP) + BAR_W / 2;
-            const cy = fatToY(r.fatigue_index);
+            const cy = fatToY(r.cmj_fatigue);
             return (
               <Circle
                 key={`fdot-${r.athlete_id}`}
@@ -312,10 +311,10 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
             );
           })}
 
-          {/* Right-side Y axis labels for fatigue (0-100%) */}
-          <SvgText x={chartWidth - 2} y={PAD_TOP + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>100%</SvgText>
-          <SvgText x={chartWidth - 2} y={PAD_TOP + PLOT_H / 2 + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>50%</SvgText>
-          <SvgText x={chartWidth - 2} y={PAD_TOP + PLOT_H + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>0%</SvgText>
+          {/* Right-side Y axis labels for CMJ fatigue (symmetric ±FAT_RANGE) */}
+          <SvgText x={chartWidth - 2} y={PAD_TOP + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>+{FAT_RANGE}%</SvgText>
+          <SvgText x={chartWidth - 2} y={zeroY + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>0%</SvgText>
+          <SvgText x={chartWidth - 2} y={PAD_TOP + PLOT_H + 3} textAnchor="end" fill={FATIGUE_COLOR} fontSize={8} opacity={0.7}>−{FAT_RANGE}%</SvgText>
         </Svg>
       </ScrollView>
 
@@ -326,8 +325,8 @@ export const NeuromuscularChart = React.memo(function NeuromuscularChart({
         title={locale === 'pt' ? 'Neuromuscular' : 'Neuromuscular'}
         body={
           locale === 'pt'
-            ? 'Barras azul safira mostram o RSImod (Reactive Strength Index modificado) de cada atleta. A linha âmbar mostra o índice de fadiga SNC (%). Áreas sombreadas representam as baselines de 28 dias — a azul marca o patamar histórico de RSImod, a âmbar marca a faixa ±5% do baseline de fadiga. Use os toggles acima para mostrar/ocultar cada baseline.'
-            : 'Sapphire bars show each athlete RSImod (modified Reactive Strength Index). The amber line shows the CNS fatigue index (%). Shaded areas represent the 28-day baselines — blue marks the historical RSImod level, amber marks the ±5% fatigue baseline range. Use the toggles above to show/hide each baseline.'
+            ? 'Barras azul safira mostram o RSImod (Reactive Strength Index modificado) de cada atleta. A linha âmbar representa o Índice de Fadiga Neuromuscular (%), calculado a partir da variação do RSImod no CMJ em relação ao baseline individual (últimos 28d) do atleta — valores positivos indicam fadiga, negativos indicam potenciação. Independe de dados de wellness. A área sombreada azul marca o patamar histórico de RSImod. Use o toggle acima para mostrar/ocultar a baseline.'
+            : 'Sapphire bars show each athlete RSImod (modified Reactive Strength Index). The amber line represents the Neuromuscular Fatigue Index (%), computed from the athlete\'s CMJ RSImod variation vs their individual 28-day baseline — positive values indicate fatigue, negative values indicate potentiation. Independent from wellness data. The shaded blue area marks the historical RSImod baseline. Use the toggle above to show/hide the baseline.'
         }
       />
     </View>
