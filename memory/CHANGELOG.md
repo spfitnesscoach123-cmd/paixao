@@ -55,3 +55,11 @@
   - `app/athlete/[id]/upload-gps.tsx` (Catapult CSV) — same.
   - `app/athlete/[id].tsx` (delete activities) — same.
 - **Verified**: Past week → `frozen=true` + persisted snapshot stable across reads. Future week → `frozen=false` + dynamic. Peak algorithms and classification flow untouched.
+
+
+## 2026-04-25 (later) — Smart Summary iOS Crash Guards (P0)
+Cirurgia mínima em `app/(tabs)/data.tsx` para impedir crashes nativos iOS (EXC_BAD_ACCESS) no react-native-svg quando Smart Summary é aberto em estados vazios/zero.
+- **GaugeChart**: `safeValue = value > 0 ? value : 0.0001`; `safeId = gauge-${safeLabel || 'default'}` (evita `gauge-` vazio); `dashArray = Math.max(progress * circumference, 0.0001)` (evita path degenerado).
+- **DonutChart**: `safeSegments = Array.isArray(segments) ? segments : []`; deps da animação estabilizadas em `[0]` quando vazio (evita churn de animação contra array vazio).
+- **RadarChart**: `safeValues` sanitizados (NaN→0); `finalValues` recebe perturbação `0.0001` no primeiro slot quando todos zeros, ou fallback `[0.0001,0,0,0,0]` quando `values=[]` (evita polígono colapsado).
+- **Sem alteração de UX**: layout, lógica de cálculo de LMPI, render condicional e arquitetura preservados. Mudanças invisíveis quando há dados reais.

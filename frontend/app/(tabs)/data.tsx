@@ -80,13 +80,20 @@ const getLmpiClassification = (lmpi: number | null | undefined, validity: string
 // Gauge Component
 const GaugeChart = ({ value, max = 100, label, color, size = 120 }: { value: number; max?: number; label: string; color: string; size?: number }) => {
   const { colors } = useTheme();
-  const animVal = useAnimatedValue(typeof value === 'number' && !isNaN(value) ? value : 0, { duration: 900 });
+  // Sanitize value: clamp to a tiny positive number to avoid zero-length SVG paths
+  // that crash react-native-svg on iOS (EXC_BAD_ACCESS) in empty-state scenarios.
+  const safeValue =
+    typeof value === 'number' && isFinite(value) && value > 0 ? value : 0.0001;
+  const animVal = useAnimatedValue(safeValue, { duration: 900 });
   const radius = (size - 16) / 2;
   const circumference = Math.PI * radius;
   const progress = Math.min(animVal / max, 1);
-  const dashArray = progress * circumference;
-  // Sanitize label for use as SVG id — strip spaces and special chars to keep url(#id) valid
-  const safeId = `gauge-${label.replace(/[^a-zA-Z0-9]/g, '')}`;
+  // Guarantee a non-zero dasharray (degenerate paths crash native SVG layer)
+  const dashArray = Math.max(progress * circumference, 0.0001);
+  // Sanitize label for use as SVG id — strip spaces and special chars to keep url(#id) valid.
+  // Fallback to 'default' so the id is never just `gauge-` (empty suffix is invalid).
+  const safeLabel = (label || '').replace(/[^a-zA-Z0-9]/g, '');
+  const safeId = `gauge-${safeLabel || 'default'}`;
   
   return (
     <View style={{ alignItems: 'center' }}>
@@ -378,17 +385,25 @@ const LineChart = ({ lines, labels, height = 160, showArea = false }: { lines: {
 // Donut Chart
 const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, centerSubtext }: { segments: { value: number; color: string; label: string }[]; size?: number; strokeWidth?: number; centerText?: string; centerSubtext?: string }) => {
   const { colors } = useTheme();
-  const animProgress = useChartAnimation({ duration: 800, delay: 300, deps: segments.map(s => s.value) });
+  // Stabilize segments and animation deps. Empty arrays as deps make the animation
+  // hook keep firing on every shallow comparison and can cause native SVG churn on iOS.
+  const safeSegments = Array.isArray(segments) ? segments : [];
+  const hasData = safeSegments.length > 0;
+  const animProgress = useChartAnimation({
+    duration: 800,
+    delay: 300,
+    deps: hasData ? safeSegments.map(s => s.value) : [0],
+  });
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
-  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  const total = safeSegments.reduce((s, seg) => s + seg.value, 0);
   let offset = 0;
   
   return (
     <View style={{ alignItems: 'center' }}>
       <Svg width={size} height={size}>
         <G rotation="-90" origin={`${size/2}, ${size/2}`}>
-          {total > 0 && segments.map((seg, i) => {
+          {total > 0 && safeSegments.map((seg, i) => {
             const pct = seg.value / total;
             const dash = pct * circumference * animProgress;
             const currentOffset = -offset * circumference / 360 * animProgress;
@@ -753,10 +768,19 @@ const WeeklyHeatmap = ({ data, height = 100 }: { data: { week: number; days: { d
 // Radar Chart
 const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: string[]; size?: number }) => {
   const { colors } = useTheme();
+  // Sanitize values: a polygon with all-zero coordinates collapses to a single
+  // point and produces a degenerate SVG path that crashes react-native-svg on iOS.
+  const safeValues = (values || []).map(v => (typeof v === 'number' && isFinite(v) ? v : 0));
+  const hasAnyValue = safeValues.length > 0 && safeValues.some(v => v > 0);
+  const finalValues = hasAnyValue
+    ? safeValues
+    : (safeValues.length > 0
+        ? safeValues.map((_, i) => (i === 0 ? 0.0001 : 0))
+        : [0.0001, 0, 0, 0, 0]);
   const cx = size / 2;
   const cy = size / 2;
   const r = (size - 40) / 2;
-  const n = values.length;
+  const n = finalValues.length;
   
   const getPoint = (index: number, val: number) => {
     const angle = (Math.PI * 2 * index) / n - Math.PI / 2;
@@ -783,7 +807,7 @@ const RadarChart = ({ values, labels, size = 160 }: { values: number[]; labels: 
       
       {/* Data polygon */}
       {(() => {
-        const pts = values.map((v, i) => getPoint(i, Math.min(v, 1)));
+        const pts = finalValues.map((v, i) => getPoint(i, Math.min(v, 1)));
         const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ') + 'Z';
         return (
           <G>
