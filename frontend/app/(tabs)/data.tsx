@@ -1325,6 +1325,32 @@ export default function DataScreen() {
     const safeAthletes = Array.isArray(athletes) ? athletes : [];
     const safeInsights = (insights && typeof insights === 'object') ? insights : {};
 
+    // ===== CONTEXT-AWARE VALIDITY GUARD =====
+    // Smart Summary depends on LMPI, which requires GPS data (ACWR is mandatory).
+    // Without at least one valid LMPI in the current context, the layer must NOT
+    // render — its charts collapse to zero values and trigger native iOS crashes.
+    const hasValidLmpi = mode === 'athlete'
+      ? (safeAthletes[0]?.lmpi_validity && safeAthletes[0].lmpi_validity !== 'invalid')
+      : safeAthletes.some((a: any) => a && a.lmpi_validity && a.lmpi_validity !== 'invalid');
+
+    if (!hasValidLmpi) {
+      return (
+        <View style={styles.card} data-testid="smart-summary-empty-state">
+          <View style={{ alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 }}>
+            <Ionicons name="bar-chart-outline" size={36} color={colors.text.tertiary} />
+            <Text style={{ color: colors.text.primary, fontSize: 15, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>
+              {locale === 'pt' ? 'Não há dados suficientes' : 'Not enough data'}
+            </Text>
+            <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 6, textAlign: 'center', lineHeight: 16 }}>
+              {locale === 'pt'
+                ? 'Importe atividades GPS para visualizar o LMPI e o Smart Summary.'
+                : 'Import GPS activities to see LMPI and the Smart Summary.'}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     const lmpi = mode === 'athlete' ? safeAthletes[0]?.lmpi : safeSummary.team_lmpi;
     const lmpiValidity = mode === 'athlete' ? (safeAthletes[0]?.lmpi_validity || 'invalid') : (lmpi != null ? 'valid' : 'invalid');
     const acwr = mode === 'athlete' ? safeAthletes[0]?.acwr : safeSummary.team_acwr;

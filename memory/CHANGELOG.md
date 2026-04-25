@@ -83,3 +83,17 @@ Cirurgia mínima em `app/(tabs)/data.tsx` para impedir crashes nativos iOS (EXC_
   - Confirmação via `Alert.alert` com texto explicando que dados/sessões/histórico serão removidos.
   - Após sucesso: invalida `athletes`, `athletes-list`, `dashboard*`, sai do modo seleção.
   - Fluxo individual de exclusão (em `/athlete/[id]`) preservado integralmente.
+
+## 2026-04-25 (final) — Smart Summary: Context-Aware Validity Guard (P0 estrutural)
+Substituído o crash nativo iOS por uma guarda de regra de negócio. Smart Summary só monta seus charts (GaugeChart/RadarChart/DonutChart) quando o LMPI é válido no contexto atual. Sem mount → sem race Reanimated×SVG → sem crash.
+
+- **`app/(tabs)/data.tsx > renderSmartSummary()`** (único arquivo modificado):
+  - Inserido `hasValidLmpi` logo após a normalização defensiva.
+  - **Athlete mode**: `safeAthletes[0]?.lmpi_validity !== 'invalid'`.
+  - **Team / Position mode**: `safeAthletes.some(a => a.lmpi_validity !== 'invalid')` — backend já filtra `athletes[]` por posição quando o filtro está ativo, cobrindo os 3 cenários sem ramificação extra.
+  - Quando `!hasValidLmpi`: retorna card único com ícone `bar-chart-outline` e mensagem `"Não há dados suficientes" / "Not enough data"` + sub-texto orientando importar GPS.
+  - Restante de `renderSmartSummary` intacto. Outras camadas (Load/Status/Neuro/Risk) **não tocadas**.
+
+- **Por que isso resolve estruturalmente**: o crash documentado vem do mount do GaugeChart com `value≈0` (Reanimated worklet completa em 1 frame e colide com commit nativo do react-native-svg). Sem dados válidos → não monta GaugeChart → race nunca acontece.
+- **Honra o contrato do backend** (`calc_lmpi` retorna `lmpi_validity='invalid'` quando ACWR é None — frontend agora respeita esse sinal).
+
