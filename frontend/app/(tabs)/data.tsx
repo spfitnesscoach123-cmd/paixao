@@ -1306,12 +1306,31 @@ export default function DataScreen() {
   };
   
   const renderSmartSummary = () => {
-    const lmpi = mode === 'athlete' ? athletes[0]?.lmpi : summary.team_lmpi;
-    const lmpiValidity = mode === 'athlete' ? (athletes[0]?.lmpi_validity || 'invalid') : (lmpi != null ? 'valid' : 'invalid');
-    const acwr = mode === 'athlete' ? athletes[0]?.acwr : summary.team_acwr;
-    const wellness = mode === 'athlete' ? athletes[0]?.wellness_score : summary.team_wellness;
-    const rsimod = mode === 'athlete' ? athletes[0]?.rsimod : summary.team_rsimod;
-    const monotony = mode === 'athlete' ? athletes[0]?.monotony : summary.team_monotony;
+    // Defensive normalization: ensures Smart Summary never crashes when backend
+    // returns partial/empty payloads (no GPS, 0 athletes, single athlete without data).
+    const safeSummary = {
+      team_acwr: null,
+      team_wellness: null,
+      team_monotony: null,
+      team_lmpi: null,
+      team_rsimod: null,
+      team_acute_load: 0,
+      team_chronic_load: 0,
+      team_readiness: null,
+      available: 0,
+      total_athletes: 0,
+      risk_distribution: {} as any,
+      ...(summary || {}),
+    };
+    const safeAthletes = Array.isArray(athletes) ? athletes : [];
+    const safeInsights = (insights && typeof insights === 'object') ? insights : {};
+
+    const lmpi = mode === 'athlete' ? safeAthletes[0]?.lmpi : safeSummary.team_lmpi;
+    const lmpiValidity = mode === 'athlete' ? (safeAthletes[0]?.lmpi_validity || 'invalid') : (lmpi != null ? 'valid' : 'invalid');
+    const acwr = mode === 'athlete' ? safeAthletes[0]?.acwr : safeSummary.team_acwr;
+    const wellness = mode === 'athlete' ? safeAthletes[0]?.wellness_score : safeSummary.team_wellness;
+    const rsimod = mode === 'athlete' ? safeAthletes[0]?.rsimod : safeSummary.team_rsimod;
+    const monotony = mode === 'athlete' ? safeAthletes[0]?.monotony : safeSummary.team_monotony;
     const lmpiClass = getLmpiClassification(lmpi, lmpiValidity, locale);
     
     // Radar data: normalized 0-1
@@ -1325,14 +1344,16 @@ export default function DataScreen() {
     
     // Quadrant: ACWR vs Wellness
     const quadrantPoints = mode !== 'athlete'
-      ? athletes.filter((a: any) => a.acwr != null && a.wellness_score != null).map((a: any) => ({
+      ? safeAthletes.filter((a: any) => a && a.acwr != null && a.wellness_score != null).map((a: any) => ({
           x: a.acwr, y: a.wellness_score, name: a.name,
           color: a.risk_level === 'high' ? COLORS.red : a.risk_level === 'moderate' ? COLORS.yellow : COLORS.green
         }))
       : [];
     
-    // Availability donut
-    const riskDist = summary.risk_distribution || {};
+    // Availability donut — risk_distribution may be missing or non-object in empty states
+    const riskDist = (safeSummary.risk_distribution && typeof safeSummary.risk_distribution === 'object')
+      ? safeSummary.risk_distribution
+      : {};
     const availDonutSegs = [
       { value: riskDist.optimal || 0, color: COLORS.cyan, label: locale === 'pt' ? 'Ótimo' : 'Optimal' },
       { value: riskDist.low || 0, color: COLORS.green, label: locale === 'pt' ? 'Baixo' : 'Low' },
@@ -1386,7 +1407,7 @@ export default function DataScreen() {
           <View style={styles.card}>
             <CardInfoHeader id="availability" />
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 }}>
-              <DonutChart segments={availDonutSegs} size={100} centerText={`${summary.available || 0}`} centerSubtext={locale === 'pt' ? 'disponíveis' : 'available'} />
+              <DonutChart segments={availDonutSegs} size={100} centerText={`${safeSummary.available || 0}`} centerSubtext={locale === 'pt' ? 'disponíveis' : 'available'} />
               <View style={{ flex: 1 }}>
                 {availDonutSegs.map((s, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
@@ -1410,14 +1431,14 @@ export default function DataScreen() {
                 <Text style={[styles.tableHeaderText, { flex: 1 }]}>Score LMPI</Text>
                 <Text style={[styles.tableHeaderText, { flex: 1.2 }]}>{locale === 'pt' ? 'Condição' : 'Condition'}</Text>
               </View>
-              {[...athletes]
-                .filter((a: any) => a.lmpi_validity !== 'invalid')
+              {[...safeAthletes]
+                .filter((a: any) => a && a.lmpi_validity !== 'invalid')
                 .sort((a: any, b: any) => (a.lmpi || 0) - (b.lmpi || 0))
                 .slice(0, 5)
                 .map((a: any, i: number) => {
                   const cls = getLmpiClassification(a.lmpi, a.lmpi_validity, locale);
                   return (
-                    <View key={a.id} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]} data-testid={`lmpi-ranking-row-${i}`}>
+                    <View key={a.id || `row-${i}`} style={[styles.tableRow, i % 2 === 0 && styles.tableRowAlt]} data-testid={`lmpi-ranking-row-${i}`}>
                       <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>{a.name}</Text>
                       <Text style={[styles.tableCell, { flex: 1, color: cls.color, fontWeight: '600' }]}>{a.lmpi?.toFixed(0) || '--'}</Text>
                       <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center' }}>
@@ -1435,7 +1456,7 @@ export default function DataScreen() {
         {/* Insight */}
         <View style={styles.insightCard}>
           <Ionicons name="bulb-outline" size={16} color={COLORS.yellow} />
-          <Text style={styles.insightText}>{insights.smart_summary || ''}</Text>
+          <Text style={styles.insightText}>{(safeInsights as any).smart_summary || ''}</Text>
         </View>
       </View>
     );

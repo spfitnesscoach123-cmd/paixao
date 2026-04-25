@@ -63,3 +63,23 @@ Cirurgia mínima em `app/(tabs)/data.tsx` para impedir crashes nativos iOS (EXC_
 - **DonutChart**: `safeSegments = Array.isArray(segments) ? segments : []`; deps da animação estabilizadas em `[0]` quando vazio (evita churn de animação contra array vazio).
 - **RadarChart**: `safeValues` sanitizados (NaN→0); `finalValues` recebe perturbação `0.0001` no primeiro slot quando todos zeros, ou fallback `[0.0001,0,0,0,0]` quando `values=[]` (evita polígono colapsado).
 - **Sem alteração de UX**: layout, lógica de cálculo de LMPI, render condicional e arquitetura preservados. Mudanças invisíveis quando há dados reais.
+
+
+## 2026-04-25 (Smart Summary normalization + multi-delete) — P0 + Feature
+
+### PARTE 1 — Smart Summary defensive normalization
+- **`app/(tabs)/data.tsx > renderSmartSummary()`**: adicionado `safeSummary` (spread sobre defaults explícitos), `safeAthletes = Array.isArray(athletes) ? athletes : []` e `safeInsights` como guarda contra payloads parciais/ausentes vindos do backend (cenários: 0 atletas, 1 atleta sem GPS, equipe inteira sem GPS).
+- Substituído todas as referências a `athletes`/`summary`/`insights` dentro de `renderSmartSummary` pelas versões seguras. `riskDist` agora também checa `typeof === 'object'` antes de ler chaves.
+- Adicionado fallback de `key` na tabela de ranking LMPI (`a.id || row-${i}`) para nunca render `undefined` como key.
+- **Sem alteração de UI/UX/lógica de cálculo** — mudanças puramente defensivas.
+
+### PARTE 2 — Multi-delete via long press na lista de atletas
+- **`components/animations/AnimatedCard.tsx`**: adicionados props `onLongPress` e `delayLongPress` (default 600ms). `Pressable` agora aceita ambos os handlers.
+- **`app/(tabs)/athletes.tsx`** — modo seleção múltipla:
+  - State: `selectionMode`, `selectedIds`, `bulkDeleting`, helpers `toggleSelect` / `exitSelectionMode`.
+  - `bulkDeleteMutation` reutiliza `DELETE /api/athletes/{id}` em paralelo (`Promise.allSettled`) — backend intacto, sem novo endpoint.
+  - Long press em qualquer card (500ms) ativa modo seleção e marca o item.
+  - Em modo seleção: tap normal alterna seleção, header substituído por barra com contador + botão "Excluir" (vermelho) + "Cancelar".
+  - Confirmação via `Alert.alert` com texto explicando que dados/sessões/histórico serão removidos.
+  - Após sucesso: invalida `athletes`, `athletes-list`, `dashboard*`, sai do modo seleção.
+  - Fluxo individual de exclusão (em `/athlete/[id]`) preservado integralmente.

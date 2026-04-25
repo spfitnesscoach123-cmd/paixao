@@ -8,10 +8,11 @@ import {
   RefreshControl,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../services/api';
@@ -32,6 +33,83 @@ export default function AthletesScreen() {
   const session = useSession();
   const [refreshing, setRefreshing] = useState(false);
   const [hubView, setHubView] = useState<HubView>('hub');
+
+  // ====== MULTI-SELECT STATE (long press → batch delete) ======
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  };
+
+  const toggleSelect = (id: string) => {
+    if (!id) return;
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      // Reuse existing single-delete endpoint sequentially (safe, idempotent).
+      // We do NOT introduce a new bulk endpoint to keep backend untouched.
+      const results = await Promise.allSettled(
+        ids.map(id => api.delete(`/athletes/${id}`))
+      );
+      const failures = results.filter(r => r.status === 'rejected');
+      return { total: ids.length, failures: failures.length };
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['athletes'] });
+      queryClient.invalidateQueries({ queryKey: ['athletes-list'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['team-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] });
+      exitSelectionMode();
+      setBulkDeleting(false);
+      if (res.failures > 0) {
+        Alert.alert(
+          locale === 'pt' ? 'Concluído com avisos' : 'Done with warnings',
+          locale === 'pt'
+            ? `${res.total - res.failures}/${res.total} atletas excluídos. ${res.failures} falharam.`
+            : `${res.total - res.failures}/${res.total} athletes deleted. ${res.failures} failed.`
+        );
+      }
+    },
+    onError: () => {
+      setBulkDeleting(false);
+      Alert.alert(
+        locale === 'pt' ? 'Erro' : 'Error',
+        locale === 'pt' ? 'Não foi possível excluir os atletas selecionados.' : 'Could not delete the selected athletes.'
+      );
+    },
+  });
+
+  const confirmBulkDelete = () => {
+    if (selectedIds.length === 0) return;
+    const title = locale === 'pt' ? 'Confirmar exclusão' : 'Confirm deletion';
+    const msg = locale === 'pt'
+      ? `Tem certeza que deseja excluir ${selectedIds.length} atleta(s)?\n\nEssa ação removerá permanentemente todos os dados, sessões e histórico.`
+      : `Delete ${selectedIds.length} athlete(s)?\n\nThis permanently removes all their data, sessions and history.`;
+    Alert.alert(
+      title,
+      msg,
+      [
+        { text: locale === 'pt' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+        {
+          text: locale === 'pt' ? 'Excluir' : 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            setBulkDeleting(true);
+            bulkDeleteMutation.mutate(selectedIds);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   const { data: athletes, isLoading } = useQuery({
     queryKey: ['athletes'],
@@ -401,17 +479,48 @@ export default function AthletesScreen() {
   if (hubView === 'athletes') {
     return (
       <View style={styles.container}>
-        <View style={[styles.selectorHeader, { paddingTop: insets.top + 12 }]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setHubView('hub')}>
-            <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
-            <Text style={styles.backButtonText}>
-              {locale === 'pt' ? 'Voltar' : 'Back'}
+        {selectionMode ? (
+          <View style={[styles.selectorHeader, styles.selectionHeader, { paddingTop: insets.top + 12 }]}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={exitSelectionMode}
+              data-testid="selection-cancel-btn"
+            >
+              <Ionicons name="close" size={22} color={colors.text.primary} />
+              <Text style={styles.backButtonText}>
+                {locale === 'pt' ? 'Cancelar' : 'Cancel'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.selectionCount} data-testid="selection-count">
+              {locale === 'pt'
+                ? `${selectedIds.length} selecionado(s)`
+                : `${selectedIds.length} selected`}
             </Text>
-          </TouchableOpacity>
-          <Text style={styles.selectorTitle}>
-            {locale === 'pt' ? 'Atletas' : 'Athletes'}
-          </Text>
-        </View>
+            <TouchableOpacity
+              style={[styles.deleteHeaderBtn, selectedIds.length === 0 && styles.deleteHeaderBtnDisabled]}
+              onPress={confirmBulkDelete}
+              disabled={selectedIds.length === 0 || bulkDeleting}
+              data-testid="selection-delete-btn"
+            >
+              <Ionicons name="trash-outline" size={18} color="#fff" />
+              <Text style={styles.deleteHeaderBtnText}>
+                {locale === 'pt' ? 'Excluir' : 'Delete'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={[styles.selectorHeader, { paddingTop: insets.top + 12 }]}>
+            <TouchableOpacity style={styles.backButton} onPress={() => setHubView('hub')}>
+              <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
+              <Text style={styles.backButtonText}>
+                {locale === 'pt' ? 'Voltar' : 'Back'}
+              </Text>
+            </TouchableOpacity>
+            <Text style={styles.selectorTitle}>
+              {locale === 'pt' ? 'Atletas' : 'Athletes'}
+            </Text>
+          </View>
+        )}
 
         {isLoading ? (
           <View style={styles.centerContainer}>
@@ -421,13 +530,29 @@ export default function AthletesScreen() {
           <FlatList
             data={athletes}
             keyExtractor={(item) => item.id || item._id || ''}
-            renderItem={({ item }) => (
+            extraData={`${selectionMode}-${selectedIds.length}`}
+            renderItem={({ item }) => {
+              const itemId = item.id || item._id || '';
+              const isSelected = selectionMode && selectedIds.includes(itemId);
+              return (
               <AnimatedCard
-                style={styles.athleteCard}
+                style={[
+                  styles.athleteCard,
+                  isSelected && styles.athleteCardSelected,
+                ]}
                 onPress={() => {
-                  session.setMode('profile');
-                  router.push(`/athlete/${item.id || item._id}` as any);
+                  if (selectionMode) {
+                    toggleSelect(itemId);
+                  } else {
+                    session.setMode('profile');
+                    router.push(`/athlete/${itemId}` as any);
+                  }
                 }}
+                onLongPress={() => {
+                  if (!selectionMode) setSelectionMode(true);
+                  toggleSelect(itemId);
+                }}
+                delayLongPress={500}
               >
                 <LinearGradient
                   colors={colors.gradients.card}
@@ -436,6 +561,14 @@ export default function AthletesScreen() {
                   style={styles.cardGradient}
                 >
                   <View style={styles.athleteCardContent}>
+                    {selectionMode && (
+                      <View
+                        style={[styles.checkbox, isSelected && styles.checkboxChecked]}
+                        data-testid={`athlete-checkbox-${itemId}`}
+                      >
+                        {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+                      </View>
+                    )}
                     {item.photo_base64 ? (
                       <View style={styles.photoContainer}>
                         <Image source={{ uri: item.photo_base64 }} style={styles.athletePhoto} />
@@ -472,11 +605,14 @@ export default function AthletesScreen() {
                         </View>
                       )}
                     </View>
-                    <Ionicons name="chevron-forward" size={24} color={colors.accent.primary} />
+                    {!selectionMode && (
+                      <Ionicons name="chevron-forward" size={24} color={colors.accent.primary} />
+                    )}
                   </View>
                 </LinearGradient>
               </AnimatedCard>
-            )}
+              );
+            }}
             contentContainerStyle={styles.listContent}
             refreshControl={
               <RefreshControl
@@ -740,5 +876,57 @@ const createStyles = (colors: any) => StyleSheet.create({
     height: 56,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  // ===== Selection mode (long-press batch delete) =====
+  selectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(47, 182, 255, 0.10)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(47, 182, 255, 0.35)',
+  },
+  selectionCount: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.text.primary,
+  },
+  deleteHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#ef4444',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  deleteHeaderBtnDisabled: {
+    opacity: 0.4,
+  },
+  deleteHeaderBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  athleteCardSelected: {
+    borderColor: '#ef4444',
+    borderWidth: 2,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.accent.primary,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  checkboxChecked: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
   },
 });
