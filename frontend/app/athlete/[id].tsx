@@ -286,6 +286,10 @@ export default function AthleteDetails() {
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
       queryClient.invalidateQueries({ queryKey: ['analysis'] });
       queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
+      // Periodization & classification consistency
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-peak-values'] });
       setDeleteMode(false);
       setSelectedForDelete([]);
       Alert.alert(locale === 'pt' ? 'Sucesso' : 'Success', locale === 'pt' ? 'Atividades excluídas com sucesso' : 'Activities deleted successfully');

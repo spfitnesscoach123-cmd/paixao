@@ -43,3 +43,15 @@
 - **Script de refactor** `/tmp/theme_refactor.py` criado (idempotente, com guard para evitar duplicidade).
 
 **Telas ainda em dark fixo** (não detectadas pelo patcher por heurística conservadora ou estrutura de componente atípica): algumas telas do athlete sub-flow, componentes compartilhados como `PremiumGate`, `ACWRBadge`, `JumpAnalysisCharts`, `ScientificAnalysisTab` — podem requerer pass adicional manual em próxima iteração se o usuário quiser coverage 100%.
+
+
+## 2026-04-25 — Periodization Consistency: Past-Week Freeze + Frontend Query Invalidation
+- **Backend (`routes/periodization/routes.py` — `GET /periodization/calculated/{week_id}`)**: Added one-time freeze logic. When `week.end_date < today`, the endpoint persists a snapshot of the calculated `athletes[]` (peak_values, weekly_targets, daily_targets) into `periodization_weeks.frozen_targets` on the first read, and from that point onward returns the snapshot verbatim. Subsequent peak updates no longer mutate past weeks. Current/future weeks remain dynamic. Response now includes `frozen: bool` and `frozen_at: str|null`.
+- **DB schema delta**: `periodization_weeks.frozen_targets = { frozen_at: ISO8601 UTC, athletes: [...] }` (additive, optional field, only present after the week closes and is read at least once).
+- **Frontend query invalidation** (no UI/UX change, only consistency):
+  - `app/upload-csv.tsx` (CSV import) — invalidates `gps-sessions-classification`, `periodization-weeks`, `periodization-calculated`, `periodization-peak-values`, `gps`.
+  - `app/(tabs)/periodization.tsx` (classify session) — added `periodization-calculated` and `periodization-peak-values` to the existing invalidation set.
+  - `app/athlete/[id]/add-gps.tsx` (manual GPS add) — invalidates the periodization keys above.
+  - `app/athlete/[id]/upload-gps.tsx` (Catapult CSV) — same.
+  - `app/athlete/[id].tsx` (delete activities) — same.
+- **Verified**: Past week → `frozen=true` + persisted snapshot stable across reads. Future week → `frozen=false` + dynamic. Peak algorithms and classification flow untouched.

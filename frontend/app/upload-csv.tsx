@@ -159,6 +159,13 @@ export default function UploadCSV() {
       qc.invalidateQueries({ queryKey: ['athletes'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['team-dashboard'] });
+      // Periodization & classification consistency: ensure the activity list
+      // and any periodization calculations refresh immediately after import.
+      qc.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      qc.invalidateQueries({ queryKey: ['periodization-weeks'] });
+      qc.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      qc.invalidateQueries({ queryKey: ['periodization-peak-values'] });
+      qc.invalidateQueries({ queryKey: ['gps'] });
     } catch (e: any) {
       setError(e.message || 'Erro na importação');
       setStep('review');

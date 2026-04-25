@@ -677,7 +677,59 @@ async def get_calculated_prescriptions(
             "weekly_targets": weekly_targets,
             "daily_targets": daily_targets
         })
-    
+
+    # ===== WEEK FREEZE LOGIC =====
+    # Past weeks (end_date < today) must be IMMUTABLE: their targets are snapshotted
+    # the first time they are read after closing, and from that moment on the
+    # snapshot is returned verbatim — new athlete peaks must NOT alter past weeks.
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    try:
+        end_date_dt = datetime.strptime(week["end_date"], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        end_date_dt = today  # treat unparseable as not-past
+    is_past = end_date_dt < today
+
+    if is_past:
+        existing_snapshot = week.get("frozen_targets")
+        if existing_snapshot and existing_snapshot.get("athletes"):
+            # Return the persisted snapshot (immutable)
+            return {
+                "week_id": week_id,
+                "week_name": week["name"],
+                "start_date": week["start_date"],
+                "end_date": week["end_date"],
+                "weekly_prescription": weekly_prescription,
+                "days_config": week["days"],
+                "athletes": existing_snapshot["athletes"],
+                "frozen": True,
+                "frozen_at": existing_snapshot.get("frozen_at")
+            }
+        # No snapshot yet — persist current calculation now (one-time freeze)
+        frozen_at = datetime.now(timezone.utc).isoformat()
+        snapshot_doc = {
+            "frozen_at": frozen_at,
+            "athletes": results
+        }
+        try:
+            await db.periodization_weeks.update_one(
+                {"_id": week["_id"]},
+                {"$set": {"frozen_targets": snapshot_doc}}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist frozen_targets for week {week_id}: {e}")
+        return {
+            "week_id": week_id,
+            "week_name": week["name"],
+            "start_date": week["start_date"],
+            "end_date": week["end_date"],
+            "weekly_prescription": weekly_prescription,
+            "days_config": week["days"],
+            "athletes": results,
+            "frozen": True,
+            "frozen_at": frozen_at
+        }
+
+    # Current/future week — dynamic calculation (reacts to peak updates)
     return {
         "week_id": week_id,
         "week_name": week["name"],
@@ -685,7 +737,8 @@ async def get_calculated_prescriptions(
         "end_date": week["end_date"],
         "weekly_prescription": weekly_prescription,
         "days_config": week["days"],
-        "athletes": results
+        "athletes": results,
+        "frozen": False
     }
 
 

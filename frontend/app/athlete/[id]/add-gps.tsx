@@ -74,6 +74,10 @@ function AddGPSContent() {
       queryClient.invalidateQueries({ queryKey: ['gps', id] });
       queryClient.invalidateQueries({ queryKey: ['athlete-analysis', id] });
       queryClient.invalidateQueries({ queryKey: ['acwr', id] });
+      // Periodization & classification consistency
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-peak-values'] });
       Alert.alert(
         locale === 'pt' ? 'Sucesso' : 'Success', 
         locale === 'pt' ? 'Dados GPS registrados com sucesso!' : 'GPS data saved successfully!'

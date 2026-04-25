@@ -146,3 +146,13 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - GO FOR PRODUCTION
 
 ### FUTURO: FASE 2 → FASE 3 → FASE 4
+
+
+## ROADMAP (P0 → P3)
+- (P1) Smart Summary empty-state crash guards (RadarChart/GaugeChart/DonutChart) em `app/(tabs)/data.tsx`.
+- (P1) Data Import via PDF (converter PDF para CSV internamente).
+- (P1) Export App Data to CSV.
+- (P2) Jump Camera — rejeição de gaps de timestamp grandes durante voo (feet-out-of-frame) com rejection logic + Debug Modal já entregue.
+- (P2) Linkar Body Scan (MediaPipe) ao modelo 3D.
+- (P3) Refatorar MediaPipe pipeline para JSI worklets.
+- (P3) Cleanup `app/athlete/[id]/vbt.tsx` (dead code) + V1 `services/vbt/RepDetector.ts`.
