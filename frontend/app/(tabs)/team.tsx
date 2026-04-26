@@ -164,7 +164,7 @@ export default function TeamDashboard() {
               <Ionicons name="cloud-upload" size={24} color="#ffffff" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.csvImportTitle}>
-                  {locale === 'pt' ? 'Importar Dados CSV Catapult' : 'Import CSV Catapult Data'}
+                  {locale === 'pt' ? 'Importar CSV - GPS' : 'CSV Import - GPS'}
                 </Text>
                 <Text style={styles.csvImportSubtitle}>
                   {locale === 'pt' ? 'GPS, Sprint, Aceleração' : 'GPS, Sprint, Acceleration'}

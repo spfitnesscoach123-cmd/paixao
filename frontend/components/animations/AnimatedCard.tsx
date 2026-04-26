@@ -5,6 +5,8 @@ interface AnimatedCardProps {
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
   onPress?: () => void;
+  onLongPress?: () => void;
+  delayLongPress?: number;
   disabled?: boolean;
   scaleDown?: number;
   duration?: number;
@@ -18,6 +20,8 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   children,
   style,
   onPress,
+  onLongPress,
+  delayLongPress = 600,
   disabled = false,
   scaleDown = 0.97,
   duration = 140,
@@ -40,7 +44,7 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
     }).start();
   }, [duration]);
 
-  if (disabled || !onPress) {
+  if (disabled || (!onPress && !onLongPress)) {
     return (
       <Animated.View style={[style, { transform: [{ scale: scaleAnim }] }]}>
         {children}
@@ -51,6 +55,8 @@ export const AnimatedCard: React.FC<AnimatedCardProps> = ({
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      delayLongPress={delayLongPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
     >

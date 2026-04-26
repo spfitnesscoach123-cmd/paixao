@@ -25,12 +25,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCameraPermissions } from 'expo-camera';
+import { useQuery } from '@tanstack/react-query';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import { useBodyScan } from '../../../hooks/useBodyScan';
 import { CameraScanner } from '../../../components/body-composition/CameraScanner';
 import { ScannerOverlay } from '../../../components/body-composition/ScannerOverlay';
 import { useTheme } from '../../../contexts/ThemeContext';
+import api from '../../../services/api';
+import { calculateProtocol } from '../../../engine/body-composition/protocolEngine';
+import { calculateComposition } from '../../../engine/body-composition/bodyComposition';
+import { calculateSymmetry } from '../../../engine/body-composition/symmetryEngine';
+import type { FullReport, Measurements, Gender } from '../../../types/protocols';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -97,11 +103,12 @@ export default function BodyScanScreen() {
 
   // Labels
   const t = {
-    title: locale === 'pt' ? 'Body Scan' : 'Body Scan',
+    title: locale === 'pt' ? 'Composicao Corporal' : 'Body Composition',
     config: locale === 'pt' ? 'Configuracao' : 'Configuration',
     height: locale === 'pt' ? 'Altura (cm)' : 'Height (cm)',
     weight: locale === 'pt' ? 'Peso (kg)' : 'Weight (kg)',
-    start: locale === 'pt' ? 'Iniciar Scanner' : 'Start Scanner',
+    start: locale === 'pt' ? 'Iniciar Composicao Corporal' : 'Start Body Composition',
+    viewLastReport: locale === 'pt' ? 'Ver Ultimo Relatorio' : 'View Last Report',
     tips: locale === 'pt' ? 'Dicas' : 'Tips',
     tip1: locale === 'pt' ? 'Posicione o atleta de frente para a camera' : 'Position athlete facing the camera',
     tip2: locale === 'pt' ? 'Corpo inteiro deve estar visivel' : 'Full body must be visible',
@@ -126,6 +133,77 @@ export default function BodyScanScreen() {
     grantPermission: locale === 'pt' ? 'Conceder' : 'Grant',
     proportions: locale === 'pt' ? 'Proporcoes Corporais (cm)' : 'Body Proportions (cm)',
   };
+
+  // ============================================================
+  // BYPASS: Body Composition flow now skips scan, goes straight
+  // to protocol-select with weight/height collected on this screen.
+  // The scanner code below remains intact (not deleted) but is no
+  // longer reachable from the start button.
+  // ============================================================
+  const handleStartBodyComposition = useCallback(() => {
+    router.push({
+      pathname: `/athlete/${athleteId}/protocol-select`,
+      params: {
+        scanWeight: athleteWeight,
+        scanHeight: athleteHeight,
+        ...(returnPath ? { returnPath } : {}),
+      },
+    } as any);
+  }, [router, athleteId, athleteWeight, athleteHeight, returnPath]);
+
+  // Fetch latest body composition record to gate "View Last Report" button
+  const { data: bcHistory } = useQuery<any[]>({
+    queryKey: ['body-composition', athleteId],
+    queryFn: async () => {
+      const response = await api.get(`/body-composition/athlete/${athleteId}`);
+      return response.data;
+    },
+    enabled: !!athleteId,
+    retry: false,
+  });
+
+  const lastReportRecord = useMemo(() => {
+    if (!bcHistory || !Array.isArray(bcHistory) || bcHistory.length === 0) return null;
+    // Newest first by date
+    return [...bcHistory].sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  }, [bcHistory]);
+
+  // Rebuild a FullReport from the saved record by re-running the SAME pure
+  // calculation engines used in measurement.tsx (no logic alteration).
+  const handleViewLastReport = useCallback(() => {
+    if (!lastReportRecord) return;
+    const r = lastReportRecord;
+    const measurements: Measurements = {
+      triceps: r.triceps,
+      subscapular: r.subscapular,
+      suprailiac: r.suprailiac,
+      abdominal: r.abdominal,
+      chest: r.chest,
+      midaxillary: r.midaxillary,
+      thigh: r.thigh,
+      calf: r.calf,
+      biceps: r.biceps,
+    };
+    const protocolResult = calculateProtocol(r.protocol, measurements, r.gender as Gender, r.age);
+    if (!protocolResult) return;
+    const composition = calculateComposition(protocolResult.bodyFatPercent, r.weight, r.height, r.gender as Gender);
+    const symmetry = calculateSymmetry(measurements);
+    const report: FullReport = {
+      protocol: protocolResult,
+      composition,
+      symmetry,
+      measurements,
+      athleteWeight: r.weight,
+      athleteHeight: r.height,
+      gender: r.gender as Gender,
+      age: r.age,
+      timestamp: r.date ? new Date(r.date).getTime() : Date.now(),
+    };
+    router.push({
+      pathname: `/athlete/${athleteId}/report`,
+      params: { report: JSON.stringify(report), ...(returnPath ? { returnPath } : {}) },
+    } as any);
+  }, [lastReportRecord, router, athleteId, returnPath]);
 
   // Iniciar scan
   const handleStartScan = useCallback(() => {
@@ -197,11 +275,6 @@ export default function BodyScanScreen() {
             <LinearGradient colors={['#2FB6FF', '#2FB6FF']} style={styles.iconGradient}>
               <Ionicons name="body" size={48} color="#ffffff" />
             </LinearGradient>
-            <Text style={styles.subtitle}>
-              {locale === 'pt'
-                ? 'Escaneie o corpo do atleta para gerar proporcoes automaticas'
-                : 'Scan the athlete body to auto-generate proportions'}
-            </Text>
           </View>
 
           {/* Config Card */}
@@ -235,44 +308,29 @@ export default function BodyScanScreen() {
             </View>
           </View>
 
-          {/* Tips */}
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t.tips}</Text>
-            {[t.tip1, t.tip2, t.tip3, t.tip4].map((tip, i) => (
-              <View key={i} style={styles.tipRow}>
-                <Ionicons
-                  name={['person', 'resize', 'sunny', 'shirt'][i] as any}
-                  size={16}
-                  color={colors.accent.primary}
-                />
-                <Text style={styles.tipText}>{tip}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Permissao */}
-          {permission && !permission.granted && (
-            <TouchableOpacity
-              style={styles.permissionButton}
-              onPress={requestPermission}
-              data-testid="body-scan-permission-btn"
-            >
-              <Ionicons name="camera" size={20} color="#ffffff" />
-              <Text style={styles.permissionText}>{t.grantPermission}</Text>
-            </TouchableOpacity>
-          )}
-
-          {/* Start Button */}
+          {/* Start Button — bypass scanner, go directly to protocol-select */}
           <TouchableOpacity
             style={styles.startButton}
-            onPress={handleStartScan}
+            onPress={handleStartBodyComposition}
             data-testid="body-scan-start-btn"
           >
             <LinearGradient colors={['#22c55e', '#16a34a']} style={styles.startButtonGradient}>
-              <Ionicons name="scan" size={24} color="#ffffff" />
+              <Ionicons name="arrow-forward" size={24} color="#ffffff" />
               <Text style={styles.startButtonText}>{t.start}</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* View Last Report — visible only when athlete has prior body composition record */}
+          {lastReportRecord && (
+            <TouchableOpacity
+              style={styles.secondaryReportButton}
+              onPress={handleViewLastReport}
+              data-testid="body-scan-view-last-report-btn"
+            >
+              <Ionicons name="document-text-outline" size={20} color={colors.accent.primary} />
+              <Text style={styles.secondaryReportButtonText}>{t.viewLastReport}</Text>
+            </TouchableOpacity>
+          )}
         </ScrollView>
       </LinearGradient>
     );
@@ -615,6 +673,24 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: '#ffffff',
     fontSize: 17,
     fontWeight: '700',
+  },
+  secondaryReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(47,182,255,0.4)',
+    backgroundColor: 'rgba(47,182,255,0.08)',
+    marginTop: 12,
+  },
+  secondaryReportButtonText: {
+    color: colors.accent.primary,
+    fontSize: 15,
+    fontWeight: '600',
   },
 
   // Camera overlay header

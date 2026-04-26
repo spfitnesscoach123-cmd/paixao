@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Platform, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -113,6 +113,22 @@ export default function UploadCSV() {
     }
   }, []);
 
+  // session_date is NOT required for enabling the import (backend has fallback to today).
+  // Only athlete_name and total_distance are gating.
+  const REQUIRED_GATING_FIELDS = ['athlete_name', 'total_distance'];
+
+  const requiredMapped = useMemo(() => {
+    if (!analysis) return false;
+    return REQUIRED_GATING_FIELDS.every(k => !!mapping[k]);
+  }, [analysis, mapping]);
+
+  // Detect whether session_date is missing from the mapping — used to show a heads-up
+  // before firing the import. Backend will fall back to today's date.
+  const sessionDateMissing = useMemo(() => {
+    if (!analysis) return false;
+    return !mapping['session_date'];
+  }, [analysis, mapping]);
+
   const handleImport = useCallback(async () => {
     if (!analysis) return;
     if (Platform.OS === 'web' && !fileContent) return;
@@ -143,6 +159,13 @@ export default function UploadCSV() {
       qc.invalidateQueries({ queryKey: ['athletes'] });
       qc.invalidateQueries({ queryKey: ['dashboard'] });
       qc.invalidateQueries({ queryKey: ['team-dashboard'] });
+      // Periodization & classification consistency: ensure the activity list
+      // and any periodization calculations refresh immediately after import.
+      qc.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      qc.invalidateQueries({ queryKey: ['periodization-weeks'] });
+      qc.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      qc.invalidateQueries({ queryKey: ['periodization-peak-values'] });
+      qc.invalidateQueries({ queryKey: ['gps'] });
     } catch (e: any) {
       setError(e.message || 'Erro na importação');
       setStep('review');
@@ -150,6 +173,33 @@ export default function UploadCSV() {
       setImporting(false);
     }
   }, [fileContent, fileUri, analysis, mapping, fileName, qc]);
+
+  // Public entrypoint used by the Import buttons. If session_date is not mapped,
+  // show a heads-up confirmation; backend will fall back to today's date.
+  const confirmAndImport = useCallback(() => {
+    if (!sessionDateMissing) {
+      handleImport();
+      return;
+    }
+    const title = 'Sem data no CSV';
+    const msg = 'Os dados serao importados com a data de hoje.';
+    if (Platform.OS === 'web') {
+      // RN Alert.alert on web only renders the title; window.confirm is reliable cross-browser.
+      // eslint-disable-next-line no-alert
+      const ok = typeof window !== 'undefined' && window.confirm(`${title}\n\n${msg}`);
+      if (ok) handleImport();
+      return;
+    }
+    Alert.alert(
+      title,
+      msg,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Continuar', onPress: () => handleImport() },
+      ],
+      { cancelable: true },
+    );
+  }, [sessionDateMissing, handleImport]);
 
   const saveTemplate = useCallback(async () => {
     if (!templateName.trim()) return;
@@ -169,11 +219,6 @@ export default function UploadCSV() {
   const applyTemplate = useCallback((tpl: any) => {
     setMapping({ ...mapping, ...tpl.mapping });
   }, [mapping]);
-
-  const requiredMapped = useMemo(() => {
-    if (!analysis) return false;
-    return analysis.field_groups.required.every(f => mapping[f.field_key]);
-  }, [analysis, mapping]);
 
   const mappedCount = useMemo(() => Object.values(mapping).filter(Boolean).length, [mapping]);
 
@@ -462,7 +507,7 @@ export default function UploadCSV() {
 
               <TouchableOpacity
                 style={[s.importBtn, !requiredMapped && s.importBtnDisabled]}
-                onPress={handleImport}
+                onPress={confirmAndImport}
                 disabled={!requiredMapped || importing}
                 data-testid="confirm-import-btn"
               >
@@ -531,7 +576,7 @@ export default function UploadCSV() {
 
               <TouchableOpacity
                 style={[s.importBtn, !requiredMapped && s.importBtnDisabled]}
-                onPress={handleImport}
+                onPress={confirmAndImport}
                 disabled={!requiredMapped || importing}
                 data-testid="confirm-import-mapping-btn"
               >

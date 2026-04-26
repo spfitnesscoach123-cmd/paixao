@@ -79,6 +79,10 @@ function UploadGPSContent() {
     },
     onSuccess: (count) => {
       queryClient.invalidateQueries({ queryKey: ['gps', id] });
+      // Periodization & classification consistency
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-peak-values'] });
       Alert.alert('Sucesso', `${count} registros importados com sucesso!`);
       router.back();
     },

@@ -34,6 +34,27 @@ except ImportError:
     LlmChat = None
     UserMessage = None
 
+# ───────────────────────────────────────────────────────────────────────────
+# PDF asset cache (module-level): logo embedded as base64 data URL.
+# Read once per process; reused across all PDF report requests.
+# Source: existing official logo asset already in the codebase.
+# TODO: replace with optimized logo (current ~285KB too large for PDF;
+# inflated to ~380KB after base64 encoding, included in every PDF).
+# ───────────────────────────────────────────────────────────────────────────
+import base64 as _b64
+
+_PDF_LOGO_DATA_URL = ""
+try:
+    _LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..",
+                              "frontend", "assets", "logo.png")
+    _LOGO_PATH = os.path.normpath(_LOGO_PATH)
+    if os.path.isfile(_LOGO_PATH):
+        with open(_LOGO_PATH, "rb") as _f:
+            _PDF_LOGO_DATA_URL = "data:image/png;base64," + _b64.b64encode(_f.read()).decode("ascii")
+except Exception as _logo_err:
+    logger.warning(f"[PDF] Failed to load brand logo: {_logo_err}")
+    _PDF_LOGO_DATA_URL = ""
+
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -1695,17 +1716,22 @@ async def get_dashboard_overview_pdf(
     """Generate HTML report for dashboard overview PDF export with inline SVG charts."""
     from fastapi.responses import HTMLResponse
     
-    overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    # TASK 6 — failsafe: never propagate internal errors to the client.
+    # If the data fetch fails, the PDF still renders (with placeholders/fallbacks).
+    try:
+        overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    except Exception:
+        overview = {}
     
     is_pt = lang == "pt"
     selected_layers = set(layers.split(","))
     mode = overview.get("mode", "team")
-    mode_label = {"team": "Equipe" if is_pt else "Team", "position": "Posicao" if is_pt else "Position", "athlete": "Atleta" if is_pt else "Athlete"}.get(mode, mode)
     
     # ── Map actual response data to PDF sections ──
     summary = overview.get("summary", {})
     athletes_list = overview.get("athletes", [])
     agg_timeline = overview.get("aggregated_timeline", [])
+    insights = overview.get("insights", {})
     
     # Build load_data from summary + athletes + aggregated_timeline
     # Velocity zones: average across athletes
@@ -1893,152 +1919,387 @@ async def get_dashboard_overview_pdf(
             <rect x="90" y="{h / 2 - 6}" width="{bw}" height="12" rx="6" fill="{color}"/>
             <text x="{w - 5}" y="{h / 2 + 4}" text-anchor="end" fill="#374151" font-size="10" font-weight="600">{value:,.0f}m</text></svg>'''
 
-    # ── Build sections ──
-    sections_html = ""
-    
+    # ──────────────────────────────────────────────────────────────────────
+    # LAYER 3 — DETAILED METRICS (P6 Redesign)
+    # Editorial report layout. Same data sources, new visual structure.
+    # Display name registry locked per spec L3-R8.
+    # ──────────────────────────────────────────────────────────────────────
+    _L3_NAMES = {
+        "load":    ("Load Intelligence",      "Load Intelligence"),
+        "summary": ("Performance Profile",    "Performance Profile"),
+        "status":  ("Team Status",            "Team Status"),
+        "neuro":   ("Neuromuscular Status",   "Neuromuscular Status"),
+        "risk":    ("Risk Intelligence",      "Risk Intelligence"),
+    }
+    _L3_EMPTY = ("Dados insuficientes para este módulo."
+                 if is_pt else
+                 "Insufficient data for this module.")
+
+    def _l3_module(module_id, size_class, body_html, has_data):
+        name = _L3_NAMES[module_id][0 if is_pt else 1]
+        body = body_html if has_data else f'<div class="module-empty">{_L3_EMPTY}</div>'
+        return (f'<div class="module {size_class}">'
+                f'<div class="module-title">{name}</div>'
+                f'{body}'
+                f'</div>')
+
+    def _l3_safe_fmt(val, fmt):
+        if val is None:
+            return "—"
+        try:
+            return f"{val:{fmt}}"
+        except (TypeError, ValueError):
+            return "—"
+
+    l3_modules_html = ""
+
+    # ── 3.1 LOAD INTELLIGENCE (large, left column) ──
     if "load" in selected_layers:
-        acwr = load_data.get("acwr") or 0
-        acute = load_data.get("acute_load") or 0
-        chronic = load_data.get("chronic_load") or 0
-        mono = load_data.get("monotony") or 0
-        strain_val = load_data.get("strain") or 0
-        vz = load_data.get("velocity_zones", {})
-        
-        timeline = load_data.get("distance_timeline", [])
-        timeline_chart = ""
-        if timeline:
-            tl_vals = [d.get("distance", 0) for d in timeline[-14:]]
-            tl_dates = [d.get("date", "")[-5:] for d in timeline[-14:]]
-            timeline_chart = make_line_chart_svg(tl_vals, tl_dates, "#0891b2", "Distancia Total" if is_pt else "Total Distance", "m")
-        
-        vz_vals = [vz.get("low_intensity", 0), vz.get("hid_z3", 0), vz.get("hsr_z4", 0), vz.get("sprint_z5", 0)]
-        vz_labels = ["Low Int", "HID Z3", "HSR Z4", "Sprint Z5"]
-        vz_colors = ["#3b82f6", "#06b6d4", "#eab308", "#ef4444"]
-        vz_total = sum(vz_vals) or 1
-        
-        vz_horiz = "".join([make_horiz_bar(v, vz_total, l, c) for v, l, c in zip(vz_vals, vz_labels, vz_colors)])
-        vz_bar_chart = make_bar_chart_svg(vz_vals, vz_labels, vz_colors, "Zonas de Velocidade" if is_pt else "Velocity Zones")
-        
-        acwr_color = "#10b981" if 0.8 <= acwr <= 1.3 else "#f59e0b" if acwr < 0.8 else "#ef4444"
-        
-        sections_html += f'''<div class="section">
-        <div class="section-header"><span class="layer-badge lb-cyan">Load Intelligence</span></div>
-        <div class="metrics-row">
-            <div class="metric-card"><div class="metric-label">Acute 7d</div><div class="metric-value" style="color:#0891b2">{acute:,.0f} m</div></div>
-            <div class="metric-card"><div class="metric-label">Chronic 28d</div><div class="metric-value" style="color:#3b82f6">{chronic:,.0f} m</div></div>
-            <div class="metric-card"><div class="metric-label">ACWR</div><div class="metric-value" style="color:{acwr_color}">{acwr:.2f}</div>
-                <div style="text-align:center;margin-top:4px">{make_gauge_svg(acwr, "ACWR")}</div></div>
-            <div class="metric-card"><div class="metric-label">Monotony</div><div class="metric-value">{mono:.1f}</div></div>
-            <div class="metric-card"><div class="metric-label">Strain</div><div class="metric-value">{strain_val:,.0f}</div></div>
-        </div>
-        {timeline_chart}
-        {vz_bar_chart}
-        <div style="margin-top:8px">{vz_horiz}</div>
-        </div>'''
-    
+        has_load = isinstance(load_data, dict) and bool(load_data)
+        if has_load:
+            acwr = load_data.get("acwr") or 0
+            acute = load_data.get("acute_load") or 0
+            chronic = load_data.get("chronic_load") or 0
+            mono = load_data.get("monotony") or 0
+            strain_val = load_data.get("strain") or 0
+            vz = load_data.get("velocity_zones", {}) or {}
+            timeline = load_data.get("distance_timeline", []) or []
+
+            timeline_chart = ""
+            if timeline:
+                tl_vals = [d.get("distance", 0) for d in timeline[-14:]]
+                tl_dates = [d.get("date", "")[-5:] for d in timeline[-14:]]
+                timeline_chart = make_line_chart_svg(
+                    tl_vals, tl_dates, "#1F2937",
+                    "Distancia Total" if is_pt else "Total Distance", "m"
+                )
+
+            vz_vals = [vz.get("low_intensity", 0), vz.get("hid_z3", 0),
+                       vz.get("hsr_z4", 0), vz.get("sprint_z5", 0)]
+            vz_labels = ["Low Int", "HID Z3", "HSR Z4", "Sprint Z5"]
+            vz_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
+            vz_total = sum(vz_vals) or 1
+            vz_horiz = "".join([
+                make_horiz_bar(v, vz_total, l, c)
+                for v, l, c in zip(vz_vals, vz_labels, vz_colors)
+            ])
+            vz_bar_chart = make_bar_chart_svg(
+                vz_vals, vz_labels, vz_colors,
+                "Zonas de Velocidade" if is_pt else "Velocity Zones"
+            )
+            acwr_color = "#DC2626" if (acwr < 0.8 or acwr > 1.5) else "#1F2937"
+
+            load_body = f'''
+            <div class="kpi-row">
+                <div class="kpi"><div class="kpi-label">{"Aguda 7d" if is_pt else "Acute 7d"}</div><div class="kpi-value">{acute:,.0f}<span class="kpi-sub"> m</span></div></div>
+                <div class="kpi"><div class="kpi-label">{"Cronica 28d" if is_pt else "Chronic 28d"}</div><div class="kpi-value">{chronic:,.0f}<span class="kpi-sub"> m</span></div></div>
+                <div class="kpi"><div class="kpi-label">ACWR</div><div class="kpi-value" style="color:{acwr_color}">{acwr:.2f}</div></div>
+                <div class="kpi"><div class="kpi-label">{"Monotonia" if is_pt else "Monotony"}</div><div class="kpi-value">{mono:.1f}</div></div>
+                <div class="kpi"><div class="kpi-label">Strain</div><div class="kpi-value">{strain_val:,.0f}</div></div>
+            </div>
+            {timeline_chart}
+            {vz_bar_chart}
+            <div class="module-horiz-bars">{vz_horiz}</div>
+            '''
+            l3_modules_html += _l3_module("load", "module-large", load_body, True)
+        else:
+            l3_modules_html += _l3_module("load", "module-large", "", False)
+
+    # ── 3.2 PERFORMANCE PROFILE (formerly Smart Summary, small) ──
     if "summary" in selected_layers:
-        lmpi = summary_data.get("lmpi", {}).get("score", 0)
-        profile = summary_data.get("performance_profile", {})
-        avail = summary_data.get("availability", {}).get("available_pct", 0)
-        high_risk = summary_data.get("high_risk_athletes", [])
-        
-        lmpi_color = "#ef4444" if lmpi < 40 else "#f59e0b" if lmpi < 70 else "#10b981"
-        
-        prof_vals = [profile.get("load", 0), profile.get("wellness", 0), profile.get("neuromuscular", 0), profile.get("power", 0)]
-        prof_labels = ["Load", "Wellness", "Neuro", "Power"]
-        prof_colors = ["#0891b2", "#10b981", "#8b5cf6", "#f59e0b"]
-        prof_chart = make_bar_chart_svg(prof_vals, prof_labels, prof_colors, "Performance Profile")
-        
-        risk_table = ""
-        if high_risk:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("lmpi",0):.0f}</td><td>{a.get("acwr",0):.2f}</td></tr>' for a in high_risk[:10]])
-            risk_table = f'<div class="chart-title">{"Atletas Alto Risco" if is_pt else "High Risk Athletes"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>LMPI</th><th>ACWR</th></tr></thead><tbody>{rows}</tbody></table>'
-        
-        sections_html += f'''<div class="section">
-        <div class="section-header"><span class="layer-badge lb-amber">Smart Summary</span></div>
-        <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">LMPI Score</div><div class="metric-value" style="color:{lmpi_color};font-size:32px">{lmpi:.0f}<span class="metric-sub">/100</span></div></div>
-            <div class="metric-card"><div class="metric-label">{"Disponibilidade" if is_pt else "Availability"}</div><div class="metric-value" style="color:#10b981">{avail:.0f}%</div></div>
-        </div>
-        {prof_chart}
-        {risk_table}
-        </div>'''
-    
+        has_summary = isinstance(summary_data, dict) and bool(summary_data)
+        if has_summary:
+            profile = summary_data.get("performance_profile", {}) or {}
+            prof_vals = [profile.get("load", 0), profile.get("wellness", 0),
+                         profile.get("neuromuscular", 0), profile.get("power", 0)]
+            prof_labels = ["Load", "Wellness", "Neuro", "Power"]
+            prof_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
+            prof_chart = make_bar_chart_svg(prof_vals, prof_labels, prof_colors, "")
+            summary_body = prof_chart if prof_chart else f'<div class="module-empty">{_L3_EMPTY}</div>'
+            l3_modules_html += _l3_module("summary", "module-small", summary_body, True)
+        else:
+            l3_modules_html += _l3_module("summary", "module-small", "", False)
+
+    # ── 3.3 TEAM STATUS (small) ──
     if "status" in selected_layers:
-        readiness = status_data.get("readiness", {}).get("score", 0)
-        wellness_avg = status_data.get("wellness_avg", {})
-        low_ready = status_data.get("low_readiness_athletes", [])
-        
-        rd_color = "#ef4444" if readiness < 50 else "#f59e0b" if readiness < 75 else "#10b981"
-        
-        w_vals = [wellness_avg.get("sleep", 0), wellness_avg.get("fatigue", 0), wellness_avg.get("soreness", 0), wellness_avg.get("stress", 0)]
-        w_labels = ["Sono" if is_pt else "Sleep", "Fadiga" if is_pt else "Fatigue", "Dor" if is_pt else "Soreness", "Estresse" if is_pt else "Stress"]
-        w_colors = ["#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6"]
-        w_chart = make_bar_chart_svg(w_vals, w_labels, w_colors, "Wellness Breakdown")
-        
-        lrt = ""
-        if low_ready:
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td class="danger">{a.get("readiness",0):.0f}%</td><td>{a.get("wellness",0):.0f}</td></tr>' for a in low_ready[:10]])
-            lrt = f'<div class="chart-title">{"Baixa Prontidao" if is_pt else "Low Readiness"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Readiness</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
-        
-        sections_html += f'''<div class="section">
-        <div class="section-header"><span class="layer-badge lb-green">Team Status</span></div>
-        <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">{"Prontidao" if is_pt else "Readiness"}</div><div class="metric-value" style="color:{rd_color};font-size:32px">{readiness:.0f}%</div></div>
-        </div>
-        {w_chart}
-        {lrt}
-        </div>'''
-    
+        has_status = isinstance(status_data, dict) and bool(status_data)
+        if has_status:
+            readiness = status_data.get("readiness", {}).get("score", 0) or 0
+            wellness_avg = status_data.get("wellness_avg", {}) or {}
+            rd_color = "#DC2626" if readiness < 50 else "#1F2937"
+            if readiness < 50:
+                rd_label = "Critico" if is_pt else "Critical"
+            elif readiness < 75:
+                rd_label = "Moderado" if is_pt else "Moderate"
+            else:
+                rd_label = "Otimo" if is_pt else "Optimal"
+
+            w_vals = [wellness_avg.get("sleep", 0), wellness_avg.get("fatigue", 0),
+                      wellness_avg.get("soreness", 0), wellness_avg.get("stress", 0)]
+            w_labels = ["Sono" if is_pt else "Sleep",
+                        "Fadiga" if is_pt else "Fatigue",
+                        "Dor" if is_pt else "Soreness",
+                        "Stress"]
+            w_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
+            w_chart = make_bar_chart_svg(w_vals, w_labels, w_colors, "")
+
+            status_body = f'''
+            <div class="readiness-block">
+                <div class="readiness-label">{"Prontidao" if is_pt else "Readiness"}</div>
+                <div class="readiness-value" style="color:{rd_color}">{readiness:.0f}<span class="kpi-sub">%</span></div>
+                <div class="readiness-sub">{rd_label}</div>
+            </div>
+            {w_chart}
+            '''
+            l3_modules_html += _l3_module("status", "module-small", status_body, True)
+        else:
+            l3_modules_html += _l3_module("status", "module-small", "", False)
+
+    # ── 3.4 NEUROMUSCULAR STATUS (small) ──
     if "neuro" in selected_layers:
-        neuro_score = neuro_data.get("neuro_score", {}).get("score", 0)
-        rsimod = neuro_data.get("rsimod", {}).get("value", 0)
-        fatigue_idx = neuro_data.get("fatigue_index", 0)
-        
-        ns_color = "#ef4444" if neuro_score < 50 else "#f59e0b" if neuro_score < 75 else "#10b981"
-        fi_color = "#ef4444" if fatigue_idx < -10 else "#f59e0b" if fatigue_idx < -5 else "#10b981"
-        
-        n_vals = [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)]
-        n_labels = ["Neuro", "RSImod", "Fatigue"]
-        n_colors = [ns_color, "#8b5cf6", fi_color]
-        n_chart = make_bar_chart_svg(n_vals, n_labels, n_colors, "Neuromuscular Overview")
-        
-        sections_html += f'''<div class="section">
-        <div class="section-header"><span class="layer-badge lb-purple">Neuromuscular Status</span></div>
-        <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">Neuro Score</div><div class="metric-value" style="color:{ns_color};font-size:32px">{neuro_score:.0f}</div></div>
-            <div class="metric-card"><div class="metric-label">RSImod</div><div class="metric-value">{rsimod:.2f}</div></div>
-            <div class="metric-card"><div class="metric-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="metric-value" style="color:{fi_color}">{fatigue_idx:.1f}%</div></div>
-        </div>
-        {n_chart}
-        </div>'''
-    
+        has_neuro = isinstance(neuro_data, dict) and bool(neuro_data)
+        if has_neuro:
+            neuro_score = neuro_data.get("neuro_score", {}).get("score", 0) or 0
+            rsimod = neuro_data.get("rsimod", {}).get("value", 0) or 0
+            fatigue_idx = neuro_data.get("fatigue_index", 0) or 0
+            ns_color = "#DC2626" if neuro_score < 50 else "#1F2937"
+            fi_color = "#DC2626" if fatigue_idx < -10 else "#1F2937"
+
+            n_vals = [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)]
+            n_labels = ["Neuro", "RSImod", "Fatigue"]
+            n_colors = ["#1F2937", "#1F2937", "#1F2937"]
+            n_chart = make_bar_chart_svg(n_vals, n_labels, n_colors, "")
+
+            neuro_body = f'''
+            <div class="kpi-row">
+                <div class="kpi"><div class="kpi-label">Neuro Score</div><div class="kpi-value" style="color:{ns_color}">{neuro_score:.0f}</div></div>
+                <div class="kpi"><div class="kpi-label">RSImod</div><div class="kpi-value">{rsimod:.2f}</div></div>
+                <div class="kpi"><div class="kpi-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="kpi-value" style="color:{fi_color}">{fatigue_idx:.1f}<span class="kpi-sub">%</span></div></div>
+            </div>
+            {n_chart}
+            '''
+            l3_modules_html += _l3_module("neuro", "module-small", neuro_body, True)
+        else:
+            l3_modules_html += _l3_module("neuro", "module-small", "", False)
+
+    # ── 3.5 RISK INTELLIGENCE (small) ──
     if "risk" in selected_layers:
-        risk_score = risk_data.get("risk_score", {}).get("score", 0)
-        risk_panel = risk_data.get("risk_panel", [])
-        
-        rs_color = "#10b981" if risk_score < 30 else "#f59e0b" if risk_score < 60 else "#ef4444"
-        
-        panel_html = ""
-        if risk_panel:
-            # Handle None values for acwr and wellness safely
-            def safe_format(val, fmt):
-                if val is None:
-                    return "-"
-                return f"{val:{fmt}}"
-            rows = "".join([f'<tr><td>{a.get("name","")}</td><td style="color:{"#10b981" if (a.get("risk_score") or 0)<30 else "#f59e0b" if (a.get("risk_score") or 0)<60 else "#ef4444"}">{safe_format(a.get("risk_score"), ".0f")}</td><td>{safe_format(a.get("acwr"), ".2f")}</td><td>{safe_format(a.get("wellness"), ".0f")}</td></tr>' for a in risk_panel[:15]])
-            panel_html = f'<div class="chart-title">{"Painel de Risco" if is_pt else "Risk Panel"}</div><table class="data-table"><thead><tr><th>{"Nome" if is_pt else "Name"}</th><th>Risk</th><th>ACWR</th><th>Wellness</th></tr></thead><tbody>{rows}</tbody></table>'
-        
-        sections_html += f'''<div class="section">
-        <div class="section-header"><span class="layer-badge lb-red">Risk Intelligence</span></div>
-        <div class="metrics-row">
-            <div class="metric-card big"><div class="metric-label">{"Risco Geral" if is_pt else "Risk Score"}</div><div class="metric-value" style="color:{rs_color};font-size:32px">{risk_score:.0f}</div></div>
-        </div>
-        {panel_html}
-        </div>'''
+        has_risk = isinstance(risk_data, dict) and bool(risk_data)
+        risk_panel = (risk_data.get("risk_panel", []) or []) if has_risk else []
+        if has_risk and risk_panel:
+            rows_html = []
+            for a in risk_panel[:15]:
+                risk_v = a.get("risk_score") or 0
+                row_class = "danger" if risk_v >= 60 else ""
+                if risk_v >= 60:
+                    status_label = "High" if not is_pt else "Alto"
+                elif risk_v >= 30:
+                    status_label = "Moderate" if not is_pt else "Moderado"
+                else:
+                    status_label = "Low" if not is_pt else "Baixo"
+                rows_html.append(
+                    f'<tr>'
+                    f'<td>{a.get("name","—")}</td>'
+                    f'<td>{_l3_safe_fmt(a.get("lmpi"), ".0f")}</td>'
+                    f'<td>{_l3_safe_fmt(a.get("acwr"), ".2f")}</td>'
+                    f'<td class="{row_class}">{status_label}</td>'
+                    f'</tr>'
+                )
+            risk_body = (
+                f'<table class="data-table">'
+                f'<thead><tr>'
+                f'<th>{"Nome" if is_pt else "Name"}</th>'
+                f'<th>LMPI</th>'
+                f'<th>ACWR</th>'
+                f'<th>Status</th>'
+                f'</tr></thead>'
+                f'<tbody>{"".join(rows_html)}</tbody>'
+                f'</table>'
+            )
+            l3_modules_html += _l3_module("risk", "module-small", risk_body, True)
+        else:
+            l3_modules_html += _l3_module("risk", "module-small", "", False)
+
+    # Wrap in section + grid (rendered only if at least one module was selected)
+    if l3_modules_html.strip():
+        section_title = "3. Métricas Detalhadas" if is_pt else "3. Detailed Metrics"
+        sections_html = (
+            f'<section class="pdf-section">'
+            f'<h2 class="pdf-section-title">{section_title}</h2>'
+            f'<div class="metrics-grid">{l3_modules_html}</div>'
+            f'</section>'
+        )
+    else:
+        sections_html = ""
     
     from datetime import datetime
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # ───── PDF HEADER (Layer 1.1) ─────
+    # Strict spec: white bg, dark text, no cards/shadows/rounded UI.
+    # Team Name is hardcoded to "—" (no team_name field exists in the data model;
+    # spec forbids inferring or repurposing unrelated fields).
+    header_team_name = "—"
+
+    # Period label uses the existing date_range parameter only. If absent or empty
+    # → fallback "—". No derivation from any other source.
+    if date_range and isinstance(date_range, str) and date_range.strip():
+        _dr = date_range.strip().lower()
+        _period_map = {
+            "7d":  ("Últimos 7 dias",  "Last 7 days"),
+            "14d": ("Últimos 14 dias", "Last 14 days"),
+            "28d": ("Últimos 28 dias", "Last 28 days"),
+            "30d": ("Últimos 30 dias", "Last 30 days"),
+            "90d": ("Últimos 90 dias", "Last 90 days"),
+        }
+        if _dr in _period_map:
+            header_period = _period_map[_dr][0] if is_pt else _period_map[_dr][1]
+        else:
+            header_period = date_range
+    else:
+        header_period = "—"
+
+    # Generated date: server-side datetime.now() at request time. Always present
+    # by construction; defensive fallback retained per spec (never break).
+    header_generated = now if now else "—"
+
+    header_label_team = "Equipe" if is_pt else "Team"
+    header_label_period = "Período" if is_pt else "Period"
+    header_label_generated = "Gerado em" if is_pt else "Generated"
+
+    pdf_header_html = f'''<header class="pdf-header">
+        <div class="pdf-brand">
+            {f'<img class="pdf-brand-logo" src="{_PDF_LOGO_DATA_URL}" alt="LoadManager Pro">' if _PDF_LOGO_DATA_URL else ''}
+            <div class="pdf-brand-text">
+                <div class="pdf-brand-name">LoadManager Pro</div>
+                <div class="pdf-brand-tagline">If it&#39;s measured. It&#39;s managed. It can be scaled.</div>
+            </div>
+        </div>
+        <h1 class="pdf-header-title">{"Relatório de Performance da Equipe" if is_pt else "Team Performance Report"}</h1>
+        <div class="pdf-header-meta">
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_team}:</span> <span class="pdf-header-meta-value">{header_team_name}</span></div>
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_period}:</span> <span class="pdf-header-meta-value">{header_period}</span></div>
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_generated}:</span> <span class="pdf-header-meta-value">{header_generated}</span></div>
+        </div>
+    </header>'''
+
+    # ───── EXECUTIVE SUMMARY (Layer 1.2) ─────
+    # Strict spec: 3 metrics ONLY (LMPI, Availability, Readiness). No Status.
+    # All values come directly from `summary`. No derivation. No recalculation.
+
+    def _es_valid_number(v):
+        # Accepts only finite, non-NaN numeric values. Booleans are rejected.
+        if v is None or isinstance(v, bool):
+            return False
+        if not isinstance(v, (int, float)):
+            return False
+        if v != v:  # NaN
+            return False
+        if v == float("inf") or v == float("-inf"):
+            return False
+        return True
+
+    _summary_obj = summary if isinstance(summary, dict) else {}
+
+    # 1. LMPI Score — summary.team_lmpi → integer, never default to 0
+    _lmpi_raw = _summary_obj.get("team_lmpi")
+    exec_lmpi = f"{_lmpi_raw:.0f}" if _es_valid_number(_lmpi_raw) else "—"
+
+    # 2. Availability — ATOMIC RULE: both `available` and `total_athletes` must
+    #    be valid non-negative numbers. Partial values are FORBIDDEN.
+    _avail_raw = _summary_obj.get("available")
+    _total_raw = _summary_obj.get("total_athletes")
+    if (_es_valid_number(_avail_raw) and _avail_raw >= 0
+            and _es_valid_number(_total_raw) and _total_raw >= 0):
+        exec_avail = f"{int(_avail_raw)} / {int(_total_raw)}"
+    else:
+        exec_avail = "—"
+
+    # 3. Readiness — summary.team_readiness → integer
+    _ready_raw = _summary_obj.get("team_readiness")
+    exec_readiness = f"{_ready_raw:.0f}" if _es_valid_number(_ready_raw) else "—"
+
+    es_label_lmpi = "LMPI Score"
+    es_label_avail = "Disponibilidade" if is_pt else "Availability"
+    es_label_ready = "Prontidão" if is_pt else "Readiness"
+
+    pdf_exec_summary_html = f'''<section class="pdf-exec-summary">
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_lmpi}</div>
+            <div class="pdf-exec-value">{exec_lmpi}</div>
+        </div>
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_avail}</div>
+            <div class="pdf-exec-value">{exec_avail}</div>
+        </div>
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_ready}</div>
+            <div class="pdf-exec-value">{exec_readiness}</div>
+        </div>
+    </section>'''
+
+    # ───── KEY INSIGHTS (Layer 2) ─────
+    # Strict spec: TEXT-ONLY rendering of existing insights. No generation,
+    # no derivation, no AI. We only filter, dedup, and render the strings
+    # already present in the `insights` payload.
+    import html as _html_lib
+
+    # Step 1 — Normalize input
+    _insights_obj = insights if isinstance(insights, dict) else {}
+
+    # Canonical module order (locked by spec §3.1): (module_id, insights_key)
+    _KI_CANONICAL = [
+        ("load",    "load_intelligence"),
+        ("summary", "smart_summary"),
+        ("status",  "team_status"),
+        ("neuro",   "neuromuscular"),
+        ("risk",    "risk_intelligence"),
+    ]
+
+    ki_bullets = []          # ordered list of (module_id, text)
+    ki_seen_per_module = {}  # module_id -> set of texts already kept (per-module dedup)
+
+    # Step 2 — Iterate ALL modules in canonical order
+    # Step 3 — Filter by selection (`selected_layers` already a set)
+    for module_id, insights_key in _KI_CANONICAL:
+        if module_id not in selected_layers:
+            continue
+        # Step 4 — Extract; skip if missing/empty/wrong type
+        raw = _insights_obj.get(insights_key)
+        if raw is None or not isinstance(raw, str):
+            continue
+        text = raw.strip()
+        if not text:
+            continue
+        # Step 5 — Dedup ONLY when (same module) AND (identical text)
+        seen = ki_seen_per_module.setdefault(module_id, set())
+        if text in seen:
+            continue
+        seen.add(text)
+        ki_bullets.append((module_id, text))
+
+    # Step 6 — Build flat bullet list (canonical order preserved by construction)
+    # Step 7 — Fallback when empty
+    if ki_bullets:
+        _ki_items_html = "".join(
+            f'<li class="pdf-insight-bullet">{_html_lib.escape(text)}</li>'
+            for _, text in ki_bullets
+        )
+    else:
+        _ki_fallback_text = (
+            "Sem insights disponíveis para os módulos selecionados."
+            if is_pt else
+            "No insights available for the selected modules."
+        )
+        _ki_items_html = (
+            f'<li class="pdf-insight-bullet pdf-insight-fallback">'
+            f'{_html_lib.escape(_ki_fallback_text)}'
+            f'</li>'
+        )
+
+    pdf_insights_html = f'''<section class="pdf-insights">
+        <ul class="pdf-insights-list">{_ki_items_html}</ul>
+    </section>'''
     
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
@@ -2056,35 +2317,6 @@ async def get_dashboard_overview_pdf(
             line-height: 1.5;
         }}
         .container {{ max-width: 800px; margin: 0 auto; }}
-        .report-header {{
-            text-align: center; margin-bottom: 28px; padding-bottom: 16px;
-            border-bottom: 2px solid #e2e8f0;
-        }}
-        .report-title {{ font-size: 20px; font-weight: 800; color: #0f172a; letter-spacing: 1.5px; }}
-        .report-subtitle {{ font-size: 11px; color: #64748b; margin-top: 4px; }}
-        .section {{
-            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;
-            padding: 20px; margin-bottom: 20px; page-break-inside: avoid;
-        }}
-        .section-header {{ margin-bottom: 14px; }}
-        .layer-badge {{
-            display: inline-block; padding: 5px 12px; border-radius: 6px;
-            font-size: 12px; font-weight: 700; letter-spacing: 0.5px;
-        }}
-        .lb-cyan {{ background: #ecfeff; color: #0891b2; }}
-        .lb-amber {{ background: #fffbeb; color: #d97706; }}
-        .lb-green {{ background: #ecfdf5; color: #059669; }}
-        .lb-purple {{ background: #f5f3ff; color: #7c3aed; }}
-        .lb-red {{ background: #fef2f2; color: #dc2626; }}
-        .metrics-row {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }}
-        .metric-card {{
-            flex: 1; min-width: 90px; background: #ffffff; border: 1px solid #e2e8f0;
-            border-radius: 10px; padding: 12px; text-align: center;
-        }}
-        .metric-card.big {{ min-width: 140px; }}
-        .metric-label {{ font-size: 9px; color: #64748b; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }}
-        .metric-value {{ font-size: 20px; font-weight: 800; color: #1e293b; }}
-        .metric-sub {{ font-size: 10px; color: #94a3b8; font-weight: 400; }}
         .chart-container {{ margin: 12px 0; }}
         .chart-title {{ font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 8px; margin-top: 12px; letter-spacing: 0.3px; }}
         .data-table {{ width: 100%; border-collapse: collapse; margin-bottom: 14px; }}
@@ -2103,16 +2335,344 @@ async def get_dashboard_overview_pdf(
         }}
         @media print {{
             body {{ background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
-            .section {{ break-inside: avoid; }}
+            .pdf-section {{ break-inside: avoid; }}
+            .module {{ break-inside: avoid; }}
+        }}
+
+        /* ───── PDF HEADER (Layer 1.1) ───── */
+        .pdf-header {{
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid #d1d5db;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            text-align: left;
+        }}
+        /* Brand block (logo + product name + tagline) */
+        .pdf-brand {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }}
+        .pdf-brand-logo {{
+            height: 28px;
+            width: auto;
+            display: block;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+        }}
+        .pdf-brand-text {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }}
+        .pdf-brand-name {{
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            line-height: 1.1;
+        }}
+        .pdf-brand-tagline {{
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 400;
+            line-height: 1.3;
+        }}
+        .pdf-header-title {{
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            margin: 0 0 14px 0;
+            line-height: 1.25;
+        }}
+        .pdf-header-meta {{
+            display: block;
+        }}
+        .pdf-header-meta-row {{
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.7;
+        }}
+        .pdf-header-meta-label {{
+            font-weight: 600;
+            color: #4b5563;
+            margin-right: 4px;
+        }}
+        .pdf-header-meta-value {{
+            font-weight: 400;
+            color: #111827;
+        }}
+
+        /* ───── EXECUTIVE SUMMARY (Layer 1.2) ───── */
+        .pdf-exec-summary {{
+            display: flex;
+            gap: 24px;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-exec-item {{
+            flex: 1 1 0;
+            text-align: left;
+            min-width: 0;
+        }}
+        .pdf-exec-label {{
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }}
+        .pdf-exec-value {{
+            font-size: 26px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }}
+
+        /* ───── KEY INSIGHTS (Layer 2) ───── */
+        .pdf-insights {{
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-insights-list {{
+            margin: 0;
+            padding-left: 18px;
+            list-style: disc outside;
+            color: #374151;
+        }}
+        .pdf-insight-bullet {{
+            font-size: 12px;
+            line-height: 1.65;
+            color: #374151;
+            margin-bottom: 6px;
+        }}
+        .pdf-insight-bullet:last-child {{
+            margin-bottom: 0;
+        }}
+        .pdf-insight-fallback {{
+            color: #6b7280;
+            font-style: italic;
+        }}
+
+        /* ═══════════════════════════════════════════════════════════════
+           VISUAL POLISH — Design System Final Overrides (LAST IN CASCADE)
+           Tokens:
+             bg: #FFFFFF | text: #111827 | secondary: #6B7280
+             divider: #E5E7EB | accent: #1F2937 | risk: #DC2626
+           Spacing scale: 8 / 16 / 24 / 32
+           No border-radius, no shadows, no colored cards, no gradients.
+           ═══════════════════════════════════════════════════════════════ */
+
+        body {{
+            color: #111827;
+            background: #FFFFFF;
+            padding: 32px 24px;
+            line-height: 1.6;
+        }}
+        .container {{ max-width: 820px; }}
+
+        .pdf-header {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+        }}
+        .pdf-header-title {{ color: #111827; font-weight: 700; }}
+        .pdf-header-meta-row {{ color: #374151; }}
+        .pdf-header-meta-label {{ color: #6B7280; }}
+        .pdf-header-meta-value {{ color: #111827; }}
+
+        .pdf-exec-summary {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+            gap: 32px;
+        }}
+        .pdf-exec-label {{ color: #6B7280; font-size: 11px; letter-spacing: 1.2px; }}
+        .pdf-exec-value {{ color: #111827; font-size: 26px; font-weight: 700; }}
+
+        .pdf-insights {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+        }}
+        .pdf-insights-list {{ padding-left: 20px; }}
+        .pdf-insight-bullet {{
+            color: #374151;
+            font-size: 13px;
+            line-height: 1.7;
+            margin-bottom: 8px;
+        }}
+        .pdf-insight-bullet:last-child {{ margin-bottom: 0; }}
+        .pdf-insight-fallback {{ color: #6B7280; font-style: italic; }}
+
+        /* ═══════════ LAYER 3 — DETAILED METRICS (P6 Redesign) ═══════════ */
+        .pdf-section {{
+            margin-bottom: 32px;
+        }}
+        .pdf-section-title {{
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            margin: 0 0 16px 0;
+            letter-spacing: 0.2px;
+        }}
+        .metrics-grid {{
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }}
+        .module {{
+            border: 1px solid #E5E7EB;
+            padding: 16px;
+            background: #FFFFFF;
+            border-radius: 0;
+            box-shadow: none;
+        }}
+        .module-large {{
+            grid-column: 1;
+            grid-row: span 2;
+        }}
+        .module-small {{
+            grid-column: auto;
+        }}
+        .module-title {{
+            font-size: 13px;
+            font-weight: 600;
+            color: #1F2937;
+            margin: 0 0 12px 0;
+        }}
+        .module-empty {{
+            font-size: 12px;
+            color: #6B7280;
+            font-style: italic;
+            padding: 8px 0;
+        }}
+        .module-horiz-bars {{
+            margin-top: 12px;
+        }}
+        /* KPI row inside a module */
+        .kpi-row {{
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 16px;
+        }}
+        .kpi {{
+            flex: 1 1 0;
+            min-width: 0;
+        }}
+        .kpi-label {{
+            font-size: 10px;
+            color: #6B7280;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+            line-height: 1.2;
+        }}
+        .kpi-value {{
+            font-size: 18px;
+            font-weight: 700;
+            color: #111827;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.15;
+        }}
+        .kpi-sub {{
+            font-size: 10px;
+            color: #6B7280;
+            font-weight: 400;
+        }}
+        /* Readiness block (Team Status hero) */
+        .readiness-block {{
+            margin-bottom: 16px;
+        }}
+        .readiness-label {{
+            font-size: 10px;
+            color: #6B7280;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }}
+        .readiness-value {{
+            font-size: 28px;
+            font-weight: 700;
+            color: #111827;
+            font-variant-numeric: tabular-nums;
+            line-height: 1.1;
+        }}
+        .readiness-sub {{
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 500;
+            margin-top: 2px;
+        }}
+        /* Chart container resets inside modules */
+        .module .chart-container {{
+            margin: 12px 0 0 0;
+        }}
+        .module .chart-title {{
+            font-size: 10px;
+            font-weight: 600;
+            color: #6B7280;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin: 0 0 6px 0;
+        }}
+        /* Tables (used in Risk module) */
+        .module .data-table {{
+            margin-top: 0;
+            margin-bottom: 0;
+            border-collapse: collapse;
+            width: 100%;
+        }}
+        .module .data-table th {{
+            color: #6B7280;
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-weight: 600;
+            border-bottom: 1px solid #E5E7EB;
+            padding: 8px 10px;
+            text-align: left;
+        }}
+        .module .data-table td {{
+            color: #111827;
+            font-size: 12px;
+            padding: 8px 10px;
+            border-bottom: 1px solid #F3F4F6;
+        }}
+        .module .data-table td.danger {{
+            color: #DC2626;
+            font-weight: 600;
+        }}
+
+        /* Footer */
+        .footer {{
+            color: #6B7280;
+            font-size: 10px;
+            border-top: 1px solid #E5E7EB;
+            margin-top: 32px;
+            padding-top: 16px;
+            text-align: left;
         }}
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="report-header">
-        <div class="report-title">DASHBOARD REPORT</div>
-        <div class="report-subtitle">{mode_label} | {"Periodo" if is_pt else "Period"}: {date_range} | {now}</div>
-    </div>
+    {pdf_header_html}
+    {pdf_exec_summary_html}
+    {pdf_insights_html}
     {sections_html}
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>

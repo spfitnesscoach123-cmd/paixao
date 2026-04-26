@@ -133,6 +133,8 @@ export default function PeriodizationScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gps-sessions-classification'] });
       queryClient.invalidateQueries({ queryKey: ['periodization-weeks'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-calculated'] });
+      queryClient.invalidateQueries({ queryKey: ['periodization-peak-values'] });
       Alert.alert(
         locale === 'pt' ? 'Sucesso' : 'Success',
         locale === 'pt' ? 'Atividade classificada e peaks recalculados' : 'Activity classified and peaks recalculated'
