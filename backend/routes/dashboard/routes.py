@@ -2081,6 +2081,61 @@ async def get_dashboard_overview_pdf(
             <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_generated}:</span> <span class="pdf-header-meta-value">{header_generated}</span></div>
         </div>
     </header>'''
+
+    # ───── EXECUTIVE SUMMARY (Layer 1.2) ─────
+    # Strict spec: 3 metrics ONLY (LMPI, Availability, Readiness). No Status.
+    # All values come directly from `summary`. No derivation. No recalculation.
+
+    def _es_valid_number(v):
+        # Accepts only finite, non-NaN numeric values. Booleans are rejected.
+        if v is None or isinstance(v, bool):
+            return False
+        if not isinstance(v, (int, float)):
+            return False
+        if v != v:  # NaN
+            return False
+        if v == float("inf") or v == float("-inf"):
+            return False
+        return True
+
+    _summary_obj = summary if isinstance(summary, dict) else {}
+
+    # 1. LMPI Score — summary.team_lmpi → integer, never default to 0
+    _lmpi_raw = _summary_obj.get("team_lmpi")
+    exec_lmpi = f"{_lmpi_raw:.0f}" if _es_valid_number(_lmpi_raw) else "—"
+
+    # 2. Availability — ATOMIC RULE: both `available` and `total_athletes` must
+    #    be valid non-negative numbers. Partial values are FORBIDDEN.
+    _avail_raw = _summary_obj.get("available")
+    _total_raw = _summary_obj.get("total_athletes")
+    if (_es_valid_number(_avail_raw) and _avail_raw >= 0
+            and _es_valid_number(_total_raw) and _total_raw >= 0):
+        exec_avail = f"{int(_avail_raw)} / {int(_total_raw)}"
+    else:
+        exec_avail = "—"
+
+    # 3. Readiness — summary.team_readiness → integer
+    _ready_raw = _summary_obj.get("team_readiness")
+    exec_readiness = f"{_ready_raw:.0f}" if _es_valid_number(_ready_raw) else "—"
+
+    es_label_lmpi = "LMPI Score"
+    es_label_avail = "Disponibilidade" if is_pt else "Availability"
+    es_label_ready = "Prontidão" if is_pt else "Readiness"
+
+    pdf_exec_summary_html = f'''<section class="pdf-exec-summary">
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_lmpi}</div>
+            <div class="pdf-exec-value">{exec_lmpi}</div>
+        </div>
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_avail}</div>
+            <div class="pdf-exec-value">{exec_avail}</div>
+        </div>
+        <div class="pdf-exec-item">
+            <div class="pdf-exec-label">{es_label_ready}</div>
+            <div class="pdf-exec-value">{exec_readiness}</div>
+        </div>
+    </section>'''
     
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
@@ -2190,11 +2245,42 @@ async def get_dashboard_overview_pdf(
             font-weight: 400;
             color: #111827;
         }}
+
+        /* ───── EXECUTIVE SUMMARY (Layer 1.2) ───── */
+        .pdf-exec-summary {{
+            display: flex;
+            gap: 24px;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-exec-item {{
+            flex: 1 1 0;
+            text-align: left;
+            min-width: 0;
+        }}
+        .pdf-exec-label {{
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }}
+        .pdf-exec-value {{
+            font-size: 26px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }}
     </style>
 </head>
 <body>
 <div class="container">
     {pdf_header_html}
+    {pdf_exec_summary_html}
     {sections_html}
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>
