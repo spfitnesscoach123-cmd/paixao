@@ -2039,6 +2039,48 @@ async def get_dashboard_overview_pdf(
     
     from datetime import datetime
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
+
+    # ───── PDF HEADER (Layer 1.1) ─────
+    # Strict spec: white bg, dark text, no cards/shadows/rounded UI.
+    # Team Name is hardcoded to "—" (no team_name field exists in the data model;
+    # spec forbids inferring or repurposing unrelated fields).
+    header_team_name = "—"
+
+    # Period label uses the existing date_range parameter only. If absent or empty
+    # → fallback "—". No derivation from any other source.
+    if date_range and isinstance(date_range, str) and date_range.strip():
+        _dr = date_range.strip().lower()
+        _period_map = {
+            "7d":  ("Últimos 7 dias",  "Last 7 days"),
+            "14d": ("Últimos 14 dias", "Last 14 days"),
+            "28d": ("Últimos 28 dias", "Last 28 days"),
+            "30d": ("Últimos 30 dias", "Last 30 days"),
+            "90d": ("Últimos 90 dias", "Last 90 days"),
+        }
+        if _dr in _period_map:
+            header_period = _period_map[_dr][0] if is_pt else _period_map[_dr][1]
+        else:
+            header_period = date_range
+    else:
+        header_period = "—"
+
+    # Generated date: server-side datetime.now() at request time. Always present
+    # by construction; defensive fallback retained per spec (never break).
+    header_generated = now if now else "—"
+
+    header_label_team = "Equipe" if is_pt else "Team"
+    header_label_period = "Período" if is_pt else "Period"
+    header_label_generated = "Gerado em" if is_pt else "Generated"
+
+    pdf_header_html = f'''<header class="pdf-header">
+        <div class="pdf-header-product">LoadManager Pro</div>
+        <h1 class="pdf-header-title">{"Relatório de Performance da Equipe" if is_pt else "Team Performance Report"}</h1>
+        <div class="pdf-header-meta">
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_team}:</span> <span class="pdf-header-meta-value">{header_team_name}</span></div>
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_period}:</span> <span class="pdf-header-meta-value">{header_period}</span></div>
+            <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_generated}:</span> <span class="pdf-header-meta-value">{header_generated}</span></div>
+        </div>
+    </header>'''
     
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
@@ -2105,14 +2147,54 @@ async def get_dashboard_overview_pdf(
             body {{ background: #ffffff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
             .section {{ break-inside: avoid; }}
         }}
+
+        /* ───── PDF HEADER (Layer 1.1) ───── */
+        .pdf-header {{
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid #d1d5db;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            text-align: left;
+        }}
+        .pdf-header-product {{
+            font-size: 11px;
+            font-weight: 600;
+            color: #6b7280;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }}
+        .pdf-header-title {{
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            margin: 0 0 14px 0;
+            line-height: 1.25;
+        }}
+        .pdf-header-meta {{
+            display: block;
+        }}
+        .pdf-header-meta-row {{
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.7;
+        }}
+        .pdf-header-meta-label {{
+            font-weight: 600;
+            color: #4b5563;
+            margin-right: 4px;
+        }}
+        .pdf-header-meta-value {{
+            font-weight: 400;
+            color: #111827;
+        }}
     </style>
 </head>
 <body>
 <div class="container">
-    <div class="report-header">
-        <div class="report-title">DASHBOARD REPORT</div>
-        <div class="report-subtitle">{mode_label} | {"Periodo" if is_pt else "Period"}: {date_range} | {now}</div>
-    </div>
+    {pdf_header_html}
     {sections_html}
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>
