@@ -2267,6 +2267,153 @@ async def get_dashboard_overview_pdf(
             .section {{ break-inside: avoid; }}
         }}
 
+        /* ═══════════════════════════════════════════════════════════════
+           VISUAL POLISH (Step 4) — Design System Overrides
+           Tokens:
+             bg: #FFFFFF | text: #111827 | secondary: #6B7280
+             divider: #E5E7EB | accent: #1F2937 | risk: #DC2626
+           Spacing scale: 8 / 16 / 24 / 32
+           No border-radius, no shadows, no colored cards, no gradients.
+           ═══════════════════════════════════════════════════════════════ */
+
+        body {{
+            color: #111827;
+            background: #FFFFFF;
+            padding: 32px 24px;
+            line-height: 1.6;
+        }}
+        .container {{ max-width: 820px; }}
+
+        /* Header & Exec Summary spacing tuning */
+        .pdf-header {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+        }}
+        .pdf-header-product {{ color: #6B7280; }}
+        .pdf-header-title {{ color: #111827; font-weight: 700; }}
+        .pdf-header-meta-row {{ color: #374151; }}
+        .pdf-header-meta-label {{ color: #6B7280; }}
+        .pdf-header-meta-value {{ color: #111827; }}
+
+        .pdf-exec-summary {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+            gap: 32px;
+        }}
+        .pdf-exec-label {{ color: #6B7280; font-size: 11px; letter-spacing: 1.2px; }}
+        .pdf-exec-value {{ color: #111827; font-size: 26px; font-weight: 700; }}
+
+        .pdf-insights {{
+            border-bottom: 1px solid #E5E7EB;
+            padding: 0 0 24px 0;
+            margin-bottom: 32px;
+        }}
+        .pdf-insights-list {{ padding-left: 20px; }}
+        .pdf-insight-bullet {{
+            color: #374151;
+            font-size: 13px;
+            line-height: 1.7;
+            margin-bottom: 8px;
+        }}
+        .pdf-insight-bullet:last-child {{ margin-bottom: 0; }}
+        .pdf-insight-fallback {{ color: #6B7280; font-style: italic; }}
+
+        /* ── Module sections (Layer 3) — flatten cards into clean rows ── */
+        .section {{
+            background: #FFFFFF;
+            border: none;
+            border-top: 1px solid #E5E7EB;
+            border-radius: 0;
+            padding: 24px 0 0 0;
+            margin-bottom: 32px;
+        }}
+        .section:first-of-type {{ border-top: none; padding-top: 0; }}
+        .section-header {{ margin-bottom: 16px; }}
+        .layer-badge {{
+            display: block;
+            background: transparent !important;
+            color: #1F2937 !important;
+            padding: 0;
+            border-radius: 0;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }}
+        /* Unify all legacy badge variants under the single accent color */
+        .lb-cyan, .lb-amber, .lb-green, .lb-purple, .lb-red {{
+            background: transparent !important;
+            color: #1F2937 !important;
+        }}
+
+        .metrics-row {{
+            gap: 24px;
+            margin-bottom: 16px;
+        }}
+        .metric-card {{
+            flex: 1 1 0;
+            min-width: 90px;
+            background: transparent;
+            border: none;
+            border-radius: 0;
+            padding: 0;
+            text-align: left;
+        }}
+        .metric-card.big {{ min-width: 140px; }}
+        .metric-label {{
+            font-size: 11px;
+            color: #6B7280;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }}
+        .metric-value {{
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            font-variant-numeric: tabular-nums;
+        }}
+        .metric-sub {{ color: #6B7280; font-size: 11px; font-weight: 400; }}
+
+        .chart-container {{ margin: 16px 0; }}
+        .chart-title {{
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin: 24px 0 8px 0;
+        }}
+
+        .data-table {{ margin-bottom: 16px; }}
+        .data-table th {{
+            color: #6B7280;
+            font-size: 10px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #E5E7EB;
+            padding: 8px 12px;
+        }}
+        .data-table td {{
+            color: #111827;
+            font-size: 12px;
+            padding: 8px 12px;
+            border-bottom: 1px solid #F3F4F6;
+        }}
+        .data-table td.danger {{ color: #DC2626; font-weight: 600; }}
+
+        .footer {{
+            color: #6B7280;
+            font-size: 10px;
+            border-top: 1px solid #E5E7EB;
+            margin-top: 32px;
+            padding-top: 16px;
+            text-align: left;
+        }}
+
         /* ───── PDF HEADER (Layer 1.1) ───── */
         .pdf-header {{
             background: #ffffff;
