@@ -34,6 +34,25 @@ except ImportError:
     LlmChat = None
     UserMessage = None
 
+# ───────────────────────────────────────────────────────────────────────────
+# PDF asset cache (module-level): logo embedded as base64 data URL.
+# Read once per process; reused across all PDF report requests.
+# Source: existing official logo asset already in the codebase.
+# ───────────────────────────────────────────────────────────────────────────
+import base64 as _b64
+
+_PDF_LOGO_DATA_URL = ""
+try:
+    _LOGO_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "..",
+                              "frontend", "assets", "logo.png")
+    _LOGO_PATH = os.path.normpath(_LOGO_PATH)
+    if os.path.isfile(_LOGO_PATH):
+        with open(_LOGO_PATH, "rb") as _f:
+            _PDF_LOGO_DATA_URL = "data:image/png;base64," + _b64.b64encode(_f.read()).decode("ascii")
+except Exception as _logo_err:
+    logger.warning(f"[PDF] Failed to load brand logo: {_logo_err}")
+    _PDF_LOGO_DATA_URL = ""
+
 
 router = APIRouter(tags=["Dashboard"])
 
@@ -2074,7 +2093,13 @@ async def get_dashboard_overview_pdf(
     header_label_generated = "Gerado em" if is_pt else "Generated"
 
     pdf_header_html = f'''<header class="pdf-header">
-        <div class="pdf-header-product">LoadManager Pro</div>
+        <div class="pdf-brand">
+            {f'<img class="pdf-brand-logo" src="{_PDF_LOGO_DATA_URL}" alt="LoadManager Pro">' if _PDF_LOGO_DATA_URL else ''}
+            <div class="pdf-brand-text">
+                <div class="pdf-brand-name">LoadManager Pro</div>
+                <div class="pdf-brand-tagline">If it&#39;s measured. It&#39;s managed. It can be scaled.</div>
+            </div>
+        </div>
         <h1 class="pdf-header-title">{"Relatório de Performance da Equipe" if is_pt else "Team Performance Report"}</h1>
         <div class="pdf-header-meta">
             <div class="pdf-header-meta-row"><span class="pdf-header-meta-label">{header_label_team}:</span> <span class="pdf-header-meta-value">{header_team_name}</span></div>
@@ -2422,6 +2447,39 @@ async def get_dashboard_overview_pdf(
             padding: 0 0 18px 0;
             margin-bottom: 24px;
             text-align: left;
+        }}
+        /* Brand block (logo + product name + tagline) */
+        .pdf-brand {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }}
+        .pdf-brand-logo {{
+            height: 28px;
+            width: auto;
+            display: block;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+        }}
+        .pdf-brand-text {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }}
+        .pdf-brand-name {{
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            line-height: 1.1;
+        }}
+        .pdf-brand-tagline {{
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 400;
+            line-height: 1.3;
         }}
         .pdf-header-product {{
             font-size: 11px;
