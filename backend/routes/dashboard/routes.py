@@ -38,6 +38,8 @@ except ImportError:
 # PDF asset cache (module-level): logo embedded as base64 data URL.
 # Read once per process; reused across all PDF report requests.
 # Source: existing official logo asset already in the codebase.
+# TODO: replace with optimized logo (current ~285KB too large for PDF;
+# inflated to ~380KB after base64 encoding, included in every PDF).
 # ───────────────────────────────────────────────────────────────────────────
 import base64 as _b64
 
@@ -1714,12 +1716,16 @@ async def get_dashboard_overview_pdf(
     """Generate HTML report for dashboard overview PDF export with inline SVG charts."""
     from fastapi.responses import HTMLResponse
     
-    overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    # TASK 6 — failsafe: never propagate internal errors to the client.
+    # If the data fetch fails, the PDF still renders (with placeholders/fallbacks).
+    try:
+        overview = await get_dashboard_overview(lang, athlete_id, position, date_range, current_user)
+    except Exception:
+        overview = {}
     
     is_pt = lang == "pt"
     selected_layers = set(layers.split(","))
     mode = overview.get("mode", "team")
-    mode_label = {"team": "Equipe" if is_pt else "Team", "position": "Posicao" if is_pt else "Position", "athlete": "Atleta" if is_pt else "Athlete"}.get(mode, mode)
     
     # ── Map actual response data to PDF sections ──
     summary = overview.get("summary", {})
@@ -2292,8 +2298,133 @@ async def get_dashboard_overview_pdf(
             .section {{ break-inside: avoid; }}
         }}
 
+        /* ───── PDF HEADER (Layer 1.1) ───── */
+        .pdf-header {{
+            background: #ffffff;
+            border: none;
+            border-bottom: 1px solid #d1d5db;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            text-align: left;
+        }}
+        /* Brand block (logo + product name + tagline) */
+        .pdf-brand {{
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }}
+        .pdf-brand-logo {{
+            height: 28px;
+            width: auto;
+            display: block;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+        }}
+        .pdf-brand-text {{
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }}
+        .pdf-brand-name {{
+            font-size: 15px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            line-height: 1.1;
+        }}
+        .pdf-brand-tagline {{
+            font-size: 11px;
+            color: #6B7280;
+            font-weight: 400;
+            line-height: 1.3;
+        }}
+        .pdf-header-title {{
+            font-size: 22px;
+            font-weight: 700;
+            color: #111827;
+            letter-spacing: 0.2px;
+            margin: 0 0 14px 0;
+            line-height: 1.25;
+        }}
+        .pdf-header-meta {{
+            display: block;
+        }}
+        .pdf-header-meta-row {{
+            font-size: 11px;
+            color: #374151;
+            line-height: 1.7;
+        }}
+        .pdf-header-meta-label {{
+            font-weight: 600;
+            color: #4b5563;
+            margin-right: 4px;
+        }}
+        .pdf-header-meta-value {{
+            font-weight: 400;
+            color: #111827;
+        }}
+
+        /* ───── EXECUTIVE SUMMARY (Layer 1.2) ───── */
+        .pdf-exec-summary {{
+            display: flex;
+            gap: 24px;
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-exec-item {{
+            flex: 1 1 0;
+            text-align: left;
+            min-width: 0;
+        }}
+        .pdf-exec-label {{
+            font-size: 10px;
+            font-weight: 600;
+            color: #6b7280;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }}
+        .pdf-exec-value {{
+            font-size: 26px;
+            font-weight: 700;
+            color: #111827;
+            line-height: 1.2;
+            font-variant-numeric: tabular-nums;
+        }}
+
+        /* ───── KEY INSIGHTS (Layer 2) ───── */
+        .pdf-insights {{
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-insights-list {{
+            margin: 0;
+            padding-left: 18px;
+            list-style: disc outside;
+            color: #374151;
+        }}
+        .pdf-insight-bullet {{
+            font-size: 12px;
+            line-height: 1.65;
+            color: #374151;
+            margin-bottom: 6px;
+        }}
+        .pdf-insight-bullet:last-child {{
+            margin-bottom: 0;
+        }}
+        .pdf-insight-fallback {{
+            color: #6b7280;
+            font-style: italic;
+        }}
+
         /* ═══════════════════════════════════════════════════════════════
-           VISUAL POLISH (Step 4) — Design System Overrides
+           VISUAL POLISH — Design System Final Overrides (LAST IN CASCADE)
            Tokens:
              bg: #FFFFFF | text: #111827 | secondary: #6B7280
              divider: #E5E7EB | accent: #1F2937 | risk: #DC2626
@@ -2309,13 +2440,11 @@ async def get_dashboard_overview_pdf(
         }}
         .container {{ max-width: 820px; }}
 
-        /* Header & Exec Summary spacing tuning */
         .pdf-header {{
             border-bottom: 1px solid #E5E7EB;
             padding: 0 0 24px 0;
             margin-bottom: 32px;
         }}
-        .pdf-header-product {{ color: #6B7280; }}
         .pdf-header-title {{ color: #111827; font-weight: 700; }}
         .pdf-header-meta-row {{ color: #374151; }}
         .pdf-header-meta-label {{ color: #6B7280; }}
@@ -2437,139 +2566,6 @@ async def get_dashboard_overview_pdf(
             margin-top: 32px;
             padding-top: 16px;
             text-align: left;
-        }}
-
-        /* ───── PDF HEADER (Layer 1.1) ───── */
-        .pdf-header {{
-            background: #ffffff;
-            border: none;
-            border-bottom: 1px solid #d1d5db;
-            padding: 0 0 18px 0;
-            margin-bottom: 24px;
-            text-align: left;
-        }}
-        /* Brand block (logo + product name + tagline) */
-        .pdf-brand {{
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
-        }}
-        .pdf-brand-logo {{
-            height: 28px;
-            width: auto;
-            display: block;
-            background: transparent;
-            border: 0;
-            box-shadow: none;
-        }}
-        .pdf-brand-text {{
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }}
-        .pdf-brand-name {{
-            font-size: 15px;
-            font-weight: 700;
-            color: #111827;
-            letter-spacing: 0.2px;
-            line-height: 1.1;
-        }}
-        .pdf-brand-tagline {{
-            font-size: 11px;
-            color: #6B7280;
-            font-weight: 400;
-            line-height: 1.3;
-        }}
-        .pdf-header-product {{
-            font-size: 11px;
-            font-weight: 600;
-            color: #6b7280;
-            letter-spacing: 1.4px;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }}
-        .pdf-header-title {{
-            font-size: 22px;
-            font-weight: 700;
-            color: #111827;
-            letter-spacing: 0.2px;
-            margin: 0 0 14px 0;
-            line-height: 1.25;
-        }}
-        .pdf-header-meta {{
-            display: block;
-        }}
-        .pdf-header-meta-row {{
-            font-size: 11px;
-            color: #374151;
-            line-height: 1.7;
-        }}
-        .pdf-header-meta-label {{
-            font-weight: 600;
-            color: #4b5563;
-            margin-right: 4px;
-        }}
-        .pdf-header-meta-value {{
-            font-weight: 400;
-            color: #111827;
-        }}
-
-        /* ───── EXECUTIVE SUMMARY (Layer 1.2) ───── */
-        .pdf-exec-summary {{
-            display: flex;
-            gap: 24px;
-            padding: 0 0 18px 0;
-            margin-bottom: 24px;
-            border-bottom: 1px solid #d1d5db;
-            background: #ffffff;
-        }}
-        .pdf-exec-item {{
-            flex: 1 1 0;
-            text-align: left;
-            min-width: 0;
-        }}
-        .pdf-exec-label {{
-            font-size: 10px;
-            font-weight: 600;
-            color: #6b7280;
-            letter-spacing: 1.2px;
-            text-transform: uppercase;
-            margin-bottom: 6px;
-        }}
-        .pdf-exec-value {{
-            font-size: 26px;
-            font-weight: 700;
-            color: #111827;
-            line-height: 1.2;
-            font-variant-numeric: tabular-nums;
-        }}
-
-        /* ───── KEY INSIGHTS (Layer 2) ───── */
-        .pdf-insights {{
-            padding: 0 0 18px 0;
-            margin-bottom: 24px;
-            border-bottom: 1px solid #d1d5db;
-            background: #ffffff;
-        }}
-        .pdf-insights-list {{
-            margin: 0;
-            padding-left: 18px;
-            list-style: disc outside;
-            color: #374151;
-        }}
-        .pdf-insight-bullet {{
-            font-size: 12px;
-            line-height: 1.65;
-            color: #374151;
-            margin-bottom: 6px;
-        }}
-        .pdf-insight-bullet:last-child {{
-            margin-bottom: 0;
-        }}
-        .pdf-insight-fallback {{
-            color: #6b7280;
-            font-style: italic;
         }}
     </style>
 </head>
