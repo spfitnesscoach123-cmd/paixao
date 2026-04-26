@@ -1706,6 +1706,7 @@ async def get_dashboard_overview_pdf(
     summary = overview.get("summary", {})
     athletes_list = overview.get("athletes", [])
     agg_timeline = overview.get("aggregated_timeline", [])
+    insights = overview.get("insights", {})
     
     # Build load_data from summary + athletes + aggregated_timeline
     # Velocity zones: average across athletes
@@ -2136,6 +2137,69 @@ async def get_dashboard_overview_pdf(
             <div class="pdf-exec-value">{exec_readiness}</div>
         </div>
     </section>'''
+
+    # ───── KEY INSIGHTS (Layer 2) ─────
+    # Strict spec: TEXT-ONLY rendering of existing insights. No generation,
+    # no derivation, no AI. We only filter, dedup, and render the strings
+    # already present in the `insights` payload.
+    import html as _html_lib
+
+    # Step 1 — Normalize input
+    _insights_obj = insights if isinstance(insights, dict) else {}
+
+    # Canonical module order (locked by spec §3.1): (module_id, insights_key)
+    _KI_CANONICAL = [
+        ("load",    "load_intelligence"),
+        ("summary", "smart_summary"),
+        ("status",  "team_status"),
+        ("neuro",   "neuromuscular"),
+        ("risk",    "risk_intelligence"),
+    ]
+
+    ki_bullets = []          # ordered list of (module_id, text)
+    ki_seen_per_module = {}  # module_id -> set of texts already kept (per-module dedup)
+
+    # Step 2 — Iterate ALL modules in canonical order
+    # Step 3 — Filter by selection (`selected_layers` already a set)
+    for module_id, insights_key in _KI_CANONICAL:
+        if module_id not in selected_layers:
+            continue
+        # Step 4 — Extract; skip if missing/empty/wrong type
+        raw = _insights_obj.get(insights_key)
+        if raw is None or not isinstance(raw, str):
+            continue
+        text = raw.strip()
+        if not text:
+            continue
+        # Step 5 — Dedup ONLY when (same module) AND (identical text)
+        seen = ki_seen_per_module.setdefault(module_id, set())
+        if text in seen:
+            continue
+        seen.add(text)
+        ki_bullets.append((module_id, text))
+
+    # Step 6 — Build flat bullet list (canonical order preserved by construction)
+    # Step 7 — Fallback when empty
+    if ki_bullets:
+        _ki_items_html = "".join(
+            f'<li class="pdf-insight-bullet">{_html_lib.escape(text)}</li>'
+            for _, text in ki_bullets
+        )
+    else:
+        _ki_fallback_text = (
+            "Sem insights disponíveis para os módulos selecionados."
+            if is_pt else
+            "No insights available for the selected modules."
+        )
+        _ki_items_html = (
+            f'<li class="pdf-insight-bullet pdf-insight-fallback">'
+            f'{_html_lib.escape(_ki_fallback_text)}'
+            f'</li>'
+        )
+
+    pdf_insights_html = f'''<section class="pdf-insights">
+        <ul class="pdf-insights-list">{_ki_items_html}</ul>
+    </section>'''
     
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
@@ -2275,12 +2339,40 @@ async def get_dashboard_overview_pdf(
             line-height: 1.2;
             font-variant-numeric: tabular-nums;
         }}
+
+        /* ───── KEY INSIGHTS (Layer 2) ───── */
+        .pdf-insights {{
+            padding: 0 0 18px 0;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #d1d5db;
+            background: #ffffff;
+        }}
+        .pdf-insights-list {{
+            margin: 0;
+            padding-left: 18px;
+            list-style: disc outside;
+            color: #374151;
+        }}
+        .pdf-insight-bullet {{
+            font-size: 12px;
+            line-height: 1.65;
+            color: #374151;
+            margin-bottom: 6px;
+        }}
+        .pdf-insight-bullet:last-child {{
+            margin-bottom: 0;
+        }}
+        .pdf-insight-fallback {{
+            color: #6b7280;
+            font-style: italic;
+        }}
     </style>
 </head>
 <body>
 <div class="container">
     {pdf_header_html}
     {pdf_exec_summary_html}
+    {pdf_insights_html}
     {sections_html}
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>
