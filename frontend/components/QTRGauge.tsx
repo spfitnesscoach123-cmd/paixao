@@ -82,7 +82,7 @@ export const QTRGauge: React.FC<QTRGaugeProps> = ({ score, size = 200 }) => {
     return '#22c55e';
   };
 
-  const containerHeight = size * 0.85;
+  const containerHeight = size;
 
   return (
     <View style={[styles.container, { width: size, height: containerHeight }]}>
