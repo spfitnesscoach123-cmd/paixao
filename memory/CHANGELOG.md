@@ -1,5 +1,23 @@
 # CHANGELOG
 
+
+## 2026-04-27 — PDF Export Layer 3 (Detailed Metrics) — FULL REBUILD (P6)
+- **Scope**: User reported the previous Layer 3 implementation was visibly broken (charts cropped, modules misaligned, dashboard appearance, table overflow).
+  Per user mandate: complete rebuild of Layer 3 only — Layer 1, Layer 2 and the data layer remain untouched.
+- **Backend (`backend/routes/dashboard/routes.py`)**:
+  - Replaced `_l3_module()` helper with strict 4-slot structure: `pdf-module-title` + `pdf-module-metrics` + `pdf-chart-container` + `pdf-module-footer`.
+  - Removed legacy classes `module-large` / `module-small` / `metrics-grid` / `kpi-row` / `readiness-block` entirely.
+  - All 5 modules (Load Intelligence, Performance Profile, Team Status, Neuromuscular Status, Risk Intelligence) now follow the same fixed structure.
+  - Charts forced into `.pdf-chart-container { height: 160px; overflow: hidden; }` — eliminates all chart cropping/overflow.
+  - Risk Intelligence: dedicated `.pdf-risk-table` (top-5 in chart-container) + `+N atletas` footer.
+  - New container: `.page-container { width: 1024px; }` rendered OUTSIDE the 820px Layer 1/2 `.container` so Layer 3 has its own wider canvas.
+  - `.pdf-grid-2col { 1fr 1fr; gap: 24px; }` — symmetric 2-col grid (replaces asymmetric `2fr 1fr` with row-spans).
+  - Empty modules render structure (title + empty metrics placeholder) per spec.
+  - `page-break-inside: avoid` on every module — verified via Chrome headless print-to-PDF: full Layer 3 fits on a single page with all 5 modules bordered, charts contained, no overflow.
+- **Test (`backend/tests/test_pdf_export.py`)**: Updated `test_metric_cards_structure` to validate the new P6 class names (`pdf-module`, `pdf-module-title`, `pdf-module-metrics`, `pdf-chart-container`).
+- **Regression**: 27/33 PDF tests pass (was 26/33). 6 remaining failures are pre-existing — they reference design tokens from 2 versions ago (`Smart Summary`, `report-header`, `lb-cyan`, hardcoded `3,500`).
+- **Verification**: End-to-end PDF generation via `google-chrome --print-to-pdf` confirms acceptance criteria met — clean 2-col grid, charts NOT cut, layout stable, professional report appearance, no dashboard semantics.
+
 ## 2026-03-13
 ### Dashboard Visão Geral da Equipe — Complete Rebuild
 - **Backend**: Created `GET /api/dashboard/overview` endpoint with full filter support (athlete_id, position, date_range)

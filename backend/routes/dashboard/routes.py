@@ -1919,11 +1919,13 @@ async def get_dashboard_overview_pdf(
             <rect x="90" y="{h / 2 - 6}" width="{bw}" height="12" rx="6" fill="{color}"/>
             <text x="{w - 5}" y="{h / 2 + 4}" text-anchor="end" fill="#374151" font-size="10" font-weight="600">{value:,.0f}m</text></svg>'''
 
-    # ──────────────────────────────────────────────────────────────────────
-    # LAYER 3 — DETAILED METRICS (P6 Redesign)
-    # Editorial report layout. Same data sources, new visual structure.
-    # Display name registry locked per spec L3-R8.
-    # ──────────────────────────────────────────────────────────────────────
+    # ══════════════════════════════════════════════════════════════════════
+    # LAYER 3 — DETAILED METRICS  (P6 FULL REBUILD)
+    # Strict report layout. NOT a dashboard.
+    # Fixed structure per module: title + metrics row + chart container + footer.
+    # 2-column grid (1fr 1fr), 24px gap, deterministic, page-break: avoid.
+    # Data layer is UNCHANGED — same sources, same calculations.
+    # ══════════════════════════════════════════════════════════════════════
     _L3_NAMES = {
         "load":    ("Load Intelligence",      "Load Intelligence"),
         "summary": ("Performance Profile",    "Performance Profile"),
@@ -1931,17 +1933,9 @@ async def get_dashboard_overview_pdf(
         "neuro":   ("Neuromuscular Status",   "Neuromuscular Status"),
         "risk":    ("Risk Intelligence",      "Risk Intelligence"),
     }
-    _L3_EMPTY = ("Dados insuficientes para este módulo."
+    _L3_EMPTY = ("Dados insuficientes."
                  if is_pt else
-                 "Insufficient data for this module.")
-
-    def _l3_module(module_id, size_class, body_html, has_data):
-        name = _L3_NAMES[module_id][0 if is_pt else 1]
-        body = body_html if has_data else f'<div class="module-empty">{_L3_EMPTY}</div>'
-        return (f'<div class="module {size_class}">'
-                f'<div class="module-title">{name}</div>'
-                f'{body}'
-                f'</div>')
+                 "Insufficient data.")
 
     def _l3_safe_fmt(val, fmt):
         if val is None:
@@ -1951,9 +1945,46 @@ async def get_dashboard_overview_pdf(
         except (TypeError, ValueError):
             return "—"
 
+    def _l3_metric(label, value):
+        """Single metric cell inside .pdf-module-metrics row."""
+        return (f'<div class="pdf-metric">'
+                f'<div class="pdf-metric-label">{label}</div>'
+                f'<div class="pdf-metric-value">{value}</div>'
+                f'</div>')
+
+    def _l3_metric_styled(label, value, color):
+        return (f'<div class="pdf-metric">'
+                f'<div class="pdf-metric-label">{label}</div>'
+                f'<div class="pdf-metric-value" style="color:{color}">{value}</div>'
+                f'</div>')
+
+    def _l3_module(module_id, metrics_html, chart_html, footer_html, has_data):
+        """Render a Layer 3 module with the strict structure (always 4 slots).
+        Empty modules still render structure (title + empty placeholders)."""
+        name = _L3_NAMES[module_id][0 if is_pt else 1]
+        # Empty-state preserves layout: empty metrics row + empty chart slot.
+        if not has_data:
+            metrics_html = f'<div class="pdf-metric pdf-metric-empty">{_L3_EMPTY}</div>'
+            chart_html = ''
+            footer_html = ''
+        footer_block = f'<div class="pdf-module-footer">{footer_html}</div>' if footer_html else ''
+        return (
+            f'<div class="pdf-module">'
+            f'<div class="pdf-module-title">{name}</div>'
+            f'<div class="pdf-module-metrics">{metrics_html}</div>'
+            f'<div class="pdf-chart-container">{chart_html}</div>'
+            f'{footer_block}'
+            f'</div>'
+        )
+
+    # Chart sized to fit 160px container exactly.
+    # SVG uses viewBox so it scales to 100% width × 100% height of the container.
+    L3_CHART_W = 480
+    L3_CHART_H = 160
+
     l3_modules_html = ""
 
-    # ── 3.1 LOAD INTELLIGENCE (large, left column) ──
+    # ── 3.1 LOAD INTELLIGENCE ─────────────────────────────────────────────
     if "load" in selected_layers:
         has_load = isinstance(load_data, dict) and bool(load_data)
         if has_load:
@@ -1965,130 +1996,165 @@ async def get_dashboard_overview_pdf(
             vz = load_data.get("velocity_zones", {}) or {}
             timeline = load_data.get("distance_timeline", []) or []
 
-            timeline_chart = ""
+            acwr_color = "#DC2626" if (acwr < 0.8 or acwr > 1.5) else "#111827"
+
+            load_metrics = (
+                _l3_metric("Acute 7d" if not is_pt else "Aguda 7d", f"{acute:,.0f}m")
+                + _l3_metric("Chronic 28d" if not is_pt else "Crônica 28d", f"{chronic:,.0f}m")
+                + _l3_metric_styled("ACWR", f"{acwr:.2f}", acwr_color)
+                + _l3_metric("Monotony" if not is_pt else "Monotonia", f"{mono:.1f}")
+                + _l3_metric("Strain", f"{strain_val:,.0f}")
+            )
+
+            load_chart = ""
             if timeline:
                 tl_vals = [d.get("distance", 0) for d in timeline[-14:]]
                 tl_dates = [d.get("date", "")[-5:] for d in timeline[-14:]]
-                timeline_chart = make_line_chart_svg(
+                load_chart = make_line_chart_svg(
                     tl_vals, tl_dates, "#1F2937",
-                    "Distancia Total" if is_pt else "Total Distance", "m"
+                    "Total Distance" if not is_pt else "Distância Total", "m",
+                    w=L3_CHART_W, h=L3_CHART_H
                 )
 
             vz_vals = [vz.get("low_intensity", 0), vz.get("hid_z3", 0),
                        vz.get("hsr_z4", 0), vz.get("sprint_z5", 0)]
             vz_labels = ["Low Int", "HID Z3", "HSR Z4", "Sprint Z5"]
-            vz_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
             vz_total = sum(vz_vals) or 1
-            vz_horiz = "".join([
-                make_horiz_bar(v, vz_total, l, c)
-                for v, l, c in zip(vz_vals, vz_labels, vz_colors)
+            vz_footer = "".join([
+                make_horiz_bar(v, vz_total, l, "#1F2937")
+                for v, l in zip(vz_vals, vz_labels)
             ])
-            vz_bar_chart = make_bar_chart_svg(
-                vz_vals, vz_labels, vz_colors,
-                "Zonas de Velocidade" if is_pt else "Velocity Zones"
-            )
-            acwr_color = "#DC2626" if (acwr < 0.8 or acwr > 1.5) else "#1F2937"
-
-            load_body = f'''
-            <div class="kpi-row">
-                <div class="kpi"><div class="kpi-label">{"Aguda 7d" if is_pt else "Acute 7d"}</div><div class="kpi-value">{acute:,.0f}<span class="kpi-sub"> m</span></div></div>
-                <div class="kpi"><div class="kpi-label">{"Cronica 28d" if is_pt else "Chronic 28d"}</div><div class="kpi-value">{chronic:,.0f}<span class="kpi-sub"> m</span></div></div>
-                <div class="kpi"><div class="kpi-label">ACWR</div><div class="kpi-value" style="color:{acwr_color}">{acwr:.2f}</div></div>
-                <div class="kpi"><div class="kpi-label">{"Monotonia" if is_pt else "Monotony"}</div><div class="kpi-value">{mono:.1f}</div></div>
-                <div class="kpi"><div class="kpi-label">Strain</div><div class="kpi-value">{strain_val:,.0f}</div></div>
-            </div>
-            {timeline_chart}
-            {vz_bar_chart}
-            <div class="module-horiz-bars">{vz_horiz}</div>
-            '''
-            l3_modules_html += _l3_module("load", "module-large", load_body, True)
+            l3_modules_html += _l3_module("load", load_metrics, load_chart, vz_footer, True)
         else:
-            l3_modules_html += _l3_module("load", "module-large", "", False)
+            l3_modules_html += _l3_module("load", "", "", "", False)
 
-    # ── 3.2 PERFORMANCE PROFILE (formerly Smart Summary, small) ──
+    # ── 3.2 PERFORMANCE PROFILE ───────────────────────────────────────────
     if "summary" in selected_layers:
         has_summary = isinstance(summary_data, dict) and bool(summary_data)
         if has_summary:
             profile = summary_data.get("performance_profile", {}) or {}
-            prof_vals = [profile.get("load", 0), profile.get("wellness", 0),
-                         profile.get("neuromuscular", 0), profile.get("power", 0)]
-            prof_labels = ["Load", "Wellness", "Neuro", "Power"]
-            prof_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
-            prof_chart = make_bar_chart_svg(prof_vals, prof_labels, prof_colors, "")
-            summary_body = prof_chart if prof_chart else f'<div class="module-empty">{_L3_EMPTY}</div>'
-            l3_modules_html += _l3_module("summary", "module-small", summary_body, True)
-        else:
-            l3_modules_html += _l3_module("summary", "module-small", "", False)
+            p_load = profile.get("load", 0)
+            p_wellness = profile.get("wellness", 0)
+            p_neuro = profile.get("neuromuscular", 0)
+            p_power = profile.get("power", 0)
 
-    # ── 3.3 TEAM STATUS (small) ──
+            prof_metrics = (
+                _l3_metric("Load", f"{p_load:.0f}")
+                + _l3_metric("Wellness", f"{p_wellness:.0f}")
+                + _l3_metric("Neuro", f"{p_neuro:.0f}")
+                + _l3_metric("Power", f"{p_power:.0f}")
+            )
+            prof_chart = make_bar_chart_svg(
+                [p_load, p_wellness, p_neuro, p_power],
+                ["Load", "Wellness", "Neuro", "Power"],
+                ["#1F2937"] * 4, "", w=L3_CHART_W, h=L3_CHART_H
+            )
+            l3_modules_html += _l3_module("summary", prof_metrics, prof_chart, "", True)
+        else:
+            l3_modules_html += _l3_module("summary", "", "", "", False)
+
+    # ── 3.3 TEAM STATUS ───────────────────────────────────────────────────
     if "status" in selected_layers:
         has_status = isinstance(status_data, dict) and bool(status_data)
         if has_status:
             readiness = status_data.get("readiness", {}).get("score", 0) or 0
             wellness_avg = status_data.get("wellness_avg", {}) or {}
-            rd_color = "#DC2626" if readiness < 50 else "#1F2937"
+            rd_color = "#DC2626" if readiness < 50 else "#111827"
             if readiness < 50:
-                rd_label = "Critico" if is_pt else "Critical"
+                rd_label = "Crítico" if is_pt else "Critical"
             elif readiness < 75:
                 rd_label = "Moderado" if is_pt else "Moderate"
             else:
-                rd_label = "Otimo" if is_pt else "Optimal"
+                rd_label = "Ótimo" if is_pt else "Optimal"
 
-            w_vals = [wellness_avg.get("sleep", 0), wellness_avg.get("fatigue", 0),
-                      wellness_avg.get("soreness", 0), wellness_avg.get("stress", 0)]
-            w_labels = ["Sono" if is_pt else "Sleep",
-                        "Fadiga" if is_pt else "Fatigue",
-                        "Dor" if is_pt else "Soreness",
-                        "Stress"]
-            w_colors = ["#1F2937", "#1F2937", "#1F2937", "#1F2937"]
-            w_chart = make_bar_chart_svg(w_vals, w_labels, w_colors, "")
+            sleep_v = wellness_avg.get("sleep", 0)
+            fatigue_v = wellness_avg.get("fatigue", 0)
+            soreness_v = wellness_avg.get("soreness", 0)
+            stress_v = wellness_avg.get("stress", 0)
 
-            status_body = f'''
-            <div class="readiness-block">
-                <div class="readiness-label">{"Prontidao" if is_pt else "Readiness"}</div>
-                <div class="readiness-value" style="color:{rd_color}">{readiness:.0f}<span class="kpi-sub">%</span></div>
-                <div class="readiness-sub">{rd_label}</div>
-            </div>
-            {w_chart}
-            '''
-            l3_modules_html += _l3_module("status", "module-small", status_body, True)
+            status_metrics = (
+                _l3_metric_styled(
+                    "Readiness" if not is_pt else "Prontidão",
+                    f"{readiness:.0f}%",
+                    rd_color
+                )
+                + _l3_metric("Sleep" if not is_pt else "Sono", f"{sleep_v:.1f}")
+                + _l3_metric("Fatigue" if not is_pt else "Fadiga", f"{fatigue_v:.1f}")
+                + _l3_metric("Soreness" if not is_pt else "Dor", f"{soreness_v:.1f}")
+            )
+
+            status_chart = make_bar_chart_svg(
+                [sleep_v, fatigue_v, soreness_v, stress_v],
+                [
+                    "Sleep" if not is_pt else "Sono",
+                    "Fatigue" if not is_pt else "Fadiga",
+                    "Soreness" if not is_pt else "Dor",
+                    "Stress",
+                ],
+                ["#1F2937"] * 4, "", w=L3_CHART_W, h=L3_CHART_H
+            )
+            status_footer = (f'<div class="pdf-module-footer-note">{rd_label}</div>')
+            l3_modules_html += _l3_module("status", status_metrics, status_chart, status_footer, True)
         else:
-            l3_modules_html += _l3_module("status", "module-small", "", False)
+            l3_modules_html += _l3_module("status", "", "", "", False)
 
-    # ── 3.4 NEUROMUSCULAR STATUS (small) ──
+    # ── 3.4 NEUROMUSCULAR STATUS ──────────────────────────────────────────
     if "neuro" in selected_layers:
         has_neuro = isinstance(neuro_data, dict) and bool(neuro_data)
         if has_neuro:
             neuro_score = neuro_data.get("neuro_score", {}).get("score", 0) or 0
             rsimod = neuro_data.get("rsimod", {}).get("value", 0) or 0
             fatigue_idx = neuro_data.get("fatigue_index", 0) or 0
-            ns_color = "#DC2626" if neuro_score < 50 else "#1F2937"
-            fi_color = "#DC2626" if fatigue_idx < -10 else "#1F2937"
+            ns_color = "#DC2626" if neuro_score < 50 else "#111827"
+            fi_color = "#DC2626" if fatigue_idx < -10 else "#111827"
 
-            n_vals = [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)]
-            n_labels = ["Neuro", "RSImod", "Fatigue"]
-            n_colors = ["#1F2937", "#1F2937", "#1F2937"]
-            n_chart = make_bar_chart_svg(n_vals, n_labels, n_colors, "")
-
-            neuro_body = f'''
-            <div class="kpi-row">
-                <div class="kpi"><div class="kpi-label">Neuro Score</div><div class="kpi-value" style="color:{ns_color}">{neuro_score:.0f}</div></div>
-                <div class="kpi"><div class="kpi-label">RSImod</div><div class="kpi-value">{rsimod:.2f}</div></div>
-                <div class="kpi"><div class="kpi-label">{"Ind. Fadiga" if is_pt else "Fatigue Idx"}</div><div class="kpi-value" style="color:{fi_color}">{fatigue_idx:.1f}<span class="kpi-sub">%</span></div></div>
-            </div>
-            {n_chart}
-            '''
-            l3_modules_html += _l3_module("neuro", "module-small", neuro_body, True)
+            neuro_metrics = (
+                _l3_metric_styled("Neuro Score", f"{neuro_score:.0f}", ns_color)
+                + _l3_metric("RSImod", f"{rsimod:.2f}")
+                + _l3_metric_styled(
+                    "Fatigue Idx" if not is_pt else "Ind. Fadiga",
+                    f"{fatigue_idx:.1f}%", fi_color
+                )
+            )
+            neuro_chart = make_bar_chart_svg(
+                [neuro_score, max(rsimod * 100, 0), max(100 + fatigue_idx, 0)],
+                ["Neuro", "RSImod", "Fatigue"],
+                ["#1F2937"] * 3, "", w=L3_CHART_W, h=L3_CHART_H
+            )
+            l3_modules_html += _l3_module("neuro", neuro_metrics, neuro_chart, "", True)
         else:
-            l3_modules_html += _l3_module("neuro", "module-small", "", False)
+            l3_modules_html += _l3_module("neuro", "", "", "", False)
 
-    # ── 3.5 RISK INTELLIGENCE (small) ──
+    # ── 3.5 RISK INTELLIGENCE ─────────────────────────────────────────────
     if "risk" in selected_layers:
         has_risk = isinstance(risk_data, dict) and bool(risk_data)
         risk_panel = (risk_data.get("risk_panel", []) or []) if has_risk else []
         if has_risk and risk_panel:
+            team_risk_score = risk_data.get("risk_score", {}).get("score", 0) or 0
+            high_count = sum(1 for a in risk_panel if (a.get("risk_score") or 0) >= 60)
+            mod_count = sum(1 for a in risk_panel if 30 <= (a.get("risk_score") or 0) < 60)
+            risk_color = "#DC2626" if team_risk_score >= 60 else "#111827"
+
+            risk_metrics = (
+                _l3_metric_styled(
+                    "Team Risk" if not is_pt else "Risco Equipe",
+                    f"{team_risk_score:.0f}", risk_color
+                )
+                + _l3_metric_styled(
+                    "High" if not is_pt else "Alto",
+                    f"{high_count}",
+                    "#DC2626" if high_count > 0 else "#111827"
+                )
+                + _l3_metric(
+                    "Moderate" if not is_pt else "Moderado",
+                    f"{mod_count}"
+                )
+            )
+
+            # Top-5 highest risk athletes — fits 160px chart container exactly.
+            top_n = risk_panel[:5]
             rows_html = []
-            for a in risk_panel[:15]:
+            for a in top_n:
                 risk_v = a.get("risk_score") or 0
                 row_class = "danger" if risk_v >= 60 else ""
                 if risk_v >= 60:
@@ -2105,8 +2171,8 @@ async def get_dashboard_overview_pdf(
                     f'<td class="{row_class}">{status_label}</td>'
                     f'</tr>'
                 )
-            risk_body = (
-                f'<table class="data-table">'
+            risk_chart = (
+                f'<table class="pdf-risk-table">'
                 f'<thead><tr>'
                 f'<th>{"Nome" if is_pt else "Name"}</th>'
                 f'<th>LMPI</th>'
@@ -2116,18 +2182,25 @@ async def get_dashboard_overview_pdf(
                 f'<tbody>{"".join(rows_html)}</tbody>'
                 f'</table>'
             )
-            l3_modules_html += _l3_module("risk", "module-small", risk_body, True)
+            extra = len(risk_panel) - len(top_n)
+            risk_footer = ""
+            if extra > 0:
+                risk_footer = (f'<div class="pdf-module-footer-note">'
+                               f'+{extra} {"atletas" if is_pt else "athletes"}</div>')
+            l3_modules_html += _l3_module("risk", risk_metrics, risk_chart, risk_footer, True)
         else:
-            l3_modules_html += _l3_module("risk", "module-small", "", False)
+            l3_modules_html += _l3_module("risk", "", "", "", False)
 
-    # Wrap in section + grid (rendered only if at least one module was selected)
+    # Wrap in section + 2-col grid + page-container 1024px (rendered only if at least one module).
     if l3_modules_html.strip():
         section_title = "3. Métricas Detalhadas" if is_pt else "3. Detailed Metrics"
         sections_html = (
+            f'<div class="page-container">'
             f'<section class="pdf-section">'
             f'<h2 class="pdf-section-title">{section_title}</h2>'
-            f'<div class="metrics-grid">{l3_modules_html}</div>'
+            f'<div class="pdf-grid-2col">{l3_modules_html}</div>'
             f'</section>'
+            f'</div>'
         )
     else:
         sections_html = ""
@@ -2515,7 +2588,17 @@ async def get_dashboard_overview_pdf(
         .pdf-insight-bullet:last-child {{ margin-bottom: 0; }}
         .pdf-insight-fallback {{ color: #6B7280; font-style: italic; }}
 
-        /* ═══════════ LAYER 3 — DETAILED METRICS (P6 Redesign) ═══════════ */
+        /* ═══════════ LAYER 3 — DETAILED METRICS (P6 FULL REBUILD) ═══════════
+           Strict report layout. Deterministic. No dashboard semantics.
+           1024px page container · 2-col grid · fixed module structure.
+           ═══════════════════════════════════════════════════════════════════ */
+        .page-container {{
+            width: 1024px;
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 0 24px;
+            box-sizing: border-box;
+        }}
         .pdf-section {{
             margin-bottom: 32px;
         }}
@@ -2526,135 +2609,138 @@ async def get_dashboard_overview_pdf(
             margin: 0 0 16px 0;
             letter-spacing: 0.2px;
         }}
-        .metrics-grid {{
+        .pdf-grid-2col {{
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 24px;
+            align-items: stretch;
         }}
-        .module {{
+        .pdf-module {{
             border: 1px solid #E5E7EB;
             padding: 16px;
             background: #FFFFFF;
+            page-break-inside: avoid;
+            break-inside: avoid;
             border-radius: 0;
             box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            box-sizing: border-box;
         }}
-        .module-large {{
-            grid-column: 1;
-            grid-row: span 2;
-        }}
-        .module-small {{
-            grid-column: auto;
-        }}
-        .module-title {{
+        .pdf-module-title {{
             font-size: 13px;
-            font-weight: 600;
+            font-weight: 700;
+            letter-spacing: 1px;
             color: #1F2937;
             margin: 0 0 12px 0;
+            text-transform: uppercase;
         }}
-        .module-empty {{
-            font-size: 12px;
-            color: #6B7280;
-            font-style: italic;
-            padding: 8px 0;
-        }}
-        .module-horiz-bars {{
-            margin-top: 12px;
-        }}
-        /* KPI row inside a module */
-        .kpi-row {{
+        .pdf-module-metrics {{
             display: flex;
             justify-content: space-between;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+            flex-wrap: nowrap;
         }}
-        .kpi {{
+        .pdf-metric {{
             flex: 1 1 0;
             min-width: 0;
         }}
-        .kpi-label {{
+        .pdf-metric-empty {{
+            font-size: 12px;
+            color: #6B7280;
+            font-style: italic;
+            text-align: left;
+        }}
+        .pdf-metric-label {{
             font-size: 10px;
             color: #6B7280;
-            letter-spacing: 1px;
             text-transform: uppercase;
+            letter-spacing: 0.6px;
             font-weight: 600;
             margin-bottom: 4px;
             line-height: 1.2;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }}
-        .kpi-value {{
+        .pdf-metric-value {{
             font-size: 18px;
             font-weight: 700;
             color: #111827;
             font-variant-numeric: tabular-nums;
             line-height: 1.15;
+            white-space: nowrap;
         }}
-        .kpi-sub {{
+        .pdf-chart-container {{
+            width: 100%;
+            height: 160px;
+            overflow: hidden;
+            box-sizing: border-box;
+            position: relative;
+        }}
+        .pdf-chart-container > svg {{
+            width: 100%;
+            height: 100%;
+            display: block;
+        }}
+        .pdf-chart-container .chart-container {{
+            margin: 0;
+            width: 100%;
+            height: 100%;
+        }}
+        .pdf-chart-container .chart-container svg {{
+            width: 100%;
+            height: 100%;
+            display: block;
+        }}
+        .pdf-chart-container .chart-title {{
+            display: none;
+        }}
+        .pdf-module-footer {{
+            margin-top: 12px;
+            padding-top: 8px;
+            border-top: 1px solid #F3F4F6;
+        }}
+        .pdf-module-footer-note {{
             font-size: 10px;
-            color: #6B7280;
-            font-weight: 400;
-        }}
-        /* Readiness block (Team Status hero) */
-        .readiness-block {{
-            margin-bottom: 16px;
-        }}
-        .readiness-label {{
-            font-size: 10px;
-            color: #6B7280;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }}
-        .readiness-value {{
-            font-size: 28px;
-            font-weight: 700;
-            color: #111827;
-            font-variant-numeric: tabular-nums;
-            line-height: 1.1;
-        }}
-        .readiness-sub {{
-            font-size: 11px;
             color: #6B7280;
             font-weight: 500;
-            margin-top: 2px;
+            letter-spacing: 0.4px;
         }}
-        /* Chart container resets inside modules */
-        .module .chart-container {{
-            margin: 12px 0 0 0;
-        }}
-        .module .chart-title {{
-            font-size: 10px;
-            font-weight: 600;
-            color: #6B7280;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin: 0 0 6px 0;
-        }}
-        /* Tables (used in Risk module) */
-        .module .data-table {{
-            margin-top: 0;
-            margin-bottom: 0;
-            border-collapse: collapse;
+        /* Risk module table — fits inside 160px chart-container */
+        .pdf-risk-table {{
             width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }}
-        .module .data-table th {{
+        .pdf-risk-table th {{
+            font-size: 9px;
             color: #6B7280;
-            font-size: 10px;
-            letter-spacing: 1px;
+            font-weight: 600;
+            letter-spacing: 0.6px;
             text-transform: uppercase;
-            font-weight: 600;
-            border-bottom: 1px solid #E5E7EB;
-            padding: 8px 10px;
             text-align: left;
+            padding: 4px 6px;
+            border-bottom: 1px solid #E5E7EB;
         }}
-        .module .data-table td {{
+        .pdf-risk-table td {{
+            font-size: 11px;
             color: #111827;
-            font-size: 12px;
-            padding: 8px 10px;
+            padding: 4px 6px;
             border-bottom: 1px solid #F3F4F6;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }}
-        .module .data-table td.danger {{
+        .pdf-risk-table td.danger {{
             color: #DC2626;
-            font-weight: 600;
+            font-weight: 700;
+        }}
+        @media print {{
+            .pdf-section {{ break-inside: avoid; }}
+            .pdf-module {{ break-inside: avoid; page-break-inside: avoid; }}
         }}
 
         /* Footer */
@@ -2673,7 +2759,9 @@ async def get_dashboard_overview_pdf(
     {pdf_header_html}
     {pdf_exec_summary_html}
     {pdf_insights_html}
-    {sections_html}
+</div>
+{sections_html}
+<div class="container">
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>
 </body>
