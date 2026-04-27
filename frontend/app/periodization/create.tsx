@@ -544,7 +544,7 @@ function CreatePeriodizationContent() {
 
   return (
     <LinearGradient
-      colors={[colors.dark.background, colors.dark.secondary]}
+      colors={[colors.dark.primary, colors.dark.secondary]}
       style={styles.container}
     >
       {/* CORREÇÃO 3: Header com SafeAreaView e padding adequado para visibilidade do botão */}
@@ -815,7 +815,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.dark.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },

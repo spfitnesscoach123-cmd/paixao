@@ -498,7 +498,7 @@ function PeriodizationDetailContent() {
 
   if (weekLoading || calculationsLoading) {
     return (
-      <LinearGradient colors={[colors.dark.background, colors.dark.secondary]} style={styles.container}>
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.accent.primary} />
         </View>
@@ -508,7 +508,7 @@ function PeriodizationDetailContent() {
 
   if (!week) {
     return (
-      <LinearGradient colors={[colors.dark.background, colors.dark.secondary]} style={styles.container}>
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
             {locale === 'pt' ? 'Semana não encontrada' : 'Week not found'}
@@ -520,7 +520,7 @@ function PeriodizationDetailContent() {
 
   return (
     <LinearGradient
-      colors={[colors.dark.background, colors.dark.secondary]}
+      colors={[colors.dark.primary, colors.dark.secondary]}
       style={styles.container}
     >
       {/* Header */}
@@ -770,10 +770,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'flex-start',
     padding: 12,
     marginBottom: 10,
-    backgroundColor: 'rgba(47, 182, 255, 0.08)',
+    backgroundColor: 'rgba(47, 182, 255, 0.16)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: 'rgba(47, 182, 255, 0.45)',
   },
   peakBannerTitle: {
     fontSize: 13,

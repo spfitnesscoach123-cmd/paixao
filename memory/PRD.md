@@ -152,7 +152,14 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - (P1) Smart Summary empty-state crash guards (RadarChart/GaugeChart/DonutChart) em `app/(tabs)/data.tsx`.
 - (P1) Data Import via PDF (converter PDF para CSV internamente).
 - (P1) Export App Data to CSV.
+- (P1) **Backend bug confirmado**: `routes/scientific/routes.py` lê `g.get("sprint_count")` (campo inexistente) em 3 lugares (linhas 126, 142, 945) — o correto é `number_of_sprints`. Causa do card "Sprints/Sessão" sempre zerado na aba Análises. NÃO corrigido nesta sessão por ordem explícita do usuário ("NÃO modificar backend").
 - (P2) Jump Camera — rejeição de gaps de timestamp grandes durante voo (feet-out-of-frame) com rejection logic + Debug Modal já entregue.
 - (P2) Linkar Body Scan (MediaPipe) ao modelo 3D.
 - (P3) Refatorar MediaPipe pipeline para JSI worklets.
 - (P3) Cleanup `app/athlete/[id]/vbt.tsx` (dead code) + V1 `services/vbt/RepDetector.ts`.
+
+## UI/UX Fine-tuning (Fev 2026)
+- Periodização: `colors.dark.background` (inexistente → undefined) substituído por `colors.dark.primary` em `app/periodization/[id].tsx` (3 locais) e `app/periodization/create.tsx` (2 locais). Corrige gradiente de fundo e botão `multiplierAdjust` que ficavam com fundo undefined.
+- Periodização: banner "Base não disponível" teve contraste reforçado (bg 0.08→0.16, border 0.25→0.45) para legibilidade em Dark Mode.
+- Dashboard Equipe: no modal de detalhe do `StackedBarChart`, valor "TD" deixou de usar `ZONE_COLORS.base` (#1B4C80, quase invisível no cartão escuro) e passou a usar `colors.text.primary` (contrast-safe em dark e light).
+- Wellness Gauge: `containerHeight` do `QTRGauge.tsx` corrigido de `size * 0.85` para `size` (já aplicado em iteração anterior) — elimina recorte inferior do arco SVG.
