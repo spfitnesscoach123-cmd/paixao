@@ -7,7 +7,7 @@ import pytest
 import requests
 import os
 
-BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://ios-native-audit.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('EXPO_PUBLIC_BACKEND_URL', 'https://athlete-binding.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

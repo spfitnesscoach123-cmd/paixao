@@ -22,7 +22,7 @@ import os
 BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/')
 if not BASE_URL:
     # Fallback for local development
-    BASE_URL = "https://ios-native-audit.preview.emergentagent.com"
+    BASE_URL = "https://athlete-binding.preview.emergentagent.com"
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

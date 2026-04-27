@@ -1,132 +1,142 @@
 <analysis>**original_problem_statement**: 
-The user requested a massive, multi-phase UX/UI overhaul, deep technical audits, and bug-fixing sessions across the frontend application. Initial requirements included fixing EAS build errors, updating logos, and fixing native iOS crashes. In this session, the focus shifted entirely to advanced forensic audits and surgical fixes for native iOS  crashes (Language Switch & Team Dashboard), fixing an off-by-one rep counting bug in the VBT (Velocity Based Training) system, and hardening the Jump Camera (CMJ) pipeline with hysteresis, flight-time ceilings, and new analytical UI components.
-
-**PRODUCT REQUIREMENTS**: 
-- Eliminate all native  crashes caused by React rendering cascades colliding with iOS native view teardowns.
-- Fix the VBT rep counter to register reps at the lockout (plateau) without waiting for the next repetition's descent, without breaking historical data or Olympic lifts.
-- Add orientation hysteresis and sanity ceilings to the Jump Camera.
-- Add additive, non-destructive analytical UI to the Jump Camera results screen (Timeline Graph & Debug Modal).
+The user requested a strict, logic-preserving UI/UX tuning session for 4 specific issues across the frontend application: 
+1) Periodization (Dark Mode): Fix contrast on the banner above Recalcular Base and across the 4 setup steps.
+2) Team Dashboard (StackedBarChart): Fix text contrast for Total Distance in the modal in Dark Mode.
+3) Athlete Profile (Sprints card): Data binding is always showing 0. Needs to map correctly to the existing backend payload.
+4) Athlete Profile (Wellness): Gauge component is cut off (overflow).
+**PRODUCT REQUIREMENTS**: Fix these 4 visual/rendering issues with **ABSOLUTELY NO** changes to business logic, data pipelines, backend calculations, or other structures. 
 
 **User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in **Portuguese** only)
 
 **what currently exists?** 
-A React Native Expo app + FastAPI backend + MongoDB. The app is highly stable against native crashes. The Language Switch is locked against concurrency. The Team Dashboard date filter uses React Query  to prevent SVG unmounting crashes. The VBT  accurately counts reps using a dual-signal plateau trigger (velocity + displacement stagnation). The Jump Camera features lateral orientation hysteresis, a strict 1200ms flight time limit to reject absurd values, a new visual Timeline Graph for jump phases, and a highly detailed Debug Overlay Modal for analyzing dropped frames.
+A React Native Expo app + FastAPI backend + MongoDB. The Dashboard PDF Export and Smart Summary guard have been completed. Currently, the app has minor UI/UX rendering bugs (Dark Mode contrast in Periodization/Charts, Sprints data binding showing 0, Wellness Gauge overflow). The previous agent started surgical CSS/binding fixes, successfully patching the Wellness Gauge overflow and partially replacing invalid theme colors () in the Periodization screens.
 
 **Last working item**: 
-    - Last item agent was working: Implementing the  and  additively to the Jump Camera results screen without touching existing UI elements or calculations.
-    - Status: USER VERIFICATION PENDING
-    - Agent Testing Done: Y (TypeScript compilation and structural validation)
-    - Which testing method agent to use?: Frontend testing agent / Screenshot tool (Note: Camera/MediaPipe features require physical device testing via EAS/TestFlight by the user).
+    - Last item agent was working: Applying the 4 targeted UI/UX fixes requested by the user. The Wellness Gauge overflow was fixed by adjusting container height. Invalid  keys were replaced with  in Periodization components to fix dark mode crashes/contrast. 
+    - Status: IN PROGRESS
+    - Agent Testing Done: N (Attempted screenshot tool, but the tool encountered an internal python error. Syntax was checked via ).
+    - Which testing method agent to use?: screenshot tool (for UI contrast validation) and curl/python -c (to verify Sprints data payload keys).
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:  
-None currently blocking.
+  - Issue 1: Sprints metric data binding always showing 0 (P0)
+     - Attempted fixes: The agent analyzed the types, API routes, and CSV parser. Found potential mismatch between  and  in the frontend/backend payload mapping. No actual code fix was applied yet.
+     - Next debug checklist: Check  and the endpoint payload (). See if the data array contains  or  and bind the frontend variable correctly. *DO NOT alter the backend or logic.*
+     - Why fix this issue and what will be achieved with the fix?: Ensures valid data is displayed to the coach.
+     - Status: IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
+     - Blocked on other issue: None
+
+  - Issue 2: StackedBarChart Dark Mode Contrast (P0)
+     - Attempted fixes: None yet.
+     - Next debug checklist: . Ensure modal text (e.g., Total Distance) uses the correct theme color (like  or ) in Dark Mode instead of hardcoded dark text.
+     - Why fix this issue and what will be achieved with the fix?: Usability in Dark Mode.
+     - Status: NOT STARTED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
+     - Blocked on other issue: None
+
+  - Issue 3: Periodization Dark Mode Contrast (P0)
+     - Attempted fixes: Replaced invalid  with  in  and . 
+     - Next debug checklist: Validate if the banner above Recalcular Base () and the 4 setup steps (, , ) are now fully legible in Dark Mode. Apply overlays or text color tweaks if necessary without altering logic.
+     - Why fix this issue and what will be achieved with the fix?: Usability in Dark Mode.
+     - Status: USER VERIFICATION PENDING / IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
+     - Blocked on other issue: None
 
 **In progress Task List**: 
-None currently.
+None
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P1) Harden Jump Camera against feet out of frame dropouts (User requested the Debug UI specifically to visualize this before implementing the actual rejection logic).
-    Future Tasks:
+    - (P1) Implement structural empty-state guard for  to prevent potential native SVG crashes when ACWR is null.
     - (P1) Data Import via PDF (Convert PDF to CSV internally).
     - (P1) Export App Data to CSV.
+    - (P2) Optimize PDF Export Logo: Resize  (currently ~285KB) to ~64px height to reduce the base64 string payload size in the PDF HTML.
+    Future Tasks:
     - (P2) Link Body Scan (MediaPipe) to the 3D model.
     - (P3) Refactor MediaPipe pipeline to use JSI worklets instead of JS bridge for performance.
     - (P3) Cleanup/Delete  (Confirmed dead code).
-    - (P3) Cleanup VBT V1 logic ( is still instantiated alongside V2 but its commits are largely bypassed).
 
 **Completed work in this session**
-- Language Switch Concurrency Fix: Added  to  to drop reentrant calls (DONE).
-- Team Dashboard Date Filter Crash Fix: Prevented SVG/FlashList unmount cascades by adding  and  to , and synced state changes with  (DONE).
-- VBT Pipeline Off-by-One Fix: Audited the entire VBT pipeline and proved  was waiting for rep N+1 to commit rep N. Added a strictly gated plateau trigger (400ms, dual-signal) to commit reps securely at lockout (DONE).
-- Jump Camera Hysteresis & Ceiling: Changed lateral orientation to use hysteresis (0.05 enter, 0.08 exit). Lowered  from 2000 to 1200 to block impossible jump heights (DONE).
-- Jump Camera Analytical UI: Created and integrated  and  additively to the results screen (DONE).
+- Wellness Gauge () overflow fix (adjusted container height from  to ) (DONE)
+- Replaced invalid  references in  and  to prevent theme crashes (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-   - Issue 1: Jump Camera Silent Failure on Feet Dropout
-     - Debug checklist: During flight, if the user's feet leave the camera frame, MediaPipe landmarks turn , causing the buffer to silently drop frames. This artificially inflates . 
-     - Why to solve this issue and what will be achieved with this?: Fixes super-estimated jump heights. The newly lowered 1200ms ceiling mitigates the worst of it, and the new Debug Modal makes it visible, but the detector still needs logic to reject jumps with massive timestamp gaps.
-     - Should Test frontend/backend/both after fix: Frontend (Physical Device / TestFlight).
-     - Is recurring issue? N
+   - Issue 1: Load Intelligence SVG Crash Risk
+   - Debug checklist:  inside .
+   - Why to solve this issue and what will be achieved with this?: Shares the same GaugeChart vulnerability as Smart Summary. If ACWR is null and GPS is missing, rendering  could cause  on iOS. Needs an empty-state guard ( equivalent).
+   - Should Test frontend/backend/both after fix: Frontend
+   - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
-  - Issue recurrence in previous fork: None
-  - Recurrence count: 0
-  - Status: RESOLVED
+  - Issue recurrence in previous fork: Native iOS SVG crashes () on degenerate paths / 0 values.
+  - Recurrence count: 3
+  - Status: PENDING FOR LOAD INTELLIGENCE
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-React Native Expo, iOS Native View Lifecycle ( prevention), React Query (), MediaPipe Pose (Biomechanics tracking, flight time physics , VBT displacement tracking), React Native SVG, Animated/Reanimated.
+React Native Expo, ThemeContext (Light/Dark mode), React Query.
 
 **key DB schema**
 Unchanged.
 
 **changes in tech stack**
-None.
+None
 
 **All files of reference** 
--  (Added )
--  (Added , )
--  (Added  pattern)
--  (Added  logic)
--  (Updated , added )
--  (Orientation logic updated for hysteresis)
--  (Hysteresis state, exposed )
--  (New file)
--  (New file)
--  (UI integration)
+-  (Fixed overflow)
+-  (Theme tokens updated)
+-  (Theme tokens updated)
+-  (Needs modal styling update)
+-  (Needs Sprints binding map fix)
 
 **Areas that need refactoring**: 
--  (Dead code to be deleted).
--  (V1 logic is running in parallel to V2 but is largely obsolete).
+- None right now. Stay strictly within the scope of the 4 UI bugs.
 
 **key api endpoints**
-Unchanged.
+-  (Used for finding the exact key for Sprints:  vs ).
 
 **Critical Info for New Agent** 
 - **LANGUAGE REQUIREMENT:** You MUST reply exclusively in **Portuguese**.
-- **EAS Build & Git Workflow:** The user tests via TestFlight. Any changes to native modules, MediaPipe, or complex UI require the user to Save to Github before running an EAS iOS Build. 
-- **Do not modify the Math/Physics:** The VBT and Jump Camera pipelines use complex, highly-audited physics and state machines. Do NOT alter thresholds, smoothing windows, or core logic unless explicitly instructed by the user after a forensic audit.
-- **Additive UI Only:** When adding features to complex screens like , strictly follow the user's mandate to make changes additively (do not replace/refactor existing layouts or buttons).
+- **CURRENT TASK SCOPE:** You are finishing 4 specific UI/UX bugs. The user explicitly stated: **DO NOT change business logic. DO NOT alter pipelines. DO NOT change backend data**. Only fix CSS, frontend bindings, and layout container constraints.
+- **Sprints Bug Hint**: Look closely at how the frontend processes  vs  in . The data is there, just mapped incorrectly.
 
 **documents and test reports created in this job** 
-None.
+- None in this specific run.
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Requests a read-only audit of a crash occurring when rapidly switching languages.
-- **Agent**: Audits and finds concurrent  calls causing massive, overlapping native view teardowns.
-- **User**: Requests a read-only audit of a crash on the Team Dashboard when changing dates.
-- **Agent**: Finds SVG charts and FlashLists unmounting concurrently via  branches, colliding with Modal teardowns.
-- **User**: Authorizes strict, minimal structural fixes for both crashes.
-- **Agent**: Implements , RQ , and  patterns.
-- **User**: Requests a read-only audit of the VBT pipeline losing exactly 1 rep (empirically proven: 1 physical rep = 0 counted).
-- **Agent**: Audits and proves an off-by-one error:  waits for the next rep to start before committing the current one. Proposes a plateau trigger fix.
-- **User**: Authorizes plateau trigger fix with 6 strict mandatory invariants (must use dual-signal, 400ms delay, etc.).
-- **Agent**: Implements the VBT fix perfectly within boundaries.
-- **User**: Requests read-only audits on Jump Camera (CMJ) regarding side-view restrictions and feet dropping out of frame risks.
-- **Agent**: Audits and proves side-view can use hysteresis, and confirms feet dropping out is a real, silent failure risk that inflates flight time.
-- **User**: Authorizes adding hysteresis to side-view, lowering max flight time to 1200ms, and adding a new Graph and Debug Modal to visualize jump data.
-- **Agent**: Implements all requested Jump Camera logic and UI components additively. Finished.
+- **User**: Imposes absolute rule: STRICT UI/UX FIXES ONLY. Lists 4 issues: Periodization Dark Mode, StackedBarChart Dark Mode, Sprints binding (shows 0), Wellness Gauge cut off. Warns not to touch business logic.
+- **Agent**: Analyzes the issues. Modifies  to fix overflow. Audits Sprints data payload. Fixes  undefined theme keys in  screens. Finishes job stating it was partially delivered and suggests checking the remaining dark mode texts and the Sprints binding. 
 
 **Project Health Check:**
-- Broken: None.
+- Broken: Sprints metric binding, StackedBarChart Dark Mode text.
 - Mocked: None.
 
 **3rd Party Integrations** 
-- i18n-js (Language switching)
+- None affected here.
 
 **Testing status**
-  - Testing agent used after significant changes: NO (Changes involved physical device hardware like Camera/MediaPipe and native iOS View lifecycles, which strictly require physical iPhone testing via EAS by the user).
-  - Troubleshoot agent used after agent stuck in loop: NO.
-  - Test files created: None.
-  - Known regressions: None.
+  - Testing agent used after significant changes: NO 
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None
+  - Known regressions: None introduced.
 
 **Credentials to test flow:**
 User: 
 Password: 
 
 **What agent forgot to execute**
-Everything was completed successfully and strictly according to the user's highly detailed instructions.</analysis>
+The agent did not fix the Sprints data binding in  and did not fix the Dark Mode text contrast in .
+
+**Debugging checklist for current issue**
+    Issue: Complete the UI/UX Fixes
+
+    Frontend files to check: 
+    - : Inspect why  evaluates to 0. The endpoint  may return  instead of  (or vice-versa). Map the property properly in the  logic.
+    - : Update tooltip/modal text colors to respect  or  based on the theme.
+    -  & : Verify the banner texts and step descriptions have good contrast (apply minimum WCAG).</analysis>
