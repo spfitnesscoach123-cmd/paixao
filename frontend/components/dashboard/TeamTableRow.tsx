@@ -122,12 +122,12 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
         )}
       </View>
 
-      {/* COL 7: PRONTIDÃO — Wellness-derived (unchanged value, renamed semantically) */}
+      {/* COL 7: PRONTIDÃO — derived from wellness.readiness_score (0-100%) */}
       <View style={styles.colFatigue}>
-        <Text style={[styles.fatigueValue, { color: STATUS_COLORS[row.fatigue_status] || colors.text.tertiary }]}>
-          {row.fatigue_index != null ? `${row.fatigue_index.toFixed(0)}%` : '-'}
+        <Text style={[styles.fatigueValue, { color: STATUS_COLORS[row.readiness_status] || colors.text.tertiary }]}>
+          {row.readiness_score != null ? `${row.readiness_score.toFixed(0)}%` : '-'}
         </Text>
-        <FatigueBar value={row.fatigue_index} status={row.fatigue_status} />
+        <FatigueBar value={row.readiness_score} status={row.readiness_status} />
       </View>
 
       {/* COL 8: FADIGA — CMJ-based Neuromuscular Fatigue Index (READ-ONLY derivation) */}

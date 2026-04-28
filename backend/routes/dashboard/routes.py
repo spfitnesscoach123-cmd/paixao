@@ -749,6 +749,7 @@ class TeamTableRow(BaseModel):
     fatigue_index: Optional[float] = None
     fatigue_baseline_28d: Optional[float] = None
     fatigue_status: str = "UNKNOWN"
+    readiness_score: Optional[float] = None  # 0-100% derived from wellness.readiness_score
     readiness_status: str = "UNKNOWN"
     weight: Optional[float] = None
     body_fat: Optional[float] = None
@@ -941,6 +942,7 @@ async def get_team_table(
         fatigue_baseline_val = None
         fatigue_st = "UNKNOWN"
         readiness_st = "UNKNOWN"
+        readiness_pct = None
         
         w_list = wellness_by_athlete.get(aid, [])
         if w_list:
@@ -958,6 +960,7 @@ async def get_team_table(
             readiness_raw = latest_w.get("readiness_score")
             if readiness_raw is not None:
                 r_pct = float(readiness_raw) * 10
+                readiness_pct = round(r_pct, 1)
                 if r_pct >= 70:
                     readiness_st = "READY"
                 elif r_pct >= 40:
@@ -997,6 +1000,7 @@ async def get_team_table(
             fatigue_index=fatigue_idx,
             fatigue_baseline_28d=fatigue_baseline_val,
             fatigue_status=fatigue_st,
+            readiness_score=readiness_pct,
             readiness_status=readiness_st,
             weight=weight_val,
             body_fat=bf_val,

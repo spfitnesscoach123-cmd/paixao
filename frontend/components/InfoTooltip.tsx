@@ -8,6 +8,7 @@ import {
   View,
   ScrollView,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
@@ -42,8 +43,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   style,
 }) => {
   const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const [visible, setVisible] = useState(false);
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const styles = useMemo(() => createStyles(colors, windowHeight), [colors, windowHeight]);
 
   const open = () => setVisible(true);
   const close = () => setVisible(false);
@@ -128,7 +130,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: any, windowHeight: number) =>
   StyleSheet.create({
     iconBtn: {
       // Área de toque mínima para acessibilidade (44x44)
@@ -149,7 +151,7 @@ const createStyles = (colors: any) =>
     card: {
       width: '100%',
       maxWidth: 460,
-      maxHeight: '80%',
+      maxHeight: Math.round(windowHeight * 0.8),
       flexDirection: 'column',
       overflow: 'hidden',
       backgroundColor: colors.dark.cardSolid || colors.dark.secondary,
