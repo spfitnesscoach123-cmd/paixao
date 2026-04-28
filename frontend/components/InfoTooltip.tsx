@@ -108,7 +108,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({
             <ScrollView
               style={styles.scrollArea}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
             >
               <Text style={styles.body}>{content}</Text>
             </ScrollView>
@@ -186,9 +186,10 @@ const createStyles = (colors: any) =>
     },
     scrollArea: {
       maxHeight: 360,
+      flexShrink: 1,
     },
     scrollContent: {
-      paddingBottom: 8,
+      paddingBottom: 24,
     },
     body: {
       fontSize: 14,
