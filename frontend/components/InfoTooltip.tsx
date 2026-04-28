@@ -151,7 +151,7 @@ const createStyles = (colors: any, windowHeight: number) =>
     card: {
       width: '100%',
       maxWidth: 460,
-      maxHeight: Math.round(windowHeight * 0.8),
+      height: Math.round(windowHeight * 0.8),
       flexDirection: 'column',
       overflow: 'hidden',
       backgroundColor: colors.dark.cardSolid || colors.dark.secondary,
