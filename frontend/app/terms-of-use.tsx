@@ -164,10 +164,14 @@ export default function TermsOfUse() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>13. Contato</Text>
-            <Text style={styles.sectionText}>
-              Para questões sobre estes Termos de Uso:{'\n\n'}
-              E-mail: legal@loadmanager.app{'\n'}
-              Endereço: [Endereço da empresa]
+            <Text style={styles.sectionText} selectable>
+              Para dúvidas sobre estes Termos de Uso, entre em contato com a LoadManager Pro:{'\n\n'}
+              <Text style={styles.bold}>E-mail:</Text> contato@loadmanagerpro.com.br{'\n'}
+              <Text style={styles.bold}>Endereço:</Text>{'\n'}
+              LoadManager Pro{'\n'}
+              Ouro Fino – MG{'\n'}
+              CEP 37570-000{'\n'}
+              Brasil
             </Text>
           </View>
         </ScrollView>
