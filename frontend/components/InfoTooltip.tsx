@@ -150,6 +150,8 @@ const createStyles = (colors: any) =>
       width: '100%',
       maxWidth: 460,
       maxHeight: '80%',
+      flexDirection: 'column',
+      overflow: 'hidden',
       backgroundColor: colors.dark.cardSolid || colors.dark.secondary,
       borderRadius: 16,
       borderWidth: 1,
@@ -174,6 +176,7 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       gap: 10,
       marginBottom: 12,
+      flexShrink: 0,
     },
     title: {
       flex: 1,
@@ -185,7 +188,7 @@ const createStyles = (colors: any) =>
       padding: 4,
     },
     scrollArea: {
-      maxHeight: 360,
+      flex: 1,
       flexShrink: 1,
     },
     scrollContent: {
@@ -202,6 +205,7 @@ const createStyles = (colors: any) =>
       borderRadius: 10,
       paddingVertical: 12,
       alignItems: 'center',
+      flexShrink: 0,
     },
     okBtnText: {
       color: '#ffffff',
