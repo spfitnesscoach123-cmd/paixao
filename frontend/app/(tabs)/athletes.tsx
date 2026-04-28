@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Image,
   ScrollView,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -33,6 +35,18 @@ export default function AthletesScreen() {
   const session = useSession();
   const [refreshing, setRefreshing] = useState(false);
   const [hubView, setHubView] = useState<HubView>('hub');
+
+  // ====== EMPTY-STATE PULSE ANIMATION (CSV button highlight on first access) ======
+  const csvPulse = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [pulseStopped, setPulseStopped] = useState(false);
+
+  const stopPulse = () => {
+    if (pulseStopped) return;
+    setPulseStopped(true);
+    pulseLoopRef.current?.stop();
+    Animated.timing(csvPulse, { toValue: 1, duration: 150, useNativeDriver: true }).start();
+  };
 
   // ====== MULTI-SELECT STATE (long press → batch delete) ======
   const [selectionMode, setSelectionMode] = useState(false);
@@ -145,6 +159,123 @@ export default function AthletesScreen() {
   };
 
   const styles = createStyles(colors);
+
+  const isEmptyState = !isLoading && Array.isArray(athletes) && athletes.length === 0;
+
+  // Trigger pulse animation only when empty state is visible (first access)
+  useEffect(() => {
+    if (hubView !== 'hub' || !isEmptyState || pulseStopped) return;
+    const seq = Animated.sequence([
+      Animated.timing(csvPulse, { toValue: 1.05, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+      Animated.timing(csvPulse, { toValue: 1.0, duration: 600, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+    ]);
+    const loop = Animated.loop(seq, { iterations: 2 });
+    pulseLoopRef.current = loop;
+    loop.start();
+    return () => loop.stop();
+  }, [hubView, isEmptyState, pulseStopped, csvPulse]);
+
+  // ====== EMPTY STATE (No athletes - CSV entry point) ======
+  if (hubView === 'hub' && isEmptyState) {
+    return (
+      <View style={styles.container}>
+        <ScrollView
+          contentContainerStyle={[styles.hubContent, { paddingTop: insets.top + 16 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.accent.primary}
+            />
+          }
+        >
+          <FadeInView delay={50}>
+            <View style={styles.emptyHero}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="cloud-upload-outline" size={56} color={colors.accent.primary} />
+              </View>
+              <Text style={styles.emptyGuide} data-testid="empty-state-guide">
+                {locale === 'pt' ? 'Comece por aqui' : 'Start here'}
+              </Text>
+              <Text style={styles.emptyTitle} data-testid="empty-state-title">
+                {locale === 'pt' ? 'Nenhum atleta cadastrado' : 'No athletes registered'}
+              </Text>
+              <Text style={styles.emptyDescription}>
+                {locale === 'pt'
+                  ? 'Importe um CSV de dados GPS (ex: Catapult, Playertek) para criar atletas automaticamente'
+                  : 'Import a GPS data CSV (e.g. Catapult, Playertek) to create athletes automatically'}
+              </Text>
+            </View>
+          </FadeInView>
+
+          <Animated.View style={{ transform: [{ scale: csvPulse }] }}>
+            <TouchableOpacity
+              style={styles.csvImportButton}
+              onPress={() => {
+                stopPulse();
+                router.push('/upload-csv' as any);
+              }}
+              activeOpacity={0.85}
+              data-testid="empty-state-csv-import-button"
+            >
+              <LinearGradient
+                colors={colors.gradients.primary}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.csvImportGradient}
+              >
+                <Ionicons name="cloud-upload" size={24} color="#ffffff" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.csvImportTitle}>
+                    {locale === 'pt' ? 'Importar CSV - GPS' : 'CSV Import - GPS'}
+                  </Text>
+                  <Text style={styles.csvImportSubtitle}>
+                    {locale === 'pt' ? 'GPS, Sprint, Aceleração' : 'GPS, Sprint, Acceleration'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
+
+          <Text style={styles.emptyOrText}>
+            {locale === 'pt' ? 'ou' : 'or'}
+          </Text>
+
+          <TouchableOpacity
+            style={styles.emptyManualBtn}
+            onPress={() => {
+              stopPulse();
+              router.push('/add-athlete' as any);
+            }}
+            activeOpacity={0.8}
+            data-testid="empty-state-add-manual-btn"
+          >
+            <Ionicons name="add" size={18} color={colors.accent.primary} />
+            <Text style={styles.emptyManualBtnText}>
+              {locale === 'pt' ? 'Cadastrar atleta manualmente' : 'Add athlete manually'}
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* Secondary FAB (+) - manual athlete creation, preserved from athletes list */}
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => {
+            stopPulse();
+            router.push('/add-athlete' as any);
+          }}
+          activeOpacity={0.8}
+          data-testid="empty-state-add-athlete-fab"
+        >
+          <LinearGradient colors={colors.gradients.primary} style={styles.fabGradient}>
+            <Ionicons name="add" size={32} color="#ffffff" />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   // ====== HUB MAIN VIEW ======
   if (hubView === 'hub') {
@@ -660,6 +791,115 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     marginBottom: 24,
+  },
+  // ===== Empty state (CSV entry point) =====
+  emptyHero: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    marginBottom: 8,
+  },
+  emptyIconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(47, 182, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(47, 182, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  emptyGuide: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+    color: colors.accent.primary,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  emptyDescription: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  // CSV import button (visual copy of team.tsx)
+  csvImportButton: {
+    marginTop: 8,
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: colors.accent.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 6,
+  },
+  csvImportGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  csvImportTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  csvImportSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.8)',
+    marginTop: 2,
+  },
+  emptySecondaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    marginTop: 4,
+  },
+  emptySecondaryActionText: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+  emptyOrText: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: colors.text.tertiary,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  emptyManualBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(47, 182, 255, 0.3)',
+    backgroundColor: 'rgba(47, 182, 255, 0.06)',
+    alignSelf: 'center',
+  },
+  emptyManualBtnText: {
+    fontSize: 13,
+    color: colors.accent.primary,
+    fontWeight: '600',
   },
   hubCard: {
     marginBottom: 14,

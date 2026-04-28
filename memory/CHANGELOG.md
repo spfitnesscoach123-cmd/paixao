@@ -1,6 +1,17 @@
 # CHANGELOG
 
 
+## 2026-04-28 (P1) — Empty State CSV Entry Point (Athletes Hub)
+- **Scope**: Adicionar botão de entrada CSV na tela "Atletas" quando não há atletas cadastrados. Estado vazio passa a guiar o usuário para importação via CSV (Catapult, Playertek), reutilizando 100% do pipeline existente. Sem alterar lógica de ingestão, parsing, validação, criação de atletas ou Dashboard.
+- **File modificado**: `frontend/app/(tabs)/athletes.tsx`
+  - Novo render condicional `hubView === 'hub' && isEmptyState` (renderiza ANTES do Hub padrão).
+  - Botão CSV é cópia visual exata do botão `csv-import-button` de `app/(tabs)/team.tsx` (mesmo gradient, padding, ícone `cloud-upload`, título "Importar CSV - GPS", subtítulo "GPS, Sprint, Aceleração"). Reusa o mesmo `router.push('/upload-csv')` — sem nova rota, sem nova lógica, sem nova função.
+  - **Highlight de primeiro acesso**: `Animated.loop` com `iterations: 2`, escala 1.0 → 1.05 → 1.0 (600ms cada), `Easing.inOut(Easing.ease)`. Para automaticamente após 2 ciclos OU ao primeiro toque (`stopPulse()` — stateful via `pulseStopped`).
+  - **Ação secundária preservada**: FAB `(+)` no canto inferior direito + link inline "Cadastrar atleta manualmente" → ambos abrem `/add-athlete` (handler existente).
+  - **Transição de estado**: assim que pelo menos 1 atleta é criado (via CSV ou manual), o React Query invalida e a tela renderiza automaticamente o Hub padrão (Atletas / VBT / Avaliações). Nenhuma duplicação de código.
+- **data-testid novos**: `empty-state-guide`, `empty-state-title`, `empty-state-csv-import-button`, `empty-state-add-manual-btn`, `empty-state-add-athlete-fab`.
+- **Verification**: ESLint OK, Metro bundle compilado em 7.7s, backend logs confirmam `GET /api/athletes` 200. Smoke test login bem-sucedido.
+
 ## 2026-04-28 (P2) — Tooltips por Módulo (VBT / Jump / Body Composition) + Remoção do Station Mode no Body Composition
 - **Scope**: Adicionar tooltips explicativos nos 3 módulos funcionais (VBT, Jump, Body Composition) e remover o botão "Station Mode" do card de Body Composition no Hub de Avaliações Físicas. Sem alterar lógica, fluxos, cálculos ou captura de dados.
 - **Tooltips adicionados** (todos com `data-testid` único, ícone (i) ao lado do título principal, conteúdo PT/EN, abre `Modal` com scroll interno e fecha por OK/X/backdrop):

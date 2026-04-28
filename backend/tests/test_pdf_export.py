@@ -17,7 +17,7 @@ import requests
 import os
 import re
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://export-rebuild.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tooltip-uifix.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

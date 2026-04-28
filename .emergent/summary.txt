@@ -1,47 +1,44 @@
 <analysis>**original_problem_statement**: 
-The user requested a strict, logic-preserving UI/UX tuning session for 4 specific issues across the frontend application: 
-1) Periodization (Dark Mode): Fix contrast on the banner above Recalcular Base and across the 4 setup steps.
-2) Team Dashboard (StackedBarChart): Fix text contrast for Total Distance in the modal in Dark Mode.
-3) Athlete Profile (Sprints card): Data binding is always showing 0. Needs to map correctly to the existing backend payload.
-4) Athlete Profile (Wellness): Gauge component is cut off (overflow).
-**PRODUCT REQUIREMENTS**: Fix these 4 visual/rendering issues with **ABSOLUTELY NO** changes to business logic, data pipelines, backend calculations, or other structures. 
+The app needed several critical updates spanning two main areas:
+1. **Original Pending UI/UX Fixes**: Sprints metric binding showing 0, StackedBarChart Dark Mode contrast, and Periodization Dark Mode contrast.
+2. **Apple Review & UX Improvements (Added this session)**: Addition of physical address/email to the Privacy Policy, fixing the iOS Safe Area for the Back button on the Register screen, adding comprehensive informational tooltips (using a new  component) across Periodization, VBT, Jump, and Body Composition modules, and removing the Station Mode button specifically from the Body Composition card.
 
-**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in **Portuguese** only)
+**User's preferred language**: Portuguese (You MUST automatically detect the user's primary language from their messages inside the <trajectory> tag and INSTRUCT next agent to respond in **Portuguese** only).
 
 **what currently exists?** 
-A React Native Expo app + FastAPI backend + MongoDB. The Dashboard PDF Export and Smart Summary guard have been completed. Currently, the app has minor UI/UX rendering bugs (Dark Mode contrast in Periodization/Charts, Sprints data binding showing 0, Wellness Gauge overflow). The previous agent started surgical CSS/binding fixes, successfully patching the Wellness Gauge overflow and partially replacing invalid theme colors () in the Periodization screens.
+A React Native Expo app + FastAPI backend + MongoDB. In this session, the frontend received a major UX upgrade with informational tooltips added to multiple modules (Periodization, VBT, Jump Test, Body Scan). Critical Apple App Store review blockers (Privacy Policy data and Register screen Safe Area bounds) were also resolved. The original UI/UX bugs (Sprints binding and Dark Mode contrast) were inadvertently skipped by the previous agent and are still pending in the codebase.
 
 **Last working item**: 
-    - Last item agent was working: Applying the 4 targeted UI/UX fixes requested by the user. The Wellness Gauge overflow was fixed by adjusting container height. Invalid  keys were replaced with  in Periodization components to fix dark mode crashes/contrast. 
-    - Status: IN PROGRESS
-    - Agent Testing Done: N (Attempted screenshot tool, but the tool encountered an internal python error. Syntax was checked via ).
-    - Which testing method agent to use?: screenshot tool (for UI contrast validation) and curl/python -c (to verify Sprints data payload keys).
+    - Last item agent was working: Phase 2 Tooltips implementation. Adding instructional tooltips to VBT (), Jump Test (), and Body Composition () screens, and removing the Station Mode button from the Body Scan card in the athletes hub.
+    - Status: USER VERIFICATION PENDING
+    - Agent Testing Done: Y 
+    - Which testing method agent to use?: Screenshot tool 
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:  
   - Issue 1: Sprints metric data binding always showing 0 (P0)
-     - Attempted fixes: The agent analyzed the types, API routes, and CSV parser. Found potential mismatch between  and  in the frontend/backend payload mapping. No actual code fix was applied yet.
-     - Next debug checklist: Check  and the endpoint payload (). See if the data array contains  or  and bind the frontend variable correctly. *DO NOT alter the backend or logic.*
-     - Why fix this issue and what will be achieved with the fix?: Ensures valid data is displayed to the coach.
-     - Status: IN PROGRESS
+     - Attempted fixes: The previous agent audited the backend payload and frontend mapping, finding a potential mismatch between  and . No code was changed yet.
+     - Next debug checklist: Check  and the endpoint payload. Map  vs  correctly in the  logic. *DO NOT alter the backend or logic.*
+     - Why fix this issue and what will be achieved with the fix?: Ensures valid sprint data is accurately displayed to the coach.
+     - Status: NOT STARTED (Agent forgot to execute this task)
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
      - Blocked on other issue: None
 
   - Issue 2: StackedBarChart Dark Mode Contrast (P0)
-     - Attempted fixes: None yet.
+     - Attempted fixes: None.
      - Next debug checklist: . Ensure modal text (e.g., Total Distance) uses the correct theme color (like  or ) in Dark Mode instead of hardcoded dark text.
-     - Why fix this issue and what will be achieved with the fix?: Usability in Dark Mode.
-     - Status: NOT STARTED
+     - Why fix this issue and what will be achieved with the fix?: Accessibility and usability in Dark Mode.
+     - Status: NOT STARTED (Agent forgot to execute this task)
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
      - Blocked on other issue: None
 
   - Issue 3: Periodization Dark Mode Contrast (P0)
-     - Attempted fixes: Replaced invalid  with  in  and . 
-     - Next debug checklist: Validate if the banner above Recalcular Base () and the 4 setup steps (, , ) are now fully legible in Dark Mode. Apply overlays or text color tweaks if necessary without altering logic.
+     - Attempted fixes: Replaced invalid  with  in  and  during an older session. 
+     - Next debug checklist: Verify the banner texts and step descriptions have good contrast.
      - Why fix this issue and what will be achieved with the fix?: Usability in Dark Mode.
-     - Status: USER VERIFICATION PENDING / IN PROGRESS
+     - Status: USER VERIFICATION PENDING
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix?: Frontend (Screenshot tool)
      - Blocked on other issue: None
@@ -51,7 +48,7 @@ None
 
 **Upcoming and Future Tasks**
     Upcoming Tasks:
-    - (P1) Implement structural empty-state guard for  to prevent potential native SVG crashes when ACWR is null.
+    - (P1) Implement structural empty-state guard for  to prevent potential native SVG crashes when ACWR is null ( equivalent).
     - (P1) Data Import via PDF (Convert PDF to CSV internally).
     - (P1) Export App Data to CSV.
     - (P2) Optimize PDF Export Logo: Resize  (currently ~285KB) to ~64px height to reduce the base64 string payload size in the PDF HTML.
@@ -61,13 +58,17 @@ None
     - (P3) Cleanup/Delete  (Confirmed dead code).
 
 **Completed work in this session**
-- Wellness Gauge () overflow fix (adjusted container height from  to ) (DONE)
-- Replaced invalid  references in  and  to prevent theme crashes (DONE)
+- Updated  with email and physical address for Apple Review compliance (DONE)
+- Fixed iOS Safe Area overlap on the Back button in  (DONE)
+- Created reusable  component (DONE)
+- Implemented 6 distinct UX tooltips across the Periodization flow (, , ) (DONE)
+- Removed Station Mode button from Body Composition card in  (DONE)
+- Implemented UX tooltips for VBT (), Jump Assessment (), and Body Scan () (DONE)
 
 **Earlier issues found/mentioned but not fixed**
    - Issue 1: Load Intelligence SVG Crash Risk
    - Debug checklist:  inside .
-   - Why to solve this issue and what will be achieved with this?: Shares the same GaugeChart vulnerability as Smart Summary. If ACWR is null and GPS is missing, rendering  could cause  on iOS. Needs an empty-state guard ( equivalent).
+   - Why to solve this issue and what will be achieved with this?: Shares the same GaugeChart vulnerability as Smart Summary. If ACWR is null and GPS is missing, rendering  could cause  on iOS. Needs an empty-state guard.
    - Should Test frontend/backend/both after fix: Frontend
    - Is recurring issue? Y
 
@@ -80,63 +81,74 @@ None
 
 
 **Key Technical Concepts**
-React Native Expo, ThemeContext (Light/Dark mode), React Query.
+React Native Expo, Custom UI Components (Modals/Popovers), iOS Safe Area Context, Frontend Data Mapping.
 
 **key DB schema**
 Unchanged.
 
 **changes in tech stack**
-None
+None.
 
 **All files of reference** 
--  (Fixed overflow)
--  (Theme tokens updated)
--  (Theme tokens updated)
--  (Needs modal styling update)
--  (Needs Sprints binding map fix)
+-  (Created to standardize tooltips)
+-  (Updated to pass Apple Review)
+-  (Updated safe area)
+-  (Added tooltip)
+-  (Added tooltips)
+-  (Added tooltips)
+-  (Removed Station Mode for Body Comp)
+-  (Added tooltip)
+-  (Added tooltip)
+-  (Added tooltip)
+-  (Pending Sprint binding fix)
+-  (Pending Dark Mode fix)
 
 **Areas that need refactoring**: 
-- None right now. Stay strictly within the scope of the 4 UI bugs.
+-  has 6 legacy failures expecting old Smart Summary string structures (non-blocking).
 
 **key api endpoints**
 -  (Used for finding the exact key for Sprints:  vs ).
 
 **Critical Info for New Agent** 
 - **LANGUAGE REQUIREMENT:** You MUST reply exclusively in **Portuguese**.
-- **CURRENT TASK SCOPE:** You are finishing 4 specific UI/UX bugs. The user explicitly stated: **DO NOT change business logic. DO NOT alter pipelines. DO NOT change backend data**. Only fix CSS, frontend bindings, and layout container constraints.
-- **Sprints Bug Hint**: Look closely at how the frontend processes  vs  in . The data is there, just mapped incorrectly.
+- **CRITICAL OVERSIGHT:** In this session, the user provided new priority tasks (Apple Review fixes and Tooltips), which the agent completed successfully. However, the agent *completely forgot* to return to the original P0 bugs from the handoff summary (Sprints Binding showing 0, StackedBarChart Dark Mode). You MUST prioritize fixing  (Sprints bug) and  (Dark Mode bug) immediately.
+- The newly created  component is the standard for any future instructional UI overlays.
 
 **documents and test reports created in this job** 
-- None in this specific run.
+- 
+- 
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- **User**: Imposes absolute rule: STRICT UI/UX FIXES ONLY. Lists 4 issues: Periodization Dark Mode, StackedBarChart Dark Mode, Sprints binding (shows 0), Wellness Gauge cut off. Warns not to touch business logic.
-- **Agent**: Analyzes the issues. Modifies  to fix overflow. Audits Sprints data payload. Fixes  undefined theme keys in  screens. Finishes job stating it was partially delivered and suggests checking the remaining dark mode texts and the Sprints binding. 
+- **User**: Please use ask_human tool and confirm your plan now.
+- **Agent**: [Tool call: ask_human]
+- **User**: Provided P1 Apple Review Critical Fixes (Privacy Policy, Register Back Button) and implementation of 6 distinct Tooltips for Periodization.
+- **Agent**: Implemented all P1 requirements, tested via screenshots, and finished the task.
+- **User**: Provided P2 instructions to add Tooltips to VBT, Jump, and Body Composition modules, and requested the removal of the Station Mode button specifically from the Body Comp card.
+- **Agent**: Implemented P2 tooltips, removed the specific Station Mode button, tested via screenshots, and finished the task.
 
 **Project Health Check:**
-- Broken: Sprints metric binding, StackedBarChart Dark Mode text.
+- Broken: Sprints metric binding on frontend (still), StackedBarChart Dark Mode text (still). 6 Pytest legacy tests fail in PDF suite due to old string matches (non-blocking).
 - Mocked: None.
 
 **3rd Party Integrations** 
-- None affected here.
+- None utilized in this session.
 
 **Testing status**
-  - Testing agent used after significant changes: NO 
+  - Testing agent used after significant changes: NO
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: None
-  - Known regressions: None introduced.
+  - Known regressions: None introduced, but original UI bugs were ignored.
 
 **Credentials to test flow:**
 User: 
 Password: 
 
 **What agent forgot to execute**
-The agent did not fix the Sprints data binding in  and did not fix the Dark Mode text contrast in .
+The agent completely dropped the 3 Original UI/UX Fixes (Sprints data binding mapping showing 0, StackedBarChart Dark Mode text visibility, and Periodization Dark mode check) to address the new App Review and Tooltip tasks injected by the user. These original frontend bugs MUST be picked back up immediately.
 
 **Debugging checklist for current issue**
-    Issue: Complete the UI/UX Fixes
+    Issue: Complete the Original Missed UI/UX Fixes
 
     Frontend files to check: 
-    - : Inspect why  evaluates to 0. The endpoint  may return  instead of  (or vice-versa). Map the property properly in the  logic.
-    - : Update tooltip/modal text colors to respect  or  based on the theme.
-    -  & : Verify the banner texts and step descriptions have good contrast (apply minimum WCAG).</analysis>
+    - : Inspect why  or sprint numbers evaluate to 0. Ensure the property mapped in the  or data binding matches what the  endpoint actually returns ( vs ). Map the correct frontend key.
+    - : Update tooltip/modal text colors to respect  or  based on the theme so they are legible in Dark Mode.</analysis>
