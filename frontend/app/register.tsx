@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -74,17 +75,22 @@ export default function Register() {
         colors={[colors.dark.secondary, colors.dark.primary]}
         style={styles.background}
       >
+        <SafeAreaView edges={['top']} style={[styles.safeAreaTop, { pointerEvents: 'box-none' }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back') || 'Voltar'}
+            data-testid="register-back-button"
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
+          </TouchableOpacity>
+        </SafeAreaView>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
-          </TouchableOpacity>
-
           <View style={styles.header}>
             <View style={styles.iconGlow}>
               <LinearGradient
@@ -225,11 +231,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
+  safeAreaTop: {
+    backgroundColor: 'transparent',
+    zIndex: 10,
+  },
   backButton: {
-    position: 'absolute',
-    top: 16,
-    left: 0,
-    padding: 8,
+    marginTop: 16,
+    marginLeft: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(47, 182, 255, 0.10)',
   },
   header: {
     alignItems: 'center',

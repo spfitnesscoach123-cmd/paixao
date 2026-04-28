@@ -16,7 +16,7 @@ import os
 from datetime import datetime
 
 # Use the preview URL from environment
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://athlete-binding.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://export-rebuild.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"

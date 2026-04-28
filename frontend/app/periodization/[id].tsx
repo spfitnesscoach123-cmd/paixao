@@ -22,6 +22,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import InfoTooltip from '../../components/InfoTooltip';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -354,6 +355,15 @@ function PeriodizationDetailContent() {
             color={colors.accent.primary} 
           />
           <Text style={styles.sectionTitle}>{tableTitle}</Text>
+          <InfoTooltip
+            testID="tooltip-weekly-goals"
+            title={locale === 'pt' ? 'Metas Semanais' : 'Weekly Goals'}
+            content={
+              locale === 'pt'
+                ? "A tabela apresenta valores individuais calculados para cada métrica.\n\nAo selecionar um dia no topo da tela, os valores são atualizados automaticamente para refletir as metas definidas para esse dia específico.\n\nO botão de imprimir no canto superior direito permite exportar um PDF com os dados exibidos na tabela.\n\nNa aba 'Cards', é possível visualizar, para cada atleta, os valores base registrados (melhor desempenho em jogos) e compará-los com as metas definidas para a semana atual."
+                : "The table shows individual values calculated for each metric.\n\nWhen you select a day at the top of the screen, the values are automatically updated to reflect the targets defined for that specific day.\n\nThe print button in the upper-right corner exports a PDF with the data displayed in the table.\n\nIn the 'Cards' tab, you can view, for each athlete, the recorded base values (best in-game performance) and compare them with the targets defined for the current week."
+            }
+          />
           {selectedDay && (
             <TouchableOpacity 
               style={styles.clearSelectionButton}

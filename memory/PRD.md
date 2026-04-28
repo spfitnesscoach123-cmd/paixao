@@ -163,3 +163,10 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - Periodização: banner "Base não disponível" teve contraste reforçado (bg 0.08→0.16, border 0.25→0.45) para legibilidade em Dark Mode.
 - Dashboard Equipe: no modal de detalhe do `StackedBarChart`, valor "TD" deixou de usar `ZONE_COLORS.base` (#1B4C80, quase invisível no cartão escuro) e passou a usar `colors.text.primary` (contrast-safe em dark e light).
 - Wellness Gauge: `containerHeight` do `QTRGauge.tsx` corrigido de `size * 0.85` para `size` (já aplicado em iteração anterior) — elimina recorte inferior do arco SVG.
+
+## Apple Review + Tooltips (Abr 2026)
+- **Política de Privacidade** atualizada com email/endereço oficiais (`contato@loadmanagerpro.com.br`, Ouro Fino – MG, CEP 37570-000) — requisito Apple Review.
+- **Cadastro (Register)**: botão Voltar reposicionado dentro de `SafeAreaView` (edges=top), 44x44px com hitSlop, fora do `ScrollView`, fundo sutil para visibilidade — corrige "muito alto / difícil clicar" reportado em iPhone.
+- **Componente reutilizável** `components/InfoTooltip.tsx`: ícone (i) + Modal popover leve, fecha ao toque fora ou OK, com `data-testid` único por instância.
+- **6 tooltips adicionados** em pontos-chave da Periodização (sem alterar lógica funcional):
+  1. Classificação de Atividades GPS, 2. Informações da Semana, 3. Classificação dos Dias, 4. Prescrição Semanal, 5. Prescrição Diária, 6. Metas Semanais. O tooltip pré-existente do botão "Recalcular Base" foi PRESERVADO sem mudanças.

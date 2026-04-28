@@ -1,6 +1,26 @@
 # CHANGELOG
 
 
+## 2026-04-28 — Tooltips Globais + Ajustes Críticos Apple Review
+- **Scope**: Adicionar 6 tooltips informativos em pontos-chave da Periodização e ajustes obrigatórios para a App Review (Apple) — Política de Privacidade com email/endereço reais e botão Voltar do Cadastro respeitando Safe Area do iOS.
+- **New component (`frontend/components/InfoTooltip.tsx`)**:
+  - Ícone `(i)` clicável com `Modal` transparente (popover leve), backdrop com `Pressable` que fecha ao toque fora, botão "OK" e "X" para fechar.
+  - Acessibilidade: `accessibilityRole`, `accessibilityLabel`, `hitSlop` (12px) e área mínima 32x32. Tema light/dark via `useTheme()`.
+- **Tooltips adicionados** (todos com `data-testid` para automação):
+  1. `tooltip-gps-activity-classification` — `app/(tabs)/periodization.tsx` (header "Classificação de Atividades GPS").
+  2. `tooltip-week-info` — `app/periodization/create.tsx` step 1 (Informações da Semana).
+  3. `tooltip-classify-days` — `app/periodization/create.tsx` step 2 (Classificação dos Dias).
+  4. `tooltip-weekly-prescription` — `app/periodization/create.tsx` step 3 (Prescrição Semanal).
+  5. `tooltip-daily-prescription` — `app/periodization/create.tsx` step 4 (Prescrição Diária).
+  6. `tooltip-weekly-goals` — `app/periodization/[id].tsx` (header "Metas Semanais"). **Não altera** o tooltip pré-existente do botão "Recalcular Base" (banner condicional `!hasAnyPeakValues`), que permanece intacto.
+- **Privacy Policy (`app/privacy-policy.tsx`)**:
+  - Substituídos placeholders por dados oficiais da empresa: `contato@loadmanagerpro.com.br` + endereço completo (LoadManager Pro, Ouro Fino – MG, CEP 37570-000, Brasil).
+  - Header agora envolto em `SafeAreaView` (edges=`top`) e botão Voltar com 44x44px de área de toque + `hitSlop`.
+- **Register (`app/register.tsx`)**:
+  - Botão Voltar movido para fora do `ScrollView`, dentro de `SafeAreaView` (edges=`top`) com `marginTop: 16`, `width/height: 44` (Apple HIG mínimo), background sutil `rgba(47,182,255,0.10)` e `hitSlop` 12px. Resolve o problema "muito alto / difícil clicar" reportado.
+- **Verification**: Testes E2E via Playwright confirmam que (a) a Política de Privacidade exibe email + endereço corretos, (b) os 6 tooltips abrem o modal correto e fecham via OK/backdrop, (c) o botão Voltar do Cadastro fica visível e na posição correta. Nenhuma lógica funcional foi alterada.
+
+
 ## 2026-04-27 — PDF Export Layer 3 (Detailed Metrics) — FULL REBUILD (P6)
 - **Scope**: User reported the previous Layer 3 implementation was visibly broken (charts cropped, modules misaligned, dashboard appearance, table overflow).
   Per user mandate: complete rebuild of Layer 3 only — Layer 1, Layer 2 and the data layer remain untouched.
