@@ -300,19 +300,6 @@ export default function AthletesScreen() {
                 <Text style={styles.hubCardDesc}>
                   {locale === 'pt' ? 'Body Scan + protocolos de dobras' : 'Body Scan + skinfold protocols'}
                 </Text>
-                {/* Station Mode button */}
-                <TouchableOpacity
-                  style={[styles.stationModeButton, { backgroundColor: 'rgba(236, 72, 153, 0.12)' }]}
-                  onPress={(e) => {
-                    e.stopPropagation?.();
-                    session.setMode('hub');
-                    router.push('/station/body-scan' as any);
-                  }}
-                  data-testid="hub-station-bodyscan"
-                >
-                  <Ionicons name="repeat" size={14} color="#ec4899" />
-                  <Text style={[styles.stationModeText, { color: '#ec4899' }]}>Station Mode</Text>
-                </TouchableOpacity>
               </View>
               <Ionicons name="chevron-forward" size={24} color={colors.text.tertiary} />
             </LinearGradient>

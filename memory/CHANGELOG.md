@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## 2026-04-28 (P2) — Tooltips por Módulo (VBT / Jump / Body Composition) + Remoção do Station Mode no Body Composition
+- **Scope**: Adicionar tooltips explicativos nos 3 módulos funcionais (VBT, Jump, Body Composition) e remover o botão "Station Mode" do card de Body Composition no Hub de Avaliações Físicas. Sem alterar lógica, fluxos, cálculos ou captura de dados.
+- **Tooltips adicionados** (todos com `data-testid` único, ícone (i) ao lado do título principal, conteúdo PT/EN, abre `Modal` com scroll interno e fecha por OK/X/backdrop):
+  1. `tooltip-vbt-flow` + `tooltip-vbt-flow-perm` — `app/athlete/[id]/vbt-camera.tsx` (header da config + render da tela "no permission" para acessibilidade antes do grant da câmera).
+  2. `tooltip-jump-flow` — `app/athlete/[id]/jump-camera.tsx` (header da página "Jump Camera" — fluxo de captura do salto).
+  3. `tooltip-body-composition-flow` — `app/athlete/[id]/body-scan.tsx` (header "Composicao Corporal").
+- **Remoção do Station Mode (Body Composition)**: deletado o `<TouchableOpacity data-testid="hub-station-bodyscan">` no card "Composição Corporal" em `app/(tabs)/athletes.tsx`. Cards VBT e Jump Assessment continuam com Station Mode intactos. Verificado E2E via Playwright (`Body station btn (should be None)` confirmado).
+- **Verification**: Playwright validou os 3 tooltips abrindo modais com texto correto e legível em viewport iPhone (390x844). Screenshots salvos em `/tmp/jump_tt_open.png`, `/tmp/vbt_tt_open.png`, `/tmp/tt_bc.png`.
+
 ## 2026-04-28 — Tooltips Globais + Ajustes Críticos Apple Review
 - **Scope**: Adicionar 6 tooltips informativos em pontos-chave da Periodização e ajustes obrigatórios para a App Review (Apple) — Política de Privacidade com email/endereço reais e botão Voltar do Cadastro respeitando Safe Area do iOS.
 - **New component (`frontend/components/InfoTooltip.tsx`)**:

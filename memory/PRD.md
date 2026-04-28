@@ -168,5 +168,5 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - **Política de Privacidade** atualizada com email/endereço oficiais (`contato@loadmanagerpro.com.br`, Ouro Fino – MG, CEP 37570-000) — requisito Apple Review.
 - **Cadastro (Register)**: botão Voltar reposicionado dentro de `SafeAreaView` (edges=top), 44x44px com hitSlop, fora do `ScrollView`, fundo sutil para visibilidade — corrige "muito alto / difícil clicar" reportado em iPhone.
 - **Componente reutilizável** `components/InfoTooltip.tsx`: ícone (i) + Modal popover leve, fecha ao toque fora ou OK, com `data-testid` único por instância.
-- **6 tooltips adicionados** em pontos-chave da Periodização (sem alterar lógica funcional):
-  1. Classificação de Atividades GPS, 2. Informações da Semana, 3. Classificação dos Dias, 4. Prescrição Semanal, 5. Prescrição Diária, 6. Metas Semanais. O tooltip pré-existente do botão "Recalcular Base" foi PRESERVADO sem mudanças.
+- **6 tooltips em Periodização** + **3 tooltips por módulo funcional** (VBT, Jump, Body Composition) — todos sem alterar lógica funcional.
+- **Body Composition no Hub**: removido botão "Station Mode" (não funcionava como nos outros módulos). VBT e Jump preservados.

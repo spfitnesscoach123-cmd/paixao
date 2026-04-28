@@ -37,6 +37,7 @@ import { calculateProtocol } from '../../../engine/body-composition/protocolEngi
 import { calculateComposition } from '../../../engine/body-composition/bodyComposition';
 import { calculateSymmetry } from '../../../engine/body-composition/symmetryEngine';
 import type { FullReport, Measurements, Gender } from '../../../types/protocols';
+import InfoTooltip from '../../../components/InfoTooltip';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -267,6 +268,16 @@ export default function BodyScanScreen() {
               <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.title}>{t.title}</Text>
+            <InfoTooltip
+              testID="tooltip-body-composition-flow"
+              title={locale === 'pt' ? 'Como executar a avaliação' : 'How to run the assessment'}
+              iconColor={colors.text.primary}
+              content={
+                locale === 'pt'
+                  ? 'Fluxo de execução da avaliação:\n\n1. Selecione o atleta na lista\n2. Defina dados básicos (peso e altura — podem ser ajustados depois)\n3. Escolha um protocolo científico na lista\n   (Verifique idade, peso e altura nos dados do atleta)\n4. Inicie o teste\n5. Insira os valores das dobras cutâneas:\n   • diretamente no avatar\n   • ou pela lista\n6. Clique em salvar e depois em concluir\n\n———\nResultados e relatórios podem ser acessados em:\n• Central de Operações → Perfil do Atleta → Ver último relatório\n• Perfil do Atleta → Avaliações (rolar a tela)'
+                  : 'How to run the assessment:\n\n1. Pick the athlete from the list\n2. Set basic data (weight and height — can be adjusted later)\n3. Pick a scientific protocol from the list\n   (Check the athlete\'s age, weight and height)\n4. Start the test\n5. Enter the skinfold values:\n   • directly on the avatar\n   • or via the list\n6. Tap save and then complete\n\n———\nResults and reports can be accessed in:\n• Operations Hub → Athlete Profile → View last report\n• Athlete Profile → Assessments (scroll the screen)'
+              }
+            />
             <View style={{ width: 40 }} />
           </View>
 

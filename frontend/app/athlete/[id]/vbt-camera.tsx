@@ -26,6 +26,7 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import PremiumGate from '../../../components/PremiumGate';
+import InfoTooltip from '../../../components/InfoTooltip';
 import { 
   useProtectedBarTracking, 
   RECOMMENDED_TRACKING_POINTS,
@@ -1208,6 +1209,16 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.title}>{labels.title}</Text>
+          <InfoTooltip
+            testID="tooltip-vbt-flow-perm"
+            title={locale === 'pt' ? 'Como executar o teste VBT' : 'How to run the VBT test'}
+            iconColor={colors.text.primary}
+            content={
+              locale === 'pt'
+                ? 'Fluxo de execução do teste VBT:\n\n1. Defina a carga (kg) na barra\n2. Escolha o exercício na lista\n3. Na próxima tela, defina o ponto de tracking\n   (O sistema sugere automaticamente o melhor ponto para cada exercício, mas você pode ajustar)\n4. Posicione o atleta de frente para a câmera, com o corpo totalmente visível (cabeça, tronco e membros)\n5. Execute o exercício e salve\n\nPara identificar a carga ótima, são necessárias pelo menos 2 sessões do mesmo exercício com cargas diferentes.\n\n———\nModo Station Hub\n\nPermite alternar rapidamente entre atletas na mesma sessão:\n• Salve os dados do Atleta A\n• Após salvar, selecione o próximo atleta na lista\n• A tela será atualizada automaticamente\n• Clique em "Próximo teste" para continuar'
+                : 'How to run the VBT test:\n\n1. Set the load (kg) on the bar\n2. Pick the exercise from the list\n3. On the next screen, set the tracking point\n   (The system automatically suggests the best point for each exercise, but you can adjust it)\n4. Position the athlete facing the camera, with the body fully visible (head, torso and limbs)\n5. Perform the exercise and save\n\nTo identify the optimal load, at least 2 sessions of the same exercise with different loads are required.\n\n———\nStation Hub Mode\n\nQuickly switch between athletes in the same session:\n• Save Athlete A data\n• After saving, pick the next athlete from the list\n• The screen will update automatically\n• Tap "Next test" to continue'
+            }
+          />
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.permissionContainer}>
@@ -1245,7 +1256,17 @@ export function VBTCameraContent({ stationAthleteId, onSaveComplete }: VBTCamera
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.title}>{labels.title}</Text>
-        
+        <InfoTooltip
+          testID="tooltip-vbt-flow"
+          title={locale === 'pt' ? 'Como executar o teste VBT' : 'How to run the VBT test'}
+          iconColor={colors.text.primary}
+          content={
+            locale === 'pt'
+              ? 'Fluxo de execução do teste VBT:\n\n1. Defina a carga (kg) na barra\n2. Escolha o exercício na lista\n3. Na próxima tela, defina o ponto de tracking\n   (O sistema sugere automaticamente o melhor ponto para cada exercício, mas você pode ajustar)\n4. Posicione o atleta de frente para a câmera, com o corpo totalmente visível (cabeça, tronco e membros)\n5. Execute o exercício e salve\n\nPara identificar a carga ótima, são necessárias pelo menos 2 sessões do mesmo exercício com cargas diferentes.\n\n———\nModo Station Hub\n\nPermite alternar rapidamente entre atletas na mesma sessão:\n• Salve os dados do Atleta A\n• Após salvar, selecione o próximo atleta na lista\n• A tela será atualizada automaticamente\n• Clique em "Próximo teste" para continuar'
+              : 'How to run the VBT test:\n\n1. Set the load (kg) on the bar\n2. Pick the exercise from the list\n3. On the next screen, set the tracking point\n   (The system automatically suggests the best point for each exercise, but you can adjust it)\n4. Position the athlete facing the camera, with the body fully visible (head, torso and limbs)\n5. Perform the exercise and save\n\nTo identify the optimal load, at least 2 sessions of the same exercise with different loads are required.\n\n———\nStation Hub Mode\n\nQuickly switch between athletes in the same session:\n• Save Athlete A data\n• After saving, pick the next athlete from the list\n• The screen will update automatically\n• Tap "Next test" to continue'
+          }
+        />
+
         {/* Camera Toggle Button - Only show during camera phases */}
         {(phase === 'pointSelection' || phase === 'recording') ? (
           <TouchableOpacity 
