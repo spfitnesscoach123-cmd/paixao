@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -71,7 +72,22 @@ function PeriodizationDetailContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const dateLocale = locale === 'pt' ? ptBR : enUS;
-  
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Responsive table layout (RN-native, no CSS-table tricks)
+  const FIRST_COL_WIDTH = 120;
+  const MIN_CELL_WIDTH = 80;
+  const HORIZONTAL_PADDING = 32; // matches outer paddingHorizontal: 16 on both sides
+  const availableWidth = Math.max(0, windowWidth - HORIZONTAL_PADDING);
+  const dynamicCellWidth = Math.max(
+    MIN_CELL_WIDTH,
+    Math.floor((availableWidth - FIRST_COL_WIDTH) / METRICS.length)
+  );
+  const tableWidth = FIRST_COL_WIDTH + dynamicCellWidth * METRICS.length;
+  const isSmallLaptop = windowWidth <= 1440;
+  const responsiveFontSize = isSmallLaptop ? 11 : 12;
+  const responsivePadding = isSmallLaptop ? 8 : 12;
+
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -412,17 +428,17 @@ function PeriodizationDetailContent() {
 
         {/* UNIFIED Table - shows weekly OR daily based on selection */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.table}>
+          <View style={[styles.table, { width: tableWidth }]}>
             {/* Header */}
             <View style={styles.tableRow}>
-              <View style={styles.tableHeaderCell}>
-                <Text style={styles.tableHeaderText}>
+              <View style={[styles.tableHeaderCell, { width: FIRST_COL_WIDTH, maxWidth: FIRST_COL_WIDTH, paddingVertical: responsivePadding }]}>
+                <Text style={[styles.tableHeaderText, { fontSize: responsiveFontSize }]}>
                   {locale === 'pt' ? 'Atleta' : 'Athlete'}
                 </Text>
               </View>
               {METRICS.map(metric => (
-                <View key={metric.id} style={styles.tableMetricCell}>
-                  <Text style={styles.tableMetricHeaderText}>{metric.label}</Text>
+                <View key={metric.id} style={[styles.tableMetricCell, { width: dynamicCellWidth, flex: undefined, minWidth: undefined, paddingVertical: responsivePadding }]}>
+                  <Text style={[styles.tableMetricHeaderText, { fontSize: responsiveFontSize }]}>{metric.label}</Text>
                 </View>
               ))}
             </View>
@@ -430,14 +446,14 @@ function PeriodizationDetailContent() {
             {/* Rows - using displayedData (memoized) */}
             {displayedData.map((athlete: any) => (
               <View key={athlete.athlete_id} style={styles.tableRow}>
-                <View style={styles.tableNameCell}>
-                  <Text style={styles.tableNameText} numberOfLines={1}>
+                <View style={[styles.tableNameCell, { width: FIRST_COL_WIDTH, maxWidth: FIRST_COL_WIDTH, paddingVertical: responsivePadding }]}>
+                  <Text style={[styles.tableNameText, { fontSize: responsiveFontSize }]} numberOfLines={1}>
                     {athlete.athlete_name}
                   </Text>
                 </View>
                 {METRICS.map(metric => (
-                  <View key={metric.id} style={styles.tableValueCell}>
-                    <Text style={styles.tableValueText}>
+                  <View key={metric.id} style={[styles.tableValueCell, { width: dynamicCellWidth, flex: undefined, minWidth: undefined, paddingVertical: responsivePadding }]}>
+                    <Text style={[styles.tableValueText, { fontSize: responsiveFontSize }]}>
                       {Math.round(athlete.values[metric.id] || 0).toLocaleString()}
                     </Text>
                   </View>
