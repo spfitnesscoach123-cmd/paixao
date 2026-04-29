@@ -126,7 +126,7 @@ async def get_athlete_gps_data(
     gps_records = await db.gps_data.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     for record in gps_records:
         record["_id"] = str(record["_id"])
@@ -240,7 +240,7 @@ async def get_athlete_sessions(
     gps_records = await db.gps_data.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     # Group by session_id or by date if no session_id
     sessions = {}

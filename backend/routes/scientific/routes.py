@@ -105,7 +105,7 @@ async def get_scientific_analysis(
     try:
         gps_data_raw = await db.gps_data.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).to_list(500)
+        }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
         
         # Filter: only include records where period is "SESSION" or there's no multi-period structure
         _SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
@@ -171,7 +171,7 @@ async def get_scientific_analysis(
     try:
         wellness_data = await db.wellness_questionnaires.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).limit(14).to_list(14)
+        }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(14).to_list(14)
         
         if wellness_data:
             avg_wellness = sum(w.get("wellness_score", 0) for w in wellness_data) / len(wellness_data)
@@ -216,7 +216,7 @@ async def get_scientific_analysis(
     try:
         jump_data = await db.jump_assessments.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).limit(10).to_list(10)
+        }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(10).to_list(10)
         
         if jump_data:
             latest = jump_data[0]
@@ -279,7 +279,7 @@ async def get_scientific_analysis(
     try:
         vbt_data = await db.vbt_data.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).limit(20).to_list(20)
+        }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(20).to_list(20)
         
         if vbt_data:
             # Group by exercise and get latest for primary exercise
@@ -373,7 +373,7 @@ async def get_scientific_analysis(
     try:
         body_comp = await db.body_compositions.find({
             "athlete_id": athlete_id
-        }).sort("date", -1).limit(5).to_list(5)
+        }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(5).to_list(5)
         
         if body_comp:
             latest = body_comp[0]
@@ -701,25 +701,25 @@ async def get_scientific_report_pdf(
     # GPS historical data
     gps_history = await db.gps_data.find({
         "athlete_id": athlete_id
-    }).sort("date", -1).limit(10).to_list(10)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(10).to_list(10)
     gps_history.reverse()
     
     # Wellness historical data
     wellness_history = await db.wellness_questionnaires.find({
         "athlete_id": athlete_id
-    }).sort("date", -1).limit(14).to_list(14)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(14).to_list(14)
     wellness_history.reverse()
     
     # Jump history for RSI evolution
     jump_history = await db.jump_assessments.find({
         "athlete_id": athlete_id
-    }).sort("date", -1).limit(10).to_list(10)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(10).to_list(10)
     jump_history.reverse()
     
     # VBT data for load-velocity chart
     vbt_data = await db.vbt_data.find({
         "athlete_id": athlete_id
-    }).sort("date", -1).limit(20).to_list(20)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(20).to_list(20)
     
     is_pt = lang == "pt"
     

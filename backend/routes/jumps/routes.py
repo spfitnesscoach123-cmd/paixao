@@ -306,7 +306,7 @@ async def create_jump_assessment(
         "athlete_id": data.athlete_id,
         "coach_id": current_user["_id"],
         "protocol": data.protocol.value
-    }).sort("date", -1).to_list(30)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(30)
     
     # Calculate fatigue based on RSI variation from baseline (average of last 5)
     fatigue_percentage = 0
@@ -382,7 +382,7 @@ async def get_jump_assessments(
     if protocol:
         query["protocol"] = protocol
     
-    assessments = await db.jump_assessments.find(query).sort("date", -1).to_list(100)
+    assessments = await db.jump_assessments.find(query).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(100)
     
     for a in assessments:
         a["_id"] = str(a["_id"])
@@ -415,7 +415,7 @@ async def get_jump_analysis(
     all_assessments = await db.jump_assessments.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(100)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(100)
     
     if not all_assessments:
         raise HTTPException(
@@ -750,7 +750,7 @@ def generate_jump_recommendations(analysis: dict, lang: str) -> List[str]:
             recommendations.append(f"🚩 Significant asymmetry ({percent:.1f}%) detected. Include corrective unilateral exercises focusing on non-dominant limb.")
     
     # Power-velocity profile recommendations
-    pv_profile = analysis.get("power_velocity_insights", {}).get("profile", {})
+    pv_profile = (analysis.get("power_velocity_insights") or {}).get("profile") or {}
     if pv_profile:
         rec = pv_profile.get("recommendation", "")
         if rec:
@@ -798,7 +798,7 @@ async def get_jump_protocol_analysis(
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"],
         "protocol": protocol
-    }).sort("date", -1).to_list(200)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(200)
 
     # Available dates (unique, sorted desc)
     available_dates = sorted(
@@ -959,7 +959,7 @@ async def get_jump_protocol_analysis(
             contra_assessment = await db.jump_assessments.find_one(
                 {"athlete_id": athlete_id, "coach_id": current_user["_id"], "protocol": contra_protocol},
                 {"_id": 0},
-                sort=[("date", -1)]
+                sort=[("date", -1), ("created_at", -1), ("_id", -1)]
             )
         if contra_assessment:
             current_rsi = current_metric_value

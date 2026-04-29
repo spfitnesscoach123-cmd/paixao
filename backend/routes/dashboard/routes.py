@@ -214,27 +214,27 @@ async def get_team_dashboard(
     # Query 2: Wellness data - last 7 days per athlete is enough
     all_wellness_data = await db.wellness.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     # Query 3: Jump assessments
     all_jump_assessments = await db.jump_assessments.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     # Query 4: Legacy assessments (strength)
     all_assessments = await db.assessments.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     # Query 5: Body compositions
     all_body_compositions = await db.body_compositions.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(200)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(200)
     
     # Query 6: EWMA load metrics (latest per athlete from load_engine)
     all_load_metrics = await db.athlete_load_metrics.find(
         {"coach_id": user_id}
-    ).sort("date", -1).to_list(5000)
+    ).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(5000)
     
     # Index load metrics by athlete_id (keep only latest per athlete)
     load_metrics_by_athlete: Dict[str, dict] = {}
@@ -805,15 +805,15 @@ async def get_team_table(
     
     all_jumps = await db.jump_assessments.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     all_body = await db.body_compositions.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(200)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(200)
     
     all_wellness = await db.wellness.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     # Index by athlete
     _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
@@ -1088,7 +1088,7 @@ async def get_dashboard_overview(
     # EWMA load metrics from RollingLoadEngine (same source as Team Dashboard)
     all_load_metrics = await db.athlete_load_metrics.find(
         {"coach_id": user_id}
-    ).sort("date", -1).to_list(5000)
+    ).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(5000)
     
     # Index: latest per athlete + full history per athlete
     load_metrics_latest: dict = {}
@@ -1105,19 +1105,19 @@ async def get_dashboard_overview(
     
     all_wellness = await db.wellness.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(2000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(2000)
     
     all_jumps = await db.jump_assessments.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     all_vbt = await db.vbt_data.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(500)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     all_body_comp = await db.body_compositions.find({
         "coach_id": user_id
-    }).sort("date", -1).to_list(200)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(200)
     
     # ============ INDEX BY ATHLETE ============
     gps_by_athlete: Dict[str, List[dict]] = {}

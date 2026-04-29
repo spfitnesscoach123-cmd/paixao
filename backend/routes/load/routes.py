@@ -996,7 +996,7 @@ async def get_fatigue_analysis(
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"],
         "date": {"$gte": date_7_days_ago}
-    }).sort("date", -1).to_list(7)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(7)
     
     if not wellness_records:
         raise HTTPException(
@@ -1199,17 +1199,17 @@ Formate sua resposta de forma estruturada e profissional.""",
     gps_records = await db.gps_data.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).limit(30).to_list(30)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(30).to_list(30)
     
     wellness_records = await db.wellness.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).limit(30).to_list(30)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(30).to_list(30)
     
     assessments = await db.assessments.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).limit(5).to_list(5)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).limit(5).to_list(5)
     
     if not gps_records and not wellness_records:
         raise HTTPException(

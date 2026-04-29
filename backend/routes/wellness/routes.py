@@ -104,7 +104,7 @@ async def get_athlete_wellness(
     wellness_records = await db.wellness.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     result = []
     for record in wellness_records:
