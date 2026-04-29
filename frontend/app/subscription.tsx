@@ -252,7 +252,7 @@ export default function Subscription() {
     if (currentPackage) {
       return formatPrice(currentPackage);
     }
-    return '$39.99';
+    return 'Loading Price';
   };
 
   const formatExpirationDate = () => {

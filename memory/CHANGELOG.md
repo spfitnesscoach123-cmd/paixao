@@ -155,3 +155,12 @@ Substituído o crash nativo iOS por uma guarda de regra de negócio. Smart Summa
 - **Por que isso resolve estruturalmente**: o crash documentado vem do mount do GaugeChart com `value≈0` (Reanimated worklet completa em 1 frame e colide com commit nativo do react-native-svg). Sem dados válidos → não monta GaugeChart → race nunca acontece.
 - **Honra o contrato do backend** (`calc_lmpi` retorna `lmpi_validity='invalid'` quando ACWR é None — frontend agora respeita esse sinal).
 
+## 2026-02-27 — Preço Dinâmico + Limite de Dispositivos
+
+- Removidos TODOS os fallbacks hardcoded `$39.99` / `R$ 39,99` no frontend (subscription.tsx, SubscriptionModals.tsx, SubscriptionGuard.tsx, PremiumGate.tsx). Substituído por `'Loading Price'` enquanto RevenueCat carrega offerings.
+- PremiumGate.tsx agora consome `currentPackage` via `useRevenueCat()` e usa `formatPrice()` para preço localizado automático (R$ no Brasil, $ nos EUA etc).
+- Backend: `MAX_DEVICES_PER_USER` alterado de 3 → 5 em `backend/models/shared.py` e `backend/routes/auth/routes.py`.
+- Bypass da conta demo (`contato@loadmanagerpro.com.br`) preservado — continua com dispositivos ilimitados.
+
+Validado via curl: login conta demo OK, endpoint /api/auth/devices retorna max_devices=5 e centenas de devices registrados (bypass funciona).
+

@@ -61,7 +61,7 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
   onStartTrial,
   onRestorePurchases,
   isLoading = false,
-  price = '$39.99',
+  price = 'Loading Price',
 }) => {
   const { locale } = useLanguage();
 
@@ -284,7 +284,7 @@ export const SubscriptionExpiredModal: React.FC<SubscriptionExpiredModalProps> =
   onSubscribe,
   onRestorePurchases,
   isLoading = false,
-  price = '$39.99',
+  price = 'Loading Price',
 }) => {
   const { locale } = useLanguage();
 

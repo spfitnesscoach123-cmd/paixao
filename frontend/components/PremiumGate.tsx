@@ -19,6 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { useLanguage } from '../contexts/LanguageContext';
 import { colors } from '../constants/theme';
+import { formatPrice } from '../services/revenuecat';
 
 // ============================================
 // TIPOS
@@ -45,7 +46,7 @@ const PremiumGate: React.FC<PremiumGateProps> = ({
 }) => {
   const router = useRouter();
   const { locale } = useLanguage();
-  const { isPro, isLoading, isInitialized } = useRevenueCat();
+  const { isPro, isLoading, isInitialized, currentPackage } = useRevenueCat();
 
   // Se está carregando e showLoading está ativo, mostra loading
   if (isLoading && showLoading && !isInitialized) {
@@ -170,8 +171,8 @@ const PremiumGate: React.FC<PremiumGateProps> = ({
         {/* Preço */}
         <Text style={styles.priceText}>
           {locale === 'pt'
-            ? 'Após o trial: $39.99/mês'
-            : 'After trial: $39.99/month'}
+            ? `Após o trial: ${currentPackage ? formatPrice(currentPackage) : 'Loading Price'}/mês`
+            : `After trial: ${currentPackage ? formatPrice(currentPackage) : 'Loading Price'}/month`}
         </Text>
       </LinearGradient>
     </View>
