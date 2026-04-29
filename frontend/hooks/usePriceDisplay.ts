@@ -19,7 +19,7 @@ import { useEffect, useState } from 'react';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { formatPrice } from '../services/revenuecat';
 
-const PRICE_FETCH_TIMEOUT_MS = 4000;
+const PRICE_FETCH_TIMEOUT_MS = 7000;
 
 export interface PriceDisplayState {
   price: string;
