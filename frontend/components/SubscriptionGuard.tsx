@@ -139,7 +139,7 @@ const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ children }) => {
     if (currentPackage) {
       return formatPrice(currentPackage);
     }
-    return 'Loading Price';
+    return undefined;
   };
 
   // ============================================

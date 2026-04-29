@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePriceDisplay } from '../hooks/usePriceDisplay';
 
 // ============================================
 // TIPOS
@@ -61,9 +62,12 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
   onStartTrial,
   onRestorePurchases,
   isLoading = false,
-  price = 'Loading Price',
+  price,
 }) => {
   const { locale } = useLanguage();
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
+  const displayPrice = price ?? resolvedPrice;
+  const canShowPrice = price !== undefined || shouldRenderPrice;
 
   return (
     <Modal
@@ -118,7 +122,9 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
               </View>
               <View style={styles.trialInfoText}>
                 <Text style={styles.trialInfoTitle}>
-                  {locale === 'pt' ? `Depois: ${price}/mês` : `Then: ${price}/month`}
+                  {canShowPrice
+                    ? (locale === 'pt' ? `Depois: ${displayPrice}/mês` : `Then: ${displayPrice}/month`)
+                    : (locale === 'pt' ? 'Carregando preço...' : 'Loading price...')}
                 </Text>
                 <Text style={styles.trialInfoDesc}>
                   {locale === 'pt'
@@ -186,9 +192,13 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
 
           {/* Legal text */}
           <Text style={styles.legalText}>
-            {locale === 'pt'
-              ? `Ao iniciar o trial, você concorda com os Termos de Uso. Após 7 dias, ${price} USD será cobrado mensalmente. Cancele a qualquer momento nas configurações da App Store.`
-              : `By starting the trial, you agree to the Terms of Use. After 7 days, ${price} USD will be charged monthly. Cancel anytime in App Store settings.`}
+            {canShowPrice
+              ? (locale === 'pt'
+                  ? `Ao iniciar o trial, você concorda com os Termos de Uso. Após 7 dias, ${displayPrice} será cobrado mensalmente. Cancele a qualquer momento nas configurações da App Store.`
+                  : `By starting the trial, you agree to the Terms of Use. After 7 days, ${displayPrice} will be charged monthly. Cancel anytime in App Store settings.`)
+              : (locale === 'pt'
+                  ? 'Ao iniciar o trial, você concorda com os Termos de Uso. O valor mensal será exibido antes da confirmação. Cancele a qualquer momento nas configurações da App Store.'
+                  : 'By starting the trial, you agree to the Terms of Use. The monthly price will be shown before confirmation. Cancel anytime in App Store settings.')}
           </Text>
         </View>
       </View>
@@ -284,9 +294,12 @@ export const SubscriptionExpiredModal: React.FC<SubscriptionExpiredModalProps> =
   onSubscribe,
   onRestorePurchases,
   isLoading = false,
-  price = 'Loading Price',
+  price,
 }) => {
   const { locale } = useLanguage();
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
+  const displayPrice = price ?? resolvedPrice;
+  const canShowPrice = price !== undefined || shouldRenderPrice;
 
   return (
     <Modal

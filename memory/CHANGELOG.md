@@ -164,3 +164,14 @@ Substituído o crash nativo iOS por uma guarda de regra de negócio. Smart Summa
 
 Validado via curl: login conta demo OK, endpoint /api/auth/devices retorna max_devices=5 e centenas de devices registrados (bypass funciona).
 
+
+## 2026-02-27 (revisão 2) — Preço Dinâmico como Estado Principal + Fallback Controlado
+
+- Criado hook central `/app/frontend/hooks/usePriceDisplay.ts` que gerencia 3 estados:
+  - **Preço real** (formatPrice do RevenueCat) = estado PRINCIPAL
+  - **'Loading Price'** = TRANSITÓRIO (durante fetch inicial)
+  - **'Unavailable'** = fallback CONTROLADO (após timeout de 4s sem resposta)
+- Expõe `shouldRender` para evitar renderização prematura: UI mostra `ActivityIndicator` enquanto `!shouldRender`, substituindo o preço apenas quando real ou timeout expirou.
+- Aplicado em: `app/subscription.tsx`, `components/SubscriptionModals.tsx` (TrialRequiredModal + SubscriptionExpiredModal), `components/SubscriptionGuard.tsx`, `components/PremiumGate.tsx`.
+- Removido `USD` do texto legal do TrialRequiredModal — o preço agora respeita moeda local automaticamente.
+- Integração RevenueCat INALTERADA (offerings, listeners, contexto).

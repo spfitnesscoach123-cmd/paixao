@@ -24,6 +24,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { formatPrice } from '../services/revenuecat';
 import { useTheme } from '../contexts/ThemeContext';
+import { usePriceDisplay } from '../hooks/usePriceDisplay';
 
 // ============================================
 // TIPOS E CONSTANTES
@@ -166,6 +167,7 @@ export default function Subscription() {
   const isSandbox = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
 
   // Atualiza status ao montar
   useEffect(() => {
@@ -248,12 +250,7 @@ export default function Subscription() {
   // HELPERS
   // ============================================
 
-  const getPrice = () => {
-    if (currentPackage) {
-      return formatPrice(currentPackage);
-    }
-    return 'Loading Price';
-  };
+  const getPrice = () => resolvedPrice;
 
   const formatExpirationDate = () => {
     if (!expirationDate) return '';
@@ -372,10 +369,16 @@ export default function Subscription() {
               {locale === 'pt' ? 'Plano Pro' : 'Pro Plan'}
             </Text>
             <View style={styles.priceContainer}>
-              <Text style={styles.priceValue}>{getPrice()}</Text>
-              <Text style={styles.pricePeriod}>
-                /{locale === 'pt' ? 'mês' : 'month'}
-              </Text>
+              {shouldRenderPrice ? (
+                <>
+                  <Text style={styles.priceValue}>{getPrice()}</Text>
+                  <Text style={styles.pricePeriod}>
+                    /{locale === 'pt' ? 'mês' : 'month'}
+                  </Text>
+                </>
+              ) : (
+                <ActivityIndicator size="small" color={colors.accent.primary} />
+              )}
             </View>
             <View style={styles.cancelPolicyContainer}>
               <Ionicons name="checkmark-circle" size={18} color={colors.status.success} />
