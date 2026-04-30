@@ -399,6 +399,26 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
   }, [clearAllTimeouts, log]);
 
   // ============================================
+  // CARREGAMENTO DE OFFERINGS (FIX 1)
+  // Garante que currentPackage seja populado independente
+  // dos early returns em verifySubscription (admin, override, web)
+  // ============================================
+
+  const loadOfferings = useCallback(async () => {
+    if (Platform.OS !== 'ios' && Platform.OS !== 'android') return;
+
+    try {
+      const result = await RevenueCatService.getOfferings();
+
+      if (result.success && result.currentPackage) {
+        setCurrentPackage(result.currentPackage);
+      }
+    } catch (e) {
+      // Falha silenciosa — não altera comportamento existente
+    }
+  }, []);
+
+  // ============================================
   // EFEITOS
   // ============================================
   
@@ -408,6 +428,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
       log('User authenticated - starting verification');
       log('Subscription status set to UNKNOWN');
       setSubscriptionStatus('UNKNOWN');
+      loadOfferings();
       verifySubscription('login');
       setupListener();
     } else if (!isAuthenticated) {
@@ -417,7 +438,7 @@ export const RevenueCatProvider: React.FC<RevenueCatProviderProps> = ({ children
         RevenueCatService.logoutUser().catch(() => {});
       }
     }
-  }, [isAuthenticated, user, verifySubscription, setupListener, clearState, log]);
+  }, [isAuthenticated, user, verifySubscription, setupListener, clearState, loadOfferings, log]);
   
   // App foreground (REGRA CRÍTICA 9)
   useEffect(() => {
