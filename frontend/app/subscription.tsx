@@ -472,8 +472,8 @@ export default function Subscription() {
                   <Ionicons name="information-circle" size={20} color={colors.text.secondary} />
                   <Text style={styles.trialInfoText}>
                     {locale === 'pt'
-                      ? `7 dias gratuitos. Após o trial, será cobrado ${getPrice()} USD/mês automaticamente. Cancele a qualquer momento.`
-                      : `7 days free. After trial, ${getPrice()} USD/month will be charged automatically. Cancel anytime.`}
+                      ? `7 dias gratuitos. Após o trial, será cobrado ${getPrice()}/mês automaticamente. Cancele a qualquer momento.`
+                      : `7 days free. After trial, ${getPrice()}/month will be charged automatically. Cancel anytime.`}
                   </Text>
                 </View>
 
