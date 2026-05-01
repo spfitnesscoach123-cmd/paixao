@@ -213,8 +213,8 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
               Privacy Policy
             </Text>
             {locale === 'pt'
-              ? '.\nA assinatura é renovada automaticamente, salvo cancelamento antes do término do período atual.'
-              : '.\nThe subscription renews automatically unless canceled before the end of the current period.'}
+              ? '.\nA assinatura é renovada automaticamente, salvo cancelamento antes do término do período atual.\nVocê pode cancelar a qualquer momento nas configurações da App Store.'
+              : '.\nThe subscription renews automatically unless canceled before the end of the current period.\nYou can cancel anytime in your App Store account settings.'}
           </Text>
         </View>
       </View>

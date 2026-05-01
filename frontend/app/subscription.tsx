@@ -497,6 +497,9 @@ export default function Subscription() {
                   >
                     Privacy Policy
                   </Text>
+                  {locale === 'pt'
+                    ? '.\nVocê pode cancelar a qualquer momento nas configurações da App Store.'
+                    : '.\nYou can cancel anytime in your App Store account settings.'}
                 </Text>
               </>
             ) : (
