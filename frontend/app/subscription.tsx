@@ -476,6 +476,28 @@ export default function Subscription() {
                       : `7 days free. After trial, ${getPrice()} USD/month will be charged automatically. Cancel anytime.`}
                   </Text>
                 </View>
+
+                {/* Terms & Privacy Links (reused pattern from register.tsx) */}
+                <Text style={styles.legalText}>
+                  {locale === 'pt'
+                    ? 'Ao iniciar o período de teste, você concorda com nossos '
+                    : 'By starting the trial period, you agree to our '}
+                  <Text
+                    style={styles.legalLink}
+                    onPress={() => router.push('/terms-of-use')}
+                    data-testid="paywall-terms-of-use-link"
+                  >
+                    Terms of Use
+                  </Text>
+                  {locale === 'pt' ? ' e ' : ' and '}
+                  <Text
+                    style={styles.legalLink}
+                    onPress={() => router.push('/privacy-policy')}
+                    data-testid="paywall-privacy-policy-link"
+                  >
+                    Privacy Policy
+                  </Text>
+                </Text>
               </>
             ) : (
               // Tem assinatura - mostrar botão de gerenciar
@@ -741,6 +763,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 10,
     flex: 1,
     lineHeight: 18,
+  },
+  legalText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: 14,
+    paddingHorizontal: 10,
+    lineHeight: 18,
+  },
+  legalLink: {
+    color: colors.accent.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   manageButton: {
     flexDirection: 'row',
