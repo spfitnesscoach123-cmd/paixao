@@ -16,6 +16,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
@@ -65,6 +66,7 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
   price,
 }) => {
   const { locale } = useLanguage();
+  const router = useRouter();
   const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
   const displayPrice = price ?? resolvedPrice;
   const canShowPrice = price !== undefined || shouldRenderPrice;
@@ -192,13 +194,27 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
 
           {/* Legal text */}
           <Text style={styles.legalText}>
-            {canShowPrice
-              ? (locale === 'pt'
-                  ? `Ao iniciar o trial, você concorda com os Termos de Uso. Após 7 dias, ${displayPrice} será cobrado mensalmente. Cancele a qualquer momento nas configurações da App Store.`
-                  : `By starting the trial, you agree to the Terms of Use. After 7 days, ${displayPrice} will be charged monthly. Cancel anytime in App Store settings.`)
-              : (locale === 'pt'
-                  ? 'Ao iniciar o trial, você concorda com os Termos de Uso. O valor mensal será exibido antes da confirmação. Cancele a qualquer momento nas configurações da App Store.'
-                  : 'By starting the trial, you agree to the Terms of Use. The monthly price will be shown before confirmation. Cancel anytime in App Store settings.')}
+            {locale === 'pt'
+              ? 'Ao iniciar o período de teste, você concorda com nossos '
+              : 'By starting the trial period, you agree to our '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/terms-of-use')}
+              data-testid="trial-modal-terms-of-use-link"
+            >
+              Terms of Use
+            </Text>
+            {locale === 'pt' ? ' e ' : ' and '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/privacy-policy')}
+              data-testid="trial-modal-privacy-policy-link"
+            >
+              Privacy Policy
+            </Text>
+            {locale === 'pt'
+              ? '.\nA assinatura é renovada automaticamente, salvo cancelamento antes do término do período atual.'
+              : '.\nThe subscription renews automatically unless canceled before the end of the current period.'}
           </Text>
         </View>
       </View>
@@ -600,6 +616,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 16,
+  },
+  legalLink: {
+    color: colors.accent.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
 
