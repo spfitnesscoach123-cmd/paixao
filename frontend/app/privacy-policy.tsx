@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,13 +21,22 @@ export default function PrivacyPolicy() {
         colors={[colors.dark.secondary, colors.dark.primary]}
         style={styles.gradient}
       >
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Política de Privacidade</Text>
-          <View style={{ width: 24 }} />
-        </View>
+        <SafeAreaView edges={['top']} style={styles.safeAreaTop}>
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              style={styles.backButton}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              accessibilityRole="button"
+              accessibilityLabel="Voltar"
+              data-testid="privacy-back-button"
+            >
+              <Ionicons name="arrow-back" size={24} color={colors.accent.primary} />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Política de Privacidade</Text>
+            <View style={{ width: 44 }} />
+          </View>
+        </SafeAreaView>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
           <Text style={styles.lastUpdated}>Última atualização: 06 de Fevereiro de 2026</Text>
@@ -142,10 +152,14 @@ export default function PrivacyPolicy() {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>10. Contato</Text>
-            <Text style={styles.sectionText}>
-              Para dúvidas sobre esta Política de Privacidade:{'\n\n'}
-              E-mail: privacy@loadmanager.app{'\n'}
-              Endereço: [Endereço da empresa]
+            <Text style={styles.sectionText} selectable>
+              Para dúvidas sobre esta Política de Privacidade, entre em contato com a LoadManager Pro:{'\n\n'}
+              <Text style={styles.bold}>E-mail:</Text> contato@loadmanagerpro.com.br{'\n'}
+              <Text style={styles.bold}>Endereço:</Text>{'\n'}
+              LoadManager Pro{'\n'}
+              Ouro Fino – MG{'\n'}
+              CEP 37570-000{'\n'}
+              Brasil
             </Text>
           </View>
         </ScrollView>
@@ -161,16 +175,22 @@ const styles = StyleSheet.create({
   gradient: {
     flex: 1,
   },
+  safeAreaTop: {
+    backgroundColor: 'transparent',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 48,
+    paddingTop: 16,
     paddingBottom: 16,
     paddingHorizontal: 16,
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: 18,

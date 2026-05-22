@@ -17,7 +17,7 @@ import requests
 import os
 import re
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://ios-native-audit.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://tooltip-uifix.preview.emergentagent.com').rstrip('/')
 
 # Test credentials
 TEST_EMAIL = "contato@loadmanagerpro.com.br"
@@ -134,23 +134,26 @@ class TestDashboardPdfExport:
         print(f"PASS: Velocity zones found - labels: {found_labels}, rect elements: {rect_count}")
     
     def test_metric_cards_structure(self):
-        """Test that metric cards with proper styling are included"""
+        """Test that Layer 3 modules with proper structure are included (P6 rebuild)."""
         response = requests.get(
             f"{BASE_URL}/api/report/dashboard-overview",
             headers=self.headers
         )
         assert response.status_code == 200
         html = response.text
-        
-        # Check for metric card CSS classes
-        assert 'class="metric-card"' in html or "class='metric-card'" in html, \
-            "HTML should contain metric-card elements"
-        assert 'class="metric-value"' in html or "class='metric-value'" in html, \
-            "HTML should contain metric-value elements"
-        assert 'class="metric-label"' in html or "class='metric-label'" in html, \
-            "HTML should contain metric-label elements"
-        
-        print("PASS: Metric cards structure present")
+
+        # P6 rebuild — strict structure: pdf-module / pdf-module-title /
+        # pdf-module-metrics / pdf-chart-container.
+        assert 'class="pdf-module"' in html, \
+            "HTML should contain pdf-module elements"
+        assert 'class="pdf-module-title"' in html, \
+            "HTML should contain pdf-module-title elements"
+        assert 'class="pdf-module-metrics"' in html, \
+            "HTML should contain pdf-module-metrics container"
+        assert 'class="pdf-chart-container"' in html, \
+            "HTML should contain pdf-chart-container slot"
+
+        print("PASS: Layer 3 module structure present (pdf-module/title/metrics/chart)")
     
     def test_all_layers_render(self):
         """Test that all 5 layers render correctly when requested"""

@@ -396,7 +396,7 @@ export const StackedBarChart = React.memo(function StackedBarChart({
                 <View style={{ gap: 6, marginBottom: 14 }}>
                   <View style={styles.detailRow}>
                     <Text style={[styles.detailLabel, { color: colors.text.secondary }]}>TD</Text>
-                    <Text style={[styles.detailValue, { color: ZONE_COLORS.base }]}>
+                    <Text style={[styles.detailValue, { color: colors.text.primary }]}>
                       {(selectedRow.total_distance / 1000).toFixed(1)} km
                     </Text>
                   </View>

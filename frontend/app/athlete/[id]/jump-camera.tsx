@@ -54,6 +54,7 @@ import api from '../../../services/api';
 import { colors } from '../../../constants/theme';
 import { useLanguage } from '../../../contexts/LanguageContext';
 import PremiumGate from '../../../components/PremiumGate';
+import InfoTooltip from '../../../components/InfoTooltip';
 import { 
   LANDMARK_INDEX_TO_VBT_NAME,
   ProcessedKeypoint,
@@ -869,6 +870,16 @@ export function JumpCameraContent({ stationAthleteId, onSaveComplete }: JumpCame
               <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={styles.title}>{t.title}</Text>
+            <InfoTooltip
+              testID="tooltip-jump-flow"
+              title={locale === 'pt' ? 'Como executar o teste de salto' : 'How to run the jump test'}
+              iconColor={colors.text.primary}
+              content={
+                locale === 'pt'
+                  ? 'Fluxo de execução do teste de salto:\n\n1. Defina a altura do atleta\n2. Observe as recomendações de setup em DICAS/TIPS\n3. Posicione o atleta lateralmente à câmera conforme orientação\n4. Execute o salto\n\nOs resultados são exibidos imediatamente após o teste.\n\n———\nOs dados também podem ser acessados em:\n• Perfil do atleta → Avaliações → Força e VBT → Análise do Salto\n• Dashboard Visão Geral (Overview)\n• Dashboard da Equipe (Team Dashboard)\n\n———\nModo Station Hub\n\nPermite alternar rapidamente entre atletas na mesma sessão:\n• Salve os dados do Atleta A\n• Selecione o próximo atleta na lista\n• Clique em "Próximo teste"'
+                  : 'How to run the jump test:\n\n1. Set the athlete height\n2. Check setup recommendations in TIPS\n3. Position the athlete sideways to the camera as instructed\n4. Perform the jump\n\nResults are shown immediately after the test.\n\n———\nThe data can also be accessed in:\n• Athlete profile → Assessments → Strength & VBT → Jump Analysis\n• Overview Dashboard\n• Team Dashboard\n\n———\nStation Hub Mode\n\nQuickly switch between athletes in the same session:\n• Save Athlete A data\n• Pick the next athlete from the list\n• Tap "Next test"'
+              }
+            />
             <View style={{ width: 40 }} />
           </View>
           

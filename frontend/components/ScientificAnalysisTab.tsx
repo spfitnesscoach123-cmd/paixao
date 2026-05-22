@@ -947,20 +947,8 @@ export const ScientificAnalysisTab: React.FC<ScientificAnalysisTabProps> = ({ at
           </Text>
           <Text style={styles.headerSubtitle}>{analysis.analysis_date}</Text>
         </View>
-        <View style={styles.headerActions}>
-          {/* BOTÃO ÚNICO - Gera PDF e abre compartilhamento DIRETO */}
-          <TouchableOpacity 
-            style={styles.pdfButton} 
-            onPress={handleGenerateAndSharePdf}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <ActivityIndicator size="small" color="#dc2626" />
-            ) : (
-              <Ionicons name="share-outline" size={20} color="#dc2626" />
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Botão de exportação PDF removido temporariamente (erro 500 em produção).
+            Função handleGenerateAndSharePdf preservada para reativação futura. */}
       </View>
 
       {/* Overall Risk Card */}

@@ -24,6 +24,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useRevenueCat } from '../contexts/RevenueCatContext';
 import { formatPrice } from '../services/revenuecat';
 import { useTheme } from '../contexts/ThemeContext';
+import { usePriceDisplay } from '../hooks/usePriceDisplay';
 
 // ============================================
 // TIPOS E CONSTANTES
@@ -166,6 +167,7 @@ export default function Subscription() {
   const isSandbox = proEntitlement?.isSandbox === true || customerInfo?.isSandbox === true;
 
   const [isProcessing, setIsProcessing] = useState(false);
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
 
   // Atualiza status ao montar
   useEffect(() => {
@@ -248,12 +250,7 @@ export default function Subscription() {
   // HELPERS
   // ============================================
 
-  const getPrice = () => {
-    if (currentPackage) {
-      return formatPrice(currentPackage);
-    }
-    return '$39.99';
-  };
+  const getPrice = () => resolvedPrice;
 
   const formatExpirationDate = () => {
     if (!expirationDate) return '';
@@ -372,10 +369,16 @@ export default function Subscription() {
               {locale === 'pt' ? 'Plano Pro' : 'Pro Plan'}
             </Text>
             <View style={styles.priceContainer}>
-              <Text style={styles.priceValue}>{getPrice()}</Text>
-              <Text style={styles.pricePeriod}>
-                /{locale === 'pt' ? 'mês' : 'month'}
-              </Text>
+              {shouldRenderPrice ? (
+                <>
+                  <Text style={styles.priceValue}>{getPrice()}</Text>
+                  <Text style={styles.pricePeriod}>
+                    /{locale === 'pt' ? 'mês' : 'month'}
+                  </Text>
+                </>
+              ) : (
+                <ActivityIndicator size="small" color={colors.accent.primary} />
+              )}
             </View>
             <View style={styles.cancelPolicyContainer}>
               <Ionicons name="checkmark-circle" size={18} color={colors.status.success} />
@@ -469,10 +472,35 @@ export default function Subscription() {
                   <Ionicons name="information-circle" size={20} color={colors.text.secondary} />
                   <Text style={styles.trialInfoText}>
                     {locale === 'pt'
-                      ? `7 dias gratuitos. Após o trial, será cobrado ${getPrice()} USD/mês automaticamente. Cancele a qualquer momento.`
-                      : `7 days free. After trial, ${getPrice()} USD/month will be charged automatically. Cancel anytime.`}
+                      ? `7 dias gratuitos. Após o trial, será cobrado ${getPrice()}/mês automaticamente. Cancele a qualquer momento.`
+                      : `7 days free. After trial, ${getPrice()}/month will be charged automatically. Cancel anytime.`}
                   </Text>
                 </View>
+
+                {/* Terms & Privacy Links (reused pattern from register.tsx) */}
+                <Text style={styles.legalText}>
+                  {locale === 'pt'
+                    ? 'Ao iniciar o período de teste, você concorda com nossos '
+                    : 'By starting the trial period, you agree to our '}
+                  <Text
+                    style={styles.legalLink}
+                    onPress={() => router.push('/terms-of-use')}
+                    data-testid="paywall-terms-of-use-link"
+                  >
+                    Terms of Use
+                  </Text>
+                  {locale === 'pt' ? ' e ' : ' and '}
+                  <Text
+                    style={styles.legalLink}
+                    onPress={() => router.push('/privacy-policy')}
+                    data-testid="paywall-privacy-policy-link"
+                  >
+                    Privacy Policy
+                  </Text>
+                  {locale === 'pt'
+                    ? '.\nVocê pode cancelar a qualquer momento nas configurações da App Store.'
+                    : '.\nYou can cancel anytime in your App Store account settings.'}
+                </Text>
               </>
             ) : (
               // Tem assinatura - mostrar botão de gerenciar
@@ -738,6 +766,19 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginLeft: 10,
     flex: 1,
     lineHeight: 18,
+  },
+  legalText: {
+    fontSize: 12,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+    marginTop: 14,
+    paddingHorizontal: 10,
+    lineHeight: 18,
+  },
+  legalLink: {
+    color: colors.accent.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   manageButton: {
     flexDirection: 'row',

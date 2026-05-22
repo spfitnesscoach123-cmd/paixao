@@ -77,7 +77,7 @@ async def get_athlete_assessments(
     assessments = await db.assessments.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     for record in assessments:
         record["_id"] = str(record["_id"])
@@ -452,7 +452,7 @@ async def get_athlete_body_compositions(
     records = await db.body_compositions.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(1000)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
     result = []
     for record in records:
@@ -513,7 +513,7 @@ async def get_body_composition_analysis(
     compositions = await db.body_compositions.find({
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"]
-    }).sort("date", -1).to_list(20)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(20)
     
     if not compositions:
         raise HTTPException(status_code=400, detail="No body composition data available")

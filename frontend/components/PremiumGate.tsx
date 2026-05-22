@@ -24,6 +24,8 @@ import { colors } from '../constants/theme';
 // TIPOS
 // ============================================
 
+import { usePriceDisplay } from '../hooks/usePriceDisplay';
+
 interface PremiumGateProps {
   children: ReactNode;
   feature?: string;
@@ -46,6 +48,7 @@ const PremiumGate: React.FC<PremiumGateProps> = ({
   const router = useRouter();
   const { locale } = useLanguage();
   const { isPro, isLoading, isInitialized } = useRevenueCat();
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
 
   // Se está carregando e showLoading está ativo, mostra loading
   if (isLoading && showLoading && !isInitialized) {
@@ -168,11 +171,13 @@ const PremiumGate: React.FC<PremiumGateProps> = ({
         </TouchableOpacity>
 
         {/* Preço */}
-        <Text style={styles.priceText}>
-          {locale === 'pt'
-            ? 'Após o trial: $39.99/mês'
-            : 'After trial: $39.99/month'}
-        </Text>
+        {shouldRenderPrice && (
+          <Text style={styles.priceText}>
+            {locale === 'pt'
+              ? `Após o trial: ${resolvedPrice}/mês`
+              : `After trial: ${resolvedPrice}/month`}
+          </Text>
+        )}
       </LinearGradient>
     </View>
   );

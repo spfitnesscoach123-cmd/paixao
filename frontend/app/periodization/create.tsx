@@ -23,6 +23,7 @@ import api from '../../services/api';
 import { format, addDays, parseISO, eachDayOfInterval } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
 import { useTheme } from '../../contexts/ThemeContext';
+import InfoTooltip from '../../components/InfoTooltip';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -202,9 +203,20 @@ function CreatePeriodizationContent() {
   // Render step 1 - Dates
   const renderStep1 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>
-        {locale === 'pt' ? 'Informações da Semana' : 'Week Information'}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.stepTitle}>
+          {locale === 'pt' ? 'Informações da Semana' : 'Week Information'}
+        </Text>
+        <InfoTooltip
+          testID="tooltip-week-info"
+          title={locale === 'pt' ? 'Informações da Semana' : 'Week Information'}
+          content={
+            locale === 'pt'
+              ? 'Defina uma data de início e uma data de fim para sua semana de treinamento. Essas datas serão usadas para permitir a classificação dos dias da semana nas próximas etapas.'
+              : 'Set a start date and an end date for your training week. These dates will be used to classify the days of the week in the next steps.'
+          }
+        />
+      </View>
 
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>
@@ -270,9 +282,20 @@ function CreatePeriodizationContent() {
   // Render step 2 - Day Classifications
   const renderStep2 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>
-        {locale === 'pt' ? 'Classificar Dias da Semana' : 'Classify Days'}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.stepTitle}>
+          {locale === 'pt' ? 'Classificar Dias da Semana' : 'Classify Days'}
+        </Text>
+        <InfoTooltip
+          testID="tooltip-classify-days"
+          title={locale === 'pt' ? 'Classificação dos Dias' : 'Day Classification'}
+          content={
+            locale === 'pt'
+              ? 'Defina qual dia será o dia de jogo (MD - Match Day). Após isso, classifique os demais dias em contagem regressiva para o jogo.\n\nExemplo:\nMD-5 (5 dias antes do jogo)\nMD-4 (4 dias antes)\nMD-3 (3 dias antes)\nMD-2 (2 dias antes)\nMD-1 (1 dia antes)\nMD (Dia do jogo)\nDO (Day Off - descanso)'
+              : 'Set which day will be the match day (MD - Match Day). After that, classify the remaining days as a countdown to the game.\n\nExample:\nMD-5 (5 days before the game)\nMD-4 (4 days before)\nMD-3 (3 days before)\nMD-2 (2 days before)\nMD-1 (1 day before)\nMD (Match Day)\nDO (Day Off - rest)'
+          }
+        />
+      </View>
       <Text style={styles.stepDescription}>
         {locale === 'pt' 
           ? 'Defina o tipo de cada dia (MD, MD-1, D.O, etc.)'
@@ -339,9 +362,20 @@ function CreatePeriodizationContent() {
   // Render step 3 - Weekly Prescription
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>
-        {locale === 'pt' ? 'Prescrição Semanal' : 'Weekly Prescription'}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.stepTitle}>
+          {locale === 'pt' ? 'Prescrição Semanal' : 'Weekly Prescription'}
+        </Text>
+        <InfoTooltip
+          testID="tooltip-weekly-prescription"
+          title={locale === 'pt' ? 'Prescrição Semanal' : 'Weekly Prescription'}
+          content={
+            locale === 'pt'
+              ? 'Defina o fator multiplicador para cada métrica. Esse valor será multiplicado pelo melhor valor registrado em uma atividade classificada como JOGO.\n\nExemplo:\nDistância Total: melhor valor em jogo = 10.000m\nMultiplicador: 2.5\nResultado semanal: 25.000m\n\nPara melhores resultados, utilize referências científicas e monitore os indicadores de carga no dashboard para ajustar volume e intensidade.'
+              : 'Set the multiplier factor for each metric. This value will be multiplied by the best value recorded in an activity classified as GAME.\n\nExample:\nTotal Distance: best in-game value = 10,000m\nMultiplier: 2.5\nWeekly result: 25,000m\n\nFor better results, use scientific references and monitor load indicators on the dashboard to adjust volume and intensity.'
+          }
+        />
+      </View>
       <Text style={styles.stepDescription}>
         {locale === 'pt' 
           ? 'Defina o fator multiplicador para cada métrica (baseado no melhor valor de JOGO)'
@@ -421,9 +455,20 @@ function CreatePeriodizationContent() {
   // Render step 4 - Daily Prescription
   const renderStep4 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>
-        {locale === 'pt' ? 'Prescrição Diária' : 'Daily Prescription'}
-      </Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.stepTitle}>
+          {locale === 'pt' ? 'Prescrição Diária' : 'Daily Prescription'}
+        </Text>
+        <InfoTooltip
+          testID="tooltip-daily-prescription"
+          title={locale === 'pt' ? 'Prescrição Diária' : 'Daily Prescription'}
+          content={
+            locale === 'pt'
+              ? 'Defina o percentual de carga desejado para cada dia da semana. Esse valor é baseado no melhor resultado individual em uma atividade classificada como JOGO.\n\nExemplo:\nDistância Total (melhor jogo): 10.000m\nMeta para MD-3 (60%): 6.000m\n\nDica: O volume de treino geralmente reduz conforme se aproxima do Match Day (MD).'
+              : 'Set the desired load percentage for each day of the week. This value is based on the individual best result in an activity classified as GAME.\n\nExample:\nTotal Distance (best game): 10,000m\nTarget for MD-3 (60%): 6,000m\n\nTip: Training volume usually decreases as Match Day (MD) approaches.'
+          }
+        />
+      </View>
       <Text style={styles.stepDescription}>
         {locale === 'pt' 
           ? 'Defina o percentual do valor de JOGO para cada dia'
@@ -544,7 +589,7 @@ function CreatePeriodizationContent() {
 
   return (
     <LinearGradient
-      colors={[colors.dark.background, colors.dark.secondary]}
+      colors={[colors.dark.primary, colors.dark.secondary]}
       style={styles.container}
     >
       {/* CORREÇÃO 3: Header com SafeAreaView e padding adequado para visibilidade do botão */}
@@ -671,6 +716,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: 'bold',
     color: colors.text.primary,
     marginBottom: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
   },
   stepDescription: {
     fontSize: 14,
@@ -815,7 +866,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.dark.background,
+    backgroundColor: colors.dark.primary,
     justifyContent: 'center',
     alignItems: 'center',
   },

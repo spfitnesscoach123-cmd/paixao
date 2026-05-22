@@ -9,6 +9,7 @@ import {
   Dimensions,
   ActivityIndicator,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import InfoTooltip from '../../components/InfoTooltip';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -70,7 +72,22 @@ function PeriodizationDetailContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const dateLocale = locale === 'pt' ? ptBR : enUS;
-  
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Responsive table layout (RN-native, no CSS-table tricks)
+  const FIRST_COL_WIDTH = 120;
+  const MIN_CELL_WIDTH = 80;
+  const HORIZONTAL_PADDING = 32; // matches outer paddingHorizontal: 16 on both sides
+  const availableWidth = Math.max(0, windowWidth - HORIZONTAL_PADDING);
+  const dynamicCellWidth = Math.max(
+    MIN_CELL_WIDTH,
+    Math.floor((availableWidth - FIRST_COL_WIDTH) / METRICS.length)
+  );
+  const tableWidth = FIRST_COL_WIDTH + dynamicCellWidth * METRICS.length;
+  const isSmallLaptop = windowWidth <= 1440;
+  const responsiveFontSize = isSmallLaptop ? 11 : 12;
+  const responsivePadding = isSmallLaptop ? 8 : 12;
+
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
@@ -354,6 +371,15 @@ function PeriodizationDetailContent() {
             color={colors.accent.primary} 
           />
           <Text style={styles.sectionTitle}>{tableTitle}</Text>
+          <InfoTooltip
+            testID="tooltip-weekly-goals"
+            title={locale === 'pt' ? 'Metas Semanais' : 'Weekly Goals'}
+            content={
+              locale === 'pt'
+                ? "A tabela apresenta valores individuais calculados para cada métrica.\n\nAo selecionar um dia no topo da tela, os valores são atualizados automaticamente para refletir as metas definidas para esse dia específico.\n\nO botão de imprimir no canto superior direito permite exportar um PDF com os dados exibidos na tabela.\n\nNa aba 'Cards', é possível visualizar, para cada atleta, os valores base registrados (melhor desempenho em jogos) e compará-los com as metas definidas para a semana atual."
+                : "The table shows individual values calculated for each metric.\n\nWhen you select a day at the top of the screen, the values are automatically updated to reflect the targets defined for that specific day.\n\nThe print button in the upper-right corner exports a PDF with the data displayed in the table.\n\nIn the 'Cards' tab, you can view, for each athlete, the recorded base values (best in-game performance) and compare them with the targets defined for the current week."
+            }
+          />
           {selectedDay && (
             <TouchableOpacity 
               style={styles.clearSelectionButton}
@@ -402,17 +428,17 @@ function PeriodizationDetailContent() {
 
         {/* UNIFIED Table - shows weekly OR daily based on selection */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.table}>
+          <View style={[styles.table, { width: tableWidth }]}>
             {/* Header */}
             <View style={styles.tableRow}>
-              <View style={styles.tableHeaderCell}>
-                <Text style={styles.tableHeaderText}>
+              <View style={[styles.tableHeaderCell, { width: FIRST_COL_WIDTH, maxWidth: FIRST_COL_WIDTH, paddingVertical: responsivePadding }]}>
+                <Text style={[styles.tableHeaderText, { fontSize: responsiveFontSize }]}>
                   {locale === 'pt' ? 'Atleta' : 'Athlete'}
                 </Text>
               </View>
               {METRICS.map(metric => (
-                <View key={metric.id} style={styles.tableMetricCell}>
-                  <Text style={styles.tableMetricHeaderText}>{metric.label}</Text>
+                <View key={metric.id} style={[styles.tableMetricCell, { width: dynamicCellWidth, flex: undefined, minWidth: undefined, paddingVertical: responsivePadding }]}>
+                  <Text style={[styles.tableMetricHeaderText, { fontSize: responsiveFontSize }]}>{metric.label}</Text>
                 </View>
               ))}
             </View>
@@ -420,14 +446,14 @@ function PeriodizationDetailContent() {
             {/* Rows - using displayedData (memoized) */}
             {displayedData.map((athlete: any) => (
               <View key={athlete.athlete_id} style={styles.tableRow}>
-                <View style={styles.tableNameCell}>
-                  <Text style={styles.tableNameText} numberOfLines={1}>
+                <View style={[styles.tableNameCell, { width: FIRST_COL_WIDTH, maxWidth: FIRST_COL_WIDTH, paddingVertical: responsivePadding }]}>
+                  <Text style={[styles.tableNameText, { fontSize: responsiveFontSize }]} numberOfLines={1}>
                     {athlete.athlete_name}
                   </Text>
                 </View>
                 {METRICS.map(metric => (
-                  <View key={metric.id} style={styles.tableValueCell}>
-                    <Text style={styles.tableValueText}>
+                  <View key={metric.id} style={[styles.tableValueCell, { width: dynamicCellWidth, flex: undefined, minWidth: undefined, paddingVertical: responsivePadding }]}>
+                    <Text style={[styles.tableValueText, { fontSize: responsiveFontSize }]}>
                       {Math.round(athlete.values[metric.id] || 0).toLocaleString()}
                     </Text>
                   </View>
@@ -498,7 +524,7 @@ function PeriodizationDetailContent() {
 
   if (weekLoading || calculationsLoading) {
     return (
-      <LinearGradient colors={[colors.dark.background, colors.dark.secondary]} style={styles.container}>
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.accent.primary} />
         </View>
@@ -508,7 +534,7 @@ function PeriodizationDetailContent() {
 
   if (!week) {
     return (
-      <LinearGradient colors={[colors.dark.background, colors.dark.secondary]} style={styles.container}>
+      <LinearGradient colors={[colors.dark.primary, colors.dark.secondary]} style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>
             {locale === 'pt' ? 'Semana não encontrada' : 'Week not found'}
@@ -520,7 +546,7 @@ function PeriodizationDetailContent() {
 
   return (
     <LinearGradient
-      colors={[colors.dark.background, colors.dark.secondary]}
+      colors={[colors.dark.primary, colors.dark.secondary]}
       style={styles.container}
     >
       {/* Header */}
@@ -770,10 +796,10 @@ const createStyles = (colors: any) => StyleSheet.create({
     alignItems: 'flex-start',
     padding: 12,
     marginBottom: 10,
-    backgroundColor: 'rgba(47, 182, 255, 0.08)',
+    backgroundColor: 'rgba(47, 182, 255, 0.16)',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: colors.border.default,
+    borderColor: 'rgba(47, 182, 255, 0.45)',
   },
   peakBannerTitle: {
     fontSize: 13,

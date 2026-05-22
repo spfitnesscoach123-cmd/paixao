@@ -185,7 +185,7 @@ async def get_athlete_vbt_data(
     if exercise:
         query["exercise"] = exercise
     
-    records = await db.vbt_data.find(query).sort("date", -1).to_list(100)
+    records = await db.vbt_data.find(query).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(100)
     
     for record in records:
         record["_id"] = str(record["_id"])
@@ -297,7 +297,7 @@ async def get_vbt_analysis(
         "athlete_id": athlete_id,
         "coach_id": current_user["_id"],
         "exercise": exercise
-    }).sort("date", -1).to_list(50)
+    }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(50)
     
     if not records:
         raise HTTPException(status_code=400, detail="No VBT data available for this exercise")

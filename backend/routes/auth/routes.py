@@ -71,7 +71,7 @@ class RegisteredDevice(BaseModel):
     platform: str
     last_login: datetime
 
-MAX_DEVICES_PER_USER = 3
+MAX_DEVICES_PER_USER = 5
 
 # ============= ACCOUNT DELETION STATUS =============
 

@@ -16,10 +16,12 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import { usePriceDisplay } from '../hooks/usePriceDisplay';
 
 // ============================================
 // TIPOS
@@ -61,9 +63,13 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
   onStartTrial,
   onRestorePurchases,
   isLoading = false,
-  price = '$39.99',
+  price,
 }) => {
   const { locale } = useLanguage();
+  const router = useRouter();
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
+  const displayPrice = price ?? resolvedPrice;
+  const canShowPrice = price !== undefined || shouldRenderPrice;
 
   return (
     <Modal
@@ -118,7 +124,9 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
               </View>
               <View style={styles.trialInfoText}>
                 <Text style={styles.trialInfoTitle}>
-                  {locale === 'pt' ? `Depois: ${price}/mês` : `Then: ${price}/month`}
+                  {canShowPrice
+                    ? (locale === 'pt' ? `Depois: ${displayPrice}/mês` : `Then: ${displayPrice}/month`)
+                    : (locale === 'pt' ? 'Carregando preço...' : 'Loading price...')}
                 </Text>
                 <Text style={styles.trialInfoDesc}>
                   {locale === 'pt'
@@ -187,8 +195,26 @@ export const TrialRequiredModal: React.FC<TrialRequiredModalProps> = ({
           {/* Legal text */}
           <Text style={styles.legalText}>
             {locale === 'pt'
-              ? `Ao iniciar o trial, você concorda com os Termos de Uso. Após 7 dias, ${price} USD será cobrado mensalmente. Cancele a qualquer momento nas configurações da App Store.`
-              : `By starting the trial, you agree to the Terms of Use. After 7 days, ${price} USD will be charged monthly. Cancel anytime in App Store settings.`}
+              ? 'Ao iniciar o período de teste, você concorda com nossos '
+              : 'By starting the trial period, you agree to our '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/terms-of-use')}
+              data-testid="trial-modal-terms-of-use-link"
+            >
+              Terms of Use
+            </Text>
+            {locale === 'pt' ? ' e ' : ' and '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/privacy-policy')}
+              data-testid="trial-modal-privacy-policy-link"
+            >
+              Privacy Policy
+            </Text>
+            {locale === 'pt'
+              ? '.\nA assinatura é renovada automaticamente, salvo cancelamento antes do término do período atual.\nVocê pode cancelar a qualquer momento nas configurações da App Store.'
+              : '.\nThe subscription renews automatically unless canceled before the end of the current period.\nYou can cancel anytime in your App Store account settings.'}
           </Text>
         </View>
       </View>
@@ -284,9 +310,12 @@ export const SubscriptionExpiredModal: React.FC<SubscriptionExpiredModalProps> =
   onSubscribe,
   onRestorePurchases,
   isLoading = false,
-  price = '$39.99',
+  price,
 }) => {
   const { locale } = useLanguage();
+  const { price: resolvedPrice, shouldRender: shouldRenderPrice } = usePriceDisplay();
+  const displayPrice = price ?? resolvedPrice;
+  const canShowPrice = price !== undefined || shouldRenderPrice;
 
   return (
     <Modal
@@ -587,6 +616,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
     lineHeight: 16,
+  },
+  legalLink: {
+    color: colors.accent.primary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });
 

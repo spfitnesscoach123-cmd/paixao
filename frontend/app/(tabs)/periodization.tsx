@@ -21,6 +21,7 @@ import { useLanguage } from '../../contexts/LanguageContext';
 import api from '../../services/api';
 import { format, parseISO, isAfter, isBefore, startOfDay } from 'date-fns';
 import { ptBR, enUS } from 'date-fns/locale';
+import InfoTooltip from '../../components/InfoTooltip';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -335,6 +336,15 @@ export default function PeriodizationScreen() {
           <Text style={styles.sectionTitle}>
             {locale === 'pt' ? 'Classificação de Atividades GPS' : 'GPS Activity Classification'}
           </Text>
+          <InfoTooltip
+            testID="tooltip-gps-activity-classification"
+            title={locale === 'pt' ? 'Classificação de Atividades GPS' : 'GPS Activity Classification'}
+            content={
+              locale === 'pt'
+                ? 'Você precisa classificar uma atividade como JOGO. O sistema usará essa informação para definir os valores base de cada jogador em cada métrica. Sempre que uma nova atividade classificada como JOGO apresentar valores superiores, o valor BASE do jogador será recalculado automaticamente.'
+                : 'You need to classify an activity as GAME. The system will use this information to define the base values of each player in each metric. Whenever a new activity classified as GAME shows higher values, the player\'s BASE value will be recalculated automatically.'
+            }
+          />
         </View>
         
         <TouchableOpacity
@@ -682,6 +692,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 2,
   },
   sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     marginBottom: 16,
   },
   sectionTitle: {
