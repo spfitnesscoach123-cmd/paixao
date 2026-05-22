@@ -391,6 +391,22 @@ export default function AthleteWellness() {
           {renderSlider('Qualidade do sono', sleepQuality, setSleepQuality, 'Ruim', 'Excelente')}
           {renderSlider('Fadiga', fatigue, setFatigue, 'Nenhuma', 'Extrema')}
           {renderSlider('Dor muscular', muscleSoreness, setMuscleSoreness, 'Nenhuma', 'Muita')}
+
+          <View style={styles.inputGroup} testID="pain-location-field">
+            <Text style={styles.label}>{t('wellness.painLocation') || 'Local da Dor'}</Text>
+            <TextInput
+              style={styles.painLocationInput}
+              value={painLocation}
+              onChangeText={(txt) => setPainLocation(txt.slice(0, 100))}
+              placeholder={t('wellness.painLocationPlaceholder') || 'Exemplo: Posterior da Coxa Direita'}
+              placeholderTextColor={colors.text.tertiary}
+              maxLength={100}
+              multiline
+              numberOfLines={2}
+              testID="pain-location-input"
+            />
+          </View>
+
           {renderSlider('Estresse', stress, setStress, 'Relaxado', 'Muito estressado')}
           {renderSlider('Humor', mood, setMood, 'Ruim', 'Excelente')}
 
