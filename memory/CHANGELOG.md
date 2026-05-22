@@ -1,6 +1,28 @@
 # CHANGELOG
 
 
+## 2026-05-22 (P1) — Pain Location optional text field (Wellness)
+- **Scope**: Add a single optional free-text field "Pain Location / Local da Dor" (≤100 chars) below the existing muscle_soreness slider in the **I'm a Player → Wellness Form** and surface it on the **Team Dashboard Analytical Table** + **Athlete Profile historical wellness cards**. NO changes to existing wellness math, readiness/fatigue scoring, calculations, flows or layout outside these touchpoints.
+- **Backend**:
+  - `backend/models/wellness_models.py` + `backend/models/shared.py`: added `pain_location: Optional[str] = Field(default=None, max_length=100)` to `WellnessQuestionnaireCreate`, `WellnessQuestionnaire`, `TokenWellnessSubmit`, `PublicWellnessSubmit`.
+  - `backend/routes/wellness/routes.py`: persist `pain_location` in `/wellness/token/submit` (Apple Review APPS26 path + normal path) and `/wellness/public/{link_token}/submit`. Backward compatible — legacy records w/o the field still load.
+  - `backend/routes/dashboard/routes.py` (`/dashboard/team-table`): `TeamTableRow` now exposes `pain_score` (muscle_soreness from latest wellness) and `pain_location` (athlete-typed string). No metric recalculation; pure read-merge.
+- **Frontend**:
+  - `frontend/types/index.ts` and `frontend/components/dashboard/types.ts`: added `pain_location` / `pain_score`.
+  - `frontend/app/athlete-wellness.tsx` ("I'm a Player"): TextInput multiline (maxLength=100) added BELOW "Dor muscular" slider. Existing slider/score behavior untouched. Submits `pain_location` (trimmed, sliced to 100, or `null` if empty).
+  - `frontend/components/dashboard/TeamTable.tsx` + `TeamTableRow.tsx`: new "Dor / Pain" column inserted between Readiness and Fatigue (%). Renders `6/10 • <text>` / `6/10` / `—`. No color logic, no risk highlighting, no sorting.
+  - `frontend/app/athlete/[id].tsx`: new line inside each historical wellness card showing `Pain: 6/10 • Right Hamstring` (or `Pain: 6/10`); hidden entirely if no muscle_soreness recorded.
+  - `frontend/locales/en.json` + `pt.json`: added `wellness.painLocation`, `wellness.painLocationPlaceholder`, `wellness.pain`.
+- **Verification**:
+  - `POST /api/wellness/token/submit` with `pain_location="Posterior da Coxa Direita"` → 200, persisted in MongoDB.
+  - `GET /api/dashboard/team-table` returned the row with `pain_score: 6` and `pain_location: "Posterior da Coxa Direita"`.
+  - `GET /api/wellness/athlete/{id}` returned `muscle_soreness: 6` + `pain_location` on the latest record. Older records still return without the field.
+  - 100-char limit enforced by Pydantic (string_too_long 422 on >100). Frontend also slices/maxLength.
+  - Submission WITHOUT the field still succeeds (backward compatibility).
+  - TypeScript compile shows no new errors related to these files.
+
+
+
 ## 2026-04-28 (P1) — Empty State CSV Entry Point (Athletes Hub)
 - **Scope**: Adicionar botão de entrada CSV na tela "Atletas" quando não há atletas cadastrados. Estado vazio passa a guiar o usuário para importação via CSV (Catapult, Playertek), reutilizando 100% do pipeline existente. Sem alterar lógica de ingestão, parsing, validação, criação de atletas ou Dashboard.
 - **File modificado**: `frontend/app/(tabs)/athletes.tsx`

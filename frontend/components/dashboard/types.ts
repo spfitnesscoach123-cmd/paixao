@@ -16,6 +16,8 @@ export interface TeamTableRowData {
   fatigue_status: string;
   readiness_score: number | null;
   readiness_status: string;
+  pain_score: number | null;
+  pain_location: string | null;
   weight: number | null;
   body_fat: number | null;
   lean_mass: number | null;

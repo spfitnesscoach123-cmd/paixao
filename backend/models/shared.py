@@ -166,6 +166,7 @@ class WellnessQuestionnaireCreate(BaseModel):
     muscle_soreness: int  # 1-10 scale
     hydration: int  # 1-10 scale
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
 
 class WellnessQuestionnaire(BaseModel):
     id: Optional[str] = Field(None, alias="_id")
@@ -182,6 +183,7 @@ class WellnessQuestionnaire(BaseModel):
     wellness_score: Optional[float] = None  # Calculated score
     readiness_score: Optional[float] = None  # Calculated score
     notes: Optional[str] = None
+    pain_location: Optional[str] = None
     submitted_via: Optional[str] = None  # Track submission source
     created_at: datetime = Field(default_factory=datetime.utcnow)
     

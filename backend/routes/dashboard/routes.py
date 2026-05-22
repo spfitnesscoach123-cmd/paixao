@@ -751,6 +751,8 @@ class TeamTableRow(BaseModel):
     fatigue_status: str = "UNKNOWN"
     readiness_score: Optional[float] = None  # 0-100% derived from wellness.readiness_score
     readiness_status: str = "UNKNOWN"
+    pain_score: Optional[int] = None  # muscle_soreness from latest wellness (1-10)
+    pain_location: Optional[str] = None  # athlete-reported text from latest wellness
     weight: Optional[float] = None
     body_fat: Optional[float] = None
     lean_mass: Optional[float] = None
@@ -943,6 +945,8 @@ async def get_team_table(
         fatigue_st = "UNKNOWN"
         readiness_st = "UNKNOWN"
         readiness_pct = None
+        pain_score_val = None
+        pain_location_val = None
         
         w_list = wellness_by_athlete.get(aid, [])
         if w_list:
@@ -969,6 +973,17 @@ async def get_team_table(
                     readiness_st = "NOT_READY"
             elif fatigue_st != "UNKNOWN":
                 readiness_st = fatigue_st
+            
+            # Pain (muscle_soreness score + athlete-typed location text)
+            ms_raw = latest_w.get("muscle_soreness")
+            if ms_raw is not None:
+                try:
+                    pain_score_val = int(round(float(ms_raw)))
+                except (TypeError, ValueError):
+                    pain_score_val = None
+            pl_raw = latest_w.get("pain_location")
+            if isinstance(pl_raw, str) and pl_raw.strip():
+                pain_location_val = pl_raw.strip()
             
             # Fatigue baseline 28d: average of last 28d wellness fatigue values
             fatigue_vals_28d = []
@@ -1002,6 +1017,8 @@ async def get_team_table(
             fatigue_status=fatigue_st,
             readiness_score=readiness_pct,
             readiness_status=readiness_st,
+            pain_score=pain_score_val,
+            pain_location=pain_location_val,
             weight=weight_val,
             body_fat=bf_val,
             lean_mass=lm_val,

@@ -66,6 +66,7 @@ export interface WellnessQuestionnaire {
   wellness_score?: number;
   readiness_score?: number;
   notes?: string;
+  pain_location?: string | null;
   created_at?: string;
 }
 

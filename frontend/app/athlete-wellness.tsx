@@ -10,6 +10,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -57,6 +58,7 @@ export default function AthleteWellness() {
   const [sleepQuality, setSleepQuality] = useState(5);
   const [fatigue, setFatigue] = useState(5);
   const [muscleSoreness, setMuscleSoreness] = useState(5);
+  const [painLocation, setPainLocation] = useState('');
   const [stress, setStress] = useState(5);
   const [mood, setMood] = useState(5);
 
@@ -126,6 +128,7 @@ export default function AthleteWellness() {
         muscle_soreness: muscleSoreness,
         stress,
         mood,
+        pain_location: painLocation.trim() ? painLocation.trim().slice(0, 100) : null,
       });
 
       setFeedback(response.data.feedback);
@@ -581,6 +584,18 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   sliderContainer: {
     marginBottom: 16,
+  },
+  painLocationInput: {
+    backgroundColor: colors.dark.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: colors.text.primary,
+    minHeight: 44,
+    textAlignVertical: 'top',
   },
   sliderLabel: {
     fontSize: 16,

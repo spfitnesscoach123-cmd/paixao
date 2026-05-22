@@ -130,6 +130,24 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
         <FatigueBar value={row.readiness_score} status={row.readiness_status} />
       </View>
 
+      {/* COL: PAIN — athlete-reported pain score (muscle_soreness) + optional location text */}
+      <View style={styles.colPain} data-testid={`pain-cell-${row.athlete_id}`}>
+        {row.pain_score == null ? (
+          <Text style={[styles.painText, { color: colors.text.tertiary }]}>—</Text>
+        ) : row.pain_location ? (
+          <Text
+            style={[styles.painText, { color: colors.text.secondary }]}
+            numberOfLines={2}
+          >
+            {row.pain_score}/10 • {row.pain_location}
+          </Text>
+        ) : (
+          <Text style={[styles.painText, { color: colors.text.secondary }]}>
+            {row.pain_score}/10
+          </Text>
+        )}
+      </View>
+
       {/* COL 8: FADIGA — CMJ-based Neuromuscular Fatigue Index (READ-ONLY derivation) */}
       <View style={styles.colFatigue}>
         {(() => {
@@ -242,6 +260,15 @@ const styles = StyleSheet.create({
     width: 82,
     paddingHorizontal: 4,
     gap: 3,
+  },
+  colPain: {
+    width: 130,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+  },
+  painText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   fatigueValue: {
     fontSize: 11,

@@ -689,6 +689,15 @@ export default function AthleteDetails() {
                         <Text style={styles.dataValue}>{item.hydration || '-'}/10</Text>
                       </View>
                     </View>
+                    {item.muscle_soreness != null && (
+                      <Text
+                        style={styles.painLine}
+                        data-testid={`wellness-pain-line-${item.id || index}`}
+                      >
+                        {`${t('wellness.pain') || 'Pain'}: ${item.muscle_soreness}/10`}
+                        {item.pain_location ? ` • ${item.pain_location}` : ''}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </>
@@ -1178,6 +1187,12 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 12,
     fontStyle: 'italic',
+  },
+  painLine: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text.secondary,
+    marginTop: 10,
   },
   scoreRow: {
     flexDirection: 'row',

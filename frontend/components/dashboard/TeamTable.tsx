@@ -237,6 +237,12 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
               <SortIcon colKey="fatigue_index" />
             </TouchableOpacity>
 
+            <View style={styles.colPain} data-testid="col-pain-header">
+              <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                {locale === 'pt' ? 'Dor' : 'Pain'}
+              </Text>
+            </View>
+
             <TouchableOpacity style={styles.colFatigue} onPress={() => handleSort('rsimod')} data-testid="sort-cmj-fatigue">
               <Text style={[styles.headerText, { color: colors.text.secondary }]}>
                 {locale === 'pt' ? 'Fadiga (%)' : 'Fatigue (%)'}
@@ -376,6 +382,12 @@ const styles = StyleSheet.create({
   },
   colFatigue: {
     width: 82,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  colPain: {
+    width: 130,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,

@@ -192,6 +192,7 @@ class TokenWellnessSubmit(BaseModel):
     mood: int  # 1-10
     hydration: Optional[int] = None  # 1-10
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
 
 def generate_token_code() -> str:
     """Generate a 6-character alphanumeric token (uppercase letters + digits)"""
@@ -406,6 +407,7 @@ async def submit_wellness_via_token(data: TokenWellnessSubmit):
                 "hydration": data.hydration or 5,
                 "readiness_score": readiness_score,
                 "notes": data.notes,
+                "pain_location": data.pain_location,
                 "created_at": datetime.utcnow(),
                 "submitted_via": "apple_review_token",
                 "token_id": token_code,
@@ -510,6 +512,7 @@ async def submit_wellness_via_token(data: TokenWellnessSubmit):
         "hydration": data.hydration or 5,
         "readiness_score": readiness_score,
         "notes": data.notes,
+        "pain_location": data.pain_location,
         "created_at": datetime.utcnow(),
         "submitted_via": "wellness_token",
         "token_id": token_code,
@@ -626,6 +629,7 @@ class PublicWellnessSubmit(BaseModel):
     hydration: Optional[int] = None  # 1-10
     nutrition: Optional[int] = None  # 1-10
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
 
 @router.post("/wellness/generate-link")
 async def generate_wellness_link(
@@ -726,6 +730,7 @@ async def submit_public_wellness(
         "nutrition": wellness_data.nutrition,
         "readiness_score": readiness_score,
         "notes": wellness_data.notes,
+        "pain_location": wellness_data.pain_location,
         "created_at": datetime.utcnow(),
         "submitted_via": "public_link"
     }

@@ -16,6 +16,7 @@ class WellnessQuestionnaireCreate(BaseModel):
     muscle_soreness: int
     hydration: int
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
 
 
 class WellnessQuestionnaire(BaseModel):
@@ -33,6 +34,7 @@ class WellnessQuestionnaire(BaseModel):
     wellness_score: Optional[float] = None
     readiness_score: Optional[float] = None
     notes: Optional[str] = None
+    pain_location: Optional[str] = None
     submitted_via: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
@@ -111,6 +113,7 @@ class TokenWellnessSubmit(BaseModel):
     mood: int
     hydration: Optional[int] = None
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
 
 
 class WellnessLinkCreate(BaseModel):
@@ -143,3 +146,4 @@ class PublicWellnessSubmit(BaseModel):
     hydration: Optional[int] = None
     nutrition: Optional[int] = None
     notes: Optional[str] = None
+    pain_location: Optional[str] = Field(default=None, max_length=100)
