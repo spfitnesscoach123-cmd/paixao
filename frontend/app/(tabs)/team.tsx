@@ -42,10 +42,18 @@ export default function TeamDashboard() {
   const [refreshing, setRefreshing] = React.useState(false);
   const [selectedDateRange, setSelectedDateRange] = React.useState('7d');
   const [dateModalVisible, setDateModalVisible] = React.useState(false);
+  // Operational Team-Dashboard-only filters (GPS-only, additive).
+  // null = "all sessions" / "all periods" → legacy behavior preserved.
+  const [selectedSession, setSelectedSession] = React.useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = React.useState<string | null>(null);
+  const [sessionModalVisible, setSessionModalVisible] = React.useState(false);
+  const [periodModalVisible, setPeriodModalVisible] = React.useState(false);
   // Holds the user's intent between Modal dismiss tap and native
   // UIViewController teardown completion. Mirrors the pattern used in
   // profile.tsx for language switching to avoid native cascade races.
   const pendingDateRangeRef = React.useRef<string | null>(null);
+  const pendingSessionRef = React.useRef<string | null | undefined>(undefined);
+  const pendingPeriodRef = React.useRef<string | null | undefined>(undefined);
 
   // Basic team query (for empty state detection)
   const { data: basicData, isLoading: basicLoading, error: basicError, refetch: basicRefetch } = useQuery({
@@ -56,8 +64,42 @@ export default function TeamDashboard() {
     },
   });
 
-  // Table data query
-  const { data: tableData, isLoading: tableLoading, refetch: tableRefetch } = useTeamTableData(selectedDateRange);
+  // Table data query (GPS-only filters propagated; wellness/RSImod/body unaffected by backend)
+  const { data: tableData, isLoading: tableLoading, refetch: tableRefetch } = useTeamTableData(
+    selectedDateRange,
+    selectedSession,
+    selectedPeriod,
+  );
+
+  // Session-names discovery (respects current date_range)
+  const { data: sessionNamesData } = useQuery({
+    queryKey: ['team-table-session-names', selectedDateRange],
+    queryFn: async () => {
+      const res = await api.get<{ sessions: { session_name: string; count: number; last_date: string }[] }>(
+        `/dashboard/team-table/session-names?date_range=${selectedDateRange}`,
+      );
+      return res.data;
+    },
+  });
+  const sessionOptions = sessionNamesData?.sessions || [];
+
+  // Session-periods discovery (only when a session is selected, respects current date_range)
+  const { data: sessionPeriodsData } = useQuery({
+    queryKey: ['team-table-session-periods', selectedDateRange, selectedSession],
+    queryFn: async () => {
+      if (!selectedSession) return { periods: [] as string[] };
+      const params = new URLSearchParams({
+        session_name: selectedSession,
+        date_range: selectedDateRange,
+      });
+      const res = await api.get<{ periods: string[] }>(
+        `/dashboard/team-table/session-periods?${params.toString()}`,
+      );
+      return res.data;
+    },
+    enabled: !!selectedSession,
+  });
+  const periodOptions = sessionPeriodsData?.periods || [];
 
   useFocusEffect(
     React.useCallback(() => {
@@ -84,16 +126,63 @@ export default function TeamDashboard() {
     const pending = pendingDateRangeRef.current;
     if (pending && pending !== selectedDateRange) {
       pendingDateRangeRef.current = null;
+      // Changing the date window invalidates the current session/period context.
+      // Reset both so the user is never left filtering on a value that is
+      // out of the new temporal scope.
+      setSelectedSession(null);
+      setSelectedPeriod(null);
       setSelectedDateRange(pending);
     } else {
       pendingDateRangeRef.current = null;
     }
   }, [selectedDateRange]);
 
+  const handleSessionSelect = React.useCallback((value: string | null) => {
+    pendingSessionRef.current = value;
+    setSessionModalVisible(false);
+  }, []);
+
+  const handleSessionModalDismiss = React.useCallback(() => {
+    const pending = pendingSessionRef.current;
+    if (pending !== undefined && pending !== selectedSession) {
+      pendingSessionRef.current = undefined;
+      setSelectedSession(pending);
+      // Switching session invalidates current period; reset.
+      setSelectedPeriod(null);
+    } else {
+      pendingSessionRef.current = undefined;
+    }
+  }, [selectedSession]);
+
+  const handlePeriodSelect = React.useCallback((value: string | null) => {
+    pendingPeriodRef.current = value;
+    setPeriodModalVisible(false);
+  }, []);
+
+  const handlePeriodModalDismiss = React.useCallback(() => {
+    const pending = pendingPeriodRef.current;
+    if (pending !== undefined && pending !== selectedPeriod) {
+      pendingPeriodRef.current = undefined;
+      setSelectedPeriod(pending);
+    } else {
+      pendingPeriodRef.current = undefined;
+    }
+  }, [selectedPeriod]);
+
   const getCurrentDateRangeLabel = React.useCallback(() => {
     const range = DATE_RANGES.find(r => r.key === selectedDateRange);
     return range ? (locale === 'pt' ? range.labelPt : range.labelEn) : '7 dias';
   }, [selectedDateRange, locale]);
+
+  const getCurrentSessionLabel = React.useCallback(() => {
+    if (!selectedSession) return locale === 'pt' ? 'Todas as sessões' : 'All sessions';
+    return selectedSession;
+  }, [selectedSession, locale]);
+
+  const getCurrentPeriodLabel = React.useCallback(() => {
+    if (!selectedPeriod) return locale === 'pt' ? 'Todos os períodos' : 'All periods';
+    return selectedPeriod;
+  }, [selectedPeriod, locale]);
 
   const handleRowPress = React.useCallback((row: TeamTableRowData) => {
     router.push(`/athlete/${row.athlete_id}`);
@@ -204,7 +293,7 @@ export default function TeamDashboard() {
             </View>
           )}
 
-          {/* DATE FILTER */}
+          {/* DATE / SESSION / PERIOD FILTERS */}
           {!hasNoData && (
             <View style={styles.filterRow}>
               <TouchableOpacity
@@ -218,6 +307,50 @@ export default function TeamDashboard() {
                 </Text>
                 <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  {
+                    borderColor: selectedSession ? colors.accent.primary : colors.border.default,
+                    backgroundColor: colors.dark.card,
+                  },
+                ]}
+                onPress={() => setSessionModalVisible(true)}
+                data-testid="session-filter-button"
+              >
+                <Ionicons name="albums-outline" size={16} color={colors.accent.primary} />
+                <Text
+                  style={[styles.filterButtonText, { color: colors.text.secondary, maxWidth: 140 }]}
+                  numberOfLines={1}
+                >
+                  {getCurrentSessionLabel()}
+                </Text>
+                <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
+              </TouchableOpacity>
+
+              {selectedSession && periodOptions.length > 0 && (
+                <TouchableOpacity
+                  style={[
+                    styles.filterButton,
+                    {
+                      borderColor: selectedPeriod ? colors.accent.primary : colors.border.default,
+                      backgroundColor: colors.dark.card,
+                    },
+                  ]}
+                  onPress={() => setPeriodModalVisible(true)}
+                  data-testid="period-filter-button"
+                >
+                  <Ionicons name="time-outline" size={16} color={colors.accent.primary} />
+                  <Text
+                    style={[styles.filterButtonText, { color: colors.text.secondary, maxWidth: 120 }]}
+                    numberOfLines={1}
+                  >
+                    {getCurrentPeriodLabel()}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color={colors.text.tertiary} />
+                </TouchableOpacity>
+              )}
 
               {tableData?.period_label && (
                 <Text style={[styles.periodLabel, { color: colors.text.tertiary }]}>
@@ -344,6 +477,285 @@ export default function TeamDashboard() {
                 )}
               </TouchableOpacity>
             ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Session Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={sessionModalVisible}
+        onRequestClose={() => setSessionModalVisible(false)}
+        onDismiss={handleSessionModalDismiss}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setSessionModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.dark.cardSolid }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {locale === 'pt' ? 'Selecionar Sessão' : 'Select Session'}
+              </Text>
+              <TouchableOpacity onPress={() => setSessionModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+              <TouchableOpacity
+                style={[
+                  styles.optionRow,
+                  {
+                    backgroundColor: selectedSession === null
+                      ? 'rgba(47, 182, 255, 0.1)'
+                      : colors.dark.secondary,
+                    borderColor: selectedSession === null
+                      ? colors.accent.primary
+                      : colors.border.default,
+                  },
+                ]}
+                onPress={() => handleSessionSelect(null)}
+                data-testid="session-option-all"
+              >
+                <View style={styles.optionContent}>
+                  <View
+                    style={[
+                      styles.radio,
+                      {
+                        borderColor: selectedSession === null
+                          ? colors.accent.primary
+                          : colors.text.tertiary,
+                      },
+                    ]}
+                  >
+                    {selectedSession === null && (
+                      <View style={[styles.radioInner, { backgroundColor: colors.accent.primary }]} />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      {
+                        color: selectedSession === null
+                          ? colors.text.primary
+                          : colors.text.secondary,
+                        fontWeight: selectedSession === null ? '600' : '500',
+                      },
+                    ]}
+                  >
+                    {locale === 'pt' ? 'Todas as sessões' : 'All sessions'}
+                  </Text>
+                </View>
+                {selectedSession === null && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+
+              {sessionOptions.length === 0 ? (
+                <Text
+                  style={{
+                    color: colors.text.tertiary,
+                    fontSize: 13,
+                    textAlign: 'center',
+                    paddingVertical: 18,
+                  }}
+                >
+                  {locale === 'pt'
+                    ? 'Nenhuma sessão na janela atual'
+                    : 'No sessions in current window'}
+                </Text>
+              ) : (
+                sessionOptions.map((opt) => {
+                  const active = selectedSession === opt.session_name;
+                  return (
+                    <TouchableOpacity
+                      key={opt.session_name}
+                      style={[
+                        styles.optionRow,
+                        {
+                          backgroundColor: active
+                            ? 'rgba(47, 182, 255, 0.1)'
+                            : colors.dark.secondary,
+                          borderColor: active
+                            ? colors.accent.primary
+                            : colors.border.default,
+                        },
+                      ]}
+                      onPress={() => handleSessionSelect(opt.session_name)}
+                      data-testid={`session-option-${opt.session_name}`}
+                    >
+                      <View style={[styles.optionContent, { flex: 1 }]}>
+                        <View
+                          style={[
+                            styles.radio,
+                            {
+                              borderColor: active
+                                ? colors.accent.primary
+                                : colors.text.tertiary,
+                            },
+                          ]}
+                        >
+                          {active && (
+                            <View style={[styles.radioInner, { backgroundColor: colors.accent.primary }]} />
+                          )}
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[
+                              styles.optionText,
+                              {
+                                color: active ? colors.text.primary : colors.text.secondary,
+                                fontWeight: active ? '600' : '500',
+                              },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {opt.session_name}
+                          </Text>
+                          <Text style={{ color: colors.text.tertiary, fontSize: 11, marginTop: 2 }}>
+                            {opt.last_date} • {opt.count} {locale === 'pt' ? 'registros' : 'records'}
+                          </Text>
+                        </View>
+                      </View>
+                      {active && (
+                        <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+            </ScrollView>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Period Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent
+        visible={periodModalVisible}
+        onRequestClose={() => setPeriodModalVisible(false)}
+        onDismiss={handlePeriodModalDismiss}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setPeriodModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: colors.dark.cardSolid }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {locale === 'pt' ? 'Selecionar Período da Sessão' : 'Select Session Period'}
+              </Text>
+              <TouchableOpacity onPress={() => setPeriodModalVisible(false)}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+              <TouchableOpacity
+                style={[
+                  styles.optionRow,
+                  {
+                    backgroundColor: selectedPeriod === null
+                      ? 'rgba(47, 182, 255, 0.1)'
+                      : colors.dark.secondary,
+                    borderColor: selectedPeriod === null
+                      ? colors.accent.primary
+                      : colors.border.default,
+                  },
+                ]}
+                onPress={() => handlePeriodSelect(null)}
+                data-testid="period-option-all"
+              >
+                <View style={styles.optionContent}>
+                  <View
+                    style={[
+                      styles.radio,
+                      {
+                        borderColor: selectedPeriod === null
+                          ? colors.accent.primary
+                          : colors.text.tertiary,
+                      },
+                    ]}
+                  >
+                    {selectedPeriod === null && (
+                      <View style={[styles.radioInner, { backgroundColor: colors.accent.primary }]} />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      {
+                        color: selectedPeriod === null
+                          ? colors.text.primary
+                          : colors.text.secondary,
+                        fontWeight: selectedPeriod === null ? '600' : '500',
+                      },
+                    ]}
+                  >
+                    {locale === 'pt' ? 'Todos os períodos' : 'All periods'}
+                  </Text>
+                </View>
+                {selectedPeriod === null && (
+                  <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                )}
+              </TouchableOpacity>
+
+              {periodOptions.map((p) => {
+                const active = selectedPeriod === p;
+                return (
+                  <TouchableOpacity
+                    key={p}
+                    style={[
+                      styles.optionRow,
+                      {
+                        backgroundColor: active
+                          ? 'rgba(47, 182, 255, 0.1)'
+                          : colors.dark.secondary,
+                        borderColor: active
+                          ? colors.accent.primary
+                          : colors.border.default,
+                      },
+                    ]}
+                    onPress={() => handlePeriodSelect(p)}
+                    data-testid={`period-option-${p}`}
+                  >
+                    <View style={styles.optionContent}>
+                      <View
+                        style={[
+                          styles.radio,
+                          {
+                            borderColor: active
+                              ? colors.accent.primary
+                              : colors.text.tertiary,
+                          },
+                        ]}
+                      >
+                        {active && (
+                          <View style={[styles.radioInner, { backgroundColor: colors.accent.primary }]} />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.optionText,
+                          {
+                            color: active ? colors.text.primary : colors.text.secondary,
+                            fontWeight: active ? '600' : '500',
+                          },
+                        ]}
+                      >
+                        {p}
+                      </Text>
+                    </View>
+                    {active && (
+                      <Ionicons name="checkmark-circle" size={20} color={colors.accent.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         </Pressable>
       </Modal>
@@ -479,7 +891,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    gap: 12,
+    gap: 8,
+    flexWrap: 'wrap',
   },
   filterButton: {
     flexDirection: 'row',

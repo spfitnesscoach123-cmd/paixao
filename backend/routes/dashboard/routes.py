@@ -765,11 +765,20 @@ class TeamTableResponse(BaseModel):
 async def get_team_table(
     lang: str = "pt",
     date_range: str = "7d",
+    session_name: Optional[str] = None,
+    period_name: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Aggregated table data for the analytical team table.
     Merges GPS, Jump, BodyComp and Wellness into a single flat row per athlete.
-    NO metric recalculation — only read and merge."""
+    NO metric recalculation — only read and merge.
+
+    Optional Team-Dashboard-only operational filters (additive, backward compatible):
+      - session_name: when provided, only GPS records with matching session_name are aggregated.
+      - period_name: when provided WITH session_name, narrows the GPS aggregation to that
+        specific period. Wellness, RSImod and Body Composition remain UNAFFECTED by these
+        filters — they always follow date_range only.
+    """
     
     user_id = current_user["_id"]
     
@@ -804,6 +813,19 @@ async def get_team_table(
         "coach_id": user_id,
         "date": {"$gte": filter_start_str}
     }).to_list(5000)
+
+    # ── Team-Dashboard-only operational filters (additive, GPS-only) ──
+    # Applied AFTER the date-window query, BEFORE existing dedup heuristic.
+    # When neither filter is set, behavior is byte-identical to the legacy path.
+    # Wellness, RSImod and Body Composition aggregations below remain untouched.
+    if session_name:
+        sn_norm = session_name.strip()
+        if sn_norm:
+            all_gps = [r for r in all_gps if (r.get("session_name") or "").strip() == sn_norm]
+            if period_name:
+                pn_norm = period_name.strip()
+                if pn_norm:
+                    all_gps = [r for r in all_gps if (r.get("period_name") or "").strip() == pn_norm]
     
     all_jumps = await db.jump_assessments.find({
         "coach_id": user_id
@@ -1027,6 +1049,99 @@ async def get_team_table(
     rows.sort(key=lambda r: r.total_distance, reverse=True)
     
     return TeamTableResponse(rows=rows, period_label=period_labels.get(date_range, "7d"))
+
+
+# ─── Team Dashboard discovery endpoints (filters) ──────────────────────────
+# Additive endpoints used exclusively by the Team Dashboard filter UI.
+# They respect the same date_range window already used by /dashboard/team-table
+# so the picker never lists sessions or periods outside the current operational
+# context. NO impact on dashboards, ACWR, load engine, scientific reports,
+# athlete profile or any read path outside the Team Dashboard.
+
+def _team_table_filter_start_str(date_range: str) -> str:
+    """Replicates the date_range → start-date string logic used in get_team_table.
+    Kept inline (no shared util) to avoid touching any other code path."""
+    date_range_days = {"today": 0, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_days.get(date_range, 7)
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    if filter_days == 0:
+        filter_start = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start = today - timedelta(days=filter_days)
+    return filter_start.strftime("%Y-%m-%d")
+
+
+@router.get("/dashboard/team-table/session-names")
+async def get_team_table_session_names(
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user),
+):
+    """List distinct session_name values present in gps_data for the current
+    coach within the same date window used by /dashboard/team-table.
+    Returns: [{ session_name, count, last_date }] sorted by last_date DESC."""
+    user_id = current_user["_id"]
+    filter_start_str = _team_table_filter_start_str(date_range)
+
+    cursor = db.gps_data.find(
+        {
+            "coach_id": user_id,
+            "date": {"$gte": filter_start_str},
+        },
+        {"session_name": 1, "date": 1},
+    )
+
+    bucket: Dict[str, Dict[str, Any]] = {}
+    async for doc in cursor:
+        sn = (doc.get("session_name") or "").strip()
+        if not sn:
+            continue
+        d = (doc.get("date") or "").strip()
+        b = bucket.get(sn)
+        if b is None:
+            bucket[sn] = {"session_name": sn, "count": 1, "last_date": d}
+        else:
+            b["count"] += 1
+            if d and d > (b["last_date"] or ""):
+                b["last_date"] = d
+
+    items = list(bucket.values())
+    items.sort(key=lambda x: (x.get("last_date") or "", x.get("session_name") or ""), reverse=True)
+    return {"sessions": items}
+
+
+@router.get("/dashboard/team-table/session-periods")
+async def get_team_table_session_periods(
+    session_name: str,
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user),
+):
+    """List distinct period_name values inside a given session_name, restricted
+    to the current Team Dashboard date window. Empty period_name values are
+    ignored. Returns: [period_name]."""
+    user_id = current_user["_id"]
+    sn = (session_name or "").strip()
+    if not sn:
+        return {"periods": []}
+    filter_start_str = _team_table_filter_start_str(date_range)
+
+    cursor = db.gps_data.find(
+        {
+            "coach_id": user_id,
+            "date": {"$gte": filter_start_str},
+            "session_name": sn,
+        },
+        {"period_name": 1},
+    )
+    seen: List[str] = []
+    seen_set = set()
+    async for doc in cursor:
+        pn = (doc.get("period_name") or "").strip()
+        if not pn or pn in seen_set:
+            continue
+        seen_set.add(pn)
+        seen.append(pn)
+    return {"periods": seen}
 
 
 

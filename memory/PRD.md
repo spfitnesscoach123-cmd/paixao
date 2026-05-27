@@ -198,3 +198,33 @@ Implementação **estritamente aditiva** no fluxo de import assistido (`upload-c
 - ✅ Nenhuma migration criada.
 - ✅ Nenhum endpoint legado quebrado — chamadas sem os novos campos continuam idênticas ao comportamento histórico.
 - ✅ Testado backend e2e com curl (4 registros, com e sem os novos parâmetros).
+
+
+## Team Dashboard — Session & Period Operational Filters (Fev 2026)
+Implementação **estritamente aditiva e isolada ao Team Dashboard**. Permite que o coach analise dados GPS por sessão específica e por período da sessão (Warmup / 1st Half / 2nd Half / Session, etc.), sem impactar dashboards globais, cálculos científicos ou perfis individuais.
+
+### Novos endpoints (additivos, escopo Team Dashboard)
+- `GET /api/dashboard/team-table/session-names?date_range=7d` — lista `[{ session_name, count, last_date }]` distinto **dentro da mesma janela de data** usada por `team-table`.
+- `GET /api/dashboard/team-table/session-periods?session_name=X&date_range=7d` — lista `period_name` distinto da sessão informada, **respeitando o mesmo `date_range`**.
+
+### Endpoint estendido
+- `GET /api/dashboard/team-table` aceita dois novos query params opcionais: `session_name`, `period_name`. Quando ausentes, comportamento byte-idêntico ao legado. Quando presentes, filtram **apenas a agregação GPS** antes do dedup heurístico — Wellness, RSImod e Body Composition seguem inalterados (apenas date_range).
+
+### Frontend (Team Dashboard)
+- 2 novos pickers (Session + Period) ao lado do filtro de data existente, na mesma linguagem visual (mesmos `filterButton`/`Modal`/`optionRow` styles).
+- Picker Period só aparece quando uma sessão é selecionada.
+- Trocar `date_range` reseta automaticamente `session` e `period` (impossível filtrar por valor fora da janela atual).
+- Trocar `session` reseta `period`.
+- Componentes que afetam: StackedBarChart, ScatterPlot, colunas GPS da TeamTable. **Não afetados**: NeuromuscularChart, colunas RSImod/Prontidão/Fadiga/Dor/Body da TeamTable (backend já os preenche independente do filtro GPS).
+
+### Arquivos alterados
+- `backend/routes/dashboard/routes.py`: extensão do `get_team_table` (filtro GPS-only) + 2 novos endpoints discovery.
+- `frontend/hooks/useTeamTableData.ts`: aceita `sessionName?` e `periodName?` opcionais.
+- `frontend/app/(tabs)/team.tsx`: estado + 2 queries + 2 botões de filtro + 2 modais (mesmo padrão visual do existente).
+
+### Confirmações (validado por screenshots e curl e2e)
+- ✅ `/dashboard/team`, `/dashboard/overview`, ACWR, EWMA, load engine, scientific reports, periodization, readiness, wellness, athlete profile, neuromuscular logic — **nenhuma alteração**.
+- ✅ Nenhuma migration, nenhuma collection nova, nenhuma normalização retroativa.
+- ✅ Heurística de keyword matching (`_GPS_SESSION_KW`/`_GPS_PERIOD_KW`) **preservada** — funciona como fallback para imports antigos sem `record_type`.
+- ✅ Discovery endpoints respeitam `date_range` (sessões/períodos fora da janela não aparecem na UI).
+- ✅ Teste e2e: bar chart muda de ~9.0 km (sessão completa) para ~3.6 km (1ST HALF only) ao aplicar os filtros.
