@@ -61,8 +61,11 @@ export const ScatterPlot = React.memo(function ScatterPlot({
   }, [pulseAnim]);
 
   // Responsive chart sizing — use measured container width (true full-width), not window
-  // Fallback to winWidth-48 when not measured yet (initial paint).
-  const effectiveW = containerWidth ?? Math.min(winWidth - 48, 1600);
+  // Fallback respects the page's content max-width (scrollContent.maxWidth=1100
+  // minus 32px page padding minus 28px card padding ≈ 1040). This avoids the
+  // initial-paint overflow when `onLayout` hasn't yet reported the measured
+  // width on wide viewports (RN-Web quirk).
+  const effectiveW = containerWidth ?? Math.min(winWidth - 48, 1040);
   const CHART_W = Math.max(320, effectiveW - 24); // 24px = horizontal card padding (12px each side)
   const CHART_H = effectiveW >= 900 ? 380 : effectiveW >= 600 ? 300 : 220;
   const PLOT_W = CHART_W - PAD.left - PAD.right;
@@ -366,6 +369,7 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 16,
     width: '100%',
+    overflow: 'hidden',
   },
   loadingWrap: {
     height: 200,
