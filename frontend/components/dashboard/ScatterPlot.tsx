@@ -20,7 +20,7 @@ const STATUS_COLORS: Record<string, string> = {
   UNKNOWN: '#64748b',
 };
 
-const PAD = { top: 16, right: 12, bottom: 32, left: 44 };
+const PAD = { top: 16, right: 16, bottom: 32, left: 36 };
 const DOT_R = 6;
 
 interface Props {
@@ -60,13 +60,16 @@ export const ScatterPlot = React.memo(function ScatterPlot({
     return () => pulseAnim.removeListener(id);
   }, [pulseAnim]);
 
-  // Responsive chart sizing — use measured container width (true full-width), not window
-  // Fallback respects the page's content max-width (scrollContent.maxWidth=1100
-  // minus 32px page padding minus 28px card padding ≈ 1040). This avoids the
-  // initial-paint overflow when `onLayout` hasn't yet reported the measured
-  // width on wide viewports (RN-Web quirk).
+  // Responsive chart sizing — use measured container width (true full-width), not window.
+  // Fallback respects the page content max-width (scrollContent.maxWidth=1100
+  // minus 32px page padding minus 28px card padding = 1040). On RN-Web in wide
+  // viewports, onLayout sometimes does not propagate the measured width — this
+  // fallback prevents initial-paint overflow.
   const effectiveW = containerWidth ?? Math.min(winWidth - 48, 1040);
-  const CHART_W = Math.max(320, effectiveW - 24); // 24px = horizontal card padding (12px each side)
+  // CHART_W subtracts the card's REAL horizontal padding (14 * 2 = 28) so the
+  // SVG fits exactly inside the card content area on every viewport (iPhone
+  // included) — eliminating the previous 4px right-shift visual asymmetry.
+  const CHART_W = Math.max(280, effectiveW - 28);
   const CHART_H = effectiveW >= 900 ? 380 : effectiveW >= 600 ? 300 : 220;
   const PLOT_W = CHART_W - PAD.left - PAD.right;
   const PLOT_H = CHART_H - PAD.top - PAD.bottom;
