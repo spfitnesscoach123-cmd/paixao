@@ -413,6 +413,28 @@ def analyze_csv(raw_content: bytes, filename: str = "upload.csv") -> Dict[str, A
     # Sample rows (first 5)
     sample_rows = rows[:5]
 
+    # Unique values per column for low-cardinality columns (e.g. period_name).
+    # ADDITIVE: used by the assisted-mapping UI to let the user pick which
+    # period_name value represents the TOTAL session. Capped to keep payload
+    # small and ignore continuous numeric/text columns.
+    unique_values_by_column: Dict[str, List[str]] = {}
+    UNIQUE_CARDINALITY_CAP = 30
+    for h in headers:
+        seen: List[str] = []
+        seen_set = set()
+        for r in rows:
+            v = (r.get(h, "") or "").strip()
+            if not v:
+                continue
+            if v in seen_set:
+                continue
+            seen_set.add(v)
+            seen.append(v)
+            if len(seen) > UNIQUE_CARDINALITY_CAP:
+                break
+        if 0 < len(seen) <= UNIQUE_CARDINALITY_CAP:
+            unique_values_by_column[h] = seen
+
     # Confidence score
     required_fields = [f for f in INTERNAL_FIELDS if INTERNAL_FIELDS[f]["group"] == "required"]
     required_mapped = sum(1 for f in required_fields if auto_mapping[f]["csv_column"])
@@ -457,6 +479,7 @@ def analyze_csv(raw_content: bytes, filename: str = "upload.csv") -> Dict[str, A
         "field_groups": field_groups,
         "unmapped_columns": unmapped_columns,
         "sample_rows": sample_rows,
+        "unique_values_by_column": unique_values_by_column,
         "metadata": metadata,
         "warnings": warnings,
     }

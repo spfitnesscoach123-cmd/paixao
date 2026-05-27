@@ -31,6 +31,7 @@ interface Analysis {
   auto_mapping: Record<string, { csv_column: string | null; confidence: number; suggestions: any[] }>;
   field_groups: Record<FieldGroup, FieldInfo[]>;
   unmapped_columns: string[]; sample_rows: Record<string, string>[];
+  unique_values_by_column?: Record<string, string[]>;
   metadata: Record<string, string>; warnings: any[];
   existing_athletes: { id: string; name: string }[];
 }
@@ -58,6 +59,9 @@ export default function UploadCSV() {
   const [templates, setTemplates] = useState<any[]>([]);
   const [templateName, setTemplateName] = useState('');
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  // Optional, additive Session Configuration (preserves legacy behavior when empty)
+  const [activityName, setActivityName] = useState('');
+  const [sessionTotalPeriod, setSessionTotalPeriod] = useState<string | null>(null);
 
   const pickFile = useCallback(async () => {
     try {
@@ -93,6 +97,10 @@ export default function UploadCSV() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setAnalysis(resp);
+      // Default Activity Name = filename without .csv (matches legacy behavior)
+      const defaultName = (asset.name || 'upload.csv').replace(/\.csv$/i, '');
+      setActivityName(defaultName);
+      setSessionTotalPeriod(null);
       // Init mapping from auto-mapping
       const initMap: Record<string, string | null> = {};
       for (const [key, val] of Object.entries(resp.auto_mapping)) {
@@ -150,6 +158,10 @@ export default function UploadCSV() {
       }
       formData.append('mapping_json', JSON.stringify(mapping));
       formData.append('create_missing', 'true');
+      // Additive Session Configuration (backend treats both as optional/nullable)
+      const activityNameTrim = (activityName || '').trim();
+      if (activityNameTrim) formData.append('activity_name', activityNameTrim);
+      if (sessionTotalPeriod) formData.append('session_total_period', sessionTotalPeriod);
 
       const { data: resp } = await api.post('/csv/import-mapped', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -172,7 +184,7 @@ export default function UploadCSV() {
     } finally {
       setImporting(false);
     }
-  }, [fileContent, fileUri, analysis, mapping, fileName, qc]);
+  }, [fileContent, fileUri, analysis, mapping, fileName, qc, activityName, sessionTotalPeriod]);
 
   // Public entrypoint used by the Import buttons. If session_date is not mapped,
   // show a heads-up confirmation; backend will fall back to today's date.
@@ -416,6 +428,80 @@ export default function UploadCSV() {
                   </Text>
                 </View>
               </View>
+            </View>
+
+            {/* Session Configuration (optional / additive) */}
+            <View style={s.sessionCfgCard}>
+              <View style={s.sessionCfgHeader}>
+                <Ionicons name="options-outline" size={18} color={C.accent} />
+                <Text style={s.sectionTitle}>Configuração da Sessão</Text>
+              </View>
+
+              <Text style={s.sessionCfgLabel}>Nome da Atividade</Text>
+              <TextInput
+                style={s.sessionCfgInput}
+                value={activityName}
+                onChangeText={setActivityName}
+                placeholder={fileName.replace(/\.csv$/i, '') || 'Ex.: Jogo vs Al Jazira'}
+                placeholderTextColor={C.textTer}
+                data-testid="csv-activity-name-input"
+              />
+              <Text style={s.sessionCfgHint}>
+                Esse nome substitui o nome do arquivo nos dashboards. Deixe em branco para usar o padrão.
+              </Text>
+
+              {(() => {
+                const periodCol = mapping['period_name'];
+                const uniqueMap = analysis.unique_values_by_column || {};
+                const periodValues: string[] = (periodCol && uniqueMap[periodCol]) || [];
+                if (!periodCol || periodValues.length === 0) {
+                  return (
+                    <Text style={[s.sessionCfgHint, { marginTop: 12 }]}>
+                      Nenhuma coluna de período mapeada ou sem valores distintos. A seleção do total da sessão está desabilitada.
+                    </Text>
+                  );
+                }
+                return (
+                  <View style={{ marginTop: 14 }}>
+                    <Text style={s.sessionCfgLabel}>Qual período representa o TOTAL da sessão?</Text>
+                    <Text style={s.sessionCfgHint}>Opcional. Se nada for selecionado, o comportamento atual é mantido.</Text>
+                    <View style={{ marginTop: 8 }}>
+                      <TouchableOpacity
+                        style={[s.periodOption, sessionTotalPeriod === null && s.periodOptionActive]}
+                        onPress={() => setSessionTotalPeriod(null)}
+                        data-testid="period-option-none"
+                      >
+                        <Ionicons
+                          name={sessionTotalPeriod === null ? 'radio-button-on' : 'radio-button-off'}
+                          size={18}
+                          color={sessionTotalPeriod === null ? C.accent : C.textTer}
+                        />
+                        <Text style={[s.periodOptionText, sessionTotalPeriod === null && { color: C.accent }]}>
+                          Nenhum (manter comportamento atual)
+                        </Text>
+                      </TouchableOpacity>
+                      {periodValues.map(v => {
+                        const active = sessionTotalPeriod === v;
+                        return (
+                          <TouchableOpacity
+                            key={v}
+                            style={[s.periodOption, active && s.periodOptionActive]}
+                            onPress={() => setSessionTotalPeriod(v)}
+                            data-testid={`period-option-${v}`}
+                          >
+                            <Ionicons
+                              name={active ? 'radio-button-on' : 'radio-button-off'}
+                              size={18}
+                              color={active ? C.accent : C.textTer}
+                            />
+                            <Text style={[s.periodOptionText, active && { color: C.accent }]} numberOfLines={1}>{v}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                );
+              })()}
             </View>
 
             {/* Data Preview */}
@@ -696,6 +782,15 @@ const s = StyleSheet.create({
   confPillText: { fontSize: 13, fontWeight: '700' },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: C.text, marginBottom: 10 },
   sectionTitleSmall: { fontSize: 13, fontWeight: '600', color: C.textSec, marginBottom: 6 },
+  // Session Configuration card (additive, same visual language as other review cards)
+  sessionCfgCard: { backgroundColor: C.card, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: C.border, marginBottom: 16 },
+  sessionCfgHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  sessionCfgLabel: { fontSize: 12, fontWeight: '600', color: C.textSec, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sessionCfgInput: { backgroundColor: C.cardAlt, borderRadius: 10, padding: 12, color: C.text, fontSize: 13, borderWidth: 1, borderColor: C.border },
+  sessionCfgHint: { fontSize: 11, color: C.textTer, marginTop: 6, lineHeight: 16 },
+  periodOption: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: C.border, backgroundColor: C.cardAlt, marginBottom: 6 },
+  periodOptionActive: { borderColor: C.accent, backgroundColor: 'rgba(47,182,255,0.08)' },
+  periodOptionText: { fontSize: 13, color: C.text, flex: 1 },
   // Preview
   previewCard: { backgroundColor: C.card, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: C.border, marginBottom: 16 },
   previewHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border, paddingBottom: 6, marginBottom: 4 },

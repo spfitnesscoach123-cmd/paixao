@@ -119,18 +119,27 @@ async def csv_import_mapped(
     file: UploadFile = File(...),
     mapping_json: str = Form(...),
     create_missing: bool = Form(True),
+    activity_name: Optional[str] = Form(None),
+    session_total_period: Optional[str] = Form(None),
     current_user: dict = Depends(get_current_user),
 ):
     """
     Import CSV with a custom field mapping.
     Preserves existing athlete auto-creation + GPS data pipeline.
+
+    Optional additive parameters (backward compatible):
+      - activity_name: User-friendly session name (overrides filename-based default)
+      - session_total_period: If provided, rows whose period_name matches receive
+        record_type="session_total"; all other rows receive record_type="period".
+        When omitted, record_type is not persisted (legacy behavior preserved).
     """
     import json as _json
 
     content = await file.read()
     mapping = _json.loads(mapping_json)
 
-    records = apply_custom_mapping(content, mapping, filename=file.filename or "upload.csv")
+    source_filename = file.filename or "upload.csv"
+    records = apply_custom_mapping(content, mapping, filename=source_filename)
 
     if not records:
         raise HTTPException(status_code=400, detail="No valid records found after applying mapping")
@@ -149,7 +158,12 @@ async def csv_import_mapped(
             by_athlete[name].append(rec)
 
     session_id = f"csv_import_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
-    session_name = (file.filename or "CSV Import").replace(".csv", "")
+    default_session_name = source_filename.replace(".csv", "")
+    activity_name_clean = (activity_name or "").strip()
+    final_session_name = activity_name_clean if activity_name_clean else default_session_name
+
+    session_total_period_clean = (session_total_period or "").strip()
+    session_total_period_key = session_total_period_clean.lower() if session_total_period_clean else None
 
     success_count = 0
     created_athletes = []
@@ -187,13 +201,15 @@ async def csv_import_mapped(
 
         for rec in recs:
             try:
+                period_value = (rec.get("period_name") or "").strip() or "Session"
                 gps_doc = {
                     "athlete_id": athlete_id,
                     "coach_id": current_user["_id"],
                     "date": rec.get("session_date", datetime.now().strftime("%Y-%m-%d")),
                     "session_id": session_id,
-                    "session_name": session_name,
-                    "period_name": rec.get("period_name", "Session") or "Session",
+                    "session_name": final_session_name,
+                    "source_filename": source_filename,
+                    "period_name": period_value,
                     "total_distance": float(rec.get("total_distance", 0) or 0),
                     "high_intensity_distance": float(rec.get("hid_distance", 0) or 0),
                     "high_speed_running": float(rec.get("hsr_distance", 0) or 0),
@@ -208,6 +224,15 @@ async def csv_import_mapped(
                     "source": "csv_import",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 }
+                # record_type is only persisted when the user explicitly chose
+                # which period represents the total session. Otherwise the field
+                # is omitted to preserve full backward compatibility.
+                if session_total_period_key is not None:
+                    gps_doc["record_type"] = (
+                        "session_total"
+                        if period_value.lower() == session_total_period_key
+                        else "period"
+                    )
                 await db.gps_data.insert_one(gps_doc)
                 success_count += 1
                 imported_by_athlete[athlete_name] = imported_by_athlete.get(athlete_name, 0) + 1

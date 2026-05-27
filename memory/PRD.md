@@ -170,3 +170,31 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 - **Componente reutilizável** `components/InfoTooltip.tsx`: ícone (i) + Modal popover leve, fecha ao toque fora ou OK, com `data-testid` único por instância.
 - **6 tooltips em Periodização** + **3 tooltips por módulo funcional** (VBT, Jump, Body Composition) — todos sem alterar lógica funcional.
 - **Body Composition no Hub**: removido botão "Station Mode" (não funcionava como nos outros módulos). VBT e Jump preservados.
+
+
+## CSV Import — Activity Name + Session Total Period (Fev 2026)
+Implementação **estritamente aditiva** no fluxo de import assistido (`upload-csv.tsx` + `/api/csv/import-mapped`). Zero alterações em dashboards, ACWR, load engine, consolidator, athlete profile, scientific reports, keyword matching legado ou na collection `gps_data` (nenhuma migration).
+
+### Novidades
+- **Activity Name** (opcional): TextInput na tela de revisão; default = nome do arquivo sem `.csv`. Salvo em `gps_data.session_name`.
+- **Session Total Period** (opcional): seletor estilo radio com os valores únicos da coluna mapeada como `period_name`. Quando selecionado, cada registro recebe `record_type` = `"session_total"` (se `period_name` coincidir) ou `"period"` (caso contrário). Quando NÃO selecionado, o campo `record_type` é simplesmente omitido do documento (100% backward compatible).
+- **`source_filename`**: nome original do CSV passa a ser persistido em todos os imports (campo aditivo, apenas auditoria/debug).
+
+### Arquivos alterados
+- `backend/csv_analyzer.py`: passa a retornar `unique_values_by_column` (apenas colunas com cardinalidade ≤ 30) na resposta de `/api/csv/analyze`.
+- `backend/routes/csv_import/routes.py`: `/api/csv/import-mapped` aceita dois `Form` opcionais — `activity_name` e `session_total_period`. Persistência de `session_name` (override), `source_filename`, `record_type` (condicional).
+- `frontend/app/upload-csv.tsx`: nova seção "Configuração da Sessão" na tela de revisão, com mesma linguagem visual dos cards existentes.
+
+### Edge cases tratados
+- CSV sem coluna `period_name` mapeada → seletor desabilitado, mensagem informativa.
+- CSV com apenas um `period_name` → seletor exibe a única opção + "Nenhum".
+- Valores vazios na coluna → ignorados na extração de únicos.
+- Usuário não seleciona total → `record_type` ausente do documento, comportamento idêntico ao legado.
+- Usuário deixa Activity Name em branco → fallback automático para o nome do arquivo sem extensão.
+
+### Confirmações
+- ✅ Nenhum dashboard alterado.
+- ✅ Nenhuma lógica científica (ACWR, EWMA, load engine, periodização, scientific reports) alterada.
+- ✅ Nenhuma migration criada.
+- ✅ Nenhum endpoint legado quebrado — chamadas sem os novos campos continuam idênticas ao comportamento histórico.
+- ✅ Testado backend e2e com curl (4 registros, com e sem os novos parâmetros).
