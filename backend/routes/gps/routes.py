@@ -297,7 +297,26 @@ async def get_athlete_sessions(
     # Second pass: resolve totals per session via central GPS resolver.
     # P1 record_type=session_total → P2 explicit → P3 has_session_total →
     # P4 legacy keywords → P5 sum all.
+    #
+    # P2C pre-check: if some OTHER athlete in this coach scope has
+    # record_type="session_total" for the same session, the coach designated
+    # a session-total period for that session. If THIS athlete lacks that
+    # designation, totals must stay at zeros (do not sum periods).
+    session_keys = [k for k in raw_records_by_key.keys()]
+    designated_session_keys: set = set()
+    if session_keys:
+        designated_raw = await db.gps_data.distinct("session_id", {
+            "coach_id": current_user["_id"],
+            "session_id": {"$in": session_keys},
+            "record_type": "session_total",
+        })
+        designated_session_keys = set(designated_raw)
+
     for session_key, raw_records in raw_records_by_key.items():
+        if (session_key in designated_session_keys
+                and not any(r.get("record_type") == "session_total" for r in raw_records)):
+            # Athlete missing the designated total → totals stays at zeros.
+            continue
         source = resolve_session_records(raw_records)
         totals = sessions[session_key]["totals"]
         for r in source:

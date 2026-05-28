@@ -304,6 +304,9 @@ async def get_team_dashboard(
     global_sessions_7d = set()
     global_sessions_total = set()
     global_sessions_filtered = set()
+    # P2C: track sessions where the coach designated a session_total period
+    # via CSV import. Used downstream to skip athletes who lack that period.
+    sessions_with_designated_total: set = set()
     
     for record in all_gps_data:
         try:
@@ -314,6 +317,8 @@ async def get_team_dashboard(
                 global_sessions_7d.add(session_key)
             if record_date >= filter_start_date:
                 global_sessions_filtered.add(session_key)
+            if record.get("record_type") == "session_total":
+                sessions_with_designated_total.add(session_key)
         except:
             continue
     
@@ -406,6 +411,15 @@ async def get_team_dashboard(
                 
                 for sname, records in sessions_map.items():
                     session_key = f"{record_date_str}_{sname}"
+
+                    # P2C pre-check: when this session has a coach-designated
+                    # session_total period (any athlete in the coach scope
+                    # has record_type="session_total" for this key) AND this
+                    # athlete does NOT have that period, the athlete must
+                    # contribute zero for this session (do not sum periods).
+                    if (session_key in sessions_with_designated_total
+                            and not any(r.get("record_type") == "session_total" for r in records)):
+                        continue
 
                     # Central resolver: P1 record_type=session_total → P2 explicit →
                     # P3 has_session_total → P4 legacy keywords → P5 sum all.
@@ -833,6 +847,14 @@ async def get_team_table(
         aid = r.get("athlete_id")
         if aid:
             gps_by_athlete.setdefault(aid, []).append(r)
+
+    # P2C: set of (date, session_name) keys where the coach designated a
+    # session_total period via CSV import. Built AFTER the operational
+    # filters above so it matches the data the loop will actually iterate.
+    sessions_with_designated_total: set = {
+        f"{r.get('date')}_{r.get('session_name') or 'default'}"
+        for r in all_gps if r.get("record_type") == "session_total"
+    }
     
     jump_by_athlete: Dict[str, list] = {}
     for r in all_jumps:
@@ -882,6 +904,11 @@ async def get_team_table(
             
             for date_str, sessions_map in grouped.items():
                 for sname, records in sessions_map.items():
+                    # P2C pre-check: skip athletes missing the designated
+                    # session_total period for this session.
+                    if (f"{date_str}_{sname}" in sessions_with_designated_total
+                            and not any(r.get("record_type") == "session_total" for r in records)):
+                        continue
                     # Central resolver: P1 record_type=session_total → P2 explicit →
                     # P3 has_session_total → P4 legacy keywords → P5 sum all.
                     source = resolve_session_records(records)
@@ -1260,6 +1287,14 @@ async def get_dashboard_overview(
             body_comp_by_athlete[aid] = r
     
     # ============ GPS DEDUP HELPER ============
+    # P2C: set of (date, session_name) keys where the coach designated a
+    # session_total period via CSV import. Computed once over all coach GPS
+    # data in window. Used inside build_daily_gps below.
+    sessions_with_designated_total: set = {
+        f"{r.get('date', '')}_{r.get('session_name') or 'default'}"
+        for r in all_gps if r.get("record_type") == "session_total"
+    }
+
     def build_daily_gps(gps_records):
         """Build daily aggregated GPS from records, deduped via central resolver."""
         daily = {}
@@ -1273,6 +1308,11 @@ async def get_dashboard_overview(
             day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
                    "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
             for sname, records in sessions_map.items():
+                # P2C pre-check: skip athletes missing the designated
+                # session_total period for this session.
+                if (f"{date_str}_{sname}" in sessions_with_designated_total
+                        and not any(r.get("record_type") == "session_total" for r in records)):
+                    continue
                 # Central resolver: P1 record_type=session_total → P2 explicit →
                 # P3 has_session_total → P4 legacy keywords → P5 sum all.
                 source = resolve_session_records(records)
