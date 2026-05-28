@@ -37,6 +37,7 @@ except ImportError:
 from gps_import import GPSCSVParser, GPSDataNormalizer, Manufacturer, parse_gps_csv, consolidate_session, METRIC_CATEGORIES
 from identity_resolver import IdentityResolver
 from routes.periodization.routes import extract_gps_metrics_from_session, update_athlete_peak_values
+from utils.gps_session_resolver import resolve_session_records
 
 router = APIRouter(tags=["GPS Data"])
 
@@ -242,8 +243,10 @@ async def get_athlete_sessions(
         "coach_id": current_user["_id"]
     }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(1000)
     
-    # Group by session_id or by date if no session_id
+    # Group by session_id or by date if no session_id (two-pass: build periods[]
+    # + max values incrementally, then resolve totals via the central resolver).
     sessions = {}
+    raw_records_by_key: Dict[str, list] = {}
     for record in gps_records:
         session_key = record.get("session_id") or record.get("date", "unknown")
         
@@ -267,6 +270,7 @@ async def get_athlete_sessions(
                 "max_acceleration": 0,
                 "max_deceleration": 0,
             }
+            raw_records_by_key[session_key] = []
         
         period_name = record.get("period_name") or (record.get("notes") or "").replace("Período: ", "") or "Full Session"
         sessions[session_key]["periods"].append({
@@ -280,27 +284,8 @@ async def get_athlete_sessions(
             "number_of_decelerations": record.get("number_of_decelerations", 0),
             "max_speed": record.get("max_speed", 0),
         })
-        
-        # Sum totals (for periods that are not "Session" to avoid double counting)
-        period_lower = period_name.lower()
-        if "session" not in period_lower and "total" not in period_lower:
-            sessions[session_key]["totals"]["total_distance"] += record.get("total_distance", 0)
-            sessions[session_key]["totals"]["high_intensity_distance"] += record.get("high_intensity_distance", 0)
-            sessions[session_key]["totals"]["high_speed_running"] += record.get("high_speed_running", 0) or 0
-            sessions[session_key]["totals"]["sprint_distance"] += record.get("sprint_distance", 0)
-            sessions[session_key]["totals"]["number_of_sprints"] += record.get("number_of_sprints", 0)
-            sessions[session_key]["totals"]["number_of_accelerations"] += record.get("number_of_accelerations", 0)
-            sessions[session_key]["totals"]["number_of_decelerations"] += record.get("number_of_decelerations", 0)
-        elif len(sessions[session_key]["periods"]) == 1:
-            # If this is the only period (Session/Total), use its values
-            sessions[session_key]["totals"]["total_distance"] = record.get("total_distance", 0)
-            sessions[session_key]["totals"]["high_intensity_distance"] = record.get("high_intensity_distance", 0)
-            sessions[session_key]["totals"]["high_speed_running"] = record.get("high_speed_running", 0) or 0
-            sessions[session_key]["totals"]["sprint_distance"] = record.get("sprint_distance", 0)
-            sessions[session_key]["totals"]["number_of_sprints"] = record.get("number_of_sprints", 0)
-            sessions[session_key]["totals"]["number_of_accelerations"] = record.get("number_of_accelerations", 0)
-            sessions[session_key]["totals"]["number_of_decelerations"] = record.get("number_of_decelerations", 0)
-        
+        raw_records_by_key[session_key].append(record)
+
         # Track max values
         if (record.get("max_speed") or 0) > sessions[session_key]["max_speed"]:
             sessions[session_key]["max_speed"] = record.get("max_speed") or 0
@@ -308,7 +293,41 @@ async def get_athlete_sessions(
             sessions[session_key]["max_acceleration"] = record.get("max_acceleration") or 0
         if (record.get("max_deceleration") or 0) > sessions[session_key]["max_deceleration"]:
             sessions[session_key]["max_deceleration"] = record.get("max_deceleration") or 0
-    
+
+    # Second pass: resolve totals per session via central GPS resolver.
+    # P1 record_type=session_total → P2 explicit → P3 has_session_total →
+    # P4 legacy keywords → P5 sum all.
+    #
+    # P2C pre-check: if some OTHER athlete in this coach scope has
+    # record_type="session_total" for the same session, the coach designated
+    # a session-total period for that session. If THIS athlete lacks that
+    # designation, totals must stay at zeros (do not sum periods).
+    session_keys = [k for k in raw_records_by_key.keys()]
+    designated_session_keys: set = set()
+    if session_keys:
+        designated_raw = await db.gps_data.distinct("session_id", {
+            "coach_id": current_user["_id"],
+            "session_id": {"$in": session_keys},
+            "record_type": "session_total",
+        })
+        designated_session_keys = set(designated_raw)
+
+    for session_key, raw_records in raw_records_by_key.items():
+        if (session_key in designated_session_keys
+                and not any(r.get("record_type") == "session_total" for r in raw_records)):
+            # Athlete missing the designated total → totals stays at zeros.
+            continue
+        source = resolve_session_records(raw_records)
+        totals = sessions[session_key]["totals"]
+        for r in source:
+            totals["total_distance"] += r.get("total_distance", 0) or 0
+            totals["high_intensity_distance"] += r.get("high_intensity_distance", 0) or 0
+            totals["high_speed_running"] += r.get("high_speed_running", 0) or 0
+            totals["sprint_distance"] += r.get("sprint_distance", 0) or 0
+            totals["number_of_sprints"] += r.get("number_of_sprints", 0) or 0
+            totals["number_of_accelerations"] += r.get("number_of_accelerations", 0) or 0
+            totals["number_of_decelerations"] += r.get("number_of_decelerations", 0) or 0
+
     return list(sessions.values())
 
 
