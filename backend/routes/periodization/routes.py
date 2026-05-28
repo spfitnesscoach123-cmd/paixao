@@ -27,6 +27,7 @@ from config import (
 )
 from dependencies import get_current_user, security, hash_password, verify_password, create_access_token, PyObjectId
 from models.shared import *
+from utils.gps_session_resolver import resolve_session_records
 
 try:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -131,12 +132,11 @@ class PeakValueNotification(BaseModel):
 def extract_gps_metrics_from_session(gps_records: List[dict]) -> dict:
     """
     Extract and calculate GPS metrics from a session's records.
-    
-    Defense-in-depth: applies session_total vs period logic for legacy data
-    that was stored before the consolidator was introduced.
-    New imports produce a single consolidated document, so this function
-    simply reads its fields. For legacy multi-record sessions, it applies
-    the same prioritization rules as the consolidator.
+
+    Source-of-truth resolution is delegated to the central GPS session resolver
+    (utils/gps_session_resolver.py) — strict priority P1 record_type=session_total
+    → P2 explicit record_type → P3 has_session_total → P4 legacy keywords →
+    P5 sum all. The summation/output shape below is preserved bit-for-bit.
     """
     if not gps_records:
         return {
@@ -144,46 +144,7 @@ def extract_gps_metrics_from_session(gps_records: List[dict]) -> dict:
             "sprint_z5": 0, "sprints_count": 0, "acc_dec_total": 0,
         }
 
-    # If the document is already consolidated (has_session_total flag), use it directly
-    if len(gps_records) == 1 and "has_session_total" in gps_records[0]:
-        r = gps_records[0]
-        return {
-            "total_distance": r.get("total_distance", 0),
-            "hid_z3": r.get("high_intensity_distance", 0),
-            "hsr_z4": r.get("high_speed_running", 0),
-            "sprint_z5": r.get("sprint_distance", 0),
-            "sprints_count": r.get("number_of_sprints", 0),
-            "acc_dec_total": (
-                r.get("number_of_accelerations", 0) +
-                r.get("number_of_decelerations", 0)
-            ),
-        }
-
-    # Legacy path: multiple records per session — apply session/period logic
-    _SESSION_KEYWORDS = {"session", "total", "full", "complete", "summary", "sessão"}
-    _PERIOD_KEYWORDS = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-
-    session_total_record = None
-    period_records = []
-
-    for record in gps_records:
-        pname = (record.get("period_name") or "").lower()
-        is_session_total = any(kw in pname for kw in _SESSION_KEYWORDS)
-        is_period = any(kw in pname for kw in _PERIOD_KEYWORDS)
-
-        if is_session_total and not is_period:
-            if session_total_record is None:
-                session_total_record = record
-        else:
-            period_records.append(record)
-
-    # Choose source: session total OR sum of periods
-    if session_total_record:
-        source = [session_total_record]
-    elif period_records:
-        source = period_records
-    else:
-        source = gps_records  # Fallback: use everything
+    source = resolve_session_records(gps_records)
 
     metrics = {
         "total_distance": 0, "hid_z3": 0, "hsr_z4": 0,
