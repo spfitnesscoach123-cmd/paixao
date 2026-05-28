@@ -43,6 +43,8 @@ interface GroupedSession {
     number_of_decelerations: number;
     max_speed: number;
   };
+  // Backend returns the session-level max outside `totals`; kept optional here.
+  max_speed?: number;
 }
 
 type TabType = 'info' | 'gps' | 'wellness' | 'assessments' | 'analysis';
@@ -85,10 +87,13 @@ export default function AthleteDetails() {
     },
   });
 
-  const { data: gpsData, isLoading: gpsLoading } = useQuery({
-    queryKey: ['gps', id],
+  const { data: sessionsData, isLoading: gpsLoading } = useQuery({
+    queryKey: ['gps-sessions', id],
     queryFn: async () => {
-      const response = await api.get<GPSData[]>(`/gps-data/athlete/${id}`);
+      // Backend-resolved sessions (central GPS resolver P1->P5 + P2C pre-check).
+      // Replaces the previous raw `/gps-data/athlete/{id}` fetch that summed
+      // periods + session totals client-side (caused inflated distances).
+      const response = await api.get<GroupedSession[]>(`/gps-data/athlete/${id}/sessions`);
       return response.data;
     },
   });
@@ -119,73 +124,41 @@ export default function AthleteDetails() {
     retry: false,
   });
 
-  // Group GPS data by session_id
+  // Sessions arrive pre-resolved from the backend (central GPS resolver + P2C).
+  // We only apply the client-side date filter and sort here — NO client-side
+  // summation of raw records (that previously double-counted periods + totals).
   const groupedSessions = useMemo((): GroupedSession[] => {
-    if (!gpsData || gpsData.length === 0) return [];
+    if (!sessionsData || sessionsData.length === 0) return [];
 
-    // Filter GPS data by date range
-    let filteredData = gpsData;
+    // Normalize: surface the session-level max_speed inside `totals` (backend
+    // keeps it outside) so the existing UI bindings keep working unchanged.
+    let sessions: GroupedSession[] = sessionsData.map((s) => ({
+      ...s,
+      activity_type: s.activity_type || 'training',
+      totals: {
+        ...s.totals,
+        max_speed: s.totals?.max_speed ?? s.max_speed ?? 0,
+      },
+    }));
+
+    // Filter sessions by date range (client-side, same UX as before)
     if (gpsDateFilter.start && gpsDateFilter.end) {
       const startDate = parseISO(gpsDateFilter.start);
       const endDate = parseISO(gpsDateFilter.end);
-      filteredData = gpsData.filter(record => {
+      sessions = sessions.filter((session) => {
         try {
-          const recordDate = parseISO(record.date);
-          return isWithinInterval(recordDate, { start: startDate, end: endDate });
+          return isWithinInterval(parseISO(session.date), { start: startDate, end: endDate });
         } catch {
           return false;
         }
       });
     }
 
-    const sessionMap = new Map<string, GroupedSession>();
-
-    filteredData.forEach((record) => {
-      // Use session_id if available, otherwise create one from date
-      const sessionKey = record.session_id || `legacy_${record.date}`;
-      const sessionName = record.session_name || t('gps.session');
-
-      if (!sessionMap.has(sessionKey)) {
-        sessionMap.set(sessionKey, {
-          session_id: sessionKey,
-          session_name: sessionName,
-          date: record.date,
-          activity_type: record.activity_type || 'training',
-          periods: [],
-          totals: {
-            total_distance: 0,
-            high_intensity_distance: 0,
-            sprint_distance: 0,
-            number_of_sprints: 0,
-            number_of_accelerations: 0,
-            number_of_decelerations: 0,
-            max_speed: 0,
-          },
-        });
-      }
-
-      const session = sessionMap.get(sessionKey)!;
-      session.periods.push(record);
-      // Update activity_type from record if available
-      if (record.activity_type) {
-        session.activity_type = record.activity_type;
-      }
-      
-      // Accumulate totals
-      session.totals.total_distance += record.total_distance || 0;
-      session.totals.high_intensity_distance += record.high_intensity_distance || 0;
-      session.totals.sprint_distance += record.sprint_distance || 0;
-      session.totals.number_of_sprints += record.number_of_sprints || 0;
-      session.totals.number_of_accelerations += record.number_of_accelerations || 0;
-      session.totals.number_of_decelerations += record.number_of_decelerations || 0;
-      session.totals.max_speed = Math.max(session.totals.max_speed, record.max_speed || 0);
-    });
-
     // Sort sessions by date (most recent first)
-    return Array.from(sessionMap.values()).sort((a, b) => 
+    return sessions.sort((a, b) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
-  }, [gpsData, t, gpsDateFilter]);
+  }, [sessionsData, gpsDateFilter]);
 
   // Handler for GPS date filter change
   const handleGpsDateFilterChange = (start: string | null, end: string | null) => {
@@ -283,6 +256,7 @@ export default function AthleteDetails() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gps', id] });
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions', id] });
       queryClient.invalidateQueries({ queryKey: ['scientific-analysis'] });
       queryClient.invalidateQueries({ queryKey: ['analysis'] });
       queryClient.invalidateQueries({ queryKey: ['jump-analysis'] });
@@ -322,6 +296,7 @@ export default function AthleteDetails() {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['athlete', id] }),
       queryClient.invalidateQueries({ queryKey: ['gps', id] }),
+      queryClient.invalidateQueries({ queryKey: ['gps-sessions', id] }),
       queryClient.invalidateQueries({ queryKey: ['wellness', id] }),
       queryClient.invalidateQueries({ queryKey: ['assessments', id] }),
       queryClient.invalidateQueries({ queryKey: ['jump-analysis'] }),
