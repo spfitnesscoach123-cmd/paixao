@@ -23,6 +23,7 @@ from .load_metrics import (
 from .ewma_calculator import EWMACalculator
 from .acwr_calculator import ACWRCalculator
 from .spike_detector import SpikeDetector
+from utils.gps_session_resolver import resolve_session_records
 
 logger = logging.getLogger(__name__)
 
@@ -133,10 +134,6 @@ class RollingLoadEngine:
         
         return await cursor.to_list(length=days)
     
-    # Session/period dedup keywords — same as Team Dashboard
-    _SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-    _PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-
     async def aggregate_gps_for_date(
         self,
         athlete_id: str,
@@ -146,10 +143,12 @@ class RollingLoadEngine:
         """
         Aggregate GPS data for a specific date WITH session/period dedup.
 
-        Uses the same dedup logic as the Team Dashboard:
-        - Group records by session_name
-        - For each session, prefer the 'Session' total row over sub-period rows
-        - Never sum Session + sub-periods together (avoids double-counting)
+        Source-of-truth resolution is delegated to the central GPS session
+        resolver (utils/gps_session_resolver.py) — strict priority P1
+        record_type=session_total → P2 explicit record_type → P3
+        has_session_total → P4 legacy keywords → P5 sum all. The grouping by
+        session_name, the totals dict shape, and the summation are preserved
+        bit-for-bit.
 
         Args:
             athlete_id: Athlete ID
@@ -183,23 +182,9 @@ class RollingLoadEngine:
             sname = record.get("session_name") or "default"
             grouped.setdefault(sname, []).append(record)
 
-        # For each session, apply dedup logic
+        # For each session, resolve via central resolver
         for sname, records in grouped.items():
-            session_total = None
-            period_recs = []
-
-            for r in records:
-                pname = (r.get("period_name") or "").lower()
-                is_sess = any(kw in pname for kw in self._SESSION_KW)
-                is_per = any(kw in pname for kw in self._PERIOD_KW)
-                if is_sess and not is_per:
-                    if session_total is None:
-                        session_total = r
-                else:
-                    period_recs.append(r)
-
-            # Choose source: session total > periods > all records
-            source = [session_total] if session_total else (period_recs if period_recs else records)
+            source = resolve_session_records(records)
 
             for r in source:
                 totals["distance"] += float(r.get("total_distance", 0) or 0)
