@@ -27,6 +27,7 @@ from config import (
 )
 from dependencies import get_current_user, security, hash_password, verify_password, create_access_token, PyObjectId
 from models.shared import *
+from utils.gps_session_resolver import resolve_session_records
 
 try:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -378,11 +379,10 @@ async def get_team_dashboard(
             
             # ============================================================
             # GPS AGGREGATION FIX: Avoid double-counting periods
-            # Group records by (date, session_name), then apply session/period logic
+            # Group records by (date, session_name), then resolve via the
+            # central GPS session resolver (utils/gps_session_resolver.py).
             # ============================================================
-            _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-            _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-            
+
             # Step 1: Group records by (date, session_name)
             grouped: Dict[str, Dict[str, list]] = {}  # date -> session_name -> [records]
             for record in gps_data:
@@ -406,23 +406,11 @@ async def get_team_dashboard(
                 
                 for sname, records in sessions_map.items():
                     session_key = f"{record_date_str}_{sname}"
-                    
-                    # Apply session/period dedup logic (same as extract_gps_metrics_from_session)
-                    session_total_rec = None
-                    period_recs = []
-                    for r in records:
-                        pname = (r.get("period_name") or "").lower()
-                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
-                        if is_sess and not is_period:
-                            if session_total_rec is None:
-                                session_total_rec = r
-                        else:
-                            period_recs.append(r)
-                    
-                    # Choose source: session total > periods > all records
-                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
-                    
+
+                    # Central resolver: P1 record_type=session_total → P2 explicit →
+                    # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                    source = resolve_session_records(records)
+
                     for r in source:
                         dist = r.get("total_distance", 0) or 0
                         hid = r.get("high_intensity_distance", 0) or 0
@@ -840,9 +828,6 @@ async def get_team_table(
     }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     # Index by athlete
-    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-    
     gps_by_athlete: Dict[str, list] = {}
     for r in all_gps:
         aid = r.get("athlete_id")
@@ -897,19 +882,9 @@ async def get_team_table(
             
             for date_str, sessions_map in grouped.items():
                 for sname, records in sessions_map.items():
-                    session_total_rec = None
-                    period_recs = []
-                    for r in records:
-                        pname = (r.get("period_name") or "").lower()
-                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
-                        if is_sess and not is_period:
-                            if session_total_rec is None:
-                                session_total_rec = r
-                        else:
-                            period_recs.append(r)
-                    
-                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    # Central resolver: P1 record_type=session_total → P2 explicit →
+                    # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                    source = resolve_session_records(records)
                     for r in source:
                         total_dist += r.get("total_distance", 0) or 0
                         z3_total += r.get("high_intensity_distance", 0) or 0
@@ -1285,11 +1260,8 @@ async def get_dashboard_overview(
             body_comp_by_athlete[aid] = r
     
     # ============ GPS DEDUP HELPER ============
-    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-    
     def build_daily_gps(gps_records):
-        """Build daily aggregated GPS from records, deduped by session/period."""
+        """Build daily aggregated GPS from records, deduped via central resolver."""
         daily = {}
         grouped = {}
         for r in gps_records:
@@ -1301,18 +1273,9 @@ async def get_dashboard_overview(
             day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
                    "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
             for sname, records in sessions_map.items():
-                session_total = None
-                period_recs = []
-                for r in records:
-                    pname = (r.get("period_name") or "").lower()
-                    is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                    is_per = any(kw in pname for kw in _GPS_PERIOD_KW)
-                    if is_sess and not is_per:
-                        if session_total is None:
-                            session_total = r
-                    else:
-                        period_recs.append(r)
-                source = [session_total] if session_total else (period_recs if period_recs else records)
+                # Central resolver: P1 record_type=session_total → P2 explicit →
+                # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                source = resolve_session_records(records)
                 for r in source:
                     day["total_distance"] += r.get("total_distance", 0) or 0
                     day["high_intensity_distance"] += r.get("high_intensity_distance", 0) or 0

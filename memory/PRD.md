@@ -34,10 +34,11 @@ App React Native Expo para gestao de carga de treinamento de atletas profissiona
 │   └── account/routes.py         # Delecao de conta
 │
 ├── models/                # 17 arquivos de modelos Pydantic por dominio
-├── utils/                 # 3 arquivos de funcoes puras
+├── utils/                 # 4 arquivos de funcoes puras
 │   ├── body_calculations.py
 │   ├── jump_calculations.py
-│   └── load_calculations.py
+│   ├── load_calculations.py
+│   └── gps_session_resolver.py   # Etapa 1 (Maio/2026) - resolver central P1->P5
 │
 ├── gps_import/            # Modulo externo GPS
 ├── jump_import/           # Modulo externo Jump
@@ -228,3 +229,48 @@ Implementação **estritamente aditiva e isolada ao Team Dashboard**. Permite qu
 - ✅ Heurística de keyword matching (`_GPS_SESSION_KW`/`_GPS_PERIOD_KW`) **preservada** — funciona como fallback para imports antigos sem `record_type`.
 - ✅ Discovery endpoints respeitam `date_range` (sessões/períodos fora da janela não aparecem na UI).
 - ✅ Teste e2e: bar chart muda de ~9.0 km (sessão completa) para ~3.6 km (1ST HALF only) ao aplicar os filtros.
+
+
+## Etapa 1 — Resolver Central de GPS Session Totals (Mai/2026)
+
+Unificação operacional/visual da resolução de "session totals" através de um único módulo central puro, substituindo 4 implementações inline duplicadas (3 idênticas + 1 divergente). Escopo estritamente read-path operacional/visual. **Nenhuma alteração** em Load Engine, Periodization, ACWR, EWMA, Scientific Reports, Readiness, pipelines Mongo, schemas, contratos de API, response shapes, frontend ou cálculos científicos persistidos.
+
+### Novo módulo central
+- `backend/utils/gps_session_resolver.py` — função pura `resolve_session_records(records)` sem IO, sem DB, sem logs, sem mutation.
+- Predicados privados separados para testabilidade: `_is_explicit_session_total`, `_has_explicit_record_types`, `_is_consolidated_session_total`, `_is_legacy_session_keyword`, `_is_legacy_period_keyword`.
+
+### Hierarquia de prioridade P1 → P5 (estrita)
+- **P1**: existe `record_type == "session_total"` → retorna o **primeiro** encontrado.
+- **P2**: nenhum P1 + qualquer `record_type` truthy → retorna **apenas** os records com `record_type` truthy (agnóstico ao vocabulário — qualquer valor explícito do coach conta; keyword matching ignorado).
+- **P3**: nenhum P1/P2 + `has_session_total == True` (strict) → retorna o **primeiro** encontrado.
+- **P4**: keyword matching legado (session keyword AND NOT period keyword) → retorna o **primeiro** match.
+- **P5**: fallback — retorna **todos** os records (caller soma).
+
+### Endpoints migrados (4)
+- `GET /api/dashboard/team` — substituído block inline de keyword matching por `resolve_session_records`.
+- `GET /api/dashboard/team-table` — idem.
+- `GET /api/dashboard/overview` — `build_daily_gps()` agora delega ao resolver.
+- `GET /api/gps-data/athlete/{athlete_id}/sessions` — refatorado para duas passadas internas (1ª: `periods[]` + max values; 2ª: resolver + `totals`). **Response shape 100% preservado**.
+
+### Endpoints / sistemas NÃO tocados
+- Load Engine, Periodization, ACWR/EWMA, Scientific Reports, Readiness.
+- `utils/load_calculations.py::extract_gps_metrics_from_session` (usada por periodization/peak values).
+- `routes/periodization/routes.py`, `load_engine/rolling_load_engine.py`, `routes/scientific/routes.py`, `gps_import/consolidator.py`.
+- Frontend, schemas, contratos, queries Mongo, pipelines, collections.
+
+### Convergência numérica consciente
+Em `/gps-data/athlete/{id}/sessions` (endpoint D), registros legados com `period_name ∈ {Complete, Summary, Full, Sessão}` passam a ser tratados como session total (antes só `"session"` ou `"total"` qualificavam). Alinha D ao keyword set canônico já usado por A/B/C. **Mudança aprovada explicitamente.**
+
+### Duplicação temporária consciente
+Constantes legadas de keywords são duplicadas em `utils/gps_session_resolver.py` (versus `utils/load_calculations.py`) intencionalmente durante a Etapa 1, para isolar o resolver operacional do código científico. Consolidação postergada para Etapa 2.
+
+### Testes
+- `backend/tests/test_gps_session_resolver.py` — 31 testes cobrindo P1→P5, predicados, multi-language (sessão), records vazios/None, mutação, referência idêntica, comportamento agnóstico ao vocabulário.
+- ✅ 31/31 passando.
+
+### Confirmações
+- ✅ Lint do resolver: 0 erros.
+- ✅ Curl e2e: HTTP 200 em todos os 4 endpoints com payload válido.
+- ✅ Endpoint D retornando `periods[]` + `totals` corretamente para João Silva (6 sessões, distâncias coerentes).
+- ✅ Backend reload sem erros.
+- ✅ Nenhuma alteração em cálculos científicos ou pipelines.
