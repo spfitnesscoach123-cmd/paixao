@@ -27,6 +27,7 @@ from config import (
 )
 from dependencies import get_current_user, security, hash_password, verify_password, create_access_token, PyObjectId
 from models.shared import *
+from utils.gps_session_resolver import resolve_session_records
 
 try:
     from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -303,6 +304,9 @@ async def get_team_dashboard(
     global_sessions_7d = set()
     global_sessions_total = set()
     global_sessions_filtered = set()
+    # P2C: track sessions where the coach designated a session_total period
+    # via CSV import. Used downstream to skip athletes who lack that period.
+    sessions_with_designated_total: set = set()
     
     for record in all_gps_data:
         try:
@@ -313,6 +317,8 @@ async def get_team_dashboard(
                 global_sessions_7d.add(session_key)
             if record_date >= filter_start_date:
                 global_sessions_filtered.add(session_key)
+            if record.get("record_type") == "session_total":
+                sessions_with_designated_total.add(session_key)
         except:
             continue
     
@@ -378,11 +384,10 @@ async def get_team_dashboard(
             
             # ============================================================
             # GPS AGGREGATION FIX: Avoid double-counting periods
-            # Group records by (date, session_name), then apply session/period logic
+            # Group records by (date, session_name), then resolve via the
+            # central GPS session resolver (utils/gps_session_resolver.py).
             # ============================================================
-            _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-            _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-            
+
             # Step 1: Group records by (date, session_name)
             grouped: Dict[str, Dict[str, list]] = {}  # date -> session_name -> [records]
             for record in gps_data:
@@ -406,23 +411,20 @@ async def get_team_dashboard(
                 
                 for sname, records in sessions_map.items():
                     session_key = f"{record_date_str}_{sname}"
-                    
-                    # Apply session/period dedup logic (same as extract_gps_metrics_from_session)
-                    session_total_rec = None
-                    period_recs = []
-                    for r in records:
-                        pname = (r.get("period_name") or "").lower()
-                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
-                        if is_sess and not is_period:
-                            if session_total_rec is None:
-                                session_total_rec = r
-                        else:
-                            period_recs.append(r)
-                    
-                    # Choose source: session total > periods > all records
-                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
-                    
+
+                    # P2C pre-check: when this session has a coach-designated
+                    # session_total period (any athlete in the coach scope
+                    # has record_type="session_total" for this key) AND this
+                    # athlete does NOT have that period, the athlete must
+                    # contribute zero for this session (do not sum periods).
+                    if (session_key in sessions_with_designated_total
+                            and not any(r.get("record_type") == "session_total" for r in records)):
+                        continue
+
+                    # Central resolver: P1 record_type=session_total → P2 explicit →
+                    # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                    source = resolve_session_records(records)
+
                     for r in source:
                         dist = r.get("total_distance", 0) or 0
                         hid = r.get("high_intensity_distance", 0) or 0
@@ -751,6 +753,8 @@ class TeamTableRow(BaseModel):
     fatigue_status: str = "UNKNOWN"
     readiness_score: Optional[float] = None  # 0-100% derived from wellness.readiness_score
     readiness_status: str = "UNKNOWN"
+    pain_score: Optional[int] = None  # muscle_soreness from latest wellness (1-10)
+    pain_location: Optional[str] = None  # athlete-reported text from latest wellness
     weight: Optional[float] = None
     body_fat: Optional[float] = None
     lean_mass: Optional[float] = None
@@ -763,11 +767,20 @@ class TeamTableResponse(BaseModel):
 async def get_team_table(
     lang: str = "pt",
     date_range: str = "7d",
+    session_name: Optional[str] = None,
+    period_name: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
     """Aggregated table data for the analytical team table.
     Merges GPS, Jump, BodyComp and Wellness into a single flat row per athlete.
-    NO metric recalculation — only read and merge."""
+    NO metric recalculation — only read and merge.
+
+    Optional Team-Dashboard-only operational filters (additive, backward compatible):
+      - session_name: when provided, only GPS records with matching session_name are aggregated.
+      - period_name: when provided WITH session_name, narrows the GPS aggregation to that
+        specific period. Wellness, RSImod and Body Composition remain UNAFFECTED by these
+        filters — they always follow date_range only.
+    """
     
     user_id = current_user["_id"]
     
@@ -802,6 +815,19 @@ async def get_team_table(
         "coach_id": user_id,
         "date": {"$gte": filter_start_str}
     }).to_list(5000)
+
+    # ── Team-Dashboard-only operational filters (additive, GPS-only) ──
+    # Applied AFTER the date-window query, BEFORE existing dedup heuristic.
+    # When neither filter is set, behavior is byte-identical to the legacy path.
+    # Wellness, RSImod and Body Composition aggregations below remain untouched.
+    if session_name:
+        sn_norm = session_name.strip()
+        if sn_norm:
+            all_gps = [r for r in all_gps if (r.get("session_name") or "").strip() == sn_norm]
+            if period_name:
+                pn_norm = period_name.strip()
+                if pn_norm:
+                    all_gps = [r for r in all_gps if (r.get("period_name") or "").strip() == pn_norm]
     
     all_jumps = await db.jump_assessments.find({
         "coach_id": user_id
@@ -816,14 +842,19 @@ async def get_team_table(
     }).sort([("date", -1), ("created_at", -1), ("_id", -1)]).to_list(500)
     
     # Index by athlete
-    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-    
     gps_by_athlete: Dict[str, list] = {}
     for r in all_gps:
         aid = r.get("athlete_id")
         if aid:
             gps_by_athlete.setdefault(aid, []).append(r)
+
+    # P2C: set of (date, session_name) keys where the coach designated a
+    # session_total period via CSV import. Built AFTER the operational
+    # filters above so it matches the data the loop will actually iterate.
+    sessions_with_designated_total: set = {
+        f"{r.get('date')}_{r.get('session_name') or 'default'}"
+        for r in all_gps if r.get("record_type") == "session_total"
+    }
     
     jump_by_athlete: Dict[str, list] = {}
     for r in all_jumps:
@@ -873,19 +904,14 @@ async def get_team_table(
             
             for date_str, sessions_map in grouped.items():
                 for sname, records in sessions_map.items():
-                    session_total_rec = None
-                    period_recs = []
-                    for r in records:
-                        pname = (r.get("period_name") or "").lower()
-                        is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                        is_period = any(kw in pname for kw in _GPS_PERIOD_KW)
-                        if is_sess and not is_period:
-                            if session_total_rec is None:
-                                session_total_rec = r
-                        else:
-                            period_recs.append(r)
-                    
-                    source = [session_total_rec] if session_total_rec else (period_recs if period_recs else records)
+                    # P2C pre-check: skip athletes missing the designated
+                    # session_total period for this session.
+                    if (f"{date_str}_{sname}" in sessions_with_designated_total
+                            and not any(r.get("record_type") == "session_total" for r in records)):
+                        continue
+                    # Central resolver: P1 record_type=session_total → P2 explicit →
+                    # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                    source = resolve_session_records(records)
                     for r in source:
                         total_dist += r.get("total_distance", 0) or 0
                         z3_total += r.get("high_intensity_distance", 0) or 0
@@ -943,6 +969,8 @@ async def get_team_table(
         fatigue_st = "UNKNOWN"
         readiness_st = "UNKNOWN"
         readiness_pct = None
+        pain_score_val = None
+        pain_location_val = None
         
         w_list = wellness_by_athlete.get(aid, [])
         if w_list:
@@ -969,6 +997,17 @@ async def get_team_table(
                     readiness_st = "NOT_READY"
             elif fatigue_st != "UNKNOWN":
                 readiness_st = fatigue_st
+            
+            # Pain (muscle_soreness score + athlete-typed location text)
+            ms_raw = latest_w.get("muscle_soreness")
+            if ms_raw is not None:
+                try:
+                    pain_score_val = int(round(float(ms_raw)))
+                except (TypeError, ValueError):
+                    pain_score_val = None
+            pl_raw = latest_w.get("pain_location")
+            if isinstance(pl_raw, str) and pl_raw.strip():
+                pain_location_val = pl_raw.strip()
             
             # Fatigue baseline 28d: average of last 28d wellness fatigue values
             fatigue_vals_28d = []
@@ -1002,6 +1041,8 @@ async def get_team_table(
             fatigue_status=fatigue_st,
             readiness_score=readiness_pct,
             readiness_status=readiness_st,
+            pain_score=pain_score_val,
+            pain_location=pain_location_val,
             weight=weight_val,
             body_fat=bf_val,
             lean_mass=lm_val,
@@ -1010,6 +1051,99 @@ async def get_team_table(
     rows.sort(key=lambda r: r.total_distance, reverse=True)
     
     return TeamTableResponse(rows=rows, period_label=period_labels.get(date_range, "7d"))
+
+
+# ─── Team Dashboard discovery endpoints (filters) ──────────────────────────
+# Additive endpoints used exclusively by the Team Dashboard filter UI.
+# They respect the same date_range window already used by /dashboard/team-table
+# so the picker never lists sessions or periods outside the current operational
+# context. NO impact on dashboards, ACWR, load engine, scientific reports,
+# athlete profile or any read path outside the Team Dashboard.
+
+def _team_table_filter_start_str(date_range: str) -> str:
+    """Replicates the date_range → start-date string logic used in get_team_table.
+    Kept inline (no shared util) to avoid touching any other code path."""
+    date_range_days = {"today": 0, "7d": 7, "14d": 14, "28d": 28, "90d": 90}
+    filter_days = date_range_days.get(date_range, 7)
+    today = datetime.utcnow()
+    today_str = today.strftime("%Y-%m-%d")
+    if filter_days == 0:
+        filter_start = datetime.strptime(today_str, "%Y-%m-%d")
+    else:
+        filter_start = today - timedelta(days=filter_days)
+    return filter_start.strftime("%Y-%m-%d")
+
+
+@router.get("/dashboard/team-table/session-names")
+async def get_team_table_session_names(
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user),
+):
+    """List distinct session_name values present in gps_data for the current
+    coach within the same date window used by /dashboard/team-table.
+    Returns: [{ session_name, count, last_date }] sorted by last_date DESC."""
+    user_id = current_user["_id"]
+    filter_start_str = _team_table_filter_start_str(date_range)
+
+    cursor = db.gps_data.find(
+        {
+            "coach_id": user_id,
+            "date": {"$gte": filter_start_str},
+        },
+        {"session_name": 1, "date": 1},
+    )
+
+    bucket: Dict[str, Dict[str, Any]] = {}
+    async for doc in cursor:
+        sn = (doc.get("session_name") or "").strip()
+        if not sn:
+            continue
+        d = (doc.get("date") or "").strip()
+        b = bucket.get(sn)
+        if b is None:
+            bucket[sn] = {"session_name": sn, "count": 1, "last_date": d}
+        else:
+            b["count"] += 1
+            if d and d > (b["last_date"] or ""):
+                b["last_date"] = d
+
+    items = list(bucket.values())
+    items.sort(key=lambda x: (x.get("last_date") or "", x.get("session_name") or ""), reverse=True)
+    return {"sessions": items}
+
+
+@router.get("/dashboard/team-table/session-periods")
+async def get_team_table_session_periods(
+    session_name: str,
+    date_range: str = "7d",
+    current_user: dict = Depends(get_current_user),
+):
+    """List distinct period_name values inside a given session_name, restricted
+    to the current Team Dashboard date window. Empty period_name values are
+    ignored. Returns: [period_name]."""
+    user_id = current_user["_id"]
+    sn = (session_name or "").strip()
+    if not sn:
+        return {"periods": []}
+    filter_start_str = _team_table_filter_start_str(date_range)
+
+    cursor = db.gps_data.find(
+        {
+            "coach_id": user_id,
+            "date": {"$gte": filter_start_str},
+            "session_name": sn,
+        },
+        {"period_name": 1},
+    )
+    seen: List[str] = []
+    seen_set = set()
+    async for doc in cursor:
+        pn = (doc.get("period_name") or "").strip()
+        if not pn or pn in seen_set:
+            continue
+        seen_set.add(pn)
+        seen.append(pn)
+    return {"periods": seen}
 
 
 
@@ -1153,11 +1287,16 @@ async def get_dashboard_overview(
             body_comp_by_athlete[aid] = r
     
     # ============ GPS DEDUP HELPER ============
-    _GPS_SESSION_KW = {"session", "total", "full", "complete", "summary", "sessão"}
-    _GPS_PERIOD_KW = {"half", "1st", "2nd", "period", "split", "tempo", "parte"}
-    
+    # P2C: set of (date, session_name) keys where the coach designated a
+    # session_total period via CSV import. Computed once over all coach GPS
+    # data in window. Used inside build_daily_gps below.
+    sessions_with_designated_total: set = {
+        f"{r.get('date', '')}_{r.get('session_name') or 'default'}"
+        for r in all_gps if r.get("record_type") == "session_total"
+    }
+
     def build_daily_gps(gps_records):
-        """Build daily aggregated GPS from records, deduped by session/period."""
+        """Build daily aggregated GPS from records, deduped via central resolver."""
         daily = {}
         grouped = {}
         for r in gps_records:
@@ -1169,18 +1308,14 @@ async def get_dashboard_overview(
             day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
                    "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
             for sname, records in sessions_map.items():
-                session_total = None
-                period_recs = []
-                for r in records:
-                    pname = (r.get("period_name") or "").lower()
-                    is_sess = any(kw in pname for kw in _GPS_SESSION_KW)
-                    is_per = any(kw in pname for kw in _GPS_PERIOD_KW)
-                    if is_sess and not is_per:
-                        if session_total is None:
-                            session_total = r
-                    else:
-                        period_recs.append(r)
-                source = [session_total] if session_total else (period_recs if period_recs else records)
+                # P2C pre-check: skip athletes missing the designated
+                # session_total period for this session.
+                if (f"{date_str}_{sname}" in sessions_with_designated_total
+                        and not any(r.get("record_type") == "session_total" for r in records)):
+                    continue
+                # Central resolver: P1 record_type=session_total → P2 explicit →
+                # P3 has_session_total → P4 legacy keywords → P5 sum all.
+                source = resolve_session_records(records)
                 for r in source:
                     day["total_distance"] += r.get("total_distance", 0) or 0
                     day["high_intensity_distance"] += r.get("high_intensity_distance", 0) or 0
