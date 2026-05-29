@@ -1016,7 +1016,7 @@ export default function DataScreen() {
   // PDF Export state
   const [pdfModalVisible, setPdfModalVisible] = useState(false);
   const [pdfLayers, setPdfLayers] = useState<Record<string, boolean>>({
-    load: true, summary: true, status: true, neuro: true, risk: true,
+    load: true, summary: true, status: true, neuro: true, risk: true, speed: true,
   });
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   
@@ -2239,6 +2239,7 @@ export default function DataScreen() {
               { key: 'status', label: 'Team Status', icon: 'people' },
               { key: 'neuro', label: 'Neuromuscular', icon: 'body' },
               { key: 'risk', label: 'Risk Intelligence', icon: 'shield-checkmark' },
+              { key: 'speed', label: 'Speed & Metabolic Load', icon: 'speedometer' },
             ].map(item => (
               <TouchableOpacity 
                 key={item.key} 

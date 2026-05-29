@@ -1,5 +1,33 @@
 # CHANGELOG
 
+## 2026-05-29 — PDF Export: Nova seção "Speed & Metabolic Load" (estritamente aditiva)
+
+Integração do conteúdo Speed & Metabolic Load no PDF export, **sem reescrever** o fluxo existente. Auditoria primeiro, depois implementação additiva e null-safe. Header/footer/logo da LoadManager Pro **preservados**. Estilo executivo, sem emojis, sem cards coloridos.
+
+### Auditoria (arquitetura atual do PDF)
+- Endpoint: `GET /api/report/dashboard-overview` (router prefix só `/api`, NÃO `/api/dashboard`). Monta HTML+SVG inline server-side.
+- Camadas atuais: Header (1.1) + Resumo Executivo (1.2) + Key Insights (2) + Seção 3 "Métricas Detalhadas" (grid 2-col, 5 módulos: load/summary/status/neuro/risk).
+- Lista de camadas: frontend `pdfLayers` (`app/(tabs)/data.tsx` l.1018) + checkboxes (l.2236); backend query param `layers` → `selected_layers`, `_L3_NAMES`, `_KI_CANONICAL`.
+- Charts: helpers `make_line_chart_svg`/`make_bar_chart_svg`/`make_gauge_svg`/`make_horiz_bar`; módulos via `_l3_module`; tabelas via `.pdf-risk-table`.
+- Dados de Speed & Metabolic JÁ presentes no `/dashboard/overview` (team_avg_player_load, team_player_load_per_min, team_max_velocity_percent, team_high_metabolic_load, aggregated_timeline.player_load, activity_split, insights.speed_metabolic) → **zero novo cálculo**.
+
+### Implementação (decisões do usuário: 1a, texto-only RSImod, tabela compacta GvT)
+- **Backend** (`routes/dashboard/routes.py`): default `layers` agora inclui `speed`; `_KI_CANONICAL` ganha `("speed","speed_metabolic")` (insight de texto entra nos Key Insights). Nova `speed_section_html` (full-width, reusa 100% helpers SVG + classes CSS existentes):
+  - Métricas: Vel.Máx %, Player Load Méd., PL/min, Carga Metab. Alta.
+  - Line chart de Player Load (reusa `make_line_chart_svg`, sem novo helper).
+  - Tabela compacta Jogo vs Treino (`.pdf-risk-table`): Player Load Médio / Carga Metab. Alta / Vel.Máx (%) — colunas Métrica | Jogo | Treino | Ratio. Null-safe ("—"/"N/A"); empty-state quando sem atividades classificadas.
+  - Bloco de texto RSImod vs Player Load (interpretação dos 4 quadrantes, PT/EN) — **sem novo gráfico de dispersão** (decisão de baixo risco).
+  - Numeração de seção dinâmica ("4." ou "3." se grid vazio).
+- **Frontend** (`app/(tabs)/data.tsx`): `pdfLayers` default `speed: true` (ligada por padrão); novo checkbox "Speed & Metabolic Load" (ícone speedometer) no modal de export. `handleExportPdf` inalterado (já envia `selectedKeys`).
+
+### Validação
+- Curl e2e (28d/90d, PT/EN): HTTP 200, seção presente, tabela GvT com dados reais (PL Jogo 420/Treino 569/Ratio 135%; HML/VelMáx null-safe "—"/"N/A"), bloco RSImod, line chart, footer/logo preservados.
+- **Backward compat**: `layers` sem `speed` → seção AUSENTE; 5 módulos existentes + header/footer intactos.
+- Screenshot: layout executivo limpo, sem quebra, integrado ao design existente.
+- 4 novos testes pytest em `tests/test_pdf_export.py::TestSpeedMetabolicPdfSection` → 4/4 PASS.
+- Pré-existentes (3 falhas em `TestDashboardPdfExport`: `report-header`, `Smart Summary`, badges `lb-*`) referem-se a tokens do design antigo (rebuild P6) — NÃO causadas por esta mudança.
+
+
 ## 2026-05-29 — P0 Validations & Correções (Load Intel gauge / Availability label / Game vs Training)
 
 Rodada de validação/correção P0 antes de fechar o checkpoint de refinements. Tudo visual/label/rendering — **zero alteração de cálculo, valor, threshold ou lógica de backend**. Arquivo único alterado: `frontend/app/(tabs)/data.tsx`.

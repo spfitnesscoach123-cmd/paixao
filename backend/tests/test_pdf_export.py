@@ -347,5 +347,68 @@ class TestReportDataContent:
         print("PASS: SVG charts have proper structure")
 
 
+class TestSpeedMetabolicPdfSection:
+    """Tests for the additive Speed & Metabolic Load PDF section (layer 'speed')."""
+
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": TEST_EMAIL,
+            "password": TEST_PASSWORD
+        })
+        assert response.status_code == 200, f"Login failed: {response.text}"
+        self.token = response.json().get("access_token")
+        assert self.token, "No access_token in login response"
+        self.headers = {"Authorization": f"Bearer {self.token}"}
+
+    def test_speed_section_present_when_selected_pt(self):
+        r = requests.get(
+            f"{BASE_URL}/api/report/dashboard-overview?lang=pt&date_range=90d&layers=load,summary,status,neuro,risk,speed",
+            headers=self.headers,
+        )
+        assert r.status_code == 200
+        html = r.text
+        assert "Velocidade & Carga Metabólica" in html
+        assert "Jogo</th>" in html and "Treino</th>" in html  # Game vs Training table
+        assert "RSImod vs Player Load" in html
+        assert "tolerância de carga" in html  # quadrant interpretation block
+        print("PASS: Speed section present in PT when selected")
+
+    def test_speed_section_present_when_selected_en(self):
+        r = requests.get(
+            f"{BASE_URL}/api/report/dashboard-overview?lang=en&date_range=90d&layers=speed",
+            headers=self.headers,
+        )
+        assert r.status_code == 200
+        html = r.text
+        assert "Speed & Metabolic Load" in html
+        assert "good load tolerance" in html
+        print("PASS: Speed section present in EN when selected")
+
+    def test_speed_section_absent_for_legacy_layers(self):
+        """Backward compatibility: legacy clients without 'speed' must NOT get the section."""
+        r = requests.get(
+            f"{BASE_URL}/api/report/dashboard-overview?lang=pt&date_range=90d&layers=load,summary,status,neuro,risk",
+            headers=self.headers,
+        )
+        assert r.status_code == 200
+        html = r.text
+        assert "Velocidade & Carga Metabólica" not in html
+        assert "Risk Intelligence" in html  # existing modules still render
+        print("PASS: Speed section absent for legacy layer list; existing modules intact")
+
+    def test_existing_sections_and_footer_intact(self):
+        r = requests.get(
+            f"{BASE_URL}/api/report/dashboard-overview?lang=pt&date_range=90d",
+            headers=self.headers,
+        )
+        assert r.status_code == 200
+        html = r.text
+        assert html.startswith("<!DOCTYPE html>")
+        assert "Load Manager Pro &mdash;" in html  # footer preserved
+        assert "LoadManager Pro" in html  # brand/logo block preserved
+        print("PASS: Header/footer/brand preserved with speed default ON")
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

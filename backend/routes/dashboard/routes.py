@@ -2244,7 +2244,7 @@ async def get_dashboard_overview_pdf(
     athlete_id: Optional[str] = None,
     position: Optional[str] = None,
     date_range: str = "28d",
-    layers: str = "load,summary,status,neuro,risk",
+    layers: str = "load,summary,status,neuro,risk,speed",
     current_user: dict = Depends(get_current_user)
 ):
     """Generate HTML report for dashboard overview PDF export with inline SVG charts."""
@@ -2861,6 +2861,7 @@ async def get_dashboard_overview_pdf(
         ("status",  "team_status"),
         ("neuro",   "neuromuscular"),
         ("risk",    "risk_intelligence"),
+        ("speed",   "speed_metabolic"),
     ]
 
     ki_bullets = []          # ordered list of (module_id, text)
@@ -2907,7 +2908,140 @@ async def get_dashboard_overview_pdf(
     pdf_insights_html = f'''<section class="pdf-insights">
         <ul class="pdf-insights-list">{_ki_items_html}</ul>
     </section>'''
-    
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SPEED & METABOLIC LOAD (additive, full-width section)
+    # Reuses existing SVG/table helpers + CSS classes ONLY. Data already present
+    # in the overview payload — no new calculations. Header/footer/logo untouched.
+    # ══════════════════════════════════════════════════════════════════════
+    speed_section_html = ""
+    if "speed" in selected_layers:
+        sm_split = overview.get("activity_split") or {}
+        sm_mvp = summary.get("team_max_velocity_percent")
+        sm_apl = summary.get("team_avg_player_load")
+        sm_plpm = summary.get("team_player_load_per_min")
+        sm_hml = summary.get("team_high_metabolic_load")
+        sm_rsimod = summary.get("team_rsimod")
+
+        def _sm_fmt(v, fmt, suffix=""):
+            if v is None or isinstance(v, bool) or not isinstance(v, (int, float)) or v != v:
+                return "—"
+            try:
+                return f"{v:{fmt}}{suffix}"
+            except (TypeError, ValueError):
+                return "—"
+
+        sm_metrics = (
+            _l3_metric("Vel. Máx %" if is_pt else "Max Velocity %", _sm_fmt(sm_mvp, ".0f", "%"))
+            + _l3_metric("Player Load Méd." if is_pt else "Avg Player Load", _sm_fmt(sm_apl, ".0f"))
+            + _l3_metric("PL/min", _sm_fmt(sm_plpm, ".1f"))
+            + _l3_metric("Carga Metab. Alta" if is_pt else "High Metab. Load", _sm_fmt(sm_hml, ".0f"))
+        )
+
+        # Player Load timeline line chart — reuse make_line_chart_svg (no new helper)
+        sm_tl = [d.get("player_load") for d in agg_timeline if d.get("player_load") is not None]
+        sm_dates = [d.get("date", "")[-5:] for d in agg_timeline if d.get("player_load") is not None]
+        sm_chart = make_line_chart_svg(
+            sm_tl, sm_dates, "#1F2937", "Player Load",
+            ("u.a." if is_pt else "AU"), w=900, h=180
+        ) if sm_tl else ""
+
+        # Game vs Training compact table — reuse .pdf-risk-table styling
+        g = sm_split.get("game") or {}
+        t = sm_split.get("training") or {}
+        rt = sm_split.get("ratio") or {}
+        has_split = bool(sm_split.get("has_game") or sm_split.get("has_training"))
+
+        def _ratio_cell(v):
+            return "N/A" if v is None else _sm_fmt(v, ".0f", "%")
+
+        if has_split:
+            gt_rows = [
+                ("Player Load Médio" if is_pt else "Average Player Load",
+                 _sm_fmt(g.get("player_load"), ".0f"), _sm_fmt(t.get("player_load"), ".0f"),
+                 _ratio_cell(rt.get("player_load"))),
+                ("Carga Metab. Alta" if is_pt else "High Metabolic Load",
+                 _sm_fmt(g.get("high_metabolic_load"), ".0f"), _sm_fmt(t.get("high_metabolic_load"), ".0f"),
+                 _ratio_cell(rt.get("high_metabolic_load"))),
+                ("Vel. Máx (%)" if is_pt else "Max Velocity (%)",
+                 _sm_fmt(g.get("max_velocity_percent"), ".0f", "%"), _sm_fmt(t.get("max_velocity_percent"), ".0f", "%"),
+                 _ratio_cell(rt.get("max_velocity_percent"))),
+            ]
+            gt_rows_html = "".join(
+                f'<tr><td>{m}</td><td>{gv}</td><td>{tv}</td><td>{rv}</td></tr>'
+                for m, gv, tv, rv in gt_rows
+            )
+            gt_table = (
+                f'<table class="pdf-risk-table">'
+                f'<thead><tr>'
+                f'<th>{"Métrica" if is_pt else "Metric"}</th>'
+                f'<th>{"Jogo" if is_pt else "Game"}</th>'
+                f'<th>{"Treino" if is_pt else "Training"}</th>'
+                f'<th>Ratio</th>'
+                f'</tr></thead>'
+                f'<tbody>{gt_rows_html}</tbody>'
+                f'</table>'
+            )
+        else:
+            gt_table = (
+                f'<div class="pdf-metric-empty">'
+                f'{"Sem atividades classificadas (Jogo/Treino) no período." if is_pt else "No classified activities (Game/Training) in the period."}'
+                f'</div>'
+            )
+
+        # RSImod vs Player Load — professional text/insight block (no scatter chart)
+        if is_pt:
+            rsi_intro = "Interpretação dos quadrantes de tolerância de carga:"
+            rsi_lines = [
+                "Player Load alto + RSImod alto: boa tolerância de carga.",
+                "Player Load alto + RSImod baixo: possível fadiga neuromuscular.",
+                "Player Load baixo + RSImod alto: perfil recuperado / fresco.",
+                "Player Load baixo + RSImod baixo: sinal de prontidão reduzida.",
+            ]
+        else:
+            rsi_intro = "Load-tolerance quadrant interpretation:"
+            rsi_lines = [
+                "High Player Load + High RSImod: good load tolerance.",
+                "High Player Load + Low RSImod: possible neuromuscular fatigue.",
+                "Low Player Load + High RSImod: fresh / recovered profile.",
+                "Low Player Load + Low RSImod: reduced readiness signal.",
+            ]
+        rsi_current = ""
+        if sm_apl is not None or sm_rsimod is not None:
+            rsi_current = (
+                f'<div class="pdf-module-footer-note">'
+                f'{("Atual — Player Load médio: " if is_pt else "Current — Average Player Load: ")}{_sm_fmt(sm_apl, ".0f")}'
+                f' · RSImod: {_sm_fmt(sm_rsimod, ".2f")}</div>'
+            )
+        rsi_bullets = "".join(
+            f'<li class="pdf-insight-bullet">{_html_lib.escape(line)}</li>' for line in rsi_lines
+        )
+        rsi_block = (
+            f'<div class="pdf-module-footer-note" style="margin-bottom:8px;">{_html_lib.escape(rsi_intro)}</div>'
+            f'<ul class="pdf-insights-list">{rsi_bullets}</ul>'
+            f'{rsi_current}'
+        )
+
+        sm_section_num = "4" if l3_modules_html.strip() else "3"
+        sm_title = f'{sm_section_num}. ' + ("Velocidade & Carga Metabólica" if is_pt else "Speed & Metabolic Load")
+        gt_title = "Jogo vs Treino" if is_pt else "Game vs Training"
+        rsi_title = "RSImod vs Player Load"
+        speed_section_html = (
+            f'<div class="page-container">'
+            f'<section class="pdf-section">'
+            f'<h2 class="pdf-section-title">{sm_title}</h2>'
+            f'<div class="pdf-module">'
+            f'<div class="pdf-module-metrics">{sm_metrics}</div>'
+            f'{sm_chart}'
+            f'<div class="pdf-module-title" style="margin-top:16px;">{gt_title}</div>'
+            f'{gt_table}'
+            f'<div class="pdf-module-title" style="margin-top:16px;">{rsi_title}</div>'
+            f'{rsi_block}'
+            f'</div>'
+            f'</section>'
+            f'</div>'
+        )
+
     html = f"""<!DOCTYPE html>
 <html lang="{lang}">
 <head>
@@ -3295,6 +3429,7 @@ async def get_dashboard_overview_pdf(
     {pdf_insights_html}
 </div>
 {sections_html}
+{speed_section_html}
 <div class="container">
     <div class="footer">Load Manager Pro &mdash; {now}</div>
 </div>
