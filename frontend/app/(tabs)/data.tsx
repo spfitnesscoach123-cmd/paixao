@@ -34,6 +34,7 @@ const LAYERS = [
   { key: 'status', icon: 'heart-outline', labelPt: 'Team Status', labelEn: 'Team Status' },
   { key: 'neuro', icon: 'flash-outline', labelPt: 'Neuromuscular', labelEn: 'Neuromuscular' },
   { key: 'risk', icon: 'shield-outline', labelPt: 'Risk Intelligence', labelEn: 'Risk Intelligence' },
+  { key: 'speed', icon: 'speedometer-outline', labelPt: 'Velocidade & Metab.', labelEn: 'Speed & Metabolic' },
 ];
 
 const DATE_RANGES = [
@@ -229,6 +230,14 @@ const TOOLTIPS: Record<string, { pt: string; en: string }> = {
     pt: 'Painel consolidado de atletas em zona de risco (ACWR, wellness, assimetria, idade). Use para priorizar conversas e decisões de seleção antes de jogos.',
     en: 'Consolidated panel of athletes in the risk zone (ACWR, wellness, asymmetry, age). Use to prioritize conversations and selection decisions before games.',
   },
+  sm_gauges: {
+    pt: 'Velocidade & Carga Metabólica. Velocidade Máxima (%) = pico atingido vs máximo do atleta (exposição de sprint). Player Load Médio = carga mecânica média do período. Carga Metabólica Alta (HML) = acúmulo de esforço de alta demanda metabólica. Valores são exibidos exatamente como importados do CSV — sem conversão de unidade. "--" indica ausência de dados no período.',
+    en: 'Speed & Metabolic Load. Max Velocity (%) = peak reached vs athlete maximum (sprint exposure). Average Player Load = mean mechanical load over the period. High Metabolic Load (HML) = accumulated high metabolic demand. Values are shown exactly as imported from CSV — no unit conversion. "--" indicates no data in the period.',
+  },
+  sm_pl_chart: {
+    pt: 'Evolução diária do Player Load Médio (linha sólida) vs Player Load por Minuto (linha tracejada). Player Load reflete volume mecânico; PL/min reflete intensidade. Subidas no PL/min sem subida proporcional no Player Load indicam sessões curtas e intensas.',
+    en: 'Daily evolution of Average Player Load (solid line) vs Player Load Per Minute (dashed line). Player Load reflects mechanical volume; PL/min reflects intensity. Rises in PL/min without proportional Player Load rise indicate short, intense sessions.',
+  },
 };
 
 const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; subtitle?: string }) => {
@@ -268,6 +277,8 @@ const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; 
     rsi_vs_acwr: { pt: 'RSImod vs ACWR', en: 'RSImod vs ACWR' },
     asymmetry_alert: { pt: 'Alerta de Assimetria (SL-CMJ)', en: 'Asymmetry Alert (SL-CMJ)' },
     risk_panel: { pt: 'Painel de Risco', en: 'Risk Panel' },
+    sm_gauges: { pt: 'Velocidade & Carga Metabólica', en: 'Speed & Metabolic Load' },
+    sm_pl_chart: { pt: 'Player Load Médio vs PL/min', en: 'Avg Player Load vs PL/min' },
   };
   const t = TITLES[id as string];
   const title = t ? (locale === 'pt' ? t.pt : t.en) : '';
@@ -1834,6 +1845,88 @@ export default function DataScreen() {
     );
   };
   
+  const renderSpeedMetabolic = () => {
+    // Period aggregates: athlete = individual values; team/position = group averages
+    const sm = mode === 'athlete'
+      ? (athletes[0]?.speed_metabolic || {})
+      : {
+          max_velocity_percent: summary.team_max_velocity_percent,
+          avg_player_load: summary.team_avg_player_load,
+          player_load_per_min: summary.team_player_load_per_min,
+          high_metabolic_load: summary.team_high_metabolic_load,
+        };
+    const maxVel = sm.max_velocity_percent;
+    const avgPL = sm.avg_player_load;
+    const hml = sm.high_metabolic_load;
+    const plPerMin = sm.player_load_per_min;
+
+    // Line chart timeline: Average Player Load vs Player Load Per Minute
+    const smTimeline = mode === 'athlete' && athletes[0]?.sm_timeline
+      ? athletes[0].sm_timeline
+      : aggTimeline;
+    const plData = smTimeline.map((d: any) => d.player_load || 0);
+    const plpmData = smTimeline.map((d: any) => d.player_load_per_min || 0);
+    const dateLabels = smTimeline.map((d: any) => d.date?.slice(5) || '');
+    const hasTimeline = plData.some((v: number) => v > 0) || plpmData.some((v: number) => v > 0);
+
+    return (
+      <View>
+        {/* Top gauges: Max Velocity (%), Average Player Load, High Metabolic Load */}
+        <FadeInView delay={0}>
+        <View style={styles.card} data-testid="speed-metabolic-gauges-card">
+          <CardInfoHeader id="sm_gauges" />
+          <ChartEntryView delay={100} duration={700}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8, flexWrap: 'wrap' }}>
+            <GaugeChart value={(maxVel ?? undefined) as any} max={100} label={locale === 'pt' ? 'Vel. Máx %' : 'Max Vel %'} color={COLORS.cyan} size={110} />
+            <GaugeChart value={(avgPL ?? undefined) as any} max={Math.max(avgPL || 1, 1) * 1.3} label={locale === 'pt' ? 'Player Load' : 'Player Load'} color={COLORS.blue} size={110} />
+            <GaugeChart value={(hml ?? undefined) as any} max={Math.max(hml || 1, 1) * 1.3} label={locale === 'pt' ? 'Carga Metab.' : 'High Metab.'} color={COLORS.orange} size={110} />
+          </View>
+          </ChartEntryView>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
+            <View style={styles.metricPill} data-testid="sm-pill-plpm"><Text style={styles.metricPillLabel}>PL/min</Text><Text style={styles.metricPillValue}>{plPerMin != null ? plPerMin.toFixed(1) : '--'}</Text></View>
+            <View style={styles.metricPill} data-testid="sm-pill-maxvel"><Text style={styles.metricPillLabel}>{locale === 'pt' ? 'Vel. Máx %' : 'Max Vel %'}</Text><Text style={styles.metricPillValue}>{maxVel != null ? `${maxVel.toFixed(0)}%` : '--'}</Text></View>
+          </View>
+        </View>
+        </FadeInView>
+
+        {/* Line chart: Average Player Load vs Player Load Per Minute */}
+        <FadeInView delay={120}>
+        <View style={styles.card} data-testid="speed-metabolic-chart-card">
+          <CardInfoHeader id="sm_pl_chart" />
+          <ChartEntryView delay={200} duration={600}>
+          <View style={{ marginTop: 8 }}>
+            {hasTimeline ? (
+              <LineChart
+                lines={[
+                  { data: plData, color: COLORS.blue },
+                  { data: plpmData, color: COLORS.cyan, dashed: true },
+                ]}
+                labels={dateLabels}
+                showArea height={150}
+              />
+            ) : (
+              <Text style={{ color: colors.text.tertiary, fontSize: 12, textAlign: 'center', paddingVertical: 24 }} data-testid="sm-chart-empty">
+                {locale === 'pt' ? 'Sem dados de Player Load no período.' : 'No Player Load data in the period.'}
+              </Text>
+            )}
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16, marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><View style={{ width: 12, height: 3, backgroundColor: COLORS.blue, borderRadius: 2 }} /><Text style={{ color: colors.text.secondary, fontSize: 10 }}>{locale === 'pt' ? 'Player Load Médio' : 'Avg Player Load'}</Text></View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><View style={{ width: 12, height: 3, backgroundColor: COLORS.cyan, borderRadius: 2 }} /><Text style={{ color: colors.text.secondary, fontSize: 10 }}>Player Load / min</Text></View>
+          </View>
+          </ChartEntryView>
+        </View>
+        </FadeInView>
+
+        {/* AI Insight (reuses existing insights architecture) */}
+        <View style={styles.insightCard} data-testid="speed-metabolic-insight">
+          <Ionicons name="bulb-outline" size={16} color={COLORS.yellow} />
+          <Text style={styles.insightText}>{insights.speed_metabolic || ''}</Text>
+        </View>
+      </View>
+    );
+  };
+
   const renderActiveLayer = () => {
     switch (activeLayer) {
       case 'load': return renderLoadIntelligence();
@@ -1841,6 +1934,7 @@ export default function DataScreen() {
       case 'status': return renderTeamStatus();
       case 'neuro': return renderNeuromuscular();
       case 'risk': return renderRiskIntelligence();
+      case 'speed': return renderSpeedMetabolic();
       default: return renderLoadIntelligence();
     }
   };

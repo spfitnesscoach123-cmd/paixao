@@ -274,3 +274,9 @@ Constantes legadas de keywords são duplicadas em `utils/gps_session_resolver.py
 - ✅ Endpoint D retornando `periods[]` + `totals` corretamente para João Silva (6 sessões, distâncias coerentes).
 - ✅ Backend reload sem erros.
 - ✅ Nenhuma alteração em cálculos científicos ou pipelines.
+
+---
+## Status update — 2026-05-29
+- **Épico "Speed & Metabolic Load"**: Fase 2 (Import) ✅, Fase 3 (Tabela Analítica Team) ✅ APROVADA, Fase 4 (Dashboard Overview Layer) ✅ implementada — aguardando aprovação do checkpoint. Fase 5 (regressão final) pendente.
+- **Dívida técnica registrada**: `backend/models/dashboard_models.py` é duplicado morto de `TeamTableRow` (definido localmente em `routes/dashboard/routes.py`). NÃO remover agora (decisão do usuário) — remover em limpeza futura.
+- Detalhes completos em CHANGELOG.md.

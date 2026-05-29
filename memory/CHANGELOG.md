@@ -218,3 +218,38 @@ Validado via curl: login conta demo OK, endpoint /api/auth/devices retorna max_d
 
 ### Risco aberto (não corrigido — fora do escopo/governança)
 - `models/dashboard_models.py` é um duplicado morto e divergente de `TeamTableRow`. Recomenda-se remover futuramente para evitar confusão (aguardando autorização).
+
+
+## 2026-05-29 — Fase 4: Dashboard Overview Layer "Speed & Metabolic Load"
+
+Nova camada do Dashboard Overview (aguardando aprovação do checkpoint). Reusa 100% a arquitetura existente de layers/gauges/line chart/AI insights — sem sistema paralelo, sem nova lib de gráfico, sem alterar layers existentes, sem tocar filtros/modos.
+
+### Backend — `routes/dashboard/routes.py` (endpoint `/dashboard/overview`, aditivo & null-safe)
+- `build_daily_gps`: agrega por dia Player Load (média), PL/min (média), HML (soma), Duração (soma), Max Velocity % (pico), Max Velocity km/h (pico) — valores EXATAMENTE como armazenados, sem conversão.
+- Novo helper `compute_speed_metabolic(daily_gps)`: agregado do período + timeline diária (PL e PL/min) para o gráfico de linha.
+- Por atleta: adiciona `speed_metabolic` (agregado) e `sm_timeline` ao resultado.
+- `daily_timeline`: adiciona `player_load` e `player_load_per_min` por dia.
+- Resumo da equipe: `team_avg_player_load`, `team_player_load_per_min`, `team_max_velocity_percent`, `team_high_metabolic_load`.
+- `aggregated_timeline`: adiciona `player_load` e `player_load_per_min` (médias da equipe/posição por dia) para o gráfico em modo team/position.
+- `insights["speed_metabolic"]`: gerado pelo mesmo mecanismo heurístico existente. Cobre exposição de Velocidade Máx (%), Player Load Médio, PL/min, HML, desvio atleta-vs-equipe e desvio atleta-vs-posição.
+
+### Frontend — `app/(tabs)/data.tsx`
+- `LAYERS`: nova layer `speed` (ícone speedometer).
+- `TOOLTIPS` + `TITLES`: entradas `sm_gauges` e `sm_pl_chart`.
+- Nova `renderSpeedMetabolic()`: 3 gauges (Max Velocity %, Average Player Load, High Metabolic Load) + line chart (Avg Player Load vs PL/min, sólida + tracejada com legenda) + card de AI Insight. Reusa GaugeChart, LineChart, CardInfoHeader, styles e insights existentes.
+- `renderActiveLayer`: case `speed`.
+
+### Comportamento por modo (validado)
+- Team: médias da equipe. Individual: histórico do atleta selecionado. Position: médias do grupo de posição. Valores diferem corretamente entre modos (ex.: Player Load Team=522 vs Individual=510).
+
+### Null-safe
+- Campos ausentes no CSV real (Max Velocity %, HML, PL/min) retornam null → gauges exibem "--"; insight omite métricas nulas; gráfico exibe estado vazio quando não há Player Load.
+
+### Validação (import de CSV de teste de 4 dias, depois removido)
+- Backend: gauges (94% / 510 / 1520), timeline de 4 dias, insight cobrindo as 6 dimensões. Limpeza: atleta + gps_data + athlete_load_metrics = 0 residual.
+- Frontend: screenshots em Team e Individual com gauges, gráfico e insight renderizando corretamente; 5 layers originais intactos.
+
+### Não implementado (fora do escopo da Fase 4, conforme instrução)
+- Sprint Exposure; Game vs Training Ratio (classificação de atividade não auditada ainda).
+
+### APIs afetadas: `GET /api/dashboard/overview` (campos aditivos). NÃO afetadas: todas as demais.

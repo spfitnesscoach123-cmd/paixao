@@ -1370,7 +1370,12 @@ async def get_dashboard_overview(
         
         for date_str, sessions_map in grouped.items():
             day = {"total_distance": 0, "high_intensity_distance": 0, "high_speed_running": 0,
-                   "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0}
+                   "sprint_distance": 0, "number_of_sprints": 0, "acc_dec": 0,
+                   # Speed & Metabolic Load accumulators (Phase 4, additive, null-safe,
+                   # values consumed EXACTLY as stored — no unit conversion)
+                   "_pl_sum": 0.0, "_pl_cnt": 0, "_plpm_sum": 0.0, "_plpm_cnt": 0,
+                   "_hml_sum": 0.0, "_hml_has": False, "_dur_sum": 0.0,
+                   "_mvp": None, "_vmax": None}
             for sname, records in sessions_map.items():
                 # P2C pre-check: skip athletes missing the designated
                 # session_total period for this session.
@@ -1389,9 +1394,73 @@ async def get_dashboard_overview(
                     acc = r.get("number_of_accelerations", 0) or 0
                     dec = r.get("number_of_decelerations", 0) or 0
                     day["acc_dec"] += acc + dec
+                    # Speed & Metabolic Load (additive, null-safe, no conversion)
+                    pl = r.get("player_load")
+                    if pl is not None:
+                        day["_pl_sum"] += pl; day["_pl_cnt"] += 1
+                    plpm = r.get("player_load_per_minute")
+                    if plpm is not None:
+                        day["_plpm_sum"] += plpm; day["_plpm_cnt"] += 1
+                    hml = r.get("high_metabolic_load")
+                    if hml is not None:
+                        day["_hml_sum"] += hml; day["_hml_has"] = True
+                    dur = r.get("duration_minutes")
+                    if dur is not None:
+                        day["_dur_sum"] += dur
+                    mvp = r.get("max_velocity_percent")
+                    if mvp is not None:
+                        day["_mvp"] = mvp if day["_mvp"] is None else max(day["_mvp"], mvp)
+                    vmax = r.get("max_speed")
+                    if vmax is not None:
+                        day["_vmax"] = vmax if day["_vmax"] is None else max(day["_vmax"], vmax)
+            # Per-day derived Speed & Metabolic values (null-safe)
+            day["player_load"] = round(day["_pl_sum"] / day["_pl_cnt"], 1) if day["_pl_cnt"] else None
+            day["player_load_per_min"] = round(day["_plpm_sum"] / day["_plpm_cnt"], 1) if day["_plpm_cnt"] else None
+            day["high_metabolic_load"] = round(day["_hml_sum"], 0) if day["_hml_has"] else None
+            day["duration"] = round(day["_dur_sum"], 0) if day["_dur_sum"] else None
+            day["max_velocity_percent"] = round(day["_mvp"], 1) if day["_mvp"] is not None else None
+            day["max_velocity_kmh"] = round(day["_vmax"], 1) if day["_vmax"] is not None else None
             daily[date_str] = day
         return daily
-    
+
+    def compute_speed_metabolic(daily_gps):
+        """Period aggregate + daily timeline for Speed & Metabolic Load (null-safe).
+        Player Load & PL/min are averaged across days with data; High Metabolic Load
+        & Duration are summed; Max Velocity (% and km/h) are peaks. Values are used
+        EXACTLY as stored (no unit conversion). Timeline carries per-day Player Load
+        and Player Load Per Minute for the line chart (None on days without data)."""
+        pls = []; plpms = []
+        hml_total = 0.0; hml_has = False; dur_total = 0.0
+        mvp = None; vmax = None
+        timeline = []
+        for i in range(effective_days):
+            d = (reference_date - timedelta(days=effective_days - 1 - i)).strftime("%Y-%m-%d")
+            day = daily_gps.get(d, {})
+            pl = day.get("player_load")
+            plpm = day.get("player_load_per_min")
+            timeline.append({"date": d, "player_load": pl, "player_load_per_min": plpm})
+            if pl is not None:
+                pls.append(pl)
+            if plpm is not None:
+                plpms.append(plpm)
+            if day.get("high_metabolic_load") is not None:
+                hml_total += day["high_metabolic_load"]; hml_has = True
+            if day.get("duration") is not None:
+                dur_total += day["duration"]
+            if day.get("max_velocity_percent") is not None:
+                mvp = day["max_velocity_percent"] if mvp is None else max(mvp, day["max_velocity_percent"])
+            if day.get("max_velocity_kmh") is not None:
+                vmax = day["max_velocity_kmh"] if vmax is None else max(vmax, day["max_velocity_kmh"])
+        agg = {
+            "avg_player_load": round(sum(pls) / len(pls), 1) if pls else None,
+            "player_load_per_min": round(sum(plpms) / len(plpms), 1) if plpms else None,
+            "high_metabolic_load": round(hml_total, 0) if hml_has else None,
+            "duration": round(dur_total, 0) if dur_total else None,
+            "max_velocity_percent": round(mvp, 1) if mvp is not None else None,
+            "max_velocity_kmh": round(vmax, 1) if vmax is not None else None,
+        }
+        return agg, timeline
+
     def get_wellness_score(w):
         """Extract or compute wellness score from a wellness record."""
         ws = w.get("wellness_score")
@@ -1490,6 +1559,8 @@ async def get_dashboard_overview(
         gps_recs = gps_by_athlete.get(aid, [])
         daily_gps = build_daily_gps(gps_recs)
         has_gps_data = len(gps_recs) > 0
+        # Speed & Metabolic Load period aggregate + daily timeline (Phase 4, null-safe)
+        sm_agg, sm_timeline = compute_speed_metabolic(daily_gps)
         
         # ACWR from EWMA (athlete_load_metrics) — ONLY when GPS data exists
         # This matches Team Dashboard logic: no GPS data = no load metrics shown
@@ -1526,7 +1597,9 @@ async def get_dashboard_overview(
                 "hsr": day_data.get("high_speed_running", 0),
                 "sprint": day_data.get("sprint_distance", 0),
                 "sprints_count": day_data.get("number_of_sprints", 0),
-                "acc_dec": day_data.get("acc_dec", 0)
+                "acc_dec": day_data.get("acc_dec", 0),
+                "player_load": day_data.get("player_load"),
+                "player_load_per_min": day_data.get("player_load_per_min")
             })
         
         # Weekly heatmap (last 4 weeks, day-of-week)
@@ -1765,6 +1838,8 @@ async def get_dashboard_overview(
             "acwr_timeline": acwr_timeline,
             "velocity_zones": velocity_zones,
             "weekly_heatmap": weekly_heatmap,
+            "speed_metabolic": sm_agg,
+            "sm_timeline": sm_timeline,
             "has_gps_data": has_gps_data
         })
     
@@ -1785,6 +1860,11 @@ async def get_dashboard_overview(
     team_acute = safe_avg([a["acute_load"] for a in gps_athletes])
     team_chronic = safe_avg([a["chronic_load"] for a in gps_athletes])
     team_rsimod = safe_avg([a["rsimod"] for a in gps_athletes])
+    # Speed & Metabolic Load team averages (only athletes with GPS, null-safe)
+    team_avg_player_load = safe_avg([a["speed_metabolic"]["avg_player_load"] for a in gps_athletes])
+    team_player_load_per_min = safe_avg([a["speed_metabolic"]["player_load_per_min"] for a in gps_athletes])
+    team_max_velocity_percent = safe_avg([a["speed_metabolic"]["max_velocity_percent"] for a in gps_athletes])
+    team_high_metabolic_load = safe_avg([a["speed_metabolic"]["high_metabolic_load"] for a in gps_athletes])
     
     # Wellness/readiness: from ALL athletes (not gated by GPS, same as Team Dashboard)
     team_wellness = safe_avg([a["wellness_score"] for a in athlete_results])
@@ -1803,6 +1883,8 @@ async def get_dashboard_overview(
                 "hid": round(safe_avg([dv.get("hid", 0) for dv in day_vals]) or 0),
                 "hsr": round(safe_avg([dv.get("hsr", 0) for dv in day_vals]) or 0),
                 "sprint": round(safe_avg([dv.get("sprint", 0) for dv in day_vals]) or 0),
+                "player_load": round(safe_avg([dv.get("player_load") for dv in day_vals]) or 0, 1),
+                "player_load_per_min": round(safe_avg([dv.get("player_load_per_min") for dv in day_vals]) or 0, 1),
             })
     
     # Risk distribution
@@ -1870,6 +1952,70 @@ async def get_dashboard_overview(
     else:
         insights["risk_intelligence"] = "Nenhum atleta em zona de alto risco atualmente." if lang == "pt" else "No athletes currently in high risk zone."
     
+    # ============ Speed & Metabolic Load insight (Phase 4) ============
+    # Reuses the same insights dict / heuristic-generation architecture.
+    def sm_for(aid):
+        for ar in athlete_results:
+            if ar["id"] == aid:
+                return ar["speed_metabolic"]
+        agg, _ = compute_speed_metabolic(build_daily_gps(gps_by_athlete.get(aid, [])))
+        return agg
+
+    sm_parts = []
+    if mode == "athlete" and athlete_results:
+        ar = athlete_results[0]
+        sm = ar["speed_metabolic"]
+        if sm["avg_player_load"] is None and sm["max_velocity_percent"] is None and sm["high_metabolic_load"] is None:
+            sm_parts.append("Sem dados de velocidade/carga metabólica no período." if lang == "pt" else "No speed/metabolic load data in the period.")
+        else:
+            if sm["max_velocity_percent"] is not None:
+                sm_parts.append((f"Pico de velocidade a {sm['max_velocity_percent']:.0f}% do máximo.") if lang == "pt" else (f"Peak velocity at {sm['max_velocity_percent']:.0f}% of max."))
+            # Team deviation
+            team_pl_base = safe_avg([sm_for(x)["avg_player_load"] for x in all_athlete_ids])
+            if sm["avg_player_load"] is not None and team_pl_base:
+                dev = (sm["avg_player_load"] - team_pl_base) / team_pl_base * 100
+                ar_pt = "acima" if dev >= 0 else "abaixo"
+                ar_en = "above" if dev >= 0 else "below"
+                sm_parts.append((f"Player Load médio {sm['avg_player_load']:.0f} ({abs(dev):.0f}% {ar_pt} da média da equipe).") if lang == "pt" else (f"Average Player Load {sm['avg_player_load']:.0f} ({abs(dev):.0f}% {ar_en} team average)."))
+            elif sm["avg_player_load"] is not None:
+                sm_parts.append((f"Player Load médio {sm['avg_player_load']:.0f}.") if lang == "pt" else (f"Average Player Load {sm['avg_player_load']:.0f}."))
+            # Position deviation
+            if sm["avg_player_load"] is not None and ar["position"]:
+                pos_ids = [x for x in all_athlete_ids if athlete_map[x].get("position", "") == ar["position"]]
+                pos_pl_base = safe_avg([sm_for(x)["avg_player_load"] for x in pos_ids])
+                if pos_pl_base:
+                    devp = (sm["avg_player_load"] - pos_pl_base) / pos_pl_base * 100
+                    ap_pt = "acima" if devp >= 0 else "abaixo"
+                    ap_en = "above" if devp >= 0 else "below"
+                    sm_parts.append((f"{abs(devp):.0f}% {ap_pt} da média da posição ({ar['position']}).") if lang == "pt" else (f"{abs(devp):.0f}% {ap_en} the position average ({ar['position']})."))
+            if sm["player_load_per_min"] is not None:
+                sm_parts.append((f"Intensidade {sm['player_load_per_min']:.1f} PL/min.") if lang == "pt" else (f"Intensity {sm['player_load_per_min']:.1f} PL/min."))
+            if sm["high_metabolic_load"] is not None:
+                sm_parts.append((f"Carga metabólica alta acumulada: {sm['high_metabolic_load']:.0f}.") if lang == "pt" else (f"Accumulated high metabolic load: {sm['high_metabolic_load']:.0f}."))
+    else:
+        scope_pt = (f"Posição {position}: " if mode == "position" else "")
+        scope_en = (f"Position {position}: " if mode == "position" else "")
+        head = scope_pt if lang == "pt" else scope_en
+        grp_pt = "posição" if mode == "position" else "equipe"
+        grp_en = "position" if mode == "position" else "team"
+        if team_avg_player_load is None and team_max_velocity_percent is None and team_high_metabolic_load is None:
+            sm_parts.append("Sem dados de velocidade/carga metabólica no período." if lang == "pt" else "No speed/metabolic load data in the period.")
+        else:
+            if team_max_velocity_percent is not None:
+                sm_parts.append((f"{head}exposição média de velocidade {team_max_velocity_percent:.0f}% do máximo.") if lang == "pt" else (f"{head}average velocity exposure {team_max_velocity_percent:.0f}% of max."))
+            if team_avg_player_load is not None:
+                sm_parts.append((f"Player Load médio da {grp_pt}: {team_avg_player_load:.0f}.") if lang == "pt" else (f"Average Player Load of {grp_en}: {team_avg_player_load:.0f}."))
+            if team_player_load_per_min is not None:
+                sm_parts.append((f"Intensidade média {team_player_load_per_min:.1f} PL/min.") if lang == "pt" else (f"Average intensity {team_player_load_per_min:.1f} PL/min."))
+            if team_high_metabolic_load is not None:
+                sm_parts.append((f"Carga metabólica alta média {team_high_metabolic_load:.0f}.") if lang == "pt" else (f"Average high metabolic load {team_high_metabolic_load:.0f}."))
+            if team_avg_player_load:
+                outliers = [a for a in gps_athletes if a["speed_metabolic"]["avg_player_load"] and a["speed_metabolic"]["avg_player_load"] > team_avg_player_load * 1.2]
+                if outliers:
+                    nm = ", ".join([o["name"].split()[0] for o in outliers[:3]])
+                    sm_parts.append((f"Atletas acima da média (>20%): {nm}.") if lang == "pt" else (f"Athletes above average (>20%): {nm}."))
+    insights["speed_metabolic"] = " ".join(sm_parts) if sm_parts else ("Dados insuficientes para gerar insight." if lang == "pt" else "Insufficient data for insight.")
+    
     # Build response
     response = {
         "mode": mode,
@@ -1893,6 +2039,10 @@ async def get_dashboard_overview(
             "team_lmpi": team_lmpi,
             "team_acute_load": team_acute,
             "team_chronic_load": team_chronic,
+            "team_avg_player_load": team_avg_player_load,
+            "team_player_load_per_min": team_player_load_per_min,
+            "team_max_velocity_percent": team_max_velocity_percent,
+            "team_high_metabolic_load": team_high_metabolic_load,
             "risk_distribution": risk_dist
         },
         "athletes": athlete_results,
