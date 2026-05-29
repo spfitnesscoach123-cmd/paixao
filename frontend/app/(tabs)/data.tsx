@@ -1043,6 +1043,27 @@ export default function DataScreen() {
     queryKey: ['athletes-list'],
     queryFn: async () => { const res = await api.get('/athletes'); return res.data; },
   });
+
+  // Phase 6A: Dashboard activity classification (INDEPENDENT from Periodization)
+  const [classifyModalVisible, setClassifyModalVisible] = useState(false);
+  const [classifyingId, setClassifyingId] = useState<string | null>(null);
+  const { data: dashSessions, isLoading: sessionsLoading } = useQuery({
+    queryKey: ['dashboard-sessions'],
+    queryFn: async () => { const res = await api.get('/dashboard/sessions'); return res.data?.sessions || []; },
+    enabled: classifyModalVisible,
+  });
+  const classifySession = useCallback(async (sessionId: string, activityType: 'game' | 'training' | null) => {
+    try {
+      setClassifyingId(sessionId);
+      await api.put(`/dashboard/sessions/${sessionId}/classify`, { activity_type: activityType });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-sessions'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-overview'] });
+    } catch (e) {
+      Alert.alert(locale === 'pt' ? 'Erro' : 'Error', locale === 'pt' ? 'Não foi possível classificar a sessão.' : 'Could not classify the session.');
+    } finally {
+      setClassifyingId(null);
+    }
+  }, [queryClient, locale]);
   
   const mode = data?.mode || 'team';
   const summary = data?.summary || {};
@@ -1933,6 +1954,14 @@ export default function DataScreen() {
         <FadeInView delay={200}>
         <View style={styles.card} data-testid="game-training-card">
           <CardInfoHeader id="sm_game_training" />
+          <TouchableOpacity
+            onPress={() => setClassifyModalVisible(true)}
+            data-testid="open-classify-modal"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: 'rgba(124,196,255,0.10)', borderRadius: 8, paddingVertical: 6, paddingHorizontal: 10, marginTop: 4, marginBottom: 4 }}
+          >
+            <Ionicons name="pricetags-outline" size={14} color={colors.accent.primary} />
+            <Text style={{ color: colors.accent.primary, fontSize: 12, fontWeight: '600' }}>{locale === 'pt' ? 'Classificar Atividades' : 'Classify Activities'}</Text>
+          </TouchableOpacity>
           {(() => {
             const split = activitySplit;
             const fmt = (v: any, suf = '') => (v == null ? '--' : `${v}${suf}`);
@@ -2203,6 +2232,63 @@ export default function DataScreen() {
                 <Text style={{ color: '#fff', fontSize: 14, fontWeight: '700' }}>Export PDF</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Classify Activities Modal (Phase 6A) — INDEPENDENT from Periodization */}
+      <Modal visible={classifyModalVisible} transparent animationType="fade">
+        <Pressable style={styles.modalOverlay} onPress={() => setClassifyModalVisible(false)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
+            <Text style={styles.modalTitle}>{locale === 'pt' ? 'CLASSIFICAR ATIVIDADES' : 'CLASSIFY ACTIVITIES'}</Text>
+            <Text style={{ color: colors.text.tertiary, fontSize: 12, marginBottom: 12, lineHeight: 17 }}>
+              {locale === 'pt'
+                ? 'Classifique sessões como Jogo ou Treino. Afeta apenas as análises do Dashboard — não altera a Periodização nem os Peak Values.'
+                : 'Classify sessions as Game or Training. Affects Dashboard analytics only — does not change Periodization or Peak Values.'}
+            </Text>
+            {sessionsLoading ? (
+              <ActivityIndicator color={colors.accent.primary} style={{ paddingVertical: 30 }} />
+            ) : (
+              <ScrollView style={{ maxHeight: 420 }} data-testid="classify-session-list">
+                {(dashSessions || []).length === 0 && (
+                  <Text style={{ color: colors.text.tertiary, fontSize: 12, textAlign: 'center', paddingVertical: 20 }}>
+                    {locale === 'pt' ? 'Nenhuma sessão encontrada.' : 'No sessions found.'}
+                  </Text>
+                )}
+                {(dashSessions || []).map((s: any) => {
+                  const busy = classifyingId === s.session_id;
+                  return (
+                    <View key={s.session_id} style={{ paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border.default }} data-testid={`classify-row-${s.session_id}`}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <View>
+                          <Text style={{ color: colors.text.primary, fontSize: 13, fontWeight: '600' }}>{s.date}</Text>
+                          <Text style={{ color: colors.text.tertiary, fontSize: 11 }}>{s.athlete_count} {locale === 'pt' ? 'atletas' : 'athletes'} · {s.avg_distance}m</Text>
+                        </View>
+                        <View style={{ backgroundColor: s.activity_type === 'game' ? 'rgba(249,115,22,0.15)' : s.activity_type === 'training' ? 'rgba(47,182,255,0.15)' : colors.dark.tertiary, borderRadius: 6, paddingVertical: 3, paddingHorizontal: 8 }} data-testid={`classify-status-${s.session_id}`}>
+                          <Text style={{ fontSize: 10, color: s.activity_type === 'game' ? COLORS.orange : s.activity_type === 'training' ? COLORS.blue : colors.text.tertiary, fontWeight: '600' }}>
+                            {s.activity_type === 'game' ? (locale === 'pt' ? 'JOGO' : 'GAME') : s.activity_type === 'training' ? (locale === 'pt' ? 'TREINO' : 'TRAINING') : (locale === 'pt' ? 'NÃO CLASSIF.' : 'UNCLASSIFIED')}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <TouchableOpacity disabled={busy} onPress={() => classifySession(s.session_id, 'game')} data-testid={`classify-game-${s.session_id}`} style={{ flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 7, borderWidth: 1, borderColor: COLORS.orange, backgroundColor: s.activity_type === 'game' ? COLORS.orange : 'transparent' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: s.activity_type === 'game' ? '#fff' : COLORS.orange }}>{locale === 'pt' ? 'Jogo' : 'Game'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity disabled={busy} onPress={() => classifySession(s.session_id, 'training')} data-testid={`classify-training-${s.session_id}`} style={{ flex: 1, alignItems: 'center', paddingVertical: 7, borderRadius: 7, borderWidth: 1, borderColor: COLORS.blue, backgroundColor: s.activity_type === 'training' ? COLORS.blue : 'transparent' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: s.activity_type === 'training' ? '#fff' : COLORS.blue }}>{locale === 'pt' ? 'Treino' : 'Training'}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity disabled={busy || !s.is_classified} onPress={() => classifySession(s.session_id, null)} data-testid={`classify-clear-${s.session_id}`} style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 7, paddingHorizontal: 12, borderRadius: 7, borderWidth: 1, borderColor: colors.border.default, opacity: s.is_classified ? 1 : 0.4 }}>
+                          {busy ? <ActivityIndicator size="small" color={colors.text.secondary} /> : <Text style={{ fontSize: 11, fontWeight: '600', color: colors.text.secondary }}>{locale === 'pt' ? 'Limpar' : 'Clear'}</Text>}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+            <TouchableOpacity style={[styles.pdfCancelBtn, { marginTop: 14, alignSelf: 'flex-end' }]} onPress={() => setClassifyModalVisible(false)} data-testid="classify-close">
+              <Text style={{ color: colors.text.secondary, fontSize: 14, fontWeight: '600' }}>{locale === 'pt' ? 'Fechar' : 'Close'}</Text>
+            </TouchableOpacity>
           </View>
         </Pressable>
       </Modal>

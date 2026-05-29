@@ -299,3 +299,29 @@ Comparativo Jogo vs Treino dentro da layer "Speed & Metabolic Load". Usa SOMENTE
 - Integridade: 0 residual de teste; 31 atletas; 601 gps_data (estado original); 87 'game' reais intactos.
 
 ### Conclusão: nenhuma funcionalidade existente quebrada. Épico funcionalmente completo.
+
+
+## 2026-05-29 — Fase 6A: Dashboard Classification Workflow (Opção B — independente)
+
+Classificação de atividades Jogo/Treino DENTRO do Dashboard, 100% independente da Periodização. Aguardando aprovação do checkpoint.
+
+### Arquitetura (Opção B aprovada)
+- Nova coleção independente `dashboard_session_classifications`: `{coach_id, session_id, activity_type: "game"|"training", classified_at}` (índice lógico coach_id+session_id; ausência = não classificado).
+- NÃO escreve em gps_data, NÃO toca gps_data.activity_type, NÃO chama update_athlete_peak_values, NÃO afeta Periodização/ACWR/load engine/resolver/session_id/CSV import. Sem migração; começa 100% limpo (sem importar classificação da Periodização).
+
+### Backend — `routes/dashboard/routes.py`
+- `GET /api/dashboard/sessions` → lista sessões (agrupadas por session_id, read-only sobre gps_data) + classificação do Dashboard (null preservado + `is_classified`).
+- `PUT /api/dashboard/sessions/{session_id}/classify` {game|training|null} → upsert/delete na nova coleção. `null` limpa. Valida posse da sessão (read-only). Zero efeito colateral.
+- `compute_activity_split` agora lê a classificação da nova coleção (mapa session_id→tipo), não mais de `gps_data.activity_type`.
+
+### Frontend — `app/(tabs)/data.tsx`
+- Botão "Classificar Atividades" no card Jogo vs Treino (layer Speed & Metabolic).
+- Modal: lista sessões (data, nº atletas, distância, status Jogo/Treino/Não classif.) com botões Jogo / Treino / Limpar por sessão. Nota de independência exibida. Ao salvar, invalida `dashboard-sessions` + `dashboard-overview` → Jogo vs Treino atualiza ao vivo.
+
+### Validação (sessões reais classificadas e depois removidas)
+- Backend: GET sessions (19, todas não classificadas no início); classify game/training → split atualiza (Game 714.8 / Training 246.9 / Ratio 34.5%); clear → game some, Ratio N/A. gps_data.activity_type intocado (distinct=[]). 
+- Frontend: modal renderiza; classificar via UI popula o card ao vivo (Game 714.8 / Training 386 / Ratio 54%) e os 3 gauges.
+- Independência: resolver diff vazio; nenhuma chamada a peaks/periodization/gps_data nos novos endpoints; gps_data game=87 (Periodização, intocado), training=0.
+- Cleanup: coleção 11→0; overview de volta a null-safe.
+
+### NÃO implementado (fora do escopo): Sprint Exposure, PDF, gráficos/métricas extras, classificação por-atleta (só por sessão).

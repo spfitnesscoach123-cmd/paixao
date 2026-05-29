@@ -1211,6 +1211,105 @@ async def get_team_table_session_periods(
 
 
 
+# ============= DASHBOARD ACTIVITY CLASSIFICATION (Phase 6A) =============
+# FULLY INDEPENDENT from Periodization. Stores classifications ONLY in the
+# `dashboard_session_classifications` collection. It NEVER writes to gps_data,
+# NEVER touches gps_data.activity_type, NEVER calls update_athlete_peak_values,
+# NEVER affects ACWR/load engine, the GPS Session Resolver, session_id
+# generation, or CSV import. Absence of a doc = Unclassified.
+# Schema: { coach_id: str, session_id: str, activity_type: "game"|"training",
+#           classified_at: ISO str }   (unique on coach_id + session_id)
+
+class DashboardClassifyRequest(BaseModel):
+    activity_type: Optional[str] = None  # "game" | "training" | None (clear)
+
+
+@router.get("/dashboard/sessions")
+async def get_dashboard_sessions(current_user: dict = Depends(get_current_user)):
+    """List GPS sessions (grouped by session_id) with the Dashboard-specific
+    classification. READ-ONLY over gps_data; classification comes ONLY from the
+    independent `dashboard_session_classifications` collection. Unclassified
+    sessions return activity_type=null + is_classified=false (no Periodization
+    coupling, no 'training' default)."""
+    coach_id = current_user["_id"]
+
+    pipeline = [
+        {"$match": {"coach_id": coach_id, "session_id": {"$ne": None}}},
+        {"$group": {
+            "_id": "$session_id",
+            "date": {"$first": "$date"},
+            "session_name": {"$first": "$session_name"},
+            "athlete_ids": {"$addToSet": "$athlete_id"},
+            "total_records": {"$sum": 1},
+            "avg_distance": {"$avg": "$total_distance"},
+        }},
+        {"$sort": {"date": -1}},
+        {"$limit": 200},
+    ]
+    sessions = await db.gps_data.aggregate(pipeline).to_list(200)
+
+    # Independent Dashboard classifications (session_id -> activity_type)
+    class_map = {}
+    async for c in db.dashboard_session_classifications.find({"coach_id": coach_id}):
+        class_map[c["session_id"]] = c.get("activity_type")
+
+    result = []
+    for s in sessions:
+        sid = s["_id"]
+        at = class_map.get(sid)  # None if not classified in Dashboard
+        result.append({
+            "session_id": sid,
+            "date": s.get("date"),
+            "session_name": s.get("session_name"),
+            "athlete_count": len(s.get("athlete_ids", [])),
+            "total_records": s.get("total_records", 0),
+            "avg_distance": round(s.get("avg_distance") or 0, 1),
+            "activity_type": at,
+            "is_classified": at in ("game", "training"),
+        })
+    return {"sessions": result}
+
+
+@router.put("/dashboard/sessions/{session_id}/classify")
+async def classify_dashboard_session(
+    session_id: str,
+    data: DashboardClassifyRequest,
+    current_user: dict = Depends(get_current_user),
+):
+    """Set/clear the Dashboard classification for a session. Writes ONLY to
+    `dashboard_session_classifications`. Does NOT touch gps_data, peaks,
+    Periodization, ACWR/load engine, or the resolver. activity_type=None clears."""
+    coach_id = current_user["_id"]
+
+    if data.activity_type not in ("game", "training", None):
+        raise HTTPException(status_code=400, detail="activity_type must be 'game', 'training' or null")
+
+    # Validate the session belongs to this coach (read-only check on gps_data)
+    exists = await db.gps_data.find_one({"session_id": session_id, "coach_id": coach_id}, {"_id": 1})
+    if not exists:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if data.activity_type is None:
+        # Clear classification
+        await db.dashboard_session_classifications.delete_one(
+            {"coach_id": coach_id, "session_id": session_id}
+        )
+        return {"success": True, "session_id": session_id, "activity_type": None, "cleared": True}
+
+    await db.dashboard_session_classifications.update_one(
+        {"coach_id": coach_id, "session_id": session_id},
+        {"$set": {
+            "coach_id": coach_id,
+            "session_id": session_id,
+            "activity_type": data.activity_type,
+            "classified_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+    return {"success": True, "session_id": session_id, "activity_type": data.activity_type, "cleared": False}
+
+
+
 # ============= DASHBOARD OVERVIEW (VISÃO GERAL DA EQUIPE) =============
 
 @router.get("/dashboard/overview")
@@ -1486,7 +1585,7 @@ async def get_dashboard_overview(
             for d, smap in grouped.items():
                 for sname, records in smap.items():
                     for r in resolve_session_records(records):
-                        at = r.get("activity_type")
+                        at = dashboard_class_map.get(r.get("session_id"))
                         if at not in ("game", "training"):
                             continue
                         b = acc[at]
@@ -2089,7 +2188,12 @@ async def get_dashboard_overview(
                     sm_parts.append((f"Atletas acima da média (>20%): {nm}.") if lang == "pt" else (f"Athletes above average (>20%): {nm}."))
     insights["speed_metabolic"] = " ".join(sm_parts) if sm_parts else ("Dados insuficientes para gerar insight." if lang == "pt" else "Insufficient data for insight.")
     
-    # Game vs Training split (Phase 4B) over the active scope (athlete/team/position)
+    # Game vs Training split (Phase 4B/6A) over the active scope (athlete/team/position)
+    # Classification source = INDEPENDENT dashboard_session_classifications collection
+    # (NOT gps_data.activity_type). Absence = unclassified.
+    dashboard_class_map = {}
+    async for _c in db.dashboard_session_classifications.find({"coach_id": user_id}):
+        dashboard_class_map[_c["session_id"]] = _c.get("activity_type")
     activity_split = compute_activity_split(target_ids)
     
     # Build response
