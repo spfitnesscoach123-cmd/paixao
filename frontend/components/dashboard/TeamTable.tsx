@@ -17,6 +17,7 @@ const TOGGLE_COLS = [
   { key: 'zones', label: 'Zonas', labelEn: 'Zones' },
   { key: 'sprint', label: 'Sprint', labelEn: 'Sprint' },
   { key: 'accDec', label: 'ACC/DEC', labelEn: 'ACC/DEC' },
+  { key: 'speedMetabolic', label: 'Vel & Metab', labelEn: 'Speed & Metab' },
 ] as const;
 
 interface Props {
@@ -35,6 +36,7 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
     zones: true,
     sprint: true,
     accDec: true,
+    speedMetabolic: true,
   });
 
   // Toggle sort
@@ -225,6 +227,45 @@ export function TeamTable({ rows, isLoading, colors, locale, onRowPress }: Props
               </TouchableOpacity>
             )}
 
+            {visibleCols.speedMetabolic && (
+              <>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('avg_player_load')} data-testid="sort-apl">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>APL</Text>
+                  <SortIcon colKey="avg_player_load" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('player_load_per_min')} data-testid="sort-plpm">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>PL/min</Text>
+                  <SortIcon colKey="player_load_per_min" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('max_velocity_percent')} data-testid="sort-vmaxpct">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>VMax %</Text>
+                  <SortIcon colKey="max_velocity_percent" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('max_velocity_kmh')} data-testid="sort-vmaxkmh">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>VMax km/h</Text>
+                  <SortIcon colKey="max_velocity_kmh" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('max_acceleration')} data-testid="sort-maxacc">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>MaxAcc</Text>
+                  <SortIcon colKey="max_acceleration" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('max_deceleration')} data-testid="sort-maxdec">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>MaxDec</Text>
+                  <SortIcon colKey="max_deceleration" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('high_metabolic_load')} data-testid="sort-hml">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>HML</Text>
+                  <SortIcon colKey="high_metabolic_load" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.colSpeed} onPress={() => handleSort('duration')} data-testid="sort-duration">
+                  <Text style={[styles.headerText, { color: colors.text.secondary }]}>
+                    {locale === 'pt' ? 'Dur (min)' : 'Dur (min)'}
+                  </Text>
+                  <SortIcon colKey="duration" />
+                </TouchableOpacity>
+              </>
+            )}
+
             <TouchableOpacity style={styles.colRsi} onPress={() => handleSort('rsimod')} data-testid="sort-rsi">
               <Text style={[styles.headerText, { color: colors.text.secondary }]}>RSImod</Text>
               <SortIcon colKey="rsimod" />
@@ -370,6 +411,12 @@ const styles = StyleSheet.create({
   },
   colSmall: {
     width: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  colSpeed: {
+    width: 76,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 4,

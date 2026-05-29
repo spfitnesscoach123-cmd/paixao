@@ -96,6 +96,52 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
         </View>
       )}
 
+      {/* COLS: SPEED & METABOLIC LOAD (additive; values shown exactly as stored) */}
+      {visibleCols.speedMetabolic && (
+        <>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.avg_player_load != null ? row.avg_player_load.toFixed(0) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.player_load_per_min != null ? row.player_load_per_min.toFixed(1) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.max_velocity_percent != null ? `${row.max_velocity_percent.toFixed(0)}%` : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.max_velocity_kmh != null ? row.max_velocity_kmh.toFixed(1) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.max_acceleration != null ? row.max_acceleration.toFixed(1) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.max_deceleration != null ? row.max_deceleration.toFixed(1) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.high_metabolic_load != null ? row.high_metabolic_load.toFixed(0) : '-'}
+            </Text>
+          </View>
+          <View style={styles.colSpeed}>
+            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+              {row.duration != null ? row.duration.toFixed(0) : '-'}
+            </Text>
+          </View>
+        </>
+      )}
+
       {/* COL 6: RSIMOD */}
       <View style={styles.colRsi}>
         <View style={styles.rsiRow}>
@@ -242,6 +288,12 @@ const styles = StyleSheet.create({
     width: 68,
     paddingHorizontal: 4,
     gap: 2,
+  },
+  colSpeed: {
+    width: 76,
+    paddingHorizontal: 4,
+    gap: 2,
+    justifyContent: 'center',
   },
   colRsi: {
     width: 82,

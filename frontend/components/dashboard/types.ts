@@ -21,6 +21,14 @@ export interface TeamTableRowData {
   weight: number | null;
   body_fat: number | null;
   lean_mass: number | null;
+  avg_player_load: number | null;
+  player_load_per_min: number | null;
+  max_velocity_percent: number | null;
+  max_velocity_kmh: number | null;
+  max_acceleration: number | null;
+  max_deceleration: number | null;
+  high_metabolic_load: number | null;
+  duration: number | null;
 }
 
 export type SortKey =
@@ -33,6 +41,14 @@ export type SortKey =
   | 'acc_dec'
   | 'rsimod'
   | 'fatigue_index'
+  | 'avg_player_load'
+  | 'player_load_per_min'
+  | 'max_velocity_percent'
+  | 'max_velocity_kmh'
+  | 'max_acceleration'
+  | 'max_deceleration'
+  | 'high_metabolic_load'
+  | 'duration'
   | 'body_fat';
 
 export type SortDir = 'asc' | 'desc';

@@ -889,6 +889,18 @@ async def get_team_table(
         z5_total = 0.0
         sprint_total = 0
         acc_dec_total = 0
+        # --- Speed & Metabolic Load accumulators (Phase 3, additive) ---
+        # Values are aggregated and exposed EXACTLY as stored (no unit
+        # conversion / normalization). Player Load & PL/min are averaged;
+        # High Metabolic Load & Duration are summed; velocities/accel are peaks.
+        pl_sum = 0.0; pl_cnt = 0
+        plpm_sum = 0.0; plpm_cnt = 0
+        hml_total = 0.0; hml_has = False
+        dur_total = 0.0; dur_has = False
+        max_vel_pct = None
+        max_speed_val = None
+        max_acc_val = None
+        max_dec_val = None
         
         gps_records = gps_by_athlete.get(aid, [])
         if gps_records:
@@ -919,6 +931,41 @@ async def get_team_table(
                         z5_total += r.get("sprint_distance", 0) or 0
                         sprint_total += r.get("number_of_sprints", 0) or 0
                         acc_dec_total += max(0, r.get("number_of_accelerations", 0) or 0) + max(0, r.get("number_of_decelerations", 0) or 0)
+                        # Speed & Metabolic Load (additive, null-safe, no conversion)
+                        pl = r.get("player_load")
+                        if pl is not None:
+                            pl_sum += pl; pl_cnt += 1
+                        plpm = r.get("player_load_per_minute")
+                        if plpm is not None:
+                            plpm_sum += plpm; plpm_cnt += 1
+                        hml = r.get("high_metabolic_load")
+                        if hml is not None:
+                            hml_total += hml; hml_has = True
+                        dur = r.get("duration_minutes")
+                        if dur is not None:
+                            dur_total += dur; dur_has = True
+                        mvp = r.get("max_velocity_percent")
+                        if mvp is not None:
+                            max_vel_pct = mvp if max_vel_pct is None else max(max_vel_pct, mvp)
+                        ms = r.get("max_speed")
+                        if ms is not None:
+                            max_speed_val = ms if max_speed_val is None else max(max_speed_val, ms)
+                        ma = r.get("max_acceleration")
+                        if ma is not None:
+                            max_acc_val = ma if max_acc_val is None else max(max_acc_val, ma)
+                        md = r.get("max_deceleration")
+                        if md is not None:
+                            max_dec_val = md if max_dec_val is None else (md if abs(md) > abs(max_dec_val) else max_dec_val)
+        
+        # --- Speed & Metabolic Load finalization (additive, null-safe) ---
+        avg_player_load = round(pl_sum / pl_cnt, 1) if pl_cnt else None
+        player_load_per_min = round(plpm_sum / plpm_cnt, 1) if plpm_cnt else None
+        high_metabolic_load_val = round(hml_total, 0) if hml_has else None
+        duration_val = round(dur_total, 0) if dur_has else None
+        max_velocity_percent_val = round(max_vel_pct, 1) if max_vel_pct is not None else None
+        max_velocity_kmh_val = round(max_speed_val, 1) if max_speed_val is not None else None
+        max_acceleration_val = round(max_acc_val, 1) if max_acc_val is not None else None
+        max_deceleration_val = round(max_dec_val, 1) if max_dec_val is not None else None
         
         # --- RSImod ---
         rsimod_val = None
@@ -1033,6 +1080,14 @@ async def get_team_table(
             z5=round(z5_total, 0),
             sprint_count=sprint_total,
             acc_dec=acc_dec_total,
+            avg_player_load=avg_player_load,
+            player_load_per_min=player_load_per_min,
+            max_velocity_percent=max_velocity_percent_val,
+            max_velocity_kmh=max_velocity_kmh_val,
+            max_acceleration=max_acceleration_val,
+            max_deceleration=max_deceleration_val,
+            high_metabolic_load=high_metabolic_load_val,
+            duration=duration_val,
             rsimod=rsimod_val,
             rsimod_delta=rsimod_delta_val,
             rsimod_baseline_28d=rsimod_baseline_val,

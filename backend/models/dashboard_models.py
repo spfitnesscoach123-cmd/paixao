@@ -60,6 +60,14 @@ class TeamTableRow(BaseModel):
     z5: float = 0
     sprint_count: int = 0
     acc_dec: int = 0
+    avg_player_load: Optional[float] = None
+    player_load_per_min: Optional[float] = None
+    max_velocity_percent: Optional[float] = None
+    max_velocity_kmh: Optional[float] = None
+    max_acceleration: Optional[float] = None
+    max_deceleration: Optional[float] = None
+    high_metabolic_load: Optional[float] = None
+    duration: Optional[float] = None
     rsimod: Optional[float] = None
     rsimod_delta: Optional[float] = None
     rsimod_baseline_28d: Optional[float] = None
