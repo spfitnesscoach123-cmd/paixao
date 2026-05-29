@@ -238,6 +238,14 @@ const TOOLTIPS: Record<string, { pt: string; en: string }> = {
     pt: 'Evolução diária do Player Load Médio (linha sólida) vs Player Load por Minuto (linha tracejada). Player Load reflete volume mecânico; PL/min reflete intensidade. Subidas no PL/min sem subida proporcional no Player Load indicam sessões curtas e intensas.',
     en: 'Daily evolution of Average Player Load (solid line) vs Player Load Per Minute (dashed line). Player Load reflects mechanical volume; PL/min reflects intensity. Rises in PL/min without proportional Player Load rise indicate short, intense sessions.',
   },
+  sm_game_training: {
+    pt: 'Comparação Jogo vs Treino usando APENAS atividades explicitamente classificadas (activity_type = "game"/"training"). Atividades não classificadas NÃO são tratadas como treino — ficam de fora. Métricas: Player Load Médio, Carga Metabólica Alta, Vel. Máx (%), Distância de Sprint. Ratio = Média Treino ÷ Média Jogo × 100 (N/A quando faltam dados).',
+    en: 'Game vs Training comparison using ONLY explicitly classified activities (activity_type = "game"/"training"). Unclassified activities are NOT treated as training — they are excluded. Metrics: Avg Player Load, High Metabolic Load, Max Velocity (%), Sprint Distance. Ratio = Training Avg ÷ Game Avg × 100 (N/A when data is missing).',
+  },
+  sm_ratio_table: {
+    pt: 'Tabela analítica Jogo vs Treino. Valores médios por sessão classificada. Ratio = Média Treino ÷ Média Jogo × 100. "--" indica ausência de dados; "N/A" indica que o Ratio não pode ser calculado (sem jogo, sem treino, ou divisão por zero).',
+    en: 'Game vs Training analytical table. Average values per classified session. Ratio = Training Avg ÷ Game Avg × 100. "--" means no data; "N/A" means the ratio cannot be computed (no game, no training, or division by zero).',
+  },
 };
 
 const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; subtitle?: string }) => {
@@ -279,6 +287,8 @@ const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; 
     risk_panel: { pt: 'Painel de Risco', en: 'Risk Panel' },
     sm_gauges: { pt: 'Velocidade & Carga Metabólica', en: 'Speed & Metabolic Load' },
     sm_pl_chart: { pt: 'Player Load Médio vs PL/min', en: 'Avg Player Load vs PL/min' },
+    sm_game_training: { pt: 'Jogo vs Treino', en: 'Game vs Training' },
+    sm_ratio_table: { pt: 'Tabela Jogo vs Treino (Ratio)', en: 'Game vs Training Table (Ratio)' },
   };
   const t = TITLES[id as string];
   const title = t ? (locale === 'pt' ? t.pt : t.en) : '';
@@ -1040,6 +1050,7 @@ export default function DataScreen() {
   const insights = data?.insights || {};
   const positions = data?.positions || [];
   const aggTimeline = data?.aggregated_timeline || [];
+  const activitySplit = data?.activity_split || null;
   
   const onRefresh = async () => {
     setRefreshing(true);
@@ -1915,6 +1926,106 @@ export default function DataScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><View style={{ width: 12, height: 3, backgroundColor: COLORS.cyan, borderRadius: 2 }} /><Text style={{ color: colors.text.secondary, fontSize: 10 }}>Player Load / min</Text></View>
           </View>
           </ChartEntryView>
+        </View>
+        </FadeInView>
+
+        {/* Game vs Training comparison (Phase 4B) — explicit classification only */}
+        <FadeInView delay={200}>
+        <View style={styles.card} data-testid="game-training-card">
+          <CardInfoHeader id="sm_game_training" />
+          {(() => {
+            const split = activitySplit;
+            const fmt = (v: any, suf = '') => (v == null ? '--' : `${v}${suf}`);
+            const ratioFmt = (v: any) => (v == null ? 'N/A' : `${v}%`);
+            if (!split || (!split.has_game && !split.has_training)) {
+              return (
+                <View style={{ paddingVertical: 20, alignItems: 'center' }} data-testid="gt-empty">
+                  <Ionicons name="information-circle-outline" size={22} color={colors.text.tertiary} />
+                  <Text style={{ color: colors.text.secondary, fontSize: 12, textAlign: 'center', marginTop: 8, lineHeight: 18 }}>
+                    {locale === 'pt'
+                      ? 'As comparações Jogo vs Treino exigem atividades classificadas. Nenhuma atividade classificada (Jogo/Treino) no período selecionado.'
+                      : 'Game vs Training comparisons require classified activities. No classified activity (Game/Training) in the selected period.'}
+                  </Text>
+                </View>
+              );
+            }
+            const metrics = [
+              { key: 'player_load', label: locale === 'pt' ? 'Player Load Médio' : 'Avg Player Load', suf: '' },
+              { key: 'high_metabolic_load', label: locale === 'pt' ? 'Carga Metabólica Alta' : 'High Metabolic Load', suf: '' },
+              { key: 'max_velocity_percent', label: locale === 'pt' ? 'Vel. Máx (%)' : 'Max Velocity (%)', suf: '%' },
+              { key: 'sprint_distance', label: locale === 'pt' ? 'Dist. Sprint' : 'Sprint Distance', suf: '' },
+            ];
+            return (
+              <View style={{ marginTop: 8 }}>
+                {!split.has_training && (
+                  <View style={{ backgroundColor: 'rgba(47,182,255,0.08)', borderRadius: 8, padding: 8, marginBottom: 10 }} data-testid="gt-no-training">
+                    <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
+                      {locale === 'pt' ? 'Sem dados de treino classificados — Ratio = N/A.' : 'No classified training data — Ratio = N/A.'}
+                    </Text>
+                  </View>
+                )}
+                {!split.has_game && (
+                  <View style={{ backgroundColor: 'rgba(249,115,22,0.08)', borderRadius: 8, padding: 8, marginBottom: 10 }} data-testid="gt-no-game">
+                    <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
+                      {locale === 'pt' ? 'Sem dados de jogo classificados — Ratio = N/A.' : 'No classified game data — Ratio = N/A.'}
+                    </Text>
+                  </View>
+                )}
+                {metrics.map((m) => {
+                  const g = split.game[m.key]; const t = split.training[m.key];
+                  const mx = Math.max(g || 0, t || 0, 1);
+                  return (
+                    <View key={m.key} style={{ marginBottom: 12 }} data-testid={`gt-metric-${m.key}`}>
+                      <Text style={{ color: colors.text.primary, fontSize: 12, fontWeight: '600', marginBottom: 4 }}>{m.label}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 3 }}>
+                        <Text style={{ width: 64, color: COLORS.orange, fontSize: 10 }}>{locale === 'pt' ? 'Jogo' : 'Game'}</Text>
+                        <View style={{ flex: 1, height: 10, backgroundColor: colors.dark.tertiary, borderRadius: 5, overflow: 'hidden' }}><View style={{ width: `${g ? (g / mx * 100) : 0}%`, height: '100%', backgroundColor: COLORS.orange }} /></View>
+                        <Text style={{ width: 70, textAlign: 'right', color: colors.text.primary, fontSize: 11 }}>{fmt(g, m.suf)}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={{ width: 64, color: COLORS.blue, fontSize: 10 }}>{locale === 'pt' ? 'Treino' : 'Training'}</Text>
+                        <View style={{ flex: 1, height: 10, backgroundColor: colors.dark.tertiary, borderRadius: 5, overflow: 'hidden' }}><View style={{ width: `${t ? (t / mx * 100) : 0}%`, height: '100%', backgroundColor: COLORS.blue }} /></View>
+                        <Text style={{ width: 70, textAlign: 'right', color: colors.text.primary, fontSize: 11 }}>{fmt(t, m.suf)}</Text>
+                      </View>
+                      <Text style={{ color: colors.text.tertiary, fontSize: 10, textAlign: 'right', marginTop: 2 }}>Ratio (T/J×100): {ratioFmt(split.ratio[m.key])}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            );
+          })()}
+        </View>
+        </FadeInView>
+
+        {/* Final analytical table (Phase 4B) */}
+        <FadeInView delay={260}>
+        <View style={styles.card} data-testid="game-training-table-card">
+          <CardInfoHeader id="sm_ratio_table" />
+          {(() => {
+            const split = activitySplit;
+            if (!split) return null;
+            const fmt = (v: any, suf = '') => (v == null ? '--' : `${v}${suf}`);
+            const ratioFmt = (v: any) => (v == null ? 'N/A' : `${v}%`);
+            const rows: [string, string][] = [
+              [locale === 'pt' ? 'Player Load (Jogo)' : 'Player Load (Game)', fmt(split.game.player_load)],
+              [locale === 'pt' ? 'Player Load (Treino)' : 'Player Load (Training)', fmt(split.training.player_load)],
+              ['Player Load Ratio', ratioFmt(split.ratio.player_load)],
+              [locale === 'pt' ? 'Carga Metab. Alta (Jogo)' : 'High Metabolic Load (Game)', fmt(split.game.high_metabolic_load)],
+              [locale === 'pt' ? 'Carga Metab. Alta (Treino)' : 'High Metabolic Load (Training)', fmt(split.training.high_metabolic_load)],
+              [locale === 'pt' ? 'Carga Metab. Alta Ratio' : 'High Metabolic Load Ratio', ratioFmt(split.ratio.high_metabolic_load)],
+              [locale === 'pt' ? 'Vel. Máx (%)' : 'Max Velocity (%)', fmt(split.game.max_velocity_percent ?? split.training.max_velocity_percent, '%')],
+            ];
+            return (
+              <View style={{ marginTop: 8 }} data-testid="gt-table">
+                {rows.map(([label, val], i) => (
+                  <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7, borderBottomWidth: i < rows.length - 1 ? 1 : 0, borderBottomColor: colors.border.default }}>
+                    <Text style={{ color: colors.text.secondary, fontSize: 12 }}>{label}</Text>
+                    <Text style={{ color: colors.text.primary, fontSize: 12, fontWeight: '600' }}>{val}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })()}
         </View>
         </FadeInView>
 

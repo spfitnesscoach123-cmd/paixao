@@ -1461,6 +1461,79 @@ async def get_dashboard_overview(
         }
         return agg, timeline
 
+    def compute_activity_split(athlete_ids):
+        """Game vs Training split using ONLY explicitly classified activities.
+        Game = activity_type == 'game'; Training = activity_type == 'training'.
+        Unclassified (None) and any other value are IGNORED — never treated as
+        training (per product decision). Averages computed per classified session
+        within the date window; Max Velocity (%) is a peak. Ratio = Training/Game*100.
+        Fully null-safe (no data / division by zero → None)."""
+        acc = {
+            "game": {"pl": [], "hml": [], "sprint": [], "mvp": None, "n": 0},
+            "training": {"pl": [], "hml": [], "sprint": [], "mvp": None, "n": 0},
+        }
+        for aid in athlete_ids:
+            recs = [r for r in gps_by_athlete.get(aid, [])
+                    if filter_start_str <= (r.get("date") or "") <= today_str]
+            grouped = {}
+            for r in recs:
+                d = r.get("date")
+                try:
+                    datetime.strptime(d, "%Y-%m-%d")
+                except (ValueError, TypeError):
+                    continue
+                grouped.setdefault(d, {}).setdefault(r.get("session_name") or "default", []).append(r)
+            for d, smap in grouped.items():
+                for sname, records in smap.items():
+                    for r in resolve_session_records(records):
+                        at = r.get("activity_type")
+                        if at not in ("game", "training"):
+                            continue
+                        b = acc[at]
+                        b["n"] += 1
+                        pl = r.get("player_load")
+                        if pl is not None:
+                            b["pl"].append(pl)
+                        hml = r.get("high_metabolic_load")
+                        if hml is not None:
+                            b["hml"].append(hml)
+                        sp = r.get("sprint_distance")
+                        if sp is not None:
+                            b["sprint"].append(sp)
+                        mvp = r.get("max_velocity_percent")
+                        if mvp is not None:
+                            b["mvp"] = mvp if b["mvp"] is None else max(b["mvp"], mvp)
+
+        def _agg(b):
+            return {
+                "player_load": round(sum(b["pl"]) / len(b["pl"]), 1) if b["pl"] else None,
+                "high_metabolic_load": round(sum(b["hml"]) / len(b["hml"]), 1) if b["hml"] else None,
+                "sprint_distance": round(sum(b["sprint"]) / len(b["sprint"]), 1) if b["sprint"] else None,
+                "max_velocity_percent": round(b["mvp"], 1) if b["mvp"] is not None else None,
+                "session_count": b["n"],
+            }
+        game = _agg(acc["game"])
+        training = _agg(acc["training"])
+
+        def _ratio(t, g):
+            # Ratio = Training Average / Game Average * 100 (null-safe)
+            if t is None or g is None or g == 0:
+                return None
+            return round(t / g * 100.0, 1)
+        ratio = {
+            "player_load": _ratio(training["player_load"], game["player_load"]),
+            "high_metabolic_load": _ratio(training["high_metabolic_load"], game["high_metabolic_load"]),
+            "sprint_distance": _ratio(training["sprint_distance"], game["sprint_distance"]),
+            "max_velocity_percent": _ratio(training["max_velocity_percent"], game["max_velocity_percent"]),
+        }
+        return {
+            "game": game,
+            "training": training,
+            "ratio": ratio,
+            "has_game": acc["game"]["n"] > 0,
+            "has_training": acc["training"]["n"] > 0,
+        }
+
     def get_wellness_score(w):
         """Extract or compute wellness score from a wellness record."""
         ws = w.get("wellness_score")
@@ -2016,6 +2089,9 @@ async def get_dashboard_overview(
                     sm_parts.append((f"Atletas acima da média (>20%): {nm}.") if lang == "pt" else (f"Athletes above average (>20%): {nm}."))
     insights["speed_metabolic"] = " ".join(sm_parts) if sm_parts else ("Dados insuficientes para gerar insight." if lang == "pt" else "Insufficient data for insight.")
     
+    # Game vs Training split (Phase 4B) over the active scope (athlete/team/position)
+    activity_split = compute_activity_split(target_ids)
+    
     # Build response
     response = {
         "mode": mode,
@@ -2047,6 +2123,7 @@ async def get_dashboard_overview(
         },
         "athletes": athlete_results,
         "aggregated_timeline": agg_timeline,
+        "activity_split": activity_split,
         "insights": insights,
         "last_update": datetime.utcnow().isoformat()
     }

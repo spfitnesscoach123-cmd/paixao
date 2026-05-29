@@ -253,3 +253,31 @@ Nova camada do Dashboard Overview (aguardando aprovação do checkpoint). Reusa 
 - Sprint Exposure; Game vs Training Ratio (classificação de atividade não auditada ainda).
 
 ### APIs afetadas: `GET /api/dashboard/overview` (campos aditivos). NÃO afetadas: todas as demais.
+
+
+## 2026-05-29 — Fase 4B: Game vs Training (Speed & Metabolic Load)
+
+Comparativo Jogo vs Treino dentro da layer "Speed & Metabolic Load". Usa SOMENTE atividades explicitamente classificadas (decisão de produto Opção A do usuário). Aguardando aprovação do checkpoint.
+
+### Auditoria de classificação (read-only)
+- Campo `gps_data.activity_type` JÁ existe: valores `"game"` (87 docs reais), `None` (514), `"training"` explícito (0).
+- Classificação feita por endpoints existentes (`PUT /gps-data/session/{id}/activity-type`, `/classify-all`).
+- Import de CSV NÃO define activity_type → nasce `None`.
+- Decisão do usuário (Opção A): Game=`game`, Training=`training`, Other=`null`. **`null` NÃO é tratado como treino.** Sem inferência por nome, sem migração de histórico.
+
+### Backend — `routes/dashboard/routes.py`
+- Novo helper `compute_activity_split(athlete_ids)`: agrupa por (data, sessão), resolve, e separa em buckets game/training APENAS para `activity_type` explícito. Médias por sessão para Player Load, HML, Sprint Distance; pico para Max Velocity (%). Ratio = Média Treino ÷ Média Jogo × 100. Null-safe (sem dados / divisão por zero → None). Flags `has_game`/`has_training`.
+- Resposta `/dashboard/overview` ganha `activity_split` (escopo athlete/team/position via `target_ids`).
+
+### Frontend — `app/(tabs)/data.tsx`
+- `renderSpeedMetabolic` ganha: card "Game vs Training" (barras Jogo×Treino + Ratio para os 4 métricas) e card "Game vs Training Table (Ratio)" (7 linhas: Player Load Game/Training/Ratio, HML Game/Training/Ratio, Max Velocity %).
+- Estados null-safe: empty state explicativo ("comparações exigem atividades classificadas"), banners "sem treino/jogo classificado", "--" para valores nulos, "N/A" para ratios.
+- Tooltips/titles `sm_game_training`, `sm_ratio_table`.
+
+### Validação (atleta de teste, 2 sessões game + 2 training, depois removido)
+- Backend: Game PL=620/HML=520/Sprint=1250/MaxVel%=95; Training PL=440/HML=310/Sprint=730/MaxVel%=86; Ratios 71% / 59.6% / 58.4% / 90.5%.
+- Frontend Individual: barras + tabela conferem com backend. Null-safe: atleta real não classificado (MANSOUR, COM dados GPS) exibe empty state e "--"/"N/A" — confirma que não classificado ≠ treino.
+- Team mode: agrega sessões classificadas (game=620, training=440, ratio=71%). Limpeza: residual = 0; 87 registros 'game' reais intactos.
+
+### NÃO implementado (fora do escopo): Sprint Exposure (aguarda estratégia de Vmax histórico).
+### Futuro proposto: forma mais segura de classificar atividade DENTRO do fluxo do Dashboard (hoje só via Periodização).
