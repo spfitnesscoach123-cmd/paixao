@@ -1227,10 +1227,10 @@ export default function DataScreen() {
         <View style={styles.card} data-testid="acute-chronic-card">
           <CardInfoHeader id="acwr_load" />
           <ChartEntryView delay={100} duration={700}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 8 }}>
-            <GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={110} />
-            <GaugeChart value={chronicLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Chronic 28d" color={COLORS.blue} size={110} />
-            <GaugeChart value={acwr || 0} max={2} label="ACWR" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={110} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+            <View style={{ flex: 1, alignItems: 'center' }}><GaugeChart value={acuteLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Acute 7d" color={COLORS.cyan} size={100} /></View>
+            <View style={{ flex: 1, alignItems: 'center' }}><GaugeChart value={chronicLoad || 0} max={Math.max(acuteLoad || 1, chronicLoad || 1) * 1.2} label="Chronic 28d" color={COLORS.blue} size={100} /></View>
+            <View style={{ flex: 1, alignItems: 'center' }}><GaugeChart value={acwr || 0} max={2} label="ACWR" color={acwr && acwr > 1.5 ? COLORS.red : acwr && acwr < 0.8 ? COLORS.yellow : COLORS.green} size={100} /></View>
           </View>
           </ChartEntryView>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
@@ -1443,15 +1443,18 @@ export default function DataScreen() {
       return { x: p.x, y: p.y, name: p.name, color };
     });
     
-    // Availability donut — risk_distribution may be missing or non-object in empty states
+    // Availability donut — risk_distribution may be missing or non-object in empty states.
+    // Labels reframed to AVAILABILITY semantics (this is the Availability card): the
+    // worst tier (high risk) reads as "Low" availability, not "High". Risk Intelligence
+    // keeps its own risk-tier labels untouched. Colors/values/thresholds unchanged.
     const riskDist = (safeSummary.risk_distribution && typeof safeSummary.risk_distribution === 'object')
       ? safeSummary.risk_distribution
       : {};
     const availDonutSegs = [
-      { value: riskDist.optimal || 0, color: COLORS.cyan, label: locale === 'pt' ? 'Ótimo' : 'Optimal' },
-      { value: riskDist.low || 0, color: COLORS.green, label: locale === 'pt' ? 'Baixo' : 'Low' },
-      { value: riskDist.moderate || 0, color: COLORS.yellow, label: locale === 'pt' ? 'Moderado' : 'Moderate' },
-      { value: riskDist.high || 0, color: COLORS.red, label: locale === 'pt' ? 'Alto' : 'High' },
+      { value: riskDist.optimal || 0, color: COLORS.cyan, label: locale === 'pt' ? 'Ótima' : 'Optimal' },
+      { value: riskDist.low || 0, color: COLORS.green, label: locale === 'pt' ? 'Alta' : 'High' },
+      { value: riskDist.moderate || 0, color: COLORS.yellow, label: locale === 'pt' ? 'Moderada' : 'Moderate' },
+      { value: riskDist.high || 0, color: COLORS.red, label: locale === 'pt' ? 'Baixa' : 'Low' },
       { value: riskDist.unknown || 0, color: '#475569', label: 'N/A' },
     ].filter(s => s.value > 0);
     
@@ -2072,7 +2075,9 @@ export default function DataScreen() {
               [locale === 'pt' ? 'Carga Metab. Alta (Jogo)' : 'High Metabolic Load (Game)', fmt(split.game.high_metabolic_load)],
               [locale === 'pt' ? 'Carga Metab. Alta (Treino)' : 'High Metabolic Load (Training)', fmt(split.training.high_metabolic_load)],
               [locale === 'pt' ? 'Carga Metab. Alta Ratio' : 'High Metabolic Load Ratio', ratioFmt(split.ratio.high_metabolic_load)],
-              [locale === 'pt' ? 'Vel. Máx (%)' : 'Max Velocity (%)', fmt(split.game.max_velocity_percent ?? split.training.max_velocity_percent, '%')],
+              [locale === 'pt' ? 'Vel. Máx % (Jogo)' : 'Max Velocity % (Game)', fmt(split.game.max_velocity_percent, '%')],
+              [locale === 'pt' ? 'Vel. Máx % (Treino)' : 'Max Velocity % (Training)', fmt(split.training.max_velocity_percent, '%')],
+              [locale === 'pt' ? 'Vel. Máx % Ratio' : 'Max Velocity % Ratio', ratioFmt(split.ratio.max_velocity_percent)],
             ];
             return (
               <View style={{ marginTop: 8 }} data-testid="gt-table">

@@ -1,5 +1,29 @@
 # CHANGELOG
 
+## 2026-05-29 — P0 Validations & Correções (Load Intel gauge / Availability label / Game vs Training)
+
+Rodada de validação/correção P0 antes de fechar o checkpoint de refinements. Tudo visual/label/rendering — **zero alteração de cálculo, valor, threshold ou lógica de backend**. Arquivo único alterado: `frontend/app/(tabs)/data.tsx`.
+
+### 1) Load Intelligence — gauge transbordando o card (REGRESSÃO confirmada e corrigida)
+- **Root cause**: card "Acute vs Chronic Load" tinha 3 GaugeCharts de largura fixa 110px (=330px) numa row com `justifyContent: 'space-around'`, que não encolhe filhos fixos. Em largura mobile (390px) a área interna do card é ~324px → o 3º gauge (ACWR) transbordava ~6px para fora da borda direita do card. Medido: cardRight=357, gauge3.right=363.
+- **Fix (layout-only)**: cada gauge embrulhado em coluna `flex:1, alignItems:center` + tamanho 110→100. Pós-fix medido: gauge3.right=353 (4px dentro do card). Overflow eliminado.
+- Escopo restrito ao Load Intelligence (demais layers NÃO tocados, conforme instrução).
+
+### 2) Smart Summary — card Availability: label "High" → "Low" (correção semântica)
+- **Problema**: o card de Disponibilidade reusava rótulos de RISCO (Optimal/Low/Moderate/High). "High" (pior tier, risco alto/vermelho) é enganoso num contexto de disponibilidade.
+- **Fix (label-only)**: rótulos reenquadrados para semântica de disponibilidade — Ótima/Alta/Moderada/**Baixa** (PT) e Optimal/High/Moderate/**Low** (EN). O tier vermelho (pior) agora lê "Low"/"Baixa" (baixa disponibilidade), sem duplicar "Low". Cores/valores/thresholds inalterados. **Risk Intelligence mantém os rótulos de risco intactos.**
+
+### 3) Speed & Metabolic — Game vs Training "só mostra valor de Jogo" (AUDITORIA + fix)
+- **Root cause = condição de DADOS, NÃO bug de cálculo.** Auditoria via API (`/dashboard/overview.activity_split`): backend `compute_activity_split` calcula Game E Training (+ratio) para TODAS as 4 métricas (Player Load, HML, Vel.Máx%, Sprint). Para os dados reais classificados, Training HML e Vel.Máx% retornam `null` porque **nenhuma sessão de treino classificada contém esses campos** (apenas sessões de jogo têm HML/MaxVel). Player Load e Sprint mostram ambos corretamente.
+- **Bug real (frontend) corrigido**: na tabela analítica Ratio (linha ~2075), Vel.Máx% colapsava em UMA linha (`game ?? training`), escondendo Treino e Ratio — diferente de Player Load e HML (3 linhas cada). Agora exibe Vel.Máx% (Jogo) / (Treino) / Ratio.
+- O card de barras Jogo vs Treino já renderizava ambos para as 4 métricas (mostra "--" quando null).
+- **Prova (dado de teste, depois removido)**: atleta com 1 sessão jogo + 1 treino, ambas com HML/MaxVel → bars e tabela exibiram Game E Training para as 4 métricas (PL 600/440, HML 520/300, Vel.Máx 95/85, Sprint 1200/700 + ratios).
+
+### Validação visual (screenshots) + limpeza
+- RSImod vs Player Load reconfirmado (4 quadrantes; x=Player Load, y=RSImod, midpoints dinâmicos da equipe).
+- Limpeza: 5 atletas de teste ZZZ + gps_data + jump_assessments + 2 classificações de teste removidos. Atletas 36→31, gps_data 607→601, **resíduo=0**, 8 classificações reais preservadas, 87 'game' reais intactos.
+
+
 ## 2026-05-29 — UI Refinements (Speed & Metabolic): Velocity Symbols + RSImod vs Player Load — VALIDADO
 
 Refinamento de UI do épico "Speed & Metabolic Load". Código já existia; esta sessão fez a **validação visual** (ambos os itens aprovados), corrigiu um bug de escala do gráfico e limpou os dados de teste.

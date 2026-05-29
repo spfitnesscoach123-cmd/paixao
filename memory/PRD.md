@@ -276,6 +276,12 @@ Constantes legadas de keywords são duplicadas em `utils/gps_session_resolver.py
 - ✅ Nenhuma alteração em cálculos científicos ou pipelines.
 
 ---
+## Status update — 2026-05-29 (P0 validações & correções)
+- **Load Intelligence**: corrigido transbordo do gauge (3º gauge saía ~6px do card em mobile) via flex:1 + size 110→100. Medido pós-fix: dentro do card.
+- **Smart Summary / Availability**: rótulo "High" do pior tier → "Low" (semântica de disponibilidade). Risk Intelligence intacto.
+- **Speed & Metabolic / Game vs Training**: auditado — Training values SÃO calculados pelo backend; "só Jogo" era condição de DADOS (sessões de treino sem HML/MaxVel). Corrigido bug da tabela Ratio (Vel.Máx% agora Jogo/Treino/Ratio). Provado com dado de teste.
+- Dados de teste removidos (resíduo=0; 8 classificações reais preservadas). NOTA: seeds de atleta devem incluir birth_date/height/weight (Athlete model exige) — corrigido via cleanup.
+
 ## Status update — 2026-05-29 (refinements UI validados)
 - **UI Refinements (Speed & Metabolic)**: símbolos Vel.Máx% na Team Table + RSImod vs Player Load no Smart Summary — **VALIDADOS visualmente**. ACWR vs Wellness permanece em Risk Intelligence (inalterado). Corrigido bug de escala do `QuadrantChart` via prop opt-in `autoScale` (default preserva ACWR vs Wellness). Dados de teste (4 ZZZ) removidos, resíduo=0. Detalhes em CHANGELOG.
 
