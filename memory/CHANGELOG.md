@@ -197,3 +197,24 @@ Validado via curl: login conta demo OK, endpoint /api/auth/devices retorna max_d
 - Aplicado em: `app/subscription.tsx`, `components/SubscriptionModals.tsx` (TrialRequiredModal + SubscriptionExpiredModal), `components/SubscriptionGuard.tsx`, `components/PremiumGate.tsx`.
 - Removido `USD` do texto legal do TrialRequiredModal — o preço agora respeita moeda local automaticamente.
 - Integração RevenueCat INALTERADA (offerings, listeners, contexto).
+
+
+## 2026-05-29 — Fase 3: Tabela Analítica Team Dashboard (Speed & Metabolic Load)
+
+Épico "Speed & Metabolic Load" — Fase 3 concluída (aguardando aprovação do checkpoint pelo usuário).
+
+### Backend
+- **BUG CRÍTICO corrigido**: o agente anterior adicionou os 8 campos novos ao modelo `models/dashboard_models.py` — porém esse arquivo é **código morto** (não importado). O modelo `TeamTableRow` realmente usado é definido LOCALMENTE em `routes/dashboard/routes.py` (linha ~738). Como o modelo real não tinha os campos, o Pydantic descartava silenciosamente os valores (extra='ignore') → API retornava os 8 campos como ausentes/null.
+- **Correção**: adicionados os 8 campos `Optional[float] = None` ao modelo local `TeamTableRow` em `routes/dashboard/routes.py` (aditivo, null-safe): `avg_player_load`, `player_load_per_min`, `max_velocity_percent`, `max_velocity_kmh`, `max_acceleration`, `max_deceleration`, `high_metabolic_load`, `duration`.
+- Agregação (já existente nas linhas ~896-968) confirmada: PL e PL/min são médias; HML e Duração são somas; velocidades/acelerações são picos. Valores expostos EXATAMENTE como armazenados (sem conversão de unidade).
+
+### Frontend (sem alteração de código nesta sessão — já estava pronto)
+- `components/dashboard/types.ts`, `TeamTable.tsx`, `TeamTableRow.tsx` já continham as 8 colunas + toggle "Vel & Metab" + headers ordenáveis. Bundle Metro estava em cache → exigiu restart do Expo para servir a versão atual.
+
+### Validação (import de CSV de teste controlado, depois removido)
+- Backend: atleta de teste retornou os 8 valores populados (APL 555.5, PL/min 7.7, VMax% 92, VMax km/h 33.3, MaxAcc 4.4, MaxDec -3.3, HML 888, Dur 95).
+- Frontend: tabela renderizou as 8 colunas; toggle "Speed & Metab" oculta/exibe; ordenação por APL funciona; null-safe ("-") para atletas sem dados; sem quebra de layout.
+- Limpeza: atleta de teste + gps_data + athlete_load_metrics removidos (evidência: contagem = 0; 31 atletas reais intactos).
+
+### Risco aberto (não corrigido — fora do escopo/governança)
+- `models/dashboard_models.py` é um duplicado morto e divergente de `TeamTableRow`. Recomenda-se remover futuramente para evitar confusão (aguardando autorização).
