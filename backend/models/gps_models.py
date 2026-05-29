@@ -46,6 +46,9 @@ class GPSData(BaseModel):
     player_load: Optional[float] = None
     duration_minutes: Optional[float] = None
     distance_per_min: Optional[float] = None
+    player_load_per_minute: Optional[float] = None
+    high_metabolic_load: Optional[float] = None
+    max_velocity_percent: Optional[float] = None
     source: Optional[str] = None
     device: Optional[str] = None
     notes: Optional[str] = None

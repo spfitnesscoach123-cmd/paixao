@@ -140,6 +140,47 @@ INTERNAL_FIELDS = {
         "type": "numeric",
         "canonical": "session_duration_min",
     },
+    "player_load_per_minute": {
+        "label_pt": "Player Load por Minuto",
+        "label_en": "Player Load Per Minute",
+        "group": "optional",
+        "type": "numeric",
+        "canonical": "player_load_per_minute",
+        "aliases": [
+            "player load per minute", "player load per min", "player load/min",
+            "player load min", "playerload per minute", "playerload/min",
+            "pl per minute", "pl per min", "pl/min", "pl min",
+            "average player load per minute", "avg player load per minute",
+            "dynamic stress load per minute", "dsl per minute",
+        ],
+    },
+    "high_metabolic_load": {
+        "label_pt": "Distância de Alta Carga Metabólica",
+        "label_en": "High Metabolic Load Distance",
+        "group": "optional",
+        "type": "numeric",
+        "aliases": [
+            "high metabolic load distance", "high metabolic load dist",
+            "high metabolic load", "high metabolic power distance",
+            "metabolic power distance", "metabolic distance",
+            "hmld", "hml distance", "hml dist", "hml",
+            "hi metabolic load distance", "high met load distance",
+            "distance high metabolic power", "hmpd",
+        ],
+    },
+    "max_velocity_percent": {
+        "label_pt": "Velocidade Máxima (%)",
+        "label_en": "Max Velocity (%)",
+        "group": "optional",
+        "type": "numeric",
+        "aliases": [
+            "max velocity %", "max velocity (%)", "max velocity percent",
+            "max vel %", "max vel percent", "max speed %", "max speed (%)",
+            "max speed percentage", "% max speed", "% max velocity",
+            "% max vel", "% of max velocity", "% of max speed",
+            "vmax %", "% vmax", "percent max velocity", "max vel pct",
+        ],
+    },
 }
 
 

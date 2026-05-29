@@ -221,6 +221,10 @@ async def csv_import_mapped(
                     "max_acceleration": float(rec.get("max_acceleration", 0) or 0) if rec.get("max_acceleration") else None,
                     "max_deceleration": float(rec.get("max_deceleration", 0) or 0) if rec.get("max_deceleration") else None,
                     "player_load": float(rec.get("player_load", 0) or 0) if rec.get("player_load") else None,
+                    "player_load_per_minute": float(rec.get("player_load_per_minute", 0) or 0) if rec.get("player_load_per_minute") else None,
+                    "high_metabolic_load": float(rec.get("high_metabolic_load", 0) or 0) if rec.get("high_metabolic_load") else None,
+                    "max_velocity_percent": float(rec.get("max_velocity_percent", 0) or 0) if rec.get("max_velocity_percent") else None,
+                    "duration_minutes": float(rec.get("duration_minutes", 0) or 0) if rec.get("duration_minutes") else None,
                     "source": "csv_import",
                     "created_at": datetime.now(timezone.utc).isoformat(),
                 }
