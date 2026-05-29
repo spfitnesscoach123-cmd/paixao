@@ -13,6 +13,16 @@ const STATUS_COLORS: Record<string, string> = {
   UNKNOWN: '#475569',
 };
 
+// Velocity Exposure indicator (symbol-only; numeric value stays primary).
+// >=95 Peak ◆ | >=90 High ● | >=85 Stable – | <85 Low ↓ | null = none
+const VELOCITY_EXPOSURE = (pct: number | null | undefined): { symbol: string; color: string } | null => {
+  if (pct == null) return null;
+  if (pct >= 95) return { symbol: '◆', color: '#2FB6FF' };
+  if (pct >= 90) return { symbol: '●', color: '#10b981' };
+  if (pct >= 85) return { symbol: '–', color: '#94a3b8' };
+  return { symbol: '↓', color: '#f59e0b' };
+};
+
 interface Props {
   row: TeamTableRowData;
   maxDistance: number;
@@ -110,9 +120,17 @@ export const TeamTableRowItem = React.memo(function TeamTableRowItem({
             </Text>
           </View>
           <View style={styles.colSpeed}>
-            <Text style={[styles.metricValue, { color: colors.text.primary }]}>
-              {row.max_velocity_percent != null ? `${row.max_velocity_percent.toFixed(0)}%` : '-'}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+              <Text style={[styles.metricValue, { color: colors.text.primary }]}>
+                {row.max_velocity_percent != null ? `${row.max_velocity_percent.toFixed(0)}%` : '-'}
+              </Text>
+              {(() => {
+                const exp = VELOCITY_EXPOSURE(row.max_velocity_percent);
+                return exp ? (
+                  <Text style={{ color: exp.color, fontSize: 11, fontWeight: '700', lineHeight: 14 }} data-testid="velocity-exposure-indicator">{exp.symbol}</Text>
+                ) : null;
+              })()}
+            </View>
           </View>
           <View style={styles.colSpeed}>
             <Text style={[styles.metricValue, { color: colors.text.primary }]}>

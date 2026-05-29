@@ -246,6 +246,10 @@ const TOOLTIPS: Record<string, { pt: string; en: string }> = {
     pt: 'Tabela analítica Jogo vs Treino. Valores médios por sessão classificada. Ratio = Média Treino ÷ Média Jogo × 100. "--" indica ausência de dados; "N/A" indica que o Ratio não pode ser calculado (sem jogo, sem treino, ou divisão por zero).',
     en: 'Game vs Training analytical table. Average values per classified session. Ratio = Training Avg ÷ Game Avg × 100. "--" means no data; "N/A" means the ratio cannot be computed (no game, no training, or division by zero).',
   },
+  rsimod_playerload: {
+    pt: 'Resposta Neuromuscular (RSImod) vs Carga Externa (Player Load). Cada ponto é um atleta; as linhas marcam as médias da equipe.\n\n• Player Load alto + RSImod alto: Boa tolerância à carga. Atleta lidando bem com as demandas de treino.\n• Player Load alto + RSImod baixo: Possível fadiga neuromuscular. Monitorar recuperação e prontidão.\n• Player Load baixo + RSImod alto: Atleta fresco/recuperado. Potencial capacidade para maior exposição.\n• Player Load baixo + RSImod baixo: Sinal de prontidão reduzida. Investigar status de recuperação e contexto.',
+    en: 'Neuromuscular Response (RSImod) vs External Load (Player Load). Each point is an athlete; the lines mark the team averages.\n\n• High Player Load + High RSImod: Good load tolerance. Athlete coping well with training demands.\n• High Player Load + Low RSImod: Possible neuromuscular fatigue. Monitor recovery and readiness.\n• Low Player Load + High RSImod: Fresh / recovered athlete. Potential capacity for greater exposure.\n• Low Player Load + Low RSImod: Reduced readiness signal. Investigate recovery status and context.',
+  },
 };
 
 const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; subtitle?: string }) => {
@@ -289,6 +293,7 @@ const CardInfoHeader = ({ id, subtitle }: { id: keyof typeof TOOLTIPS | string; 
     sm_pl_chart: { pt: 'Player Load Médio vs PL/min', en: 'Avg Player Load vs PL/min' },
     sm_game_training: { pt: 'Jogo vs Treino', en: 'Game vs Training' },
     sm_ratio_table: { pt: 'Tabela Jogo vs Treino (Ratio)', en: 'Game vs Training Table (Ratio)' },
+    rsimod_playerload: { pt: 'RSImod vs Player Load', en: 'RSImod vs Player Load' },
   };
   const t = TITLES[id as string];
   const title = t ? (locale === 'pt' ? t.pt : t.en) : '';
@@ -1411,13 +1416,25 @@ export default function DataScreen() {
       lmpi ? lmpi / 100 : 0,
     ];
     
-    // Quadrant: ACWR vs Wellness
-    const quadrantPoints = mode !== 'athlete'
-      ? safeAthletes.filter((a: any) => a && a.acwr != null && a.wellness_score != null).map((a: any) => ({
-          x: a.acwr, y: a.wellness_score, name: a.name,
-          color: a.risk_level === 'high' ? COLORS.red : a.risk_level === 'moderate' ? COLORS.yellow : COLORS.green
-        }))
+    // Quadrant: RSImod vs Player Load (Neuromuscular response vs External load)
+    // Replaces the redundant ACWR vs Wellness (kept in Risk Intelligence).
+    const rsiPlRaw = mode !== 'athlete'
+      ? safeAthletes.filter((a: any) => a && a.rsimod != null && a.speed_metabolic?.avg_player_load != null)
+          .map((a: any) => ({ x: a.speed_metabolic.avg_player_load, y: a.rsimod, name: a.name }))
       : [];
+    const plMid = rsiPlRaw.length ? rsiPlRaw.reduce((s: number, p: any) => s + p.x, 0) / rsiPlRaw.length : undefined;
+    const rsiMid = rsiPlRaw.length ? rsiPlRaw.reduce((s: number, p: any) => s + p.y, 0) / rsiPlRaw.length : undefined;
+    const rsiPlPoints = rsiPlRaw.map((p: any) => {
+      const highPL = plMid != null && p.x >= plMid;
+      const highRSI = rsiMid != null && p.y >= rsiMid;
+      // Q1 high/high = good (green); Q2 highPL/lowRSI = fatigue (red);
+      // Q3 lowPL/highRSI = fresh (cyan); Q4 low/low = reduced readiness (yellow)
+      let color = COLORS.green;
+      if (highPL && !highRSI) color = COLORS.red;
+      else if (!highPL && highRSI) color = COLORS.cyan;
+      else if (!highPL && !highRSI) color = COLORS.yellow;
+      return { x: p.x, y: p.y, name: p.name, color };
+    });
     
     // Availability donut — risk_distribution may be missing or non-object in empty states
     const riskDist = (safeSummary.risk_distribution && typeof safeSummary.risk_distribution === 'object')
@@ -1463,11 +1480,17 @@ export default function DataScreen() {
           </View>
         </View>
         
-        {/* Quadrant ACWR vs Wellness */}
-        {mode !== 'athlete' && quadrantPoints.length > 0 && (
-          <View style={styles.card}>
-            <CardInfoHeader id="acwr_wellness" />
-            <QuadrantChart points={quadrantPoints} xLabel="ACWR" yLabel="Wellness" xMid={1.3} yMid={5} height={200} />
+        {/* Quadrant RSImod vs Player Load (Neuromuscular response vs External load) */}
+        {mode !== 'athlete' && rsiPlPoints.length > 0 && (
+          <View style={styles.card} data-testid="rsimod-playerload-card">
+            <CardInfoHeader id="rsimod_playerload" />
+            <QuadrantChart points={rsiPlPoints} xLabel="Player Load" yLabel="RSImod" xMid={plMid} yMid={rsiMid} height={200} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Boa tolerância' : 'Good tolerance'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.red, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Possível fadiga' : 'Possible fatigue'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.cyan, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Fresco/recuperado' : 'Fresh/recovered'}</Text></View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.yellow, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Prontidão reduzida' : 'Reduced readiness'}</Text></View>
+            </View>
           </View>
         )}
         
