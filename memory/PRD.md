@@ -276,6 +276,9 @@ Constantes legadas de keywords são duplicadas em `utils/gps_session_resolver.py
 - ✅ Nenhuma alteração em cálculos científicos ou pipelines.
 
 ---
+## Status update — 2026-05-29 (refinements UI validados)
+- **UI Refinements (Speed & Metabolic)**: símbolos Vel.Máx% na Team Table + RSImod vs Player Load no Smart Summary — **VALIDADOS visualmente**. ACWR vs Wellness permanece em Risk Intelligence (inalterado). Corrigido bug de escala do `QuadrantChart` via prop opt-in `autoScale` (default preserva ACWR vs Wellness). Dados de teste (4 ZZZ) removidos, resíduo=0. Detalhes em CHANGELOG.
+
 ## Status update — 2026-05-29
 - **Épico "Speed & Metabolic Load"**: Fase 2 (Import) ✅, Fase 3 (Tabela Analítica Team) ✅ APROVADA, Fase 4 (Dashboard Overview Layer) ✅ implementada — aguardando aprovação do checkpoint. Fase 5 (regressão final) pendente.
 - **Dívida técnica registrada**: `backend/models/dashboard_models.py` é duplicado morto de `TeamTableRow` (definido localmente em `routes/dashboard/routes.py`). NÃO remover agora (decisão do usuário) — remover em limpeza futura.

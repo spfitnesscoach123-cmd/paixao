@@ -1,5 +1,27 @@
 # CHANGELOG
 
+## 2026-05-29 — UI Refinements (Speed & Metabolic): Velocity Symbols + RSImod vs Player Load — VALIDADO
+
+Refinamento de UI do épico "Speed & Metabolic Load". Código já existia; esta sessão fez a **validação visual** (ambos os itens aprovados), corrigiu um bug de escala do gráfico e limpou os dados de teste.
+
+### 1) Símbolos de Velocidade Máx (%) na Team Table (`components/dashboard/TeamTableRow.tsx`)
+- ◆ ≥95 Peak (#2FB6FF) · ● ≥90 High (#10b981) · – ≥85 Stable · ↓ <85 Low (#f59e0b). `null` = sem símbolo.
+- Já validado visualmente pelo usuário em sessão anterior (sem novo screenshot necessário).
+
+### 2) RSImod vs Player Load no Smart Summary (`app/(tabs)/data.tsx`)
+- Substitui o redundante "ACWR vs Wellness" no Smart Summary. **ACWR vs Wellness PERMANECE em Risk Intelligence** (linhas ~1826-1830, código inalterado — renderiza condicionalmente quando há `acwr` E `wellness_score`; atualmente em empty-state porque nenhum atleta tem wellness no período).
+- Gráfico: x = Player Load, y = RSImod, midpoints = **médias dinâmicas da equipe** (`plMid`, `rsiMid`). Só renderiza em modo team/position com pontos válidos (`rsimod != null && speed_metabolic.avg_player_load != null`).
+- Interpretação dos quadrantes (aprovada): PL alto + RSImod alto = Boa tolerância (verde); PL alto + RSImod baixo = Possível fadiga (vermelho); PL baixo + RSImod alto = Fresco/recuperado (ciano); PL baixo + RSImod baixo = Prontidão reduzida (amarelo).
+
+### BUG corrigido — escala do `QuadrantChart`
+- O `QuadrantChart` é compartilhado com o ACWR vs Wellness e tinha **pisos de eixo fixos** (`xMax=2` p/ ACWR, `yMax=10` p/ Wellness). Reusado para RSImod (0–1), isso esmagava todos os pontos no rodapé do gráfico.
+- **Fix mínimo e aditivo**: nova prop opcional `autoScale` (default `false` → preserva 100% o comportamento do ACWR vs Wellness). Quando `true`, o domínio é derivado dos dados com margem de 15%. Aplicada **somente** ao gráfico RSImod vs Player Load (linha ~1494). Risk Intelligence intocado.
+
+### Validação visual (dados de teste seedados e depois removidos)
+- Seedados 4 atletas ZZZ com Player Load variado (380–620) + CMJ jump_assessments (rsi 0.28–0.55) para distribuir 1 ponto por quadrante. Screenshot confirmou os 4 quadrantes corretos (ciano TL, verde TR, amarelo BL, vermelho BR), eixos e legenda corretos.
+- **Limpeza**: removidos 4 atletas ZZZ + gps_data + jump_assessments + athlete_load_metrics. Atletas 35→31; gps_data 605→601; **resíduo = 0**; dados reais de Periodização intactos (87 'game').
+
+
 
 ## 2026-05-22 (P1) — Pain Location optional text field (Wellness)
 - **Scope**: Add a single optional free-text field "Pain Location / Local da Dor" (≤100 chars) below the existing muscle_soreness slider in the **I'm a Player → Wellness Form** and surface it on the **Team Dashboard Analytical Table** + **Athlete Profile historical wellness cards**. NO changes to existing wellness math, readiness/fatigue scoring, calculations, flows or layout outside these touchpoints.

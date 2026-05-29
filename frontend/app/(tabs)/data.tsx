@@ -445,7 +445,7 @@ const DonutChart = ({ segments, size = 100, strokeWidth = 14, centerText, center
 };
 
 // Scatter/Quadrant Chart — clickable points reveal tooltip with athlete name + values
-const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { points: { x: number; y: number; name: string; color: string }[]; xLabel: string; yLabel: string; xMid?: number; yMid?: number; height?: number }) => {
+const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200, autoScale = false }: { points: { x: number; y: number; name: string; color: string }[]; xLabel: string; yLabel: string; xMid?: number; yMid?: number; height?: number; autoScale?: boolean }) => {
   const { colors } = useTheme();
   const CHART_WIDTH = useChartWidth();
   const [selectedIdx, setSelectedIdx] = React.useState<number | null>(null);
@@ -456,10 +456,17 @@ const QuadrantChart = ({ points, xLabel, yLabel, xMid, yMid, height = 200 }: { p
   
   const xs = points.map(p => p.x);
   const ys = points.map(p => p.y);
-  const xMin = Math.min(...xs, 0);
-  const xMax = Math.max(...xs, 2);
-  const yMin = Math.min(...ys, 0);
-  const yMax = Math.max(...ys, 10);
+  // autoScale: domain derived from data with a 15% margin (for arbitrary metric
+  // scales such as RSImod 0-1 vs Player Load). Default (false) keeps the fixed
+  // ACWR(0-2) vs Wellness(0-10) reference frame used by Risk Intelligence.
+  const dataXMin = Math.min(...xs), dataXMax = Math.max(...xs);
+  const dataYMin = Math.min(...ys), dataYMax = Math.max(...ys);
+  const xPad = (dataXMax - dataXMin) * 0.15 || Math.abs(dataXMax * 0.15) || 1;
+  const yPad = (dataYMax - dataYMin) * 0.15 || Math.abs(dataYMax * 0.15) || 1;
+  const xMin = autoScale ? dataXMin - xPad : Math.min(...xs, 0);
+  const xMax = autoScale ? dataXMax + xPad : Math.max(...xs, 2);
+  const yMin = autoScale ? Math.max(0, dataYMin - yPad) : Math.min(...ys, 0);
+  const yMax = autoScale ? dataYMax + yPad : Math.max(...ys, 10);
   const xRange = xMax - xMin || 1;
   const yRange = yMax - yMin || 1;
   
@@ -1484,7 +1491,7 @@ export default function DataScreen() {
         {mode !== 'athlete' && rsiPlPoints.length > 0 && (
           <View style={styles.card} data-testid="rsimod-playerload-card">
             <CardInfoHeader id="rsimod_playerload" />
-            <QuadrantChart points={rsiPlPoints} xLabel="Player Load" yLabel="RSImod" xMid={plMid} yMid={rsiMid} height={200} />
+            <QuadrantChart points={rsiPlPoints} xLabel="Player Load" yLabel="RSImod" xMid={plMid} yMid={rsiMid} height={200} autoScale />
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.green, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Boa tolerância' : 'Good tolerance'}</Text></View>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.red, marginRight: 4 }} /><Text style={{ color: colors.text.secondary, fontSize: 9 }}>{locale === 'pt' ? 'Possível fadiga' : 'Possible fatigue'}</Text></View>
