@@ -281,3 +281,21 @@ Comparativo Jogo vs Treino dentro da layer "Speed & Metabolic Load". Usa SOMENTE
 
 ### NÃO implementado (fora do escopo): Sprint Exposure (aguarda estratégia de Vmax histórico).
 ### Futuro proposto: forma mais segura de classificar atividade DENTRO do fluxo do Dashboard (hoje só via Periodização).
+
+
+## 2026-05-29 — Fase 5: Regressão Final (read-only, sem novas features)
+
+Épico "Speed & Metabolic Load" — regressão completa. Nenhuma feature nova adicionada (Sprint Exposure, seletor de classificação, PDF, gráficos/métricas extras — NÃO implementados, conforme instrução).
+
+### Esclarecimento confirmado ao usuário
+- Team Mode calcula Game vs Training ao vivo a partir de TODAS as atividades classificadas da população filtrada (`compute_activity_split(target_ids)`). Dataset de validação deletado. Prova: 28d → 0/0; 90d → 22 jogos reais (PL 688.9), 0 treino → Ratio N/A.
+
+### Resultados da regressão
+- Backend (read-only, 19/19 PASS): Overview Team (7d/28d/90d), Individual, Position; insights das 6 layers; team-table com 8 colunas novas + colunas existentes (31 linhas); /dashboard/team 200; activity_split presente; campos de velocidade null-safe.
+- Frontend: 6 layers renderizam sem crash (Load Intelligence, Smart Summary, Team Status, Neuromuscular, Risk Intelligence, Speed & Metabolic). Load Intelligence intacto (gauges Acute/Chronic, timeline, ACWR zone, velocity zones).
+- CSV import: `/api/csv/analyze` detecta todas as colunas (incl. novas) — compatibilidade preservada.
+- Modos Team/Individual/Position: corretos. Filtros date/athlete/position: ok.
+- Null-safe: atleta real sem dados → None/"--"/"N/A"/empty state; não classificado ≠ treino.
+- Integridade: 0 residual de teste; 31 atletas; 601 gps_data (estado original); 87 'game' reais intactos.
+
+### Conclusão: nenhuma funcionalidade existente quebrada. Épico funcionalmente completo.
