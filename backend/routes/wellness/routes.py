@@ -147,6 +147,7 @@ EXPIRY_TO_MINUTES = {
 class WellnessTokenCreate(BaseModel):
     max_uses: int = Field(ge=1, le=100, default=30)
     expires_in: str = "24h"  # 30min, 1h, 2h, 8h, 24h
+    language: Optional[str] = None
 
 class WellnessTokenStatus(str, Enum):
     ACTIVE = "active"
@@ -203,6 +204,40 @@ def generate_token_code() -> str:
     chars = chars.replace('O', '').replace('0', '').replace('I', '').replace('1', '').replace('L', '')
     return ''.join(random.choice(chars) for _ in range(6))
 
+
+def _sanitize_lang(value) -> str:
+    """Coach language for the public athlete form. Only 'pt'/'en'; fallback 'pt'."""
+    if isinstance(value, str) and value.strip().lower() in ("pt", "en"):
+        return value.strip().lower()
+    return "pt"
+
+
+def _build_recommendations(data, lang: str) -> list:
+    """Generate wellness feedback recommendations in the coach's language.
+    Display-only strings (NOT persisted); values/DB untouched."""
+    is_en = lang == "en"
+    recs = []
+    if data.sleep_hours < 7:
+        recs.append("Try to sleep at least 7-8 hours per night" if is_en
+                    else "Tente dormir pelo menos 7-8 horas por noite")
+    if data.sleep_quality < 6:
+        recs.append("Consider improving your sleep hygiene" if is_en
+                    else "Considere melhorar sua higiene do sono")
+    if data.fatigue > 7:
+        recs.append("High fatigue level - consider extra rest" if is_en
+                    else "Nível de fadiga elevado - considere descanso extra")
+    if data.muscle_soreness > 7:
+        recs.append("High muscle soreness - consider active recovery" if is_en
+                    else "Dor muscular alta - considere recuperação ativa")
+    if data.stress > 7:
+        recs.append("High stress level - practice relaxation techniques" if is_en
+                    else "Nível de estresse alto - pratique técnicas de relaxamento")
+    if not recs:
+        recs.append("Great! You are in good condition!" if is_en
+                    else "Ótimo! Você está em boas condições!")
+    return recs
+
+
 @router.post("/wellness/token")
 async def create_wellness_token(
     data: WellnessTokenCreate,
@@ -231,6 +266,7 @@ async def create_wellness_token(
         "expires_at": expires_at,
         "status": "active",
         "created_at": datetime.utcnow(),
+        "language": _sanitize_lang(data.language),
     }
     
     result = await db.wellness_tokens.insert_one(token_doc)
@@ -241,6 +277,7 @@ async def create_wellness_token(
         "current_uses": 0,
         "expires_at": expires_at.isoformat(),
         "status": "active",
+        "language": token_doc["language"],
     }
 
 @router.post("/wellness/token/validate")
@@ -257,6 +294,7 @@ async def validate_wellness_token(data: TokenValidateRequest):
                 "valid": True,
                 "token_id": token_code,
                 "coach_id": str(demo_coach["_id"]),
+                "language": "pt",
             }
     # === FIM APPLE REVIEW TOKEN ===
     
@@ -292,6 +330,7 @@ async def validate_wellness_token(data: TokenValidateRequest):
         "valid": True,
         "token_id": token_code,
         "coach_id": token["coach_id"],
+        "language": _sanitize_lang(token.get("language")),
     }
 
 @router.get("/wellness/token/{token_id}/athletes")
@@ -421,22 +460,8 @@ async def submit_wellness_via_token(data: TokenWellnessSubmit):
                 "date": data.date,
                 "readiness_score": readiness_score,
                 "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
-                "recommendations": []
+                "recommendations": _build_recommendations(data, "pt")
             }
-            
-            if data.sleep_hours < 7:
-                feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
-            if data.sleep_quality < 6:
-                feedback["recommendations"].append("Considere melhorar sua higiene do sono")
-            if data.fatigue > 7:
-                feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
-            if data.muscle_soreness > 7:
-                feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
-            if data.stress > 7:
-                feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
-            
-            if not feedback["recommendations"]:
-                feedback["recommendations"].append("Ótimo! Você está em boas condições!")
             
             return {
                 "success": True,
@@ -546,22 +571,8 @@ async def submit_wellness_via_token(data: TokenWellnessSubmit):
         "date": data.date,
         "readiness_score": readiness_score,
         "status": "optimal" if readiness_score >= 7 else "moderate" if readiness_score >= 5 else "low",
-        "recommendations": []
+        "recommendations": _build_recommendations(data, _sanitize_lang(token.get("language")))
     }
-    
-    if data.sleep_hours < 7:
-        feedback["recommendations"].append("Tente dormir pelo menos 7-8 horas por noite")
-    if data.sleep_quality < 6:
-        feedback["recommendations"].append("Considere melhorar sua higiene do sono")
-    if data.fatigue > 7:
-        feedback["recommendations"].append("Nível de fadiga elevado - considere descanso extra")
-    if data.muscle_soreness > 7:
-        feedback["recommendations"].append("Dor muscular alta - considere recuperação ativa")
-    if data.stress > 7:
-        feedback["recommendations"].append("Nível de estresse alto - pratique técnicas de relaxamento")
-    
-    if not feedback["recommendations"]:
-        feedback["recommendations"].append("Ótimo! Você está em boas condições!")
     
     return {
         "success": True,

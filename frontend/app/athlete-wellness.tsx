@@ -19,6 +19,7 @@ import Slider from '@react-native-community/slider';
 import api from '../services/api';
 import { colors } from '../constants/theme';
 import { useLanguage } from '../contexts/LanguageContext';
+import i18n from '../i18n';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface Athlete {
@@ -38,9 +39,14 @@ export default function AthleteWellness() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { token } = useLocalSearchParams<{ token: string }>();
+  const { token, lang } = useLocalSearchParams<{ token: string; lang?: string }>();
   const router = useRouter();
-  const { t } = useLanguage();
+  const { locale } = useLanguage();
+  // Coach language drives the public athlete form (from the token that opened it),
+  // NOT the athlete's device language. Fallback to the app locale when absent/invalid.
+  const rawLang = Array.isArray(lang) ? lang[0] : lang;
+  const coachLang = rawLang === 'pt' || rawLang === 'en' ? rawLang : locale;
+  const tc = (key: string) => i18n.t(key, { locale: coachLang });
   
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +91,7 @@ export default function AthleteWellness() {
     try {
       const response = await api.get(`/wellness/token/${token}/check-athlete/${athleteId}`);
       if (response.data.already_used) {
-        setAlreadyUsedError(response.data.message);
+        setAlreadyUsedError(tc('wellness.alreadyAnswered'));
         return true;
       }
       setAlreadyUsedError(null);
@@ -105,14 +111,14 @@ export default function AthleteWellness() {
 
   const handleSubmit = async () => {
     if (!selectedAthlete) {
-      Alert.alert('Erro', 'Por favor, selecione seu nome');
+      Alert.alert(tc('common.error'), tc('wellness.pleaseSelectName'));
       return;
     }
 
     // Double check usage before submit
     const alreadyUsed = await checkAthleteUsage(selectedAthlete);
     if (alreadyUsed) {
-      Alert.alert('Erro', 'Você já respondeu este questionário.');
+      Alert.alert(tc('common.error'), tc('wellness.alreadyAnswered'));
       return;
     }
 
@@ -134,7 +140,7 @@ export default function AthleteWellness() {
       setFeedback(response.data.feedback);
       setIsSubmitted(true);
     } catch (err: any) {
-      Alert.alert('Erro', err.response?.data?.detail || 'Erro ao enviar questionário');
+      Alert.alert(tc('common.error'), err.response?.data?.detail || tc('wellness.submitError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -160,9 +166,9 @@ export default function AthleteWellness() {
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'optimal': return 'Ótimo';
-      case 'moderate': return 'Moderado';
-      case 'low': return 'Baixo';
+      case 'optimal': return tc('wellness.optimal');
+      case 'moderate': return tc('wellness.moderate');
+      case 'low': return tc('wellness.low');
       default: return status;
     }
   };
@@ -209,7 +215,7 @@ export default function AthleteWellness() {
         <Ionicons name="alert-circle" size={64} color={colors.status.error} />
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleGoBack}>
-          <Text style={styles.retryText}>Voltar</Text>
+          <Text style={styles.retryText}>{tc('common.back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -224,11 +230,11 @@ export default function AthleteWellness() {
         <ScrollView contentContainerStyle={styles.feedbackContainer}>
           <View style={styles.feedbackCard}>
             <Ionicons name="checkmark-circle" size={64} color={colors.status.success} />
-            <Text style={styles.feedbackTitle}>Questionário Enviado!</Text>
+            <Text style={styles.feedbackTitle}>{tc('wellness.questionnaireSubmitted')}</Text>
             <Text style={styles.feedbackSubtitle}>{feedback.athlete_name}</Text>
             
             <View style={styles.scoreContainer}>
-              <Text style={styles.scoreLabel}>Prontidão</Text>
+              <Text style={styles.scoreLabel}>{tc('wellness.readiness')}</Text>
               <Text style={[styles.scoreValue, { color: getStatusColor(feedback.status) }]}>
                 {feedback.readiness_score}/10
               </Text>
@@ -240,7 +246,7 @@ export default function AthleteWellness() {
             </View>
 
             <View style={styles.recommendationsContainer}>
-              <Text style={styles.recommendationsTitle}>Recomendações:</Text>
+              <Text style={styles.recommendationsTitle}>{`${tc('wellness.recommendations')}:`}</Text>
               {feedback.recommendations.map((rec, index) => (
                 <View key={index} style={styles.recommendationItem}>
                   <Ionicons name="chevron-forward" size={16} color={colors.accent.primary} />
@@ -260,7 +266,7 @@ export default function AthleteWellness() {
                 end={{ x: 1, y: 0 }}
                 style={styles.finishGradient}
               >
-                <Text style={styles.finishText}>Finalizar</Text>
+                <Text style={styles.finishText}>{tc('wellness.finish')}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -286,13 +292,13 @@ export default function AthleteWellness() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
           <Ionicons name="fitness" size={48} color={colors.accent.primary} />
-          <Text style={styles.title}>Questionário de Bem-Estar</Text>
-          <Text style={styles.subtitle}>Preencha para monitorar sua recuperação</Text>
+          <Text style={styles.title}>{tc('wellness.questionnaire')}</Text>
+          <Text style={styles.subtitle}>{tc('wellness.fillToMonitor')}</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Selecione seu nome:</Text>
+            <Text style={styles.label}>{`${tc('wellness.selectName')}:`}</Text>
             <TouchableOpacity
               style={styles.athleteSelector}
               onPress={() => setIsAthleteModalVisible(true)}
@@ -300,7 +306,7 @@ export default function AthleteWellness() {
               testID="athlete-selector-button"
             >
               <Text style={styles.athleteSelectorText}>
-                {athletes.find(a => a.id === selectedAthlete)?.name || 'Selecionar atleta'}
+                {athletes.find(a => a.id === selectedAthlete)?.name || tc('wellness.selectAthlete')}
               </Text>
               <Ionicons name="chevron-down" size={20} color={colors.accent.primary} />
             </TouchableOpacity>
@@ -321,7 +327,7 @@ export default function AthleteWellness() {
             >
               <View style={styles.modalContainer}>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Selecione seu nome</Text>
+                  <Text style={styles.modalTitle}>{tc('wellness.selectName')}</Text>
                   <TouchableOpacity
                     onPress={() => setIsAthleteModalVisible(false)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -370,11 +376,11 @@ export default function AthleteWellness() {
           )}
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Data: {date}</Text>
+            <Text style={styles.label}>{`${tc('common.date')}: ${date}`}</Text>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Horas de sono: {sleepHours}h</Text>
+            <Text style={styles.label}>{`${tc('wellness.sleepHours')}: ${sleepHours}h`}</Text>
             <Slider
               style={styles.slider}
               minimumValue={3}
@@ -388,17 +394,17 @@ export default function AthleteWellness() {
             />
           </View>
 
-          {renderSlider('Qualidade do sono', sleepQuality, setSleepQuality, 'Ruim', 'Excelente')}
-          {renderSlider('Fadiga', fatigue, setFatigue, 'Nenhuma', 'Extrema')}
-          {renderSlider('Dor muscular', muscleSoreness, setMuscleSoreness, 'Nenhuma', 'Muita')}
+          {renderSlider(tc('wellness.sleepQuality'), sleepQuality, setSleepQuality, tc('wellness.poor'), tc('wellness.excellent'))}
+          {renderSlider(tc('wellness.fatigue'), fatigue, setFatigue, tc('wellness.none'), tc('wellness.extreme'))}
+          {renderSlider(tc('wellness.muscleSoreness'), muscleSoreness, setMuscleSoreness, tc('wellness.none'), tc('wellness.severe'))}
 
           <View style={styles.inputGroup} testID="pain-location-field">
-            <Text style={styles.label}>{t('wellness.painLocation') || 'Local da Dor'}</Text>
+            <Text style={styles.label}>{tc('wellness.painLocation')}</Text>
             <TextInput
               style={styles.painLocationInput}
               value={painLocation}
               onChangeText={(txt) => setPainLocation(txt.slice(0, 100))}
-              placeholder={t('wellness.painLocationPlaceholder') || 'Exemplo: Posterior da Coxa Direita'}
+              placeholder={tc('wellness.painLocationPlaceholder')}
               placeholderTextColor={colors.text.tertiary}
               maxLength={100}
               multiline
@@ -407,8 +413,8 @@ export default function AthleteWellness() {
             />
           </View>
 
-          {renderSlider('Estresse', stress, setStress, 'Relaxado', 'Muito estressado')}
-          {renderSlider('Humor', mood, setMood, 'Ruim', 'Excelente')}
+          {renderSlider(tc('wellness.stress'), stress, setStress, tc('wellness.relaxed'), tc('wellness.veryStressed'))}
+          {renderSlider(tc('wellness.mood'), mood, setMood, tc('wellness.poor'), tc('wellness.excellent'))}
 
           <TouchableOpacity
             style={[styles.submitButton, alreadyUsedError && styles.submitButtonDisabled]}
@@ -428,7 +434,7 @@ export default function AthleteWellness() {
               ) : (
                 <>
                   <Ionicons name="send" size={24} color="#ffffff" />
-                  <Text style={styles.submitText}>Enviar Questionário</Text>
+                  <Text style={styles.submitText}>{tc('wellness.submitQuestionnaire')}</Text>
                 </>
               )}
             </LinearGradient>

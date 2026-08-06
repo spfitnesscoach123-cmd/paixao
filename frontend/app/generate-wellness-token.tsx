@@ -24,7 +24,7 @@ export default function GenerateWellnessToken() {
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const router = useRouter();
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedToken, setGeneratedToken] = useState<{
     tokenId: string;
@@ -54,6 +54,7 @@ export default function GenerateWellnessToken() {
       const response = await api.post('/wellness/token', {
         max_uses: maxUses,
         expires_in: expiresIn,
+        language: locale,
       });
       
       setGeneratedToken({

@@ -63,6 +63,7 @@ EXPIRY_TO_MINUTES = {
 class WellnessTokenCreate(BaseModel):
     max_uses: int = Field(ge=1, le=100, default=30)
     expires_in: str = "24h"
+    language: Optional[str] = None
 
 
 class WellnessTokenStatus(str, Enum):

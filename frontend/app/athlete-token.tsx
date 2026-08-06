@@ -44,10 +44,10 @@ export default function AthleteToken() {
       });
 
       if (response.data.valid) {
-        // Navigate to athlete wellness form with token
+        // Navigate to athlete wellness form with token + coach language
         router.push({
           pathname: '/athlete-wellness',
-          params: { token: token.trim().toUpperCase() },
+          params: { token: token.trim().toUpperCase(), lang: response.data.language || 'pt' },
         });
       }
     } catch (err: any) {

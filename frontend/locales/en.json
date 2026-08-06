@@ -217,7 +217,17 @@
     "physicalMentalState": "Physical and Mental State",
     "sleepHydration": "Sleep and Hydration",
     "sleepHoursRequired": "Please fill in sleep hours",
-    "scoresAutoCalculated": "Wellness and Readiness scores will be calculated automatically"
+    "scoresAutoCalculated": "Wellness and Readiness scores will be calculated automatically",
+    "fillToMonitor": "Fill in to monitor your recovery",
+    "selectAthlete": "Select athlete",
+    "severe": "Severe",
+    "optimal": "Optimal",
+    "moderate": "Moderate",
+    "low": "Low",
+    "finish": "Finish",
+    "pleaseSelectName": "Please select your name",
+    "alreadyAnswered": "You have already answered this questionnaire.",
+    "submitError": "Error submitting questionnaire"
   },
   "assessments": {
     "title": "Assessments",

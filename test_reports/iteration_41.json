@@ -1,0 +1,23 @@
+{
+  "summary": "Verified i18n bug fix for public wellness form (LoadManager Pro). Tested both English (token JSUT58) and Portuguese (token V2ZD3V) flows via /athlete-token -> /athlete-wellness. Form labels, sliders, placeholders, submit button, and success modal (title, Readiness/Prontidão, status badge, Recommendations list, Finish/Finalizar) all render in the coach/token language with no mixed-language leftovers. Submission returned 200 in both cases and success modal shown with correct recommendations in the correct language.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Same athlete (Carlos Novo) was able to submit under both tokens — expected since 'already answered' is per-token; no bug, just a note.",
+    "Web build uses native <select> not exposed as <select> DOM (react-native-web renders custom), but default first athlete pre-selected worked fine for submission."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "100%"},
+  "test_credentials": "Pre-generated tokens JSUT58 (EN coach) and V2ZD3V (PT coach) worked as documented.",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "i18n bug fix verified end-to-end. EN form body: 'Wellness Questionnaire / Fill in to monitor your recovery / Select your name: / Date / Sleep hours / Sleep quality (Poor-Excellent) / Fatigue (None-Extreme) / Muscle soreness (None-Severe) / Pain Location + Example: Right Hamstring / Stress (Relaxed-Very stressed) / Mood (Poor-Excellent) / Submit Questionnaire'. EN success modal: 'Questionnaire Submitted! / Readiness / Moderate / Recommendations: / Consider improving your sleep hygiene / Finish'. PT form: 'Questionário de Bem-Estar / Preencha para monitorar sua recuperação / Selecione seu nome / Data / Horas de sono / Qualidade do sono (Ruim-Excelente) / Fadiga (Nenhuma-Extrema) / Dor muscular (Nenhuma-Muita) / Local da Dor + Exemplo: Posterior da Coxa Direita / Estresse (Relaxado-Muito estressado) / Humor (Ruim-Excelente) / Enviar Questionário'. PT success modal: 'Questionário Enviado! / Prontidão / Moderado / Recomendações: / Considere melhorar sua higiene do sono / Finalizar'.",
+  "rca of the issue": "Prior bug: form used device locale. Fix confirmed working: /athlete-token now passes lang=<coach language> as route param to /athlete-wellness; tc(key)=i18n.t(key,{locale: coachLang}) forces coach language. Backend /token/submit builds recommendations in token language."
+}

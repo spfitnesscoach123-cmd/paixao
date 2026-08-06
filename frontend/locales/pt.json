@@ -217,7 +217,17 @@
     "physicalMentalState": "Estado Físico e Mental",
     "sleepHydration": "Sono e Hidratação",
     "sleepHoursRequired": "Por favor, preencha as horas de sono",
-    "scoresAutoCalculated": "Os scores de Wellness e Prontidão serão calculados automaticamente"
+    "scoresAutoCalculated": "Os scores de Wellness e Prontidão serão calculados automaticamente",
+    "fillToMonitor": "Preencha para monitorar sua recuperação",
+    "selectAthlete": "Selecionar atleta",
+    "severe": "Muita",
+    "optimal": "Ótimo",
+    "moderate": "Moderado",
+    "low": "Baixo",
+    "finish": "Finalizar",
+    "pleaseSelectName": "Por favor, selecione seu nome",
+    "alreadyAnswered": "Você já respondeu este questionário.",
+    "submitError": "Erro ao enviar questionário"
   },
   "assessments": {
     "title": "Avaliações",
