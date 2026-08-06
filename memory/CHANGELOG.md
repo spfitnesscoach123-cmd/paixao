@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 2026-08-06 — FIX iOS versioning (TestFlight "Invalid Version 409")
+
+**Causa raiz (análise de config):** projeto é BARE (pasta `ios/` versionada — forçada ao git apesar de estar no `.gitignore`, 20 arquivos rastreados incl. `project.pbxproj`). Com `appVersionSource: "local"`, o EAS lê a versão do projeto NATIVO, não do app.json. O `ios/LoadManagerPro/Info.plist` tinha valores LITERAIS obsoletos `CFBundleShortVersionString=1.0.98` / `CFBundleVersion=98` (e `app.json` também em 1.0.98). Logo o IPA foi compilado com a versão antiga 1.0.98 (não 1.1.6), colidindo com um (version,build) já existente no App Store Connect → **Invalid Version (409)** (Possibilidade 1 + 5: IPA contém versão antiga / config nativa sobrescreve Expo).
+
+**Correção (apenas versionamento — nada de funcionalidade/deps/bundle id/credenciais):**
+- `app.json`: version 1.0.98→**1.1.6**, ios.buildNumber 98→**116**
+- `ios/LoadManagerPro/Info.plist`: CFBundleShortVersionString 1.0.98→**1.1.6**, CFBundleVersion 98→**116**
+- `ios/LoadManagerPro.xcodeproj/project.pbxproj`: MARKETING_VERSION 1.0→**1.1.6** (Debug+Release), CURRENT_PROJECT_VERSION 1→**116** (Debug+Release)
+- `eas.json` inalterado: `appVersionSource: local` + `production.autoIncrement: true` mantidos (não alterados sem necessidade). Bundle id `com.silaspaixao.loadmanagerpro` e App ID 6758922377 preservados.
+
+**Por que resolve:** 1.1.6 é uma versão nova (nunca aceita na TF — o IPA rejeitado era 1.0.98); a regra "build maior" da Apple é por CFBundleShortVersionString, então qualquer build para 1.1.6 é fresco. Consistência local/nativo garantida.
+
+**Ação do usuário (obrigatória — não posso acessar EAS/Apple daqui):** gerar NOVO IPA (`eas build -p ios --profile production`) e submeter; NÃO reenviar o IPA rejeitado. Se o App Store Connect já tiver algum build ≥116 sob 1.1.6 (improvável), aumentar `buildNumber`. `autoIncrement` cuidará dos próximos.
+
+
 ## 2026-08-06 — BUG FIX: i18n da página pública "I'm an Athlete" (idioma segue o coach)
 
 **Causa raiz:** O formulário público do atleta (`app/athlete-wellness.tsx`) tinha os textos hardcoded em português e, onde usava `t()`, seguia o idioma do dispositivo do atleta — nunca o idioma do coach. O idioma do coach não era persistido no token nem propagado ao formulário.

@@ -2,7 +2,7 @@
   "expo": {
     "name": "LoadManager Pro",
     "slug": "loadmanager-pro-vbt",
-    "version": "1.0.98",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "loadmanager",
@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.silaspaixao.loadmanagerpro",
-      "buildNumber": "98",
+      "buildNumber": "116",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
         "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
