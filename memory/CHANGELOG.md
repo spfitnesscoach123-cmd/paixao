@@ -1,5 +1,26 @@
 # CHANGELOG
 
+## 2026-08-06 — BUG FIX: i18n da página pública "I'm an Athlete" (idioma segue o coach)
+
+**Causa raiz:** O formulário público do atleta (`app/athlete-wellness.tsx`) tinha os textos hardcoded em português e, onde usava `t()`, seguia o idioma do dispositivo do atleta — nunca o idioma do coach. O idioma do coach não era persistido no token nem propagado ao formulário.
+
+**Correção (isolada, apenas i18n — sem alterar layout/tema/valores/DB/endpoints/lógica de token):**
+- Backend `routes/wellness/routes.py` (havia um `WellnessTokenCreate` local em l.147 que sombreava o model — foi o ponto real da correção):
+  - `WellnessTokenCreate` agora aceita `language` opcional; `POST /wellness/token` persiste `language` (saneado p/ 'pt'/'en', fallback 'pt') no token.
+  - `POST /wellness/token/validate` retorna `language` (campo aditivo; APPS26 → 'pt').
+  - `POST /wellness/token/submit` gera as `recommendations` no idioma do token via `_build_recommendations(data, lang)` (display-only, valores/DB inalterados). `status` continua código ('optimal'/'moderate'/'low') traduzido no front.
+- Frontend:
+  - `generate-wellness-token.tsx`: coach envia `language: locale` ao gerar o token.
+  - `athlete-token.tsx`: após validar, navega para `/athlete-wellness` passando `lang: response.data.language`.
+  - `athlete-wellness.tsx`: `coachLang` derivado do param `lang` (fallback: locale do dispositivo); `tc(key)=i18n.t(key,{locale:coachLang})`; TODOS os textos visíveis (títulos, labels, sliders, placeholders, botões, alertas, modal de sucesso, status) usam `tc()`.
+  - `locales/pt.json` & `en.json`: novas chaves em `wellness` (fillToMonitor, selectAthlete, severe, optimal, moderate, low, finish, pleaseSelectName, alreadyAnswered, submitError).
+
+**Fallback:** idioma ausente/inválido → padrão (pt). **Backward-compat:** tokens antigos sem `language` → 'pt' (idêntico ao atual); contrato do endpoint de atletas inalterado.
+
+**Validação:** curl e2e (EN→recs inglês, PT→português, validate retorna language). Screenshot form EN OK. **testing_agent: 100% frontend, fluxos EN e PT + modal de sucesso, sem textos misturados, sem issues** (`/app/test_reports/iteration_41.json`).
+**Nota:** correção secundária — removido erro de sintaxe (bloco de estilos duplicado no fim de `athlete-wellness.tsx`); web (`output:'static'`) só renderiza o form via `/athlete-token` (deep-link direto a `/athlete-wellness` → SSR 500, pré-existente).
+
+
 ## 2026-05-29 — PDF Export: Nova seção "Speed & Metabolic Load" (estritamente aditiva)
 
 Integração do conteúdo Speed & Metabolic Load no PDF export, **sem reescrever** o fluxo existente. Auditoria primeiro, depois implementação additiva e null-safe. Header/footer/logo da LoadManager Pro **preservados**. Estilo executivo, sem emojis, sem cards coloridos.

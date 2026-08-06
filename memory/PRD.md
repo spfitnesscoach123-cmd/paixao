@@ -282,6 +282,9 @@ Constantes legadas de keywords são duplicadas em `utils/gps_session_resolver.py
 - **Speed & Metabolic / Game vs Training**: auditado — Training values SÃO calculados pelo backend; "só Jogo" era condição de DADOS (sessões de treino sem HML/MaxVel). Corrigido bug da tabela Ratio (Vel.Máx% agora Jogo/Treino/Ratio). Provado com dado de teste.
 - Dados de teste removidos (resíduo=0; 8 classificações reais preservadas). NOTA: seeds de atleta devem incluir birth_date/height/weight (Athlete model exige) — corrigido via cleanup.
 
+## Status update — 2026-08-06 (i18n do formulário público do atleta)
+- Corrigido: página pública "I'm an Athlete" (`athlete-wellness.tsx`) agora segue o idioma do COACH que gerou o token (não mais o idioma do dispositivo do atleta). Idioma persistido no token na geração, retornado no validate, propagado ao form via param `lang`, e usado nas recomendações do backend. Todos os textos + modal de sucesso traduzidos. Verificado por testing_agent (100% frontend, EN+PT). Escopo estritamente i18n; layout/tema/valores/DB/endpoints preservados.
+
 ## Status update — 2026-05-29 (PDF: seção Speed & Metabolic Load)
 - PDF Export estendido (aditivo) com nova seção **Speed & Metabolic Load** (métricas + line chart Player Load + tabela compacta Jogo vs Treino + bloco de texto RSImod vs Player Load). Ligada por padrão; marcável no modal. Header/footer/logo preservados, estilo executivo. Backward-compatible (clients sem `speed` não recebem a seção). 4 testes pytest novos PASS. Sem reescrita do fluxo existente, sem novo cálculo no backend (dados já vinham do `/dashboard/overview`).
 - Observação (fora de escopo): `GET /api/athletes` retornou 500 intermitente para 1 registro de atleta sem `birth_date` (Athlete model exige) — dado legado, não tocado por governança.
