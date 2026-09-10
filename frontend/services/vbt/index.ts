@@ -1,0 +1,111 @@
+/**
+ * VBT (Velocity Based Training) Services
+ * 
+ * This module provides barbell tracking and velocity calculation
+ * for VBT assessments using the device camera.
+ * 
+ * COMPONENTS:
+ * - barTracker: Core tracking logic, physics calculations, position processing
+ * - useBarTracking: Basic React hook (simulation/dev)
+ * - trackingProtection: 5-STAGE PROGRESSIVE VALIDATION pipeline
+ * - useProtectedBarTracking: Protected React hook for production
+ * - diagnostics: Real-time diagnostic logging for debugging
+ * - VelocityCalculator: Production-grade velocity calculation with smoothing
+ * - RepDetector: Full rep cycle detection with phase tracking
+ * - TrackingSystem: Landmark-based tracking system
+ * - RecordingPipeline: Video recording management
+ * - useMediaPipePose: MediaPipe integration hook
+ * 
+ * PROGRESSIVE VALIDATION STAGES:
+ * 1. FRAME_USABLE - Pose exists with keypoints
+ * 2. FRAME_STABLE - Enough stable frames (INDEPENDENT of tracking)
+ * 3. FRAME_TRACKABLE - Tracking point valid
+ * 4. FRAME_VALID - Movement detected
+ * 5. FRAME_COUNTABLE - Ready for rep counting
+ */
+
+export * from './barTracker';
+export * from './useBarTracking';
+export * from './trackingProtection';
+export * from './useProtectedBarTracking';
+export * from './diagnostics';
+export * from './recordingController';
+
+// New production modules
+export * from './VelocityCalculator';
+export * from './RepDetector';
+export * from './TrackingSystem';
+export * from './RecordingPipeline';
+export * from './useMediaPipePose';
+
+// Re-export types
+export type {
+  BarPosition,
+  VelocityData,
+  CameraCalibration,
+  TrackerConfig,
+} from './barTracker';
+
+export type {
+  BarTrackingConfig,
+  RepData,
+  BarTrackingResult,
+} from './useBarTracking';
+
+export type {
+  Keypoint,
+  PoseData,
+  TrackingPoint,
+  TrackingState,
+  ValidationStage,
+  ValidationFlags,
+  ProtectionConfig,
+  ProtectionResult,
+} from './trackingProtection';
+
+export type {
+  ProtectedTrackingConfig,
+  ProtectedRepData,
+  ProtectedTrackingResult,
+} from './useProtectedBarTracking';
+
+export type {
+  VBTDiagnosticFrame,
+  BlockingDiagnosis,
+  LayerStatus,
+} from './diagnostics';
+
+// New production types
+export type {
+  VelocityPosition,
+  VelocityResult,
+  VelocityCalibration,
+  VelocityCalculatorConfig,
+} from './VelocityCalculator';
+
+export type {
+  RepPhase,
+  RepData as RepDetectorRepData,
+  RepDetectorConfig,
+  RepDetectorResult,
+} from './RepDetector';
+
+export type {
+  TrackingConfig,
+  TrackedLandmark,
+  TrackingResult,
+  TrackingSystemState,
+} from './TrackingSystem';
+
+export type {
+  RecordingState,
+  RecordingConfig,
+  RecordingResult,
+  RecordingPipelineState,
+  RecordingCallbacks,
+} from './RecordingPipeline';
+
+export type {
+  MediaPipePoseConfig,
+  MediaPipePoseResult,
+} from './useMediaPipePose';

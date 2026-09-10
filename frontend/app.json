@@ -1,0 +1,89 @@
+{
+  "expo": {
+    "name": "LoadManager Pro",
+    "slug": "loadmanager-pro-vbt",
+    "version": "1.0.29",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "loadmanager",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "jsEngine": "jsc",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.loadmanager.app",
+      "buildNumber": "29",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Escolha fotos dos atletas",
+        "NSCameraUsageDescription": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
+        "NSMicrophoneUsageDescription": "Necessário para captura de vídeo do VBT."
+      }
+    },
+    "android": {
+      "package": "com.loadmanager.app",
+      "versionCode": 29,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#000F1F"
+      },
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-image.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT.",
+          "microphonePermission": "Necessário para captura de vídeo do VBT.",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Escolha fotos dos atletas",
+          "cameraPermission": "Precisamos acessar a câmera para capturar dados do VBT."
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Precisamos acessar a câmera para capturar dados do VBT e detecção de pose.",
+          "enableMicrophonePermission": false,
+          "enableLocation": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f4714b6a-260d-41fa-9c24-a4e0e6f28b6d"
+      }
+    },
+    "owner": "paixaofit"
+  }
+}
