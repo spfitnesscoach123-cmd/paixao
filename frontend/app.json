@@ -7,8 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "loadmanager",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "jsEngine": "jsc",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.loadmanager.app",
@@ -26,7 +24,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000F1F"
       },
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -73,7 +70,14 @@
           "enableMicrophonePermission": false,
           "enableLocation": false
         }
-      ]
+      ],
+      "expo-font",
+      "expo-image",
+      "expo-localization",
+      "expo-secure-store",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

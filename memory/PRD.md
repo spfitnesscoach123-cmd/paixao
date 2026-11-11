@@ -168,4 +168,31 @@ Português (Brazilian Portuguese)
 
 ## Known Issues
 - EAS Project slug conflict needs resolution
-- Some package version warnings (non-blocking)
+
+---
+
+## Tech Stack Updates
+
+### December 2025 - Expo SDK 58 Upgrade
+**Previous**: Expo SDK 54, React Native 0.81.5, React 19.1.0
+**Current**: Expo SDK 58, React Native 0.88.1, React 19.3.0
+
+**Changes Made**:
+1. Updated all expo packages to SDK 58 compatible versions
+2. Removed deprecated `newArchEnabled` (now default in SDK 58)
+3. Removed deprecated `jsEngine` (Hermes is default)
+4. Removed deprecated `edgeToEdgeEnabled` (now default)
+5. Removed duplicate lock file (package-lock.json)
+6. Removed native folders (ios/android) for CNG compatibility
+
+**Breaking Changes Handled**:
+- React Native 0.88 strict TypeScript API
+- Scene-based lifecycle for iOS
+- Expo Router changes for web output
+
+---
+
+## Version History
+- **1.1.7**: Expo SDK 58 upgrade, icon fix, version format fix
+- **1.1.6**: Previous build (corrupted due to power outage)
+- **1.0.28**: Last stable version before issues
