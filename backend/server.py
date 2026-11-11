@@ -4204,19 +4204,19 @@ async def get_comprehensive_analysis(
     try:
         acwr = await get_acwr_analysis(athlete_id, lang, current_user)
         result.acwr = acwr
-    except:
+    except Exception:
         pass
     
     try:
         fatigue = await get_fatigue_analysis(athlete_id, lang, current_user)
         result.fatigue = fatigue
-    except:
+    except Exception:
         pass
     
     try:
         insights = await get_ai_insights(athlete_id, lang, current_user)
         result.ai_insights = insights
-    except:
+    except Exception:
         pass
     
     return result
@@ -4384,10 +4384,10 @@ def classify_rsi(rsi: float) -> str:
 
 def get_fatigue_status(rsi_variation_percent: float) -> dict:
     """Get fatigue status based on RSI variation from baseline"""
-    for status, thresholds in FATIGUE_RSI_THRESHOLDS.items():
+    for fatigue_status, thresholds in FATIGUE_RSI_THRESHOLDS.items():
         if thresholds["min"] <= rsi_variation_percent <= thresholds["max"]:
             return {
-                "status": status,
+                "status": fatigue_status,
                 "status_pt": thresholds["status_pt"],
                 "status_en": thresholds["status_en"],
                 "color": thresholds["color"]
@@ -5400,7 +5400,7 @@ async def get_scientific_analysis(
         }
         if acwr_result.overall_risk in ["high", "moderate"]:
             injury_risk_factors.append(f"ACWR em nível {acwr_result.overall_risk}" if lang == "pt" else f"ACWR at {acwr_result.overall_risk} level")
-    except:
+    except Exception:
         pass
     
     # 3. Wellness Summary
@@ -6782,7 +6782,7 @@ async def get_team_dashboard(
             global_sessions_total.add(session_key)
             if record_date >= seven_days_ago:
                 global_sessions_7d.add(session_key)
-        except:
+        except Exception:
             continue
     
     # Total sessions count is now global (1 CSV = 1 session)
@@ -6869,7 +6869,7 @@ async def get_team_dashboard(
             for record in gps_data:
                 try:
                     record_date = datetime.strptime(record["date"], "%Y-%m-%d")
-                except:
+                except Exception:
                     continue
                     
                 dist = record.get("total_distance", 0)
@@ -9046,7 +9046,7 @@ async def delete_jump(
 
 
 @api_router.get("/jumps/analysis/{athlete_id}")
-async def get_jump_analysis(
+async def get_jump_analysis_v2(
     athlete_id: str,
     current_user: dict = Depends(get_current_user)
 ):

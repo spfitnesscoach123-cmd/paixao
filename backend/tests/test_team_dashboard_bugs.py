@@ -48,7 +48,7 @@ class TestTeamDashboardBugFixes:
         for athlete_id in self.created_athletes:
             try:
                 self.session.delete(f"{BASE_URL}/api/athletes/{athlete_id}")
-            except:
+            except Exception:
                 pass
     
     def test_position_summary_structure(self):
@@ -309,7 +309,7 @@ class TestWellnessColorLogic:
         for athlete_id in self.created_athletes:
             try:
                 self.session.delete(f"{BASE_URL}/api/athletes/{athlete_id}")
-            except:
+            except Exception:
                 pass
     
     def test_wellness_data_structure(self):
@@ -379,7 +379,7 @@ class TestDecimalInputForVelocity:
         for athlete_id in self.created_athletes:
             try:
                 self.session.delete(f"{BASE_URL}/api/athletes/{athlete_id}")
-            except:
+            except Exception:
                 pass
     
     def test_vbt_decimal_velocity_input(self):

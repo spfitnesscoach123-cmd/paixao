@@ -118,11 +118,11 @@ class BaseMapper(ABC):
         # Apply type-specific transformations
         expected_type = self.CANONICAL_FIELDS.get(field)
         
-        if expected_type == float:
+        if expected_type is float:
             return self._to_float(value)
-        elif expected_type == int:
+        elif expected_type is int:
             return self._to_int(value)
-        elif expected_type == datetime:
+        elif expected_type is datetime:
             return self._to_datetime(value)
         
         return value

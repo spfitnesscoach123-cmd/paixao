@@ -257,7 +257,7 @@ class GenericMapper(BaseMapper):
                     try:
                         combined = f"{date_val.strip()} {time_val.strip()}"
                         result['jump_date'] = combined
-                    except:
+                    except Exception:
                         pass
             
             # Remove the separate time field
